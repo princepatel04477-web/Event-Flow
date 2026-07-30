@@ -1,0 +1,395 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+---
+
+## 1. What this project is
+
+A multi-tenant event operations platform for a large Indian wedding, replacing Excel
+sheets, Google Forms, manual calling records, and manual room/hamper/logistics tracking.
+
+- **Scale:** ~238 family groups, ~465 guests (from `CALLING_MASTER_LIST.xlsx`)
+- **Users:** 10–20 event staff on cheap Android phones, plus the client (read-only)
+- **Hard deadline:** submission by **26 August 2026**
+- **Who writes the code:** Prince, driving Claude Code. Assume the human is a competent
+  web developer with **no prior mobile app experience**.
+
+---
+
+## 2. Repository state
+
+**This repo currently contains SQL only. The application has not been scaffolded yet.**
+
+```
+CLAUDE.md
+SCHEMA_GUIDE.md
+20260731000100_foundation.sql          extensions, enums, tenancy, helpers, audit
+20260731000200_guests_rsvp.sql         guest_groups, guests, travel_legs, call chain
+20260731000300_rooms_deliverables.sql  hotels, rooms, assignments, deliverables, proofs
+20260731000400_logistics_messaging.sql vehicles, trips, messages, import batches
+20260731000500_rls.sql                 all RLS policies + storage buckets
+20260731000600_views_rpc.sql           4 views + 3 RPCs
+20260731000700_seed.sql                vehicle types + message templates
+test_security.sql                      8 security tests
+```
+
+Facts a new session needs before touching anything:
+
+- **No `package.json`, no `supabase/` directory, no Next.js app.** The next code written
+  here is the first application code in the project.
+- **Not a git repository.** `git init` is still pending, despite §14 saying to commit each session.
+- **Migrations live at the repo root, not in `supabase/migrations/`.** They must be moved
+  there (or copied) before `supabase db push` will see them.
+- **`CALLING_MASTER_LIST.xlsx` is not in the repo.** `p1c` needs it; ask for it before starting.
+- **The migrations have not been applied to the live Supabase project.** They were applied
+  and tested against a separate Postgres instance. See §3.
+
+---
+
+## 3. Commands
+
+There is no global `supabase` binary on this machine — **always invoke it through `npx`.**
+
+```bash
+npx supabase --version
+npx supabase projects list          # confirms which account is logged in
+npx supabase orgs list
+```
+
+Supabase project (cloud):
+
+| | |
+|---|---|
+| Project | EventFlow |
+| Ref | `xktxnkuzplhzxkevwrcj` |
+| Org | Varunya Technologies (`cuwsovksnpfsoaonyteg`) |
+| Region | ap-northeast-2 |
+| Postgres | **17.6.1.155** — note, not 16 |
+| Linked | **no** |
+
+First-time setup, not yet done:
+
+```bash
+npx supabase init
+npx supabase link --project-ref xktxnkuzplhzxkevwrcj
+mkdir -p supabase/migrations && mv 2026*.sql supabase/migrations/
+npx supabase db push
+```
+
+Running the security suite — `test_security.sql` is written for a **scratch database**. It
+creates two events and four users and asserts against them. Do not run it against a database
+holding real guest data.
+
+```bash
+npx supabase db reset                              # local stack, wipes and replays migrations
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f test_security.sql
+```
+
+Once the Next.js app exists, record its `dev` / `build` / `lint` / `test` commands here —
+this section is the first place a new session looks.
+
+---
+
+## 4. Stack (locked — do not re-litigate)
+
+| Layer | Choice |
+|---|---|
+| Frontend | Next.js (App Router) + TypeScript + Tailwind |
+| Backend | Supabase (Postgres, Auth, Storage, Edge Functions, Realtime) |
+| Mobile | PWA first, then **Capacitor** wrap into an APK — **not** Expo, **not** React Native |
+| Distribution | APK sent to staff over WhatsApp. **No Play Store submission.** |
+| Excel | SheetJS. Import + export only. Postgres is truth, Excel is an interface. |
+| STT | Sarvam Saarika or Google STT v2 (gu-IN + hi-IN + en-IN) |
+| Extraction | Claude → strict JSON with per-field confidence |
+
+Capacitor was chosen over Expo specifically because it wraps the existing Next.js web app,
+so almost nothing new has to be learned under deadline pressure.
+
+---
+
+## 5. Non-negotiable architectural rules
+
+Enforced at the **database level**, not in application code. Do not weaken them.
+
+1. **Every table is fenced by `event_id`.** RLS uses `app.is_staff(event_id)`. Child tables
+   use composite foreign keys `(child_id, event_id)` referencing a `unique (id, event_id)`
+   on the parent — so a row physically cannot point at a parent in a different event.
+2. **`delivery_proofs` are insert-only.** No update policy, no delete policy,
+   `revoke update, delete ... from authenticated`, plus `app.block_mutation()` triggers on
+   both. The triggers are unconditional, so **not even an admin or the service role can
+   delete one.**
+3. **Server clock only.** `app.force_server_recorded_at()` overwrites `recorded_at` with
+   `now()` on every insert to `delivery_proofs` and `call_recordings`. The phone's claim is
+   kept in `device_captured_at`, marked untrusted. `call_attempts` uses
+   `app.force_server_started_at()`, which moves the submitted value into `device_started_at`
+   and stamps `started_at` from the server.
+4. **`call_attempts` is append-only with one-shot completion.** Not fully insert-only —
+   UPDATE is permitted so a caller can write `ended_at` and `outcome` when the call finishes.
+   The moment `outcome` goes from null to non-null, `app.guard_call_attempt()` stamps
+   `finalized_at` and the row freezes permanently. Identity columns (`id`, `event_id`,
+   `group_id`, `caller_id`, `dialed_number`, `started_at`) are force-restored to their old
+   values on every update. DELETE is blocked by trigger and revoked grant.
+   **Attempt count is `count(*)`, never a stored counter** — stored counters drift.
+5. **Audit logging via triggers**, not application code. `app.attach_standard_triggers()`
+   attaches an audit trigger, plus a `touch_updated_at` trigger where an `updated_at` column
+   exists. Coverage is **not universal** — see §10.
+6. **Excel import is idempotent.** `guest_groups.source_row_hash` is unique per event via a
+   partial index. Re-running the same file changes nothing. Exported rows carry hidden ids
+   so a re-import matches instead of duplicating.
+7. **Offline-first for field screens.** IndexedDB outbox queue that drains when signal
+   returns. Venue Wi-Fi will fail.
+8. **The review screen is non-negotiable.** Transcripts and extractions are *evidence*;
+   only a human-reviewed commit becomes data. Fields below ~0.8 confidence render amber.
+   Nothing auto-writes. `apply_rsvp_extraction()` is the only path from AI output into
+   guest data.
+
+---
+
+## 6. Domain model decisions (settled — build against these)
+
+- **The calling unit is the group, not the guest.** You dial one number and the family head
+  answers for six people. PAX lives on `guest_groups` (`expected_pax` / `confirmed_pax`),
+  not scattered across individual guests. The SRS contradicts itself here; the group wins.
+- **Individual member names are collected later**, at room allocation — not over the phone.
+- **Hampers and return gifts are the same shape.** One `deliverables` table with a `kind`
+  enum, one insert-only `delivery_proofs` table. Do not build it twice.
+- **Groups are locked to a caller for 15 minutes** on open (`claim_group()` defaults to
+  `p_minutes => 15`). With a 10-person calling team, two people *will* dial the same uncle.
+- **`travel_legs` holds arrival and departure in one table**, so arrivals-vs-departures
+  reconciliation is one query (`v_travel_ledger`).
+- **Fleet is live inventory and capacities are luggage-adjusted.** The sticker number lies:
+  traveller 17→14, 20→17, 24→20, 33→29. Buses seeded at 30 and 50 — **placeholder, unconfirmed.**
+- **Vehicle suggestion is advisory.** Greedy PAX fit, always human-overridable.
+- **No custom dialer.** `tel:` deep link + one-tap outcome logging
+  (Confirmed / Declined / No answer / Callback / Wrong number).
+
+---
+
+## 7. Roles and access model
+
+Exactly three roles. There is no fourth role and no global "see everything" switch except
+`profiles.global_role = 'admin'`.
+
+| | admin | event_team | client |
+|---|---|---|---|
+| Scope | every event | one event | one event |
+| Base tables | read + write + delete | read + insert + update | **nothing** |
+| Views | all | staff views | `client_guest_profiles` only |
+| Can see other events exist? | yes | no | no |
+| Can delete anything? | yes (except proofs) | no | no |
+
+A client login querying `guest_groups` gets **zero rows**, not an error.
+
+Helper functions, all `security definer` so policies never recurse into RLS:
+`app.is_admin()`, `app.role_in_event(uuid)`, `app.is_staff(uuid)`, `app.is_member(uuid)`.
+`is_staff` = admin or `event_team` on that event. `is_member` = staff or client.
+
+Bootstrapping the first admin relies on `auth.uid()` being null from the SQL editor or a
+service-role key — `app.guard_profile_role()` short-circuits in that case. Through the app,
+only an admin can change `global_role`.
+
+---
+
+## 8. Table map
+
+**Tenancy** — `events`, `profiles`, `event_members`, `audit_log`
+
+**RSVP (Phase 1)** — `guest_groups`, `guests`, `travel_legs`,
+`call_attempts` → `call_recordings` → `transcripts` → `rsvp_extractions`
+
+**Rooms** — `hotels`, `rooms`, `room_assignments`
+
+**Hampers / return gifts** — `deliverables`, `delivery_proofs`
+
+**Logistics** — `vehicle_types`, `vehicles`, `trips`, `trip_passengers`
+
+**Messaging / import** — `message_templates`, `messages`, `import_batches`, `import_rows`
+
+**Views** — `client_guest_profiles`, `v_rsvp_queue`, `v_travel_ledger`, `v_event_dashboard`
+
+**RPCs** — `claim_group()`, `release_group()`, `apply_rsvp_extraction()`
+
+`client_guest_profiles` is `security_invoker = false` — it runs as owner and **bypasses
+base-table RLS**. Its `where app.is_member(g.event_id)` clause is the only fence. Treat any
+edit to that view as a security change. The other three views are `security_invoker = true`,
+so normal staff RLS applies and a client login sees nothing through them.
+
+---
+
+## 9. The RSVP capture pipeline
+
+```
+tel: dial → call recording (native Capacitor module) or post-call voice note
+  → IndexedDB queue → Supabase Storage
+  → Edge fn: STT (gu-IN + hi-IN + en-IN)
+  → Edge fn: Claude → strict JSON + per-field confidence
+  → REVIEW SCREEN  ← human confirms
+  → apply_rsvp_extraction()  ← the only write path
+  → Excel export
+```
+
+Extraction contract:
+
+```json
+{
+  "rsvp_status": "confirmed|declined|tentative|callback|unreachable",
+  "confirmed_pax": 6,
+  "arrival":   {"date":"2026-12-20","time":"10:30","mode":"air",
+                "reference":"6E 5074","point":"Ahmedabad T2"},
+  "departure": {"date":null,"time":null,"mode":null,"reference":null,"point":null},
+  "special_requests": "wheelchair for mother",
+  "language": "gu",
+  "confidence": {"rsvp_status":0.95,"confirmed_pax":0.88,"arrival.date":0.71}
+}
+```
+
+**The payload the review screen sends to `apply_rsvp_extraction()` is not this shape.** The
+RPC reads exactly these top-level keys and ignores everything else:
+
+| RPC reads | Writes to |
+|---|---|
+| `rsvp_status` | `guest_groups.rsvp_status` |
+| `confirmed_pax` | `guest_groups.confirmed_pax` |
+| `side` | `guest_groups.side` |
+| `remarks` | `guest_groups.remarks` |
+| `arrival` / `departure` objects, keys `mode` `date` `time` `reference` `point` `pax` | `travel_legs` |
+
+So `special_requests` must be mapped to **`remarks`**, `arrival.pax` is `pax` (not
+`pax_on_leg`), and `language` / `confidence` are ignored by the RPC — persist those on the
+`rsvp_extractions` row instead. Every field uses `coalesce(new, existing)`, so omitting a key
+leaves the current value alone; there is no way to null a field out through this RPC.
+
+Feed the group's **existing record** into the prompt as context — that is what resolves
+"same as last time", "do divas pehla", DD/MM ordering, and "saade das" → 10:30.
+Instruct the model to emit `null` rather than guess, especially on flight numbers.
+A hallucinated PNR is worse than a blank.
+
+---
+
+## 10. Where the schema differs from what you'd assume
+
+Verified against the migrations. Do not go looking for things in this list — they aren't there.
+
+- **Room double-booking is *not* prevented by an `EXCLUDE` constraint.** There is no
+  `btree_gist`, no `stay_range` column, no exclusion constraint anywhere. What exists is
+  `app.guard_room_capacity()`, a `before insert or update` trigger that counts active
+  assignments and raises `23514` if occupancy would exceed `rooms.capacity`, bypassable with
+  `is_override = true` plus a non-null `override_reason`. Plus a partial unique index
+  `room_assignments_one_active_per_guest on (guest_id) where released_at is null`, so one
+  guest cannot hold two active rooms. **Date ranges are not considered at all** —
+  `check_in_date` / `check_out_date` are informational. Two guests in the same room on
+  non-overlapping dates still both count against capacity. If true date-range exclusion is
+  wanted, it is new work.
+- **There is no "disputed proof" mechanism.** `delivery_proofs` has no `disputed` column and
+  no admin flow to mark one. The row is genuinely immutable. Building this means a new
+  sibling table — do not add a column to `delivery_proofs`.
+- **There are no `desk` or `hamper` roles.** `app.event_role` is exactly
+  `('event_team', 'client')`. A finer field-staff split needs an enum value plus new RLS, and
+  every existing `app.is_staff()` call would need revisiting.
+- **Audit trigger coverage is not universal.** Attached to: `events`, `profiles`,
+  `event_members`, `guest_groups`, `guests`, `travel_legs`, `call_attempts`,
+  `call_recordings`, `rsvp_extractions`, `hotels`, `rooms`, `room_assignments`,
+  `deliverables`, `vehicle_types`, `vehicles`, `trips`, `message_templates`, and
+  `delivery_proofs` (insert only). **Missing on:** `transcripts`, `trip_passengers`,
+  `messages`, `import_batches`, `import_rows`.
+- **`apply_rsvp_extraction()` updates only the oldest leg per direction** — it selects
+  `order by created_at limit 1`. A group with two arrival legs will never see the second one
+  updated through the RPC.
+- **`apply_rsvp_extraction()` blocks re-applying `accepted` only.** A `rejected` or
+  `superseded` extraction can still be applied.
+- **`rooms` is `unique (hotel_id, room_number)`**, not `(event_id, hotel_id, room_number)` —
+  safe, because `hotel_id` is already event-fenced.
+- **`guests` allows at most one head per group** via `guests_single_head_per_group on
+  (group_id) where is_head`.
+- **`deliverables_one_per_group_kind`** is `on (group_id, kind) where guest_id is null` —
+  group-level hampers are unique per kind, per-guest ones are not constrained.
+- **`trips.seats_used` is maintained by trigger** (`app.recount_trip_seats()`). Never write
+  it from application code.
+- **Storage buckets `call-recordings` and `delivery-proofs` are created by migration 0500**,
+  both private, with select + insert policies only. No update, no delete, deliberately.
+
+---
+
+## 11. Current status (as of 31 July 2026)
+
+**Done**
+- `p1a` — Database schema, RLS, audit triggers. 7 migrations, ~1,663 lines, applied clean on
+  Postgres 16. Schema covers **all 19 SRS sections**, not just Phase 1 — `event_id` was put
+  everywhere up front deliberately, because retrofitting tenancy in week three kills deadlines.
+- `p1b` — `test_security.sql`, 8 tests passing: cross-event insert blocked, client sees
+  nothing in base tables, phone claiming 2020 gets stamped with real server time, room
+  capacity guard fires, two callers can't lock the same group.
+
+Both were verified against a Postgres 16 instance. **Neither has been applied to the live
+EventFlow project**, which runs Postgres 17 — re-run `test_security.sql` there after the
+first `db push`.
+
+**Next up**
+- `p1c` — **Excel import from `CALLING_MASTER_LIST.xlsx`.** Column mapper, mobile
+  normalisation (+91 → last 10), idempotent by row hash. This is the line that turns an
+  empty database into 238 real families.
+- Then: `p1d` auth/event switching/role routing → `p1e` calling queue → `p1f` call screen →
+  `p1g` native call-recording module → `p1h` upload/transcribe/extract → `p1i` review screen →
+  `p1j` Excel export.
+
+**Later phases:** 2 Rooms · 3 Hampers & return gifts · 4 Logistics & departure ·
+5 Ship (WhatsApp, admin dashboard, APK, dry run, training).
+
+---
+
+## 12. Known traps (learned the hard way — do not rediscover these)
+
+- **Storage paths must start with the event id.** Bucket policies read the first folder
+  segment as the tenant key and cast it to uuid:
+  `delivery-proofs/{event_id}/{deliverable_id}/{uuid}.jpg`,
+  `call-recordings/{event_id}/{group_id}/{uuid}.m4a`. Wrong path → rejected upload.
+- **Excel import must create a `guests` row for the family head**, not just a `guest_groups`
+  row. `client_guest_profiles` reads from `guests`; heads-only groups render blank.
+- **`tel:` backgrounds the browser and Android may discard page state.** Write the
+  `call_attempts` row with `started_at` **before** the dial fires, keep the id in
+  `sessionStorage`, rehydrate on resume. The flow is *resume-first*, not *continue-first*.
+  Remember the row freezes once `outcome` is set — write it once, at the end.
+- **Real Excel is messy:** merged family rows, `"4th"` vs `"4TH"`, mobile numbers stored as
+  decimals, `"Not Coming"` / `"Not Sure"` buried in a remarks column, blank rows. Import
+  must show a **preview with a warning list** before it writes anything.
+- **No browser can record a live phone call.** OS-level restriction, not a coding problem.
+  It is why the native Capacitor module exists.
+- **`delivery_proofs` insert requires `captured_by = auth.uid()`** in the RLS check. Setting
+  it to anyone else fails, even for an admin.
+
+---
+
+## 13. Open questions
+
+1. **Call recording on Android 13+ is untested.** Restricted on many devices. This is the
+   only open item that can change the *shape* of Phase 1 rather than just its schedule.
+   Twenty minutes on one real team phone settles it. Everything else was deliberately built
+   not to depend on the answer.
+2. **Bus luggage-adjusted capacity unconfirmed.** Sticker sizes are 34 and 56; seeded 30 and
+   50 as guesses. Needs the real numbers before the first dispatch.
+
+---
+
+## 14. Working rules for Claude Code sessions
+
+- Start each session by pasting the current task's goal and its **definition of done**.
+- End each session by committing to Git **and testing on a real Android phone**, not the
+  laptop browser.
+- Record every non-obvious decision in `DECISIONS.md` as it is made.
+- If a task isn't finished, **simplify it on the spot** rather than borrowing from the next one.
+- Mobile-first always: base font 16px, tap targets ≥44px, sticky header, works on a cheap
+  Android phone on bad venue Wi-Fi.
+- After feature freeze, the answer to every "can we also add…" is "after the event."
+
+---
+
+## 15. Scope cuts, in order, if time runs short
+
+1. Departure dashboard
+2. Excel export
+3. WhatsApp templates beyond three (RSVP request, room + arrival confirmation, logistics detail)
+4. Dashboard counters beyond eight
+5. Vehicle *recommendation* (vehicle *assignment* is a must-have)
+
+**Never cut:** import preview · check-in · hamper photo proof · realtime sync · the review screen.
