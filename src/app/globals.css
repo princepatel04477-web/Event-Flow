@@ -1,26 +1,188 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ====================================================================
+   EventFlow tokens
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+   Field software, not a dashboard: high contrast, 16px base, big touch
+   targets, readable outdoors on a cheap Android screen. Light and dark
+   follow the OS — staff will not go hunting for a theme toggle at 11pm
+   in a banquet hall.
+
+   Tailwind v4 is CSS-first. There is no tailwind.config.js and there
+   must not be one.
+   ==================================================================== */
+
+:root {
+  color-scheme: light;
+
+  --ef-bg: #f4f4f5;
+  --ef-surface: #ffffff;
+  --ef-surface-2: #ececee;
+  --ef-fg: #18181b;
+  --ef-muted: #52525b;
+  --ef-subtle: #71717a;
+  --ef-border: #d4d4d8;
+  --ef-border-strong: #a1a1aa;
+
+  --ef-brand: #4338ca;
+  --ef-brand-hover: #3730a3;
+  --ef-brand-fg: #ffffff;
+
+  --ef-danger: #b91c1c;
+  --ef-danger-hover: #991b1b;
+  --ef-danger-fg: #ffffff;
+
+  --ef-success: #15803d;
+  --ef-warning: #b45309;
+  --ef-info: #0369a1;
+
+  --ef-tint-neutral: #e4e4e7;
+  --ef-tint-success: #dcfce7;
+  --ef-tint-warning: #fef3c7;
+  --ef-tint-danger: #fee2e2;
+  --ef-tint-info: #e0f2fe;
+
+  --ef-ring: #4338ca;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: dark;
+
+    --ef-bg: #09090b;
+    --ef-surface: #18181b;
+    --ef-surface-2: #27272a;
+    --ef-fg: #fafafa;
+    --ef-muted: #a1a1aa;
+    --ef-subtle: #8f8f98;
+    --ef-border: #3f3f46;
+    --ef-border-strong: #52525b;
+
+    --ef-brand: #6366f1;
+    --ef-brand-hover: #818cf8;
+    --ef-brand-fg: #0b0b14;
+
+    --ef-danger: #dc2626;
+    --ef-danger-hover: #ef4444;
+    --ef-danger-fg: #ffffff;
+
+    --ef-success: #4ade80;
+    --ef-warning: #fbbf24;
+    --ef-info: #38bdf8;
+
+    --ef-tint-neutral: #27272a;
+    --ef-tint-success: #12331f;
+    --ef-tint-warning: #3a2a0a;
+    --ef-tint-danger: #3b1414;
+    --ef-tint-info: #0b2b3d;
+
+    --ef-ring: #818cf8;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --color-bg: var(--ef-bg);
+  --color-surface: var(--ef-surface);
+  --color-surface-2: var(--ef-surface-2);
+  --color-fg: var(--ef-fg);
+  --color-muted: var(--ef-muted);
+  --color-subtle: var(--ef-subtle);
+  --color-border: var(--ef-border);
+  --color-border-strong: var(--ef-border-strong);
+
+  --color-brand: var(--ef-brand);
+  --color-brand-hover: var(--ef-brand-hover);
+  --color-brand-fg: var(--ef-brand-fg);
+
+  --color-danger: var(--ef-danger);
+  --color-danger-hover: var(--ef-danger-hover);
+  --color-danger-fg: var(--ef-danger-fg);
+
+  --color-success: var(--ef-success);
+  --color-warning: var(--ef-warning);
+  --color-info: var(--ef-info);
+
+  --color-tint-neutral: var(--ef-tint-neutral);
+  --color-tint-success: var(--ef-tint-success);
+  --color-tint-warning: var(--ef-tint-warning);
+  --color-tint-danger: var(--ef-tint-danger);
+  --color-tint-info: var(--ef-tint-info);
+
+  --color-ring: var(--ef-ring);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@layer base {
+  /* Tailwind v4 defaults `border` to currentColor. Put it back to the
+     token so a stray `border` never draws in the text colour. */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--ef-border);
+  }
+
+  html {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--ef-bg);
+    color: var(--ef-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  /* Anything under 16px makes iOS Safari zoom the whole page on focus,
+     and the staff never get it back. Controls inherit, always. */
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ef-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Safe-area helpers — the app ships as an APK with viewport-fit=cover,
+   so notches and gesture bars are real. */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility px-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+@utility mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Bottom padding that clears the fixed tab bar plus the gesture bar. */
+@utility pb-nav {
+  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Kill the 300ms grey flash on Android taps. */
+@utility tap {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }

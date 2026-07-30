@@ -1,0 +1,88 @@
+'use client'
+
+import type { ReactNode } from 'react'
+
+import { cn } from '@/lib/utils'
+
+export interface FieldProps {
+  /** Id of the control this label points at. Input/Select/Textarea supply it. */
+  id: string
+  label?: ReactNode
+  hint?: ReactNode
+  error?: string | null
+  required?: boolean
+  className?: string
+  children: ReactNode
+}
+
+/**
+ * The label / hint / error shell shared by Input, Select and Textarea.
+ *
+ * Ids follow one convention so `aria-describedby` can be assembled without
+ * the control knowing anything: `${id}-hint` and `${id}-error`.
+ */
+export function Field({
+  id,
+  label,
+  hint,
+  error,
+  required = false,
+  className,
+  children,
+}: FieldProps) {
+  return (
+    <div className={cn('flex flex-col gap-1.5', className)}>
+      {label ? (
+        <label htmlFor={id} className="text-sm font-medium text-fg">
+          {label}
+          {required ? (
+            <span className="ml-0.5 text-danger" aria-hidden>
+              *
+            </span>
+          ) : null}
+        </label>
+      ) : null}
+
+      {children}
+
+      {hint && !error ? (
+        <p id={`${id}-hint`} className="text-sm text-muted">
+          {hint}
+        </p>
+      ) : null}
+
+      {error ? (
+        <p id={`${id}-error`} role="alert" className="text-sm font-medium text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * Shared control styling. 16px text is deliberate — smaller and iOS Safari
+ * zooms the page on focus.
+ */
+export function fieldControlClasses(hasError: boolean): string {
+  return cn(
+    'tap block w-full rounded-xl border bg-surface px-3.5 text-base text-fg',
+    'placeholder:text-subtle transition-colors',
+    'disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70',
+    hasError ? 'border-danger' : 'border-border-strong',
+  )
+}
+
+/** Builds the `aria-describedby` value for a control inside a Field. */
+export function fieldDescribedBy(
+  id: string,
+  hint: unknown,
+  error: string | null | undefined,
+): string | undefined {
+  const parts: string[] = []
+  if (hint && !error) parts.push(`${id}-hint`)
+  if (error) parts.push(`${id}-error`)
+  return parts.length > 0 ? parts.join(' ') : undefined
+}
+
+export default Field

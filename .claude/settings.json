@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe",
+            "args": [
+              "-NoProfile",
+              "-ExecutionPolicy",
+              "Bypass",
+              "-File",
+              "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\.claude\\hooks\\capture-context.ps1"
+            ],
+            "timeout": 45,
+            "statusMessage": "Capturing context to Obsidian vault"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe",
+            "args": [
+              "-NoProfile",
+              "-ExecutionPolicy",
+              "Bypass",
+              "-File",
+              "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\.claude\\hooks\\capture-context.ps1"
+            ],
+            "timeout": 45,
+            "statusMessage": "Capturing context to Obsidian vault"
+          }
+        ]
+      }
+    ]
+  }
+}

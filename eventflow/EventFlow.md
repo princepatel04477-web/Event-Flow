@@ -44,6 +44,13 @@ Per-area detail: [[Guests and RSVP]] · [[Rooms and Assignments]] ·
 - [[Known Traps]] — things already learned the hard way
 - [[Open Questions]] — two unresolved items
 
+## History
+
+- [[Sessions]] — auto-captured session logs, written by a hook on compact and session end
+
+Raw history, not knowledge. Anything durable learned in a session belongs in a curated
+note above.
+
 ## The five guarantees
 
 Each is enforced in the database, not in application code. Weakening any of them in app
