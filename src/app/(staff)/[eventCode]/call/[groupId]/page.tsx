@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Badge } from '@/components/ui/Badge'
 import { ShieldAlertIcon, ClockIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
-import { getEventByCode, getViewer } from '@/lib/supabase/queries'
+import { getViewer, requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import { claimGroupForCall } from '@/lib/actions/call'
 import { formatMobile } from '@/lib/phone'
 import { formatDateTime } from '@/lib/utils'
@@ -30,9 +30,13 @@ export default async function CallGroupPage({ params }: PageProps) {
     redirect(`/login?next=${encodeURIComponent(`/${eventCode}/call/${groupId}`)}`)
   }
 
-  const event =
-    (await getEventByCode(eventCode)) ?? (await getEventByCode(eventCode.toUpperCase()))
+  const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
+
+  // Staff only, and BEFORE the claim below — claim_group() takes a
+  // 15-minute lock, so a non-staff visitor must be turned away before any
+  // side effect fires, not after it.
+  await requireStaff(event.id, event.code)
 
   // Opening this screen IS "claiming" the group for calling — claim_group()
   // is re-entrant for the same caller, so a refresh just re-confirms the

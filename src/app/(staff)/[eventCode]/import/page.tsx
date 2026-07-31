@@ -1,9 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
-import { EmptyState } from '@/components/ui/EmptyState'
-import { ShieldAlertIcon } from '@/components/icons'
-import { getEventAccess, getEventByCode } from '@/lib/supabase/queries'
+import { requireAdmin, resolveEventByCode } from '@/lib/supabase/queries'
 
 import { ImportWizard } from './_components/ImportWizard'
 
@@ -19,25 +17,23 @@ type PageProps = {
 export default async function ImportPage({ params }: PageProps) {
   const { eventCode } = await params
 
-  const event =
-    (await getEventByCode(eventCode)) ?? (await getEventByCode(eventCode.toUpperCase()))
+  const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
 
-  // The (staff) layout only checks membership, and `app.is_member()` lets a
-  // client-role account reach their event. Without this, a client login sees
-  // an import wizard whose preview reports every family as "New", because
-  // RLS returns them zero existing rows with no error. Tell them the truth
-  // before they can build a fabricated preview. RLS is still the real fence.
-  const access = await getEventAccess(event.id)
-  if (access !== 'admin' && access !== 'event_team') {
-    return (
-      <EmptyState
-        icon={<ShieldAlertIcon className="h-7 w-7" />}
-        title="Import is for event staff"
-        description="Your account is on this event as a client, so the guest list is invisible to it — any preview built here would be wrong rather than empty. Ask an admin to add you as event_team if you need to import."
-      />
-    )
-  }
+  // Import is admin-only. Two separate reasons, worth keeping apart:
+  //
+  // 1. Honesty. The (staff) layout only proves membership, and
+  //    `app.is_member()` is true for a client-role account. Left alone, a
+  //    client would get an import wizard whose preview calls every family
+  //    "New" — because RLS hands them zero existing rows with no error. A
+  //    fabricated preview is worse than a locked door.
+  // 2. Product. RLS would in fact let an `event_team` member insert
+  //    import_batches, import_rows and guest_groups; the human decided one
+  //    admin owns the file that turns an empty database into 238 families.
+  //    That is a restriction layered above the database, not a security
+  //    boundary — RLS remains the fence. To relax it, swap this one call for
+  //    `requireStaff` and add the Import tab back in BottomTabs. No migration.
+  await requireAdmin(event.id, event.code, 'import')
 
   return (
     <div className="flex flex-col gap-4">

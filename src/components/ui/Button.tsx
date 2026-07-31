@@ -34,6 +34,28 @@ const SIZES: Record<ButtonSize, string> = {
   lg: 'min-h-14 px-5 py-3.5 text-lg',
 }
 
+/**
+ * The button look, without the `<button>`.
+ *
+ * Exported so a navigation target can be styled as a button without anyone
+ * copying the class list into a page — a `<button>` nested in an `<a>` is
+ * invalid HTML, and a `<button>` with an onClick router.push is not a link
+ * (no middle-click, no long-press, no prefetch). See `LinkButton`.
+ */
+export function buttonClassName({
+  variant = 'primary',
+  size = 'md',
+  fullWidth = false,
+  className,
+}: {
+  variant?: ButtonVariant
+  size?: ButtonSize
+  fullWidth?: boolean
+  className?: string
+} = {}): string {
+  return cn(BASE, VARIANTS[variant], SIZES[size], fullWidth && 'w-full', className)
+}
+
 export function Button({
   variant = 'primary',
   size = 'md',

@@ -5,9 +5,14 @@ import { notFound } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
 import { Card, CardBody } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { CheckCircleIcon, ClipboardCheckIcon, ClockIcon } from '@/components/icons'
+import {
+  CheckCircleIcon,
+  ClipboardCheckIcon,
+  ClockIcon,
+  ShieldAlertIcon,
+} from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
-import { getEventByCode } from '@/lib/supabase/queries'
+import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import { RSVP_STATUS_LABELS, parseExtractionPayload } from '@/lib/review/payload'
 import { summarizeConfidence } from '@/lib/review/confidence'
 import { formatCount, formatDateTime } from '@/lib/utils'
@@ -26,20 +31,35 @@ export default async function ReviewListPage({ params, searchParams }: PageProps
   const { eventCode } = await params
   const { done } = await searchParams
 
-  const event =
-    (await getEventByCode(eventCode)) ?? (await getEventByCode(eventCode.toUpperCase()))
+  const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
+
+  // Staff only. `rsvp_extractions` is fenced by `app.is_staff(event_id)`, so
+  // a client's read is zero rows with no error — which this page would print
+  // as "Nothing waiting for review" while ten extractions sat pending.
+  await requireStaff(event.id, event.code)
 
   const supabase = await createClient()
 
-  // rsvp_extractions is staff-fenced (app.is_staff(event_id)); a client
-  // login sees zero rows here, which is correct, not a bug.
-  const { data: extractions } = await supabase
+  const { data: extractions, error } = await supabase
     .from('rsvp_extractions')
     .select('id, created_at, confidence, parsed, group_id, guest_groups(head_name, primary_mobile)')
     .eq('event_id', event.id)
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
+
+  // `extractions ?? []` alone collapses a failed read and an empty queue into
+  // one screen. Say which happened — "nothing to review" is a claim about the
+  // event, and we only earn it when the query actually came back.
+  if (error) {
+    return (
+      <EmptyState
+        icon={<ShieldAlertIcon className="h-7 w-7" />}
+        title="Could not load the review queue"
+        description="The pending extractions did not come back from the database this time. This is a load failure, not an empty queue — reload the page, and tell your admin if it keeps happening."
+      />
+    )
+  }
 
   const rows = extractions ?? []
 

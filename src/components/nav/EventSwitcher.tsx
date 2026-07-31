@@ -5,12 +5,15 @@ import { useTransition, type ChangeEvent } from 'react'
 
 import { ChevronDownIcon, SwitchIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
-import type { Membership } from '@/lib/supabase/queries'
+import { eventHomePath, type Membership } from '@/lib/events/paths'
 
 export interface EventSwitcherProps {
-  events: Pick<Membership, 'eventId' | 'eventCode' | 'eventName'>[]
+  /** Full memberships — `role` is needed to pick each event's landing page. */
+  events: Membership[]
   /** Canonical code of the event currently open. */
   currentCode: string
+  /** Admin-ness is global, not per-event, so it arrives once. */
+  isAdmin: boolean
 }
 
 /**
@@ -20,8 +23,14 @@ export interface EventSwitcherProps {
  * one-handed on a cheap Android phone, and it needs no JS to open. It is laid
  * transparently over the visible chip so the trigger keeps a 44px target
  * without fighting platform select styling.
+ *
+ * Routes through `eventHomePath()` rather than pushing `/{code}`. This is the
+ * ONLY navigation control a client-role account has — BottomTabs draws
+ * nothing for them — so hard-coding the dashboard sent the one role that
+ * cannot read it straight onto a staff screen, to be bounced off by the page
+ * guard. Same destination logic as the front door and the picker.
  */
-export function EventSwitcher({ events, currentCode }: EventSwitcherProps) {
+export function EventSwitcher({ events, currentCode, isAdmin }: EventSwitcherProps) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
 
@@ -29,8 +38,11 @@ export function EventSwitcher({ events, currentCode }: EventSwitcherProps) {
     const code = event.target.value
     if (!code || code === currentCode) return
 
+    const target = events.find((option) => option.eventCode === code)
+    if (!target) return
+
     startTransition(() => {
-      router.push(`/${code}`)
+      router.push(eventHomePath(target, isAdmin))
     })
   }
 

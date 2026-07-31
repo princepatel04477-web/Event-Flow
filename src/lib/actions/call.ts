@@ -41,6 +41,17 @@ export type ClaimGroupResult =
  * message promising the lock will release on its own. So the row is re-read
  * and the cases are told apart: a group we cannot see is `not_found`, which
  * is the honest answer for a stale id and for a client-role account alike.
+ *
+ * THE PRE-CHECK IS NOT REDUNDANT. `claim_group()` takes only `p_group_id`;
+ * it is security definer and fences on `app.is_staff(group.event_id)` — the
+ * group's OWN event, never the one in the URL. For an admin, who is staff on
+ * every event, calling it with a group id from another wedding SUCCEEDS and
+ * writes a 15-minute lock there. The `data.event_id !== eventId` test below
+ * would then 404, but the damage is done: a family in the other event is
+ * unreachable for 15 minutes and nothing on screen says why. Admins are
+ * expected to hold two events open in two tabs, so a pasted URL crossing
+ * them is a normal accident, not a contrived one. Prove the group belongs to
+ * this event first, then claim.
  */
 export async function claimGroupForCall(
   eventId: string,
@@ -48,6 +59,22 @@ export async function claimGroupForCall(
   minutes = 15,
 ): Promise<ClaimGroupResult> {
   const supabase = await createClient()
+
+  const { data: scoped, error: scopeError } = await supabase
+    .from('guest_groups')
+    .select('id')
+    .eq('id', groupId)
+    .eq('event_id', eventId)
+    .maybeSingle()
+
+  if (scopeError) {
+    return { ok: false, reason: 'error', message: friendlyDbError(scopeError) }
+  }
+  // No row = wrong event, no such group, or not staff on it. All three are
+  // "there is nothing here for you", and none of them should take a lock.
+  if (!scoped) {
+    return { ok: false, reason: 'not_found' }
+  }
 
   const { data, error } = await supabase.rpc('claim_group', {
     p_group_id: groupId,

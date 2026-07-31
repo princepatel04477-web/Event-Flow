@@ -13,42 +13,78 @@ import {
   UserIcon,
   UsersIcon,
 } from '@/components/icons'
+import { Card, CardBody } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { createClient } from '@/lib/supabase/server'
-import { getEventByCode } from '@/lib/supabase/queries'
+import {
+  requireStaff,
+  resolveEventByCode,
+  type DeniedReason,
+} from '@/lib/supabase/queries'
 import { count, formatCount } from '@/lib/utils'
 
 export const metadata: Metadata = {
   title: 'Dashboard',
 }
 
-type PageProps = {
-  // Next 15+ hands params over as a Promise.
-  params: Promise<{ eventCode: string }>
+/**
+ * Messages for `?denied=`, looked up rather than read out of the URL.
+ *
+ * `requireAdmin` bounces an event_team member here, and a bounce with no
+ * explanation reads as a broken link. The query string only ever selects a
+ * key — the sentence itself is ours, so a crafted URL cannot put words in
+ * the app's mouth.
+ */
+const DENIED_MESSAGES: Record<DeniedReason, string> = {
+  import:
+    'Importing the guest list is an admin job, so we brought you back here. Ask your event admin to run the import.',
+  admin: 'That screen is admin-only, so we brought you back here.',
 }
 
-export default async function EventDashboardPage({ params }: PageProps) {
-  const { eventCode } = await params
+function deniedMessage(value: string | undefined): string | null {
+  if (!value) return null
+  return DENIED_MESSAGES[value as DeniedReason] ?? null
+}
 
-  const event = (await getEventByCode(eventCode)) ?? (await getEventByCode(eventCode.toUpperCase()))
+type PageProps = {
+  // Next 15+ hands params and searchParams over as Promises.
+  params: Promise<{ eventCode: string }>
+  searchParams: Promise<{ denied?: string }>
+}
+
+export default async function EventDashboardPage({ params, searchParams }: PageProps) {
+  const { eventCode } = await params
+  const { denied } = await searchParams
+  const deniedNote = deniedMessage(denied)
+
+  const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
+
+  // Staff only. Without this a client renders the whole board as zeros:
+  // `v_event_dashboard` selects FROM `events`, whose RLS is
+  // `using (app.is_member(id))` — TRUE for a client — while every counter is
+  // a subquery over guest_groups / travel_legs / deliverables, all fenced by
+  // `app.is_staff()` — FALSE for a client. So the read returns ONE row of
+  // zeros, not zero rows, and the `!stats` fallback below never fires. The
+  // client would be told "Total groups 0" for a 238-family wedding.
+  await requireStaff(event.id, event.code)
 
   const supabase = await createClient()
 
-  // v_event_dashboard is security_invoker = true, so this runs under the
-  // viewer's own RLS. A client login gets zero rows here — which is the point.
-  const { data: stats } = await supabase
+  const { data: stats, error } = await supabase
     .from('v_event_dashboard')
     .select('*')
     .eq('event_id', event.id)
     .maybeSingle()
 
-  if (!stats) {
+  // Reachable only as a genuine read failure now — the guard above has
+  // already established the viewer is staff on this event.
+  if (error || !stats) {
     return (
       <EmptyState
         icon={<ShieldAlertIcon className="h-7 w-7" />}
-        title="No numbers to show"
-        description="This event has no dashboard row you can read. Usually that means your account is on the event as a client rather than as staff — ask an admin to check your role."
+        title="Could not load the numbers"
+        description="The dashboard counters did not come back from the database this time. This is a load failure, not an empty event — reload the page, and tell your admin if it keeps happening."
       />
     )
   }
@@ -57,6 +93,15 @@ export default async function EventDashboardPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {deniedNote ? (
+        <Card className="border-border-strong bg-surface-2">
+          <CardBody className="flex items-start gap-2 py-3">
+            <ShieldAlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-muted" />
+            <p className="text-sm text-fg">{deniedNote}</p>
+          </CardBody>
+        </Card>
+      ) : null}
+
       <div>
         <h2 className="text-xl font-semibold text-fg">Today at a glance</h2>
         <p className="mt-0.5 text-sm text-muted">
@@ -125,9 +170,9 @@ export default async function EventDashboardPage({ params }: PageProps) {
       </div>
 
       <p className="text-xs leading-relaxed text-subtle">
-        Counters come from <code className="font-mono">v_event_dashboard</code> and respect
-        your access. A zero here can mean &quot;nothing yet&quot; or &quot;not visible to
-        you&quot; — it never means the query failed.
+        Counters are read live from the database on every visit. A zero here means
+        nothing has been recorded yet — if a read fails you get a message instead of a
+        number, never a silent zero.
       </p>
     </div>
   )

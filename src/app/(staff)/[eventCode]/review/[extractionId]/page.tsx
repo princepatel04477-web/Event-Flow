@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 
 import { ChevronLeftIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
-import { getEventByCode } from '@/lib/supabase/queries'
+import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import {
   buildInitialFormValues,
   parseExtractionPayload,
@@ -45,9 +45,15 @@ function toExistingLeg(leg: {
 export default async function ReviewDetailPage({ params }: PageProps) {
   const { eventCode, extractionId } = await params
 
-  const event =
-    (await getEventByCode(eventCode)) ?? (await getEventByCode(eventCode.toUpperCase()))
+  const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
+
+  // Staff only, stated rather than inferred. A client used to end up here on
+  // a bare 404 by accident — because the `rsvp_extractions` read happened to
+  // return nothing under RLS. That is the right outcome for the wrong reason,
+  // and it dropped them outside the shell with no way back. Redirect them to
+  // the one page they own instead.
+  await requireStaff(event.id, event.code)
 
   const supabase = await createClient()
 

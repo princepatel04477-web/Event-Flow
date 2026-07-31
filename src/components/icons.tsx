@@ -207,3 +207,30 @@ export function SwitchIcon(props: IconProps) {
     </svg>
   )
 }
+
+export function SlidersIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 6h10" />
+      <path d="M18 6h2" />
+      <path d="M4 12h4" />
+      <path d="M12 12h8" />
+      <path d="M4 18h10" />
+      <path d="M18 18h2" />
+      <circle cx="16" cy="6" r="2" />
+      <circle cx="10" cy="12" r="2" />
+      <circle cx="16" cy="18" r="2" />
+    </svg>
+  )
+}
+
+export function RefreshIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 12a9 9 0 0 1 15.5-6.2L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-15.5 6.2L3 16" />
+      <path d="M3 21v-5h5" />
+    </svg>
+  )
+}

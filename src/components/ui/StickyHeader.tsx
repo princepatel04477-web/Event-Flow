@@ -37,7 +37,7 @@ export function StickyHeader({
         className,
       )}
     >
-      <div className="mx-auto flex w-full max-w-2xl items-center gap-2 px-3 py-2">
+      <div className="mx-auto flex w-full max-w-[480px] items-center gap-2 px-3 py-2">
         {backHref ? (
           <Link
             href={backHref}
@@ -59,7 +59,7 @@ export function StickyHeader({
       </div>
 
       {children ? (
-        <div className="mx-auto w-full max-w-2xl px-3 pb-2">{children}</div>
+        <div className="mx-auto w-full max-w-[480px] px-3 pb-2">{children}</div>
       ) : null}
     </header>
   )

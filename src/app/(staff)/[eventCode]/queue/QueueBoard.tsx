@@ -21,6 +21,15 @@ import {
 export interface QueueBoardProps {
   eventId: string
   eventCode: string
+  /**
+   * Whether to offer the "Go to import" shortcut on the empty state.
+   *
+   * The import route is admin-only, so showing this to an `event_team` member
+   * would hand them a button that bounces them off `requireAdmin` with no
+   * explanation. Resolved on the server by the page and passed down — this is
+   * a client component and must never ask Supabase who it is talking to.
+   */
+  canImport: boolean
 }
 
 type LoadState =
@@ -40,7 +49,7 @@ type LoadState =
  * subscriptions report SUBSCRIBED and then deliver nothing, forever. The
  * board still works — it just will not self-update.
  */
-export function QueueBoard({ eventId, eventCode }: QueueBoardProps) {
+export function QueueBoard({ eventId, eventCode, canImport }: QueueBoardProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -218,11 +227,17 @@ export function QueueBoard({ eventId, eventCode }: QueueBoardProps) {
           <EmptyState
             icon={<UploadIcon className="h-7 w-7" />}
             title="Nothing to call yet"
-            description="Import the guest list to fill this queue with families to call."
+            description={
+              canImport
+                ? 'Import the guest list to fill this queue with families to call.'
+                : 'The guest list has not been imported yet. An admin loads the calling list, and families appear here as soon as they do.'
+            }
             action={
-              <Button fullWidth onClick={() => router.push(`/${eventCode}/import`)}>
-                Go to import
-              </Button>
+              canImport ? (
+                <Button fullWidth onClick={() => router.push(`/${eventCode}/import`)}>
+                  Go to import
+                </Button>
+              ) : undefined
             }
           />
         )
