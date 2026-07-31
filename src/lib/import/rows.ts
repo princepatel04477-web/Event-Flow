@@ -102,10 +102,22 @@ export function buildRow(
     ? null
     : 'Head / family name is required and is blank on this row.'
 
+  // `import_rows.raw` is the ONLY permanent record of what the sheet said —
+  // that table has no audit trigger (see Schema Reality Check). So it must
+  // lose nothing: iterate the full width of headers AND cells (sheet_to_json
+  // returns ragged rows, so a stray value past the last header is real data),
+  // and disambiguate repeated header text instead of letting the last one win.
   const raw: Record<string, unknown> = {}
-  headers.forEach((h, i) => {
-    raw[h ?? `column_${i + 1}`] = row.cells[i] ?? null
-  })
+  const seenHeaders = new Map<string, number>()
+  const width = Math.max(headers.length, row.cells.length)
+
+  for (let i = 0; i < width; i++) {
+    const base = headers[i] ?? `column_${i + 1}`
+    const occurrence = (seenHeaders.get(base) ?? 0) + 1
+    seenHeaders.set(base, occurrence)
+    const key = occurrence === 1 ? base : `${base} (${occurrence})`
+    raw[key] = row.cells[i] ?? null
+  }
 
   const fields: ImportRowFields = {
     headName,

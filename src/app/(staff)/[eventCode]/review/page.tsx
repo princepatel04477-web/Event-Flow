@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getEventByCode } from '@/lib/supabase/queries'
 import { RSVP_STATUS_LABELS, parseExtractionPayload } from '@/lib/review/payload'
 import { summarizeConfidence } from '@/lib/review/confidence'
-import { formatCount } from '@/lib/utils'
+import { formatCount, formatDateTime } from '@/lib/utils'
 
 export const metadata: Metadata = {
   title: 'Review',
@@ -89,7 +89,6 @@ export default async function ReviewListPage({ params, searchParams }: PageProps
             } | null
             const parsed = parseExtractionPayload(ex.parsed)
             const { lowest, lowCount } = summarizeConfidence(ex.confidence)
-            const createdAt = new Date(ex.created_at)
 
             return (
               <li key={ex.id}>
@@ -102,12 +101,7 @@ export default async function ReviewListPage({ params, searchParams }: PageProps
                         </p>
                         <p className="mt-0.5 flex items-center gap-1 text-sm text-muted">
                           <ClockIcon className="h-4 w-4 shrink-0" />
-                          {createdAt.toLocaleString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
+                          {formatDateTime(ex.created_at)}
                         </p>
                         {parsed.rsvp_status ? (
                           <p className="mt-1 text-sm text-subtle">

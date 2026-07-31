@@ -93,6 +93,9 @@ export function ImportWizard({ eventId, eventCode }: ImportWizardProps) {
         setStepError(result.error ?? 'Import failed.')
         return
       }
+      // A run can succeed AND carry a problem — there is no transaction, so
+      // rows that landed stay landed. Always show what was written.
+      setStepError(result.partial ? (result.error ?? null) : null)
       setCommitResult(result)
       setStep('result')
     } catch (e) {
@@ -114,9 +117,12 @@ export function ImportWizard({ eventId, eventCode }: ImportWizardProps) {
   }
 
   const blockedCount = preview?.counts.blocked ?? 0
-  const importableCount = preview
-    ? preview.counts.new + preview.counts.update + preview.counts.unchanged + preview.counts.duplicate
-    : 0
+  // Only rows that will actually change the database. The merged-family
+  // CALLING_MASTER_LIST collapses 465 sheet rows onto 238 families, so
+  // counting unchanged + duplicate rows here promised writes that never
+  // happen — and made a no-op re-import indistinguishable from a real one.
+  const writeCount = preview ? preview.counts.new + preview.counts.update : 0
+  const noOpCount = preview ? preview.counts.unchanged + preview.counts.duplicate : 0
 
   return (
     <div className="flex flex-col gap-4">
@@ -177,12 +183,25 @@ export function ImportWizard({ eventId, eventCode }: ImportWizardProps) {
             <Button variant="secondary" onClick={() => setStep('map')}>
               Back to mapping
             </Button>
-            <Button fullWidth loading={committing} disabled={importableCount === 0} onClick={handleConfirmImport}>
+            <Button fullWidth loading={committing} disabled={writeCount === 0} onClick={handleConfirmImport}>
               {committing
                 ? 'Writing…'
-                : `Confirm import (${importableCount} row${importableCount === 1 ? '' : 's'})`}
+                : writeCount === 0
+                  ? 'Nothing to write'
+                  : `Confirm import (${writeCount} row${writeCount === 1 ? '' : 's'})`}
             </Button>
           </div>
+          {writeCount === 0 ? (
+            <p className="text-xs text-subtle">
+              Every family in this file already matches the database — re-importing it would
+              change nothing, so there is nothing to confirm.
+            </p>
+          ) : noOpCount > 0 ? (
+            <p className="text-xs text-subtle">
+              {noOpCount} further row{noOpCount === 1 ? '' : 's'} will be skipped: already up to
+              date, or a repeat of a family listed earlier in the same file.
+            </p>
+          ) : null}
           {blockedCount > 0 ? (
             <p className="text-xs text-subtle">
               {blockedCount} row{blockedCount === 1 ? '' : 's'} cannot be imported and will be skipped

@@ -4,44 +4,10 @@ import { revalidatePath } from 'next/cache'
 
 import { createClient } from '@/lib/supabase/server'
 import type { Json } from '@/lib/supabase/database.types'
+import { friendlyRpcError } from '@/lib/errors'
 import type { RpcPayload } from '@/lib/review/payload'
 
 export type ReviewActionResult = { ok: true } | { ok: false; error: string }
-
-type MaybePostgrestError = {
-  message?: string
-  code?: string
-}
-
-/**
- * Map raw Postgres/PostgREST failures onto sentences a reviewer can act on.
- * Never surface a raw error — a cast failure on an enum column reads like
- * gibberish to someone reviewing a phone call in a corridor.
- */
-function friendlyRpcError(error: MaybePostgrestError): string {
-  const message = (error.message ?? '').toLowerCase()
-
-  if (message.includes('already been applied')) {
-    return 'This extraction has already been applied. Refresh the review queue.'
-  }
-  if (message.includes('lock_not_available') || message.includes('locked by another')) {
-    return 'This group is locked by another caller right now. Try again shortly.'
-  }
-  if (error.code === '42501' || message.includes('not permitted')) {
-    return 'You do not have permission to apply this extraction.'
-  }
-  if (message.includes('invalid input value for enum')) {
-    return 'One of the fields has a value the database does not recognise. Check the RSVP status and side fields.'
-  }
-  if (message.includes('invalid input syntax for type integer')) {
-    return 'Confirmed pax or a leg’s pax must be a whole number.'
-  }
-  if (message.includes('fetch failed') || message.includes('network')) {
-    return 'Could not reach the server. Check your connection and try again.'
-  }
-
-  return 'Could not save this review. Try again in a moment.'
-}
 
 /**
  * Accept a reviewed extraction: apply_rsvp_extraction() is the ONLY path
@@ -98,6 +64,12 @@ export async function rejectExtraction(
     return { ok: false, error: 'Your session has expired. Sign in again and retry.' }
   }
 
+  // `.eq('status', 'pending')` is the concurrency guard, not decoration.
+  // Without it a reviewer holding a stale page could flip an extraction that
+  // another reviewer had already ACCEPTED to `rejected` — writing their own
+  // rejection notes over it while the accepted extraction's real effects
+  // stayed live in guest_groups and travel_legs. The update must only ever
+  // match a row still awaiting review.
   const { data, error } = await supabase
     .from('rsvp_extractions')
     .update({
@@ -107,18 +79,37 @@ export async function rejectExtraction(
       reviewed_at: new Date().toISOString(),
     })
     .eq('id', extractionId)
+    .eq('status', 'pending')
     .select('id')
 
   if (error) {
     return { ok: false, error: 'Could not reject this extraction. Try again.' }
   }
 
-  // event_team deletes/updates that RLS blocks return 0 rows, not an error —
-  // never read the absence of an error as success.
+  // event_team updates that RLS blocks return 0 rows, not an error — never
+  // read the absence of an error as success. Zero rows here means one of:
+  // not permitted, the extraction is gone, or (now genuinely reachable) it
+  // is no longer pending because someone else reviewed it first.
   if (!data || data.length === 0) {
+    const { data: current } = await supabase
+      .from('rsvp_extractions')
+      .select('status, reviewed_at')
+      .eq('id', extractionId)
+      .maybeSingle()
+
+    if (current && current.status !== 'pending') {
+      return {
+        ok: false,
+        error:
+          current.status === 'accepted'
+            ? 'Someone else already accepted this extraction, and accepting it applied real changes to guest data. It cannot be rejected now — refresh to see what was applied.'
+            : `Someone else already reviewed this extraction (status: ${current.status}). Refresh the review queue.`,
+      }
+    }
+
     return {
       ok: false,
-      error: 'Nothing was updated — you may not have permission, or someone else already reviewed this.',
+      error: 'Nothing was updated — you may not have permission to review this extraction.',
     }
   }
 

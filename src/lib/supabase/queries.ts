@@ -101,3 +101,49 @@ export async function getEventByCode(code: string) {
     .maybeSingle()
   return data
 }
+
+/** What `app.is_staff()` / `app.is_member()` would answer for this viewer. */
+export type EventAccess = 'admin' | 'event_team' | 'client' | 'none'
+
+/**
+ * Resolve the viewer's role on one event, computed from exactly the two
+ * inputs `app.is_staff()` uses: `profiles.global_role` and `event_members`.
+ * Both are readable-by-self under RLS, so this answer matches the database's.
+ *
+ * This exists because RLS makes "you are not staff" and "there is no data"
+ * indistinguishable at the query layer — a `client` reading `guest_groups`
+ * gets zero rows and no error. Anything that would otherwise present an
+ * empty result as fact (the import preview above all) has to ask this first.
+ *
+ * It is still NOT the authorisation boundary — RLS is. Use it to tell the
+ * user the truth, never to decide whether a write is allowed.
+ */
+export async function getEventAccess(eventId: string): Promise<EventAccess> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return 'none'
+
+  const [{ data: profile }, { data: member }] = await Promise.all([
+    supabase.from('profiles').select('global_role').eq('id', user.id).maybeSingle(),
+    supabase
+      .from('event_members')
+      .select('role')
+      .eq('event_id', eventId)
+      .eq('user_id', user.id)
+      .maybeSingle(),
+  ])
+
+  if (profile?.global_role === 'admin') return 'admin'
+  if (member?.role === 'event_team') return 'event_team'
+  if (member?.role === 'client') return 'client'
+  return 'none'
+}
+
+/** admin or event_team on this event — i.e. `app.is_staff(event_id)`. */
+export async function isEventStaff(eventId: string): Promise<boolean> {
+  const access = await getEventAccess(eventId)
+  return access === 'admin' || access === 'event_team'
+}

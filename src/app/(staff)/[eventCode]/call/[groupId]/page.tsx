@@ -8,7 +8,8 @@ import { ShieldAlertIcon, ClockIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
 import { getEventByCode, getViewer } from '@/lib/supabase/queries'
 import { claimGroupForCall } from '@/lib/actions/call'
-import { formatMobile } from '@/lib/call/phone'
+import { formatMobile } from '@/lib/phone'
+import { formatDateTime } from '@/lib/utils'
 import { CallScreen } from './CallScreen'
 
 type PageProps = {
@@ -58,10 +59,7 @@ export default async function CallGroupPage({ params }: PageProps) {
   if (claim.ok === false && claim.reason === 'locked') {
     const group = claim.group
     const untilLabel = group?.locked_until
-      ? new Date(group.locked_until).toLocaleTimeString('en-IN', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
+      ? formatDateTime(group.locked_until, { hour: '2-digit', minute: '2-digit', hour12: false })
       : null
 
     return (

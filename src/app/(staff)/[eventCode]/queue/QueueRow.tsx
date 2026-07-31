@@ -3,34 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { Badge, type BadgeTone } from '@/components/ui/Badge'
+import { Badge } from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Spinner'
 import { claimGroupAction } from '@/lib/actions/queue'
-import { cn } from '@/lib/utils'
+import { rsvpStatusLabel, rsvpStatusTone } from '@/lib/rsvp'
+import { cn, formatDateTime } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/database.types'
 
 export type QueueGroupRow = Database['public']['Views']['v_rsvp_queue']['Row']
-type RsvpStatus = Database['app']['Enums']['rsvp_status']
-
-const STATUS_LABEL: Record<RsvpStatus, string> = {
-  not_started: 'Not started',
-  attempted: 'Attempted',
-  callback: 'Callback due',
-  tentative: 'Tentative',
-  confirmed: 'Confirmed',
-  declined: 'Declined',
-  unreachable: 'Unreachable',
-}
-
-const STATUS_TONE: Record<RsvpStatus, BadgeTone> = {
-  not_started: 'neutral',
-  attempted: 'info',
-  callback: 'warning',
-  tentative: 'warning',
-  confirmed: 'success',
-  declined: 'danger',
-  unreachable: 'danger',
-}
 
 export interface QueueRowProps {
   row: QueueGroupRow
@@ -54,6 +34,7 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
   const status = row.rsvp_status ?? 'not_started'
   const attemptCount = row.attempt_count ?? 0
   const isLocked = row.is_locked ?? false
+  const nextCallbackAt = row.next_callback_at
 
   async function handleTap() {
     if (!groupId || pending) return
@@ -92,11 +73,12 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
             <span>
               {attemptCount} {attemptCount === 1 ? 'attempt' : 'attempts'}
             </span>
+            {nextCallbackAt ? <span>Callback {formatDateTime(nextCallbackAt)}</span> : null}
           </span>
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <Badge tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Badge>
+          <Badge tone={rsvpStatusTone(status)}>{rsvpStatusLabel(status)}</Badge>
           {isLocked ? <Badge tone="warning">Locked</Badge> : null}
         </div>
 

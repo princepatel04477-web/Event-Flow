@@ -10,34 +10,19 @@
  */
 
 import type { Database } from '@/lib/supabase/database.types'
+// RSVP status labels/options live in @/lib/rsvp — one map for the queue, the
+// call screen and this form, which had each grown their own.
+import { RSVP_STATUS_LABELS, RSVP_STATUS_OPTIONS, type RsvpStatus } from '@/lib/rsvp'
 
-export type RsvpStatus = Database['app']['Enums']['rsvp_status']
+export { RSVP_STATUS_LABELS, RSVP_STATUS_OPTIONS }
+export type { RsvpStatus }
+
 export type Side = Database['app']['Enums']['side']
 export type TravelMode = Database['app']['Enums']['travel_mode']
-
-export const RSVP_STATUS_OPTIONS: RsvpStatus[] = [
-  'not_started',
-  'attempted',
-  'callback',
-  'tentative',
-  'confirmed',
-  'declined',
-  'unreachable',
-]
 
 export const SIDE_OPTIONS: Side[] = ['bride', 'groom', 'both', 'other']
 
 export const TRAVEL_MODE_OPTIONS: TravelMode[] = ['air', 'train', 'bus', 'cab', 'self_drive']
-
-export const RSVP_STATUS_LABELS: Record<RsvpStatus, string> = {
-  not_started: 'Not started',
-  attempted: 'Attempted',
-  callback: 'Callback',
-  tentative: 'Tentative',
-  confirmed: 'Confirmed',
-  declined: 'Declined',
-  unreachable: 'Unreachable',
-}
 
 export const SIDE_LABELS: Record<Side, string> = {
   bride: 'Bride',
@@ -242,11 +227,49 @@ function normalize(raw: string): string | null {
   return trimmed === '' ? null : trimmed
 }
 
+/**
+ * Whole numbers only, and only when the input really IS a whole number.
+ *
+ * `Number.parseInt("15.7")` returns 15 with no error, so a mistyped decimal
+ * used to write a smaller pax silently. Anything that is not an integer comes
+ * back as null here and is reported separately by `detectInvalidNumbers()`,
+ * which blocks the accept button — a pax count must never be quietly rounded
+ * down on someone's behalf.
+ */
 function parseIntOrNull(raw: string): number | null {
   const normalized = normalize(raw)
   if (normalized === null) return null
-  const n = Number.parseInt(normalized, 10)
-  return Number.isFinite(n) ? n : null
+  if (!/^-?\d+$/.test(normalized)) return null
+  const n = Number(normalized)
+  return Number.isSafeInteger(n) ? n : null
+}
+
+export interface InvalidNumber {
+  field: string
+  label: string
+  raw: string
+}
+
+function checkNumber(raw: string, field: string, label: string, out: InvalidNumber[]): void {
+  const normalized = normalize(raw)
+  if (normalized === null) return
+  if (parseIntOrNull(normalized) === null || Number(normalized) < 0) {
+    out.push({ field, label, raw: normalized })
+  }
+}
+
+/**
+ * Every pax field the reviewer typed that is not a non-negative whole
+ * number. The UI must block accept while this is non-empty: silently
+ * dropping or truncating a pax count is how a family arrives with more
+ * people than the rooms booked for them.
+ */
+export function detectInvalidNumbers(values: ReviewFormValues): InvalidNumber[] {
+  const out: InvalidNumber[] = []
+  checkNumber(values.confirmedPax, 'confirmedPax', 'Confirmed pax', out)
+  checkNumber(values.arrival.pax, 'arrival.pax', 'Arrival pax', out)
+  checkNumber(values.departure.pax, 'departure.pax', 'Departure pax', out)
+  return out
 }
 
 /**

@@ -79,34 +79,60 @@ export async function parseWorkbook(file: File): Promise<ParsedSheet> {
 }
 
 /**
- * Forward-fills blank cells in the family-identifying columns from the
- * nearest preceding non-blank row, so a visually merged family block (one
- * header row per family, blank cells on the member rows beneath it) resolves
- * to identical identity fields on every row. Those rows then collapse onto
- * one `guest_groups` upsert via the row hash instead of becoming duplicates.
+ * Forward-fills blank cells in the family-identifying columns, so a visually
+ * merged family block (one header row per family, blank cells on the member
+ * rows beneath it) resolves to identical identity fields on every row. Those
+ * rows then collapse onto one `guest_groups` upsert via the row hash instead
+ * of becoming duplicates.
+ *
+ * THE RULE THAT MATTERS: a row inherits from the family above it ONLY when
+ * its own head-name cell is blank — that is what makes it a continuation row
+ * of the merged block. A row that names a different family head starts a new
+ * block and inherits nothing, however many of its other cells are empty.
+ *
+ * Without that test, a family whose phone cell was left blank silently
+ * acquired the previous family's number: the head name differs so the row
+ * hashes differently and imports as its own `guest_groups` row, complete
+ * with someone else's `primary_mobile`. A caller then taps the tel: link for
+ * Suresh Shah and reaches Ramesh Patel, and the RSVP is logged against the
+ * wrong family. The same mechanism set `needs_return_gift` on families that
+ * merely sat below a special guest.
  */
 export function forwardFillGroupColumns(
   rows: RawSheetRow[],
   mapping: ColumnMapping,
 ): RawSheetRow[] {
+  const headColumn = mapping.head_name
+
+  // With no head-name column there is no way to tell a continuation row from
+  // a new family, and guessing is exactly the bug. Fill nothing.
+  if (typeof headColumn !== 'number') return rows
+
   const fillColumns = GROUP_FILL_FIELDS.map((key) => mapping[key]).filter(
     (idx): idx is number => typeof idx === 'number',
   )
 
   if (fillColumns.length === 0) return rows
 
-  const last = new Map<number, unknown>()
+  // The identifying cells of the family block currently open, or null before
+  // the first named head row in the sheet.
+  let openBlock: Map<number, unknown> | null = null
 
   return rows.map((row) => {
-    const cells = [...row.cells]
+    if (!isBlankCell(row.cells[headColumn])) {
+      // Named head -> this row opens a new family block. It inherits nothing;
+      // its own cells (blanks included) become what continuation rows below
+      // it will inherit.
+      openBlock = new Map(fillColumns.map((col) => [col, row.cells[col] ?? null]))
+      return row
+    }
 
+    // Blank head -> continuation row of the block above, if there is one.
+    if (!openBlock) return row
+
+    const cells = [...row.cells]
     for (const col of fillColumns) {
-      const value = cells[col]
-      if (isBlankCell(value)) {
-        if (last.has(col)) cells[col] = last.get(col)
-      } else {
-        last.set(col, value)
-      }
+      if (isBlankCell(cells[col])) cells[col] = openBlock.get(col) ?? null
     }
 
     return { ...row, cells }

@@ -17,6 +17,22 @@ export interface StoredCallAttempt {
   eventId: string
   dialedNumber: string
   startedAt: string // ISO, as returned by the server insert
+  /**
+   * Phone-clock epoch ms at the moment the `tel:` link actually fired.
+   *
+   * NOT the same as `startedAt`, which is when the row was inserted — i.e.
+   * before the dial. Absent when the attempt was rehydrated from the server
+   * rather than from this session, and duration is then reported as unknown
+   * rather than invented.
+   */
+  dialedAt?: number
+  /**
+   * Phone-clock epoch ms of the first moment the page became visible again
+   * after the dial — i.e. when the caller came back from the dialer. The
+   * span dialedAt -> returnedAt is the closest honest proxy for how long the
+   * call lasted; it deliberately excludes the time spent typing notes.
+   */
+  returnedAt?: number
 }
 
 function key(groupId: string): string {

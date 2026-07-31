@@ -12,63 +12,10 @@
  * as a *warning*, never a silent drop - the family still gets imported.
  */
 
-export interface MobileResult {
-  /** Exactly 10 digits, or null if it could not be reduced to that. */
-  value: string | null
-  /** Human-readable reason, set only when `value` is null and the cell was non-blank. */
-  reason: string | null
-}
-
-/**
- * Strip spaces/dashes/brackets/dots, a leading +91 or 0 country/trunk
- * prefix, and the trailing ".0" Excel's number formatting leaves on a
- * mobile number that was stored as a numeric cell.
- */
-export function normaliseMobile(raw: unknown): MobileResult {
-  if (raw === null || raw === undefined) {
-    return { value: null, reason: null }
-  }
-
-  let s: string
-  if (typeof raw === 'number') {
-    if (!Number.isFinite(raw)) return { value: null, reason: 'not a number' }
-    // Excel stores phone numbers as doubles; a genuine 10-digit number never
-    // has a real fractional part, so truncate rather than round.
-    s = Math.trunc(raw).toString()
-  } else {
-    s = String(raw).trim()
-  }
-
-  if (!s) return { value: null, reason: null }
-
-  const original = s
-
-  // A text cell exported from Excel can carry a literal ".0" / ".00".
-  s = s.replace(/\.0+$/, '')
-
-  // Now strip everything that isn't a digit: spaces, dashes, brackets, +.
-  s = s.replace(/\D/g, '')
-
-  if (!s) {
-    return { value: null, reason: `no digits found in "${original}"` }
-  }
-
-  // Country code, with or without the + (already stripped above).
-  if (s.length === 12 && s.startsWith('91')) s = s.slice(2)
-  else if (s.length === 13 && s.startsWith('091')) s = s.slice(3)
-
-  // A single leading trunk zero.
-  if (s.length === 11 && s.startsWith('0')) s = s.slice(1)
-
-  if (/^\d{10}$/.test(s)) {
-    return { value: s, reason: null }
-  }
-
-  return {
-    value: null,
-    reason: `does not reduce to 10 digits ("${original}" -> "${s}")`,
-  }
-}
+// Mobile normalisation is shared with the call screen — one implementation,
+// in @/lib/phone. Re-exported here so import-pipeline callers keep reading as
+// one module.
+export { normaliseMobile, type MobileResult } from '@/lib/phone'
 
 /** "6", "6 pax", "six", "", null -> number | null. Never zero or negative. */
 export function parsePax(raw: unknown): number | null {

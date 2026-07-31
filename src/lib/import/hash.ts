@@ -46,8 +46,14 @@ function cyrb53(str: string, seed = 0): string {
   return combined.toString(16).padStart(14, '0')
 }
 
-/** Case/whitespace-insensitive so "4th" and "4TH" hash identically. */
-function normKey(value: string | null | undefined): string {
+/**
+ * Case/whitespace-insensitive so "4th" and "4TH" hash identically.
+ *
+ * Exported because `classifyRows` needs the exact same normalisation to match
+ * a row against an existing family by head name when the hash itself has
+ * moved — see the identity-drift note below.
+ */
+export function normKey(value: string | null | undefined): string {
   if (!value) return ''
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
@@ -76,4 +82,36 @@ export function rowHash(identity: RowIdentity): string {
   ].join(FIELD_SEPARATOR)
 
   return cyrb53(canonical)
+}
+
+/**
+ * IDENTITY DRIFT — read this before relying on the hash alone.
+ *
+ * The hash is computed over the POST-normalisation mobile, so a cell the
+ * normaliser could not reduce to 10 digits contributes an empty string. The
+ * operator then reads the preview warning, fixes the cell, re-imports — and
+ * the row's identity has changed. Matching on hash alone would create a
+ * duplicate family for every mobile the operator corrected, which is exactly
+ * the failure CLAUDE.md guarantee #5 forbids. Mapping the group-code column
+ * on a second run does the same thing.
+ *
+ * The hash therefore is not the only matcher. `classifyRows` falls back to
+ * matching on the normalised head name, accepting an existing family only
+ * when every identifying field that is present on BOTH sides agrees and the
+ * match is unambiguous — then rewrites `source_row_hash` to the new canonical
+ * value so the fast path takes over from the next run onward.
+ */
+export function identityMatches(
+  row: { groupCode: string | null; primaryMobile: string | null },
+  existing: { group_code: string | null; primary_mobile: string | null },
+): boolean {
+  const codeRow = normKey(row.groupCode)
+  const codeDb = normKey(existing.group_code)
+  if (codeRow && codeDb && codeRow !== codeDb) return false
+
+  const mobRow = normKey(row.primaryMobile)
+  const mobDb = normKey(existing.primary_mobile)
+  if (mobRow && mobDb && mobRow !== mobDb) return false
+
+  return true
 }

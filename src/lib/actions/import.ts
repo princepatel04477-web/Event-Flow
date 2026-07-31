@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache'
 
 import { createClient } from '@/lib/supabase/server'
+import { getEventAccess } from '@/lib/supabase/queries'
 import type { Database, Json } from '@/lib/supabase/database.types'
-import { rowHash } from '@/lib/import/hash'
+import { identityMatches, normKey, rowHash } from '@/lib/import/hash'
 import type { ImportRowFields } from '@/lib/import/rows'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
@@ -48,6 +49,24 @@ interface ExistingHead {
 
 const GROUP_SELECT =
   'id, source_row_hash, head_name, group_code, primary_mobile, alt_mobile, expected_pax, side, group_type, city, remarks, needs_return_gift'
+
+/**
+ * Thrown when the viewer is not staff on this event. RLS makes "not
+ * permitted" and "no data" indistinguishable — a client login reading
+ * `guest_groups` gets zero rows and no error — so the preview would happily
+ * report "238 New" for a database that already holds all 238. The preview
+ * screen is the one mechanism CLAUDE.md forbids cutting; it must never
+ * fabricate.
+ */
+class NotStaffError extends Error {
+  constructor() {
+    super(
+      'You are not staff on this event, so the guest list is invisible to your account. ' +
+        'Nothing was read or written — ask an admin to add you as event_team.',
+    )
+    this.name = 'NotStaffError'
+  }
+}
 
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = []
@@ -93,7 +112,10 @@ function groupFieldsDiffer(existing: ExistingGroup, row: PreparedRow): boolean {
     f.group_type !== existing.group_type ||
     f.city !== existing.city ||
     f.remarks !== existing.remarks ||
-    f.needs_return_gift !== existing.needs_return_gift
+    f.needs_return_gift !== existing.needs_return_gift ||
+    // A row matched by head name rather than by hash still needs its stored
+    // hash brought up to date, even when nothing else changed.
+    existing.source_row_hash !== row.hash
   )
 }
 
@@ -102,7 +124,6 @@ interface Classification {
   blocked: PreparedRow[]
   importable: PreparedRow[]
   duplicates: Array<{ row: PreparedRow; canonical: PreparedRow }>
-  existingByHash: Map<string, ExistingGroup>
   toInsert: PreparedRow[]
   toUpdate: Array<{ row: PreparedRow; existing: ExistingGroup }>
   unchanged: Array<{ row: PreparedRow; existing: ExistingGroup }>
@@ -145,10 +166,10 @@ async function classifyRows(
     }
   }
 
+  // --- pass 1: exact hash match (the fast path, and the common case) -----
   const existingByHash = new Map<string, ExistingGroup>()
-  const hashes = importable.map((r) => r.hash)
 
-  for (const c of chunk(hashes, 300)) {
+  for (const c of chunk(importable.map((r) => r.hash), 300)) {
     if (c.length === 0) continue
     const { data, error } = await supabase
       .from('guest_groups')
@@ -163,12 +184,67 @@ async function classifyRows(
     }
   }
 
+  const matched = new Map<PreparedRow, ExistingGroup>()
+  const claimedGroupIds = new Set<string>()
+  const unmatched: PreparedRow[] = []
+
+  for (const row of importable) {
+    const existing = existingByHash.get(row.hash)
+    if (existing) {
+      matched.set(row, existing)
+      claimedGroupIds.add(existing.id)
+    } else {
+      unmatched.push(row)
+    }
+  }
+
+  // --- pass 2: head-name match, for rows whose identity drifted ----------
+  // See the identity-drift note in import/hash.ts. Correcting a mobile the
+  // preview warned about (or mapping the group-code column on a later run)
+  // changes the hash; without this pass the corrected row imports as a
+  // second copy of the same family.
+  if (unmatched.length > 0) {
+    const headNames = [...new Set(unmatched.map((r) => r.headName).filter((n): n is string => !!n))]
+    const byHeadName = new Map<string, ExistingGroup[]>()
+
+    for (const c of chunk(headNames, 200)) {
+      if (c.length === 0) continue
+      const { data, error } = await supabase
+        .from('guest_groups')
+        .select(GROUP_SELECT)
+        .eq('event_id', eventId)
+        .in('head_name', c)
+
+      if (error) throw new Error(`Could not check existing families by name: ${error.message}`)
+
+      for (const g of (data ?? []) as ExistingGroup[]) {
+        const key = normKey(g.head_name)
+        const bucket = byHeadName.get(key)
+        if (bucket) bucket.push(g)
+        else byHeadName.set(key, [g])
+      }
+    }
+
+    for (const row of unmatched) {
+      const candidates = (byHeadName.get(normKey(row.headName)) ?? []).filter(
+        (g) => !claimedGroupIds.has(g.id) && identityMatches(row, g),
+      )
+
+      // Exactly one compatible family, or we cannot tell them apart and must
+      // not guess — two genuinely different families can share a head name.
+      if (candidates.length === 1) {
+        matched.set(row, candidates[0])
+        claimedGroupIds.add(candidates[0].id)
+      }
+    }
+  }
+
   const toInsert: PreparedRow[] = []
   const toUpdate: Array<{ row: PreparedRow; existing: ExistingGroup }> = []
   const unchanged: Array<{ row: PreparedRow; existing: ExistingGroup }> = []
 
   for (const row of importable) {
-    const existing = existingByHash.get(row.hash)
+    const existing = matched.get(row)
     if (!existing) {
       toInsert.push(row)
     } else if (groupFieldsDiffer(existing, row)) {
@@ -178,7 +254,7 @@ async function classifyRows(
     }
   }
 
-  return { prepared, blocked, importable, duplicates, existingByHash, toInsert, toUpdate, unchanged }
+  return { prepared, blocked, importable, duplicates, toInsert, toUpdate, unchanged }
 }
 
 export type RowOutcomeStatus = 'new' | 'update' | 'unchanged' | 'duplicate' | 'blocked'
@@ -215,6 +291,11 @@ export async function previewImport(
   }
 
   try {
+    // Must come BEFORE any read: a non-staff account sees zero rows with no
+    // error, which would render as "every family is new".
+    const access = await getEventAccess(eventId)
+    if (access !== 'admin' && access !== 'event_team') throw new NotStaffError()
+
     const c = await classifyRows(supabase, eventId, rows)
 
     const outcomes: RowOutcome[] = []
@@ -267,12 +348,21 @@ export interface CommitRowResult {
 
 export interface CommitResult {
   ok: boolean
+  /** Set when the run did not complete cleanly. `rows` may still describe real writes. */
   error?: string
+  /**
+   * True when `error` is set but writes DID land. The UI must show the
+   * results, not a bare "import failed" — the database is not rolled back.
+   */
+  partial?: boolean
   batchId?: string
   totalRows: number
   inserted: number
   updated: number
+  /** Rows deliberately not written: already up to date, or a duplicate within the file. */
   skipped: number
+  /** Rows that were meant to be written and were not. Never folded into `skipped`. */
+  failed: number
   rows: CommitRowResult[]
 }
 
@@ -286,7 +376,17 @@ function emptyPreview(error: string): PreviewResult {
 }
 
 function emptyCommit(error: string, batchId?: string): CommitResult {
-  return { ok: false, error, batchId, totalRows: 0, inserted: 0, updated: 0, skipped: 0, rows: [] }
+  return {
+    ok: false,
+    error,
+    batchId,
+    totalRows: 0,
+    inserted: 0,
+    updated: 0,
+    skipped: 0,
+    failed: 0,
+    rows: [],
+  }
 }
 
 /**
@@ -294,6 +394,11 @@ function emptyCommit(error: string, batchId?: string): CommitResult {
  * per sheet row, and for every importable row a `guest_groups` upsert plus
  * its mandatory head `guests` row. Re-running the same file reports
  * "0 inserted, 0 updated, N skipped" - see CLAUDE.md guarantee #5.
+ *
+ * There is no transaction across these statements and there cannot be one
+ * through PostgREST, so this function NEVER reports total failure after a
+ * partial write. Every stage records its own errors and execution continues;
+ * the result always describes what actually landed.
  */
 export async function commitImport(
   eventId: string,
@@ -312,6 +417,11 @@ export async function commitImport(
 
   if (rows.length === 0) {
     return emptyCommit('Nothing to import - the file had no usable rows.')
+  }
+
+  const access = await getEventAccess(eventId)
+  if (access !== 'admin' && access !== 'event_team') {
+    return emptyCommit(new NotStaffError().message)
   }
 
   const { data: batch, error: batchError } = await supabase
@@ -336,99 +446,124 @@ export async function commitImport(
 
   const batchId = batch.id as string
 
+  let c: Classification
   try {
-    const c = await classifyRows(supabase, eventId, rows)
+    c = await classifyRows(supabase, eventId, rows)
+  } catch (e) {
+    // Nothing has been written yet, so this really is a clean failure.
+    const message = e instanceof Error ? e.message : 'Could not classify the sheet.'
+    await supabase
+      .from('import_batches')
+      .update({ status: 'failed', error: message, completed_at: new Date().toISOString() })
+      .eq('id', batchId)
+    return emptyCommit(message, batchId)
+  }
 
-    // --- 1. bulk-insert new groups -----------------------------------
-    const hashToGroupId = new Map<string, string>()
-    const insertErrors = new Map<string, string>()
+  // Every stage below records into these and never throws past this point.
+  const hashToGroupId = new Map<string, string>()
+  const insertErrors = new Map<string, string>()
+  const updateErrors = new Map<string, string>()
+  const headErrors = new Map<string, string>() // keyed by group_id
+  const stageWarnings: string[] = []
 
-    for (const rowChunk of chunk(c.toInsert, 200)) {
-      if (rowChunk.length === 0) continue
-      const payload = rowChunk.map((row) => buildGroupInsert(eventId, row))
-      const { data, error } = await supabase
-        .from('guest_groups')
-        .insert(payload)
-        .select('id, source_row_hash')
+  // --- 1. bulk-insert new groups -------------------------------------
+  for (const rowChunk of chunk(c.toInsert, 200)) {
+    if (rowChunk.length === 0) continue
+    const payload = rowChunk.map((row) => buildGroupInsert(eventId, row))
+    const { data, error } = await supabase
+      .from('guest_groups')
+      .insert(payload)
+      .select('id, source_row_hash')
 
-      if (error) {
-        // The whole chunk failed together - fall back to one at a time so a
-        // single bad row doesn't sink every other family in the batch.
-        for (const row of rowChunk) {
-          const { data: single, error: singleError } = await supabase
-            .from('guest_groups')
-            .insert(buildGroupInsert(eventId, row))
-            .select('id')
-            .single()
+    if (error) {
+      // The whole chunk failed together - fall back to one at a time so a
+      // single bad row doesn't sink every other family in the batch.
+      for (const row of rowChunk) {
+        const { data: single, error: singleError } = await supabase
+          .from('guest_groups')
+          .insert(buildGroupInsert(eventId, row))
+          .select('id')
+          .single()
 
-          if (singleError || !single) {
-            insertErrors.set(row.hash, singleError?.message ?? 'insert failed')
-          } else {
-            hashToGroupId.set(row.hash, single.id)
-          }
-        }
-      } else {
-        for (const g of data ?? []) {
-          if (g.source_row_hash) hashToGroupId.set(g.source_row_hash, g.id)
+        if (singleError || !single) {
+          insertErrors.set(row.hash, singleError?.message ?? 'insert failed')
+        } else {
+          hashToGroupId.set(row.hash, single.id)
         }
       }
-    }
-
-    // --- 2. individual updates (usually a small set) ------------------
-    const updateErrors = new Map<string, string>()
-
-    for (const { row, existing } of c.toUpdate) {
-      const { error } = await supabase
-        .from('guest_groups')
-        .update(buildGroupUpdate(row, existing))
-        .eq('id', existing.id)
-        .eq('event_id', eventId)
-
-      if (error) {
-        updateErrors.set(row.hash, error.message)
-      } else {
-        hashToGroupId.set(row.hash, existing.id)
+    } else {
+      for (const g of data ?? []) {
+        if (g.source_row_hash) hashToGroupId.set(g.source_row_hash, g.id)
       }
     }
+  }
 
-    for (const { row, existing } of c.unchanged) {
+  // --- 2. individual updates (usually a small set) --------------------
+  for (const { row, existing } of c.toUpdate) {
+    const { error } = await supabase
+      .from('guest_groups')
+      .update(buildGroupUpdate(row, existing))
+      .eq('id', existing.id)
+      .eq('event_id', eventId)
+
+    if (error) {
+      updateErrors.set(row.hash, error.message)
+    } else {
       hashToGroupId.set(row.hash, existing.id)
     }
+  }
 
-    // --- 3. ensure every successful group has a head guest ------------
-    // The single most likely thing to get wrong: client_guest_profiles is
-    // built from `guests`, not `guest_groups`. See Known Traps.
-    const headErrors = new Map<string, string>() // keyed by group_id
+  for (const { row, existing } of c.unchanged) {
+    hashToGroupId.set(row.hash, existing.id)
+  }
 
-    const readyHashes = [...hashToGroupId.keys()].filter(
-      (h) => !insertErrors.has(h) && !updateErrors.has(h),
-    )
+  // --- 3. ensure every successful group has a head guest ---------------
+  // The single most likely thing to get wrong: client_guest_profiles is
+  // built from `guests`, not `guest_groups`. See Known Traps.
+  const readyHashes = [...hashToGroupId.keys()].filter(
+    (h) => !insertErrors.has(h) && !updateErrors.has(h),
+  )
 
-    if (readyHashes.length > 0) {
-      const groupIds = readyHashes.map((h) => hashToGroupId.get(h)!)
-      const existingHeads = new Map<string, ExistingHead>()
+  if (readyHashes.length > 0) {
+    const groupIds = readyHashes.map((h) => hashToGroupId.get(h)!)
+    const existingHeads = new Map<string, ExistingHead>()
+    let headLookupFailed = false
 
-      for (const idChunk of chunk(groupIds, 300)) {
-        const { data, error } = await supabase
-          .from('guests')
-          .select('id, group_id, full_name, mobile')
-          .eq('event_id', eventId)
-          .eq('is_head', true)
-          .in('group_id', idChunk)
+    for (const idChunk of chunk(groupIds, 300)) {
+      const { data, error } = await supabase
+        .from('guests')
+        .select('id, group_id, full_name, mobile')
+        .eq('event_id', eventId)
+        .eq('is_head', true)
+        .in('group_id', idChunk)
 
-        if (error) throw new Error(`Could not check existing family heads: ${error.message}`)
-        for (const g of data ?? []) existingHeads.set(g.group_id, g)
+      if (error) {
+        // Do NOT abort: the guest_groups rows above are already committed and
+        // will not be rolled back. Record it, skip head reconciliation, and
+        // report honestly. A re-import repairs the heads.
+        headLookupFailed = true
+        stageWarnings.push(`Could not check existing family heads: ${error.message}`)
+        break
       }
+      for (const g of data ?? []) existingHeads.set(g.group_id, g)
+    }
 
+    if (!headLookupFailed) {
       const rowByHash = new Map(c.importable.map((r) => [r.hash, r]))
-      const headsToInsert: Array<{
+      type HeadInsert = {
         event_id: string
         group_id: string
         full_name: string
         mobile: string | null
         is_head: true
+      }
+      const headsToInsert: HeadInsert[] = []
+      const headUpdates: Array<{
+        id: string
+        groupId: string
+        full_name: string
+        mobile: string | null
       }> = []
-      const headUpdates: Array<{ id: string; groupId: string; full_name: string; mobile: string | null }> = []
 
       for (const hash of readyHashes) {
         const groupId = hashToGroupId.get(hash)!
@@ -454,8 +589,16 @@ export async function commitImport(
       for (const headChunk of chunk(headsToInsert, 200)) {
         if (headChunk.length === 0) continue
         const { error } = await supabase.from('guests').insert(headChunk)
-        if (error) {
-          for (const h of headChunk) headErrors.set(h.group_id, error.message)
+        if (!error) continue
+
+        // A multi-row INSERT is one statement: one violation (a head that
+        // already exists and the select above missed, a transient drop)
+        // fails all 200. Retry one at a time, exactly as step 1 does, so a
+        // bad row cannot block good ones on the step client_guest_profiles
+        // depends on.
+        for (const h of headChunk) {
+          const { error: singleError } = await supabase.from('guests').insert(h)
+          if (singleError) headErrors.set(h.group_id, singleError.message)
         }
       }
 
@@ -464,136 +607,151 @@ export async function commitImport(
           .from('guests')
           .update({ full_name: u.full_name, mobile: u.mobile })
           .eq('id', u.id)
+          .eq('event_id', eventId)
         if (error) headErrors.set(u.groupId, error.message)
       }
     }
+  }
 
-    // --- 4. assemble per-row outcomes ----------------------------------
-    const results: CommitRowResult[] = []
+  // --- 4. assemble per-row outcomes ------------------------------------
+  const results: CommitRowResult[] = []
 
-    for (const row of c.blocked) {
-      results.push({
-        rowNumber: row.rowNumber,
-        status: 'error',
-        error: row.blockReason ?? 'Missing required field.',
-      })
-    }
-
-    for (const row of c.toInsert) {
-      const err = insertErrors.get(row.hash)
-      if (err) {
-        results.push({ rowNumber: row.rowNumber, status: 'error', error: err })
-        continue
-      }
-      const groupId = hashToGroupId.get(row.hash)
-      const headErr = groupId ? headErrors.get(groupId) : undefined
-      results.push({
-        rowNumber: row.rowNumber,
-        status: headErr ? 'error' : 'inserted',
-        error: headErr ? `Family saved, but the head guest record failed: ${headErr}` : null,
-      })
-    }
-
-    for (const { row, existing } of c.toUpdate) {
-      const err = updateErrors.get(row.hash)
-      if (err) {
-        results.push({ rowNumber: row.rowNumber, status: 'error', error: err })
-        continue
-      }
-      const headErr = headErrors.get(existing.id)
-      results.push({
-        rowNumber: row.rowNumber,
-        status: headErr ? 'error' : 'updated',
-        error: headErr ? `Family updated, but the head guest record failed: ${headErr}` : null,
-      })
-    }
-
-    for (const { row, existing } of c.unchanged) {
-      const headErr = headErrors.get(existing.id)
-      results.push({
-        rowNumber: row.rowNumber,
-        status: headErr ? 'error' : 'unchanged',
-        error: headErr ? `Head guest record failed: ${headErr}` : null,
-      })
-    }
-
-    for (const { row, canonical } of c.duplicates) {
-      results.push({
-        rowNumber: row.rowNumber,
-        status: 'duplicate',
-        error: `Duplicate of sheet row ${canonical.rowNumber} in this file (same family).`,
-      })
-    }
-
-    results.sort((a, b) => a.rowNumber - b.rowNumber)
-
-    const inserted = results.filter((r) => r.status === 'inserted').length
-    const updated = results.filter((r) => r.status === 'updated').length
-    const skipped = results.length - inserted - updated
-
-    // --- 5. write the audit trail --------------------------------------
-    const resultByRowNumber = new Map(results.map((r) => [r.rowNumber, r]))
-    const groupIdByRowNumber = new Map<number, string | null>()
-    for (const row of c.toInsert) groupIdByRowNumber.set(row.rowNumber, hashToGroupId.get(row.hash) ?? null)
-    for (const { row, existing } of c.toUpdate) {
-      groupIdByRowNumber.set(row.rowNumber, updateErrors.has(row.hash) ? null : existing.id)
-    }
-    for (const { row, existing } of c.unchanged) groupIdByRowNumber.set(row.rowNumber, existing.id)
-    for (const { row, canonical } of c.duplicates) {
-      groupIdByRowNumber.set(row.rowNumber, hashToGroupId.get(canonical.hash) ?? null)
-    }
-
-    const importRowsPayload = c.prepared.map((row) => {
-      const outcome = resultByRowNumber.get(row.rowNumber)
-      return {
-        batch_id: batchId,
-        event_id: eventId,
-        row_number: row.rowNumber,
-        raw: row.raw as Json,
-        row_hash: row.hash,
-        status: outcome?.status ?? 'error',
-        group_id: groupIdByRowNumber.get(row.rowNumber) ?? null,
-        error: outcome?.error ?? null,
-      }
+  for (const row of c.blocked) {
+    results.push({
+      rowNumber: row.rowNumber,
+      status: 'error',
+      error: row.blockReason ?? 'Missing required field.',
     })
+  }
 
-    let auditWarning: string | null = null
-    for (const rowChunk of chunk(importRowsPayload, 300)) {
-      if (rowChunk.length === 0) continue
-      const { error } = await supabase.from('import_rows').insert(rowChunk)
-      if (error) auditWarning = error.message
+  for (const row of c.toInsert) {
+    const err = insertErrors.get(row.hash)
+    if (err) {
+      results.push({ rowNumber: row.rowNumber, status: 'error', error: err })
+      continue
     }
+    const groupId = hashToGroupId.get(row.hash)
+    const headErr = groupId ? headErrors.get(groupId) : undefined
+    results.push({
+      rowNumber: row.rowNumber,
+      status: headErr ? 'error' : 'inserted',
+      error: headErr ? `Family saved, but the head guest record failed: ${headErr}` : null,
+    })
+  }
 
-    await supabase
-      .from('import_batches')
-      .update({
-        status: 'completed',
-        inserted_rows: inserted,
-        updated_rows: updated,
-        skipped_rows: skipped,
-        completed_at: new Date().toISOString(),
-        error: auditWarning,
-      })
-      .eq('id', batchId)
+  for (const { row, existing } of c.toUpdate) {
+    const err = updateErrors.get(row.hash)
+    if (err) {
+      results.push({ rowNumber: row.rowNumber, status: 'error', error: err })
+      continue
+    }
+    const headErr = headErrors.get(existing.id)
+    results.push({
+      rowNumber: row.rowNumber,
+      status: headErr ? 'error' : 'updated',
+      error: headErr ? `Family updated, but the head guest record failed: ${headErr}` : null,
+    })
+  }
 
-    revalidatePath(`/${eventCode}`, 'layout')
+  for (const { row, existing } of c.unchanged) {
+    const headErr = headErrors.get(existing.id)
+    results.push({
+      rowNumber: row.rowNumber,
+      status: headErr ? 'error' : 'unchanged',
+      error: headErr ? `Head guest record failed: ${headErr}` : null,
+    })
+  }
 
+  for (const { row, canonical } of c.duplicates) {
+    results.push({
+      rowNumber: row.rowNumber,
+      status: 'duplicate',
+      error: `Duplicate of sheet row ${canonical.rowNumber} in this file (same family).`,
+    })
+  }
+
+  results.sort((a, b) => a.rowNumber - b.rowNumber)
+
+  // Counted explicitly, never as a remainder: `skipped` used to absorb every
+  // errored row, so a batch with 40 failed heads recorded skipped_rows = 40
+  // with nothing to say those were failures.
+  const inserted = results.filter((r) => r.status === 'inserted').length
+  const updated = results.filter((r) => r.status === 'updated').length
+  const skipped = results.filter((r) => r.status === 'unchanged' || r.status === 'duplicate').length
+  const failed = results.filter((r) => r.status === 'error').length
+
+  // --- 5. write the audit trail ----------------------------------------
+  const resultByRowNumber = new Map(results.map((r) => [r.rowNumber, r]))
+  const groupIdByRowNumber = new Map<number, string | null>()
+  for (const row of c.toInsert) {
+    groupIdByRowNumber.set(row.rowNumber, hashToGroupId.get(row.hash) ?? null)
+  }
+  for (const { row, existing } of c.toUpdate) {
+    groupIdByRowNumber.set(row.rowNumber, updateErrors.has(row.hash) ? null : existing.id)
+  }
+  for (const { row, existing } of c.unchanged) groupIdByRowNumber.set(row.rowNumber, existing.id)
+  for (const { row, canonical } of c.duplicates) {
+    groupIdByRowNumber.set(row.rowNumber, hashToGroupId.get(canonical.hash) ?? null)
+  }
+
+  const importRowsPayload = c.prepared.map((row) => {
+    const outcome = resultByRowNumber.get(row.rowNumber)
     return {
-      ok: true,
-      batchId,
-      totalRows: results.length,
-      inserted,
-      updated,
-      skipped,
-      rows: results,
+      batch_id: batchId,
+      event_id: eventId,
+      row_number: row.rowNumber,
+      raw: row.raw as Json,
+      row_hash: row.hash,
+      status: outcome?.status ?? 'error',
+      group_id: groupIdByRowNumber.get(row.rowNumber) ?? null,
+      error: outcome?.error ?? null,
     }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Import failed for an unknown reason.'
-    await supabase
-      .from('import_batches')
-      .update({ status: 'failed', error: message, completed_at: new Date().toISOString() })
-      .eq('id', batchId)
-    return emptyCommit(message, batchId)
+  })
+
+  for (const rowChunk of chunk(importRowsPayload, 300)) {
+    if (rowChunk.length === 0) continue
+    const { error } = await supabase.from('import_rows').insert(rowChunk)
+    if (error) stageWarnings.push(`Row-level audit trail incomplete: ${error.message}`)
+  }
+
+  const batchNote = stageWarnings.length > 0 ? stageWarnings.join(' | ') : null
+
+  const { error: batchUpdateError } = await supabase
+    .from('import_batches')
+    .update({
+      status: failed > 0 || stageWarnings.length > 0 ? 'completed_with_errors' : 'completed',
+      inserted_rows: inserted,
+      updated_rows: updated,
+      skipped_rows: skipped,
+      completed_at: new Date().toISOString(),
+      error: batchNote,
+    })
+    .eq('id', batchId)
+
+  if (batchUpdateError) {
+    // The writes landed; only the batch bookkeeping did not. Say so rather
+    // than leaving a `processing` batch row that contradicts the database.
+    stageWarnings.push(
+      `The guest rows were written, but this import batch could not be marked complete ` +
+        `(${batchUpdateError.message}). The batch record in import_batches is out of date.`,
+    )
+  }
+
+  revalidatePath(`/${eventCode}`, 'layout')
+
+  const problem = stageWarnings.length > 0 ? stageWarnings.join(' | ') : undefined
+
+  return {
+    ok: true,
+    error: problem,
+    partial: problem !== undefined,
+    batchId,
+    totalRows: results.length,
+    inserted,
+    updated,
+    skipped,
+    failed,
+    rows: results,
   }
 }
 
@@ -618,6 +776,10 @@ function buildGroupInsert(eventId: string, row: PreparedRow) {
 function buildGroupUpdate(row: PreparedRow, existing: ExistingGroup) {
   const f = effectiveGroupFields(row, existing)
   return {
+    // Converge the stored identity onto the current canonical hash, so a row
+    // matched by head name after a corrected mobile takes the fast path next
+    // run instead of drifting again.
+    source_row_hash: row.hash,
     head_name: f.head_name,
     group_code: f.group_code,
     primary_mobile: f.primary_mobile,

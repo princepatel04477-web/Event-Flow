@@ -47,5 +47,17 @@ export interface CallCompletionPayload {
   notes: string | null
   callbackAt: string | null // ISO timestamp, only when outcome === 'callback'
   endedAt: string // ISO timestamp
-  durationSec: number
+  /**
+   * Seconds spent in the dialer, or NULL when it is not known.
+   *
+   * Nullable on purpose. It used to be wall-clock since the attempt row was
+   * inserted, so an attempt resumed two days later wrote 172800 — and
+   * `app.guard_call_attempt()` then froze the row, so nobody, admin
+   * included, could ever correct it. An unknown duration is recorded as
+   * unknown.
+   */
+  durationSec: number | null
 }
+
+/** Longest span we will accept as a real call. Beyond this the phone was simply put down. */
+export const MAX_PLAUSIBLE_CALL_SEC = 2 * 60 * 60

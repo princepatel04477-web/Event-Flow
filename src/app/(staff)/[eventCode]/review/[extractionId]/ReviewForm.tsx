@@ -21,12 +21,16 @@ import {
   TRAVEL_MODE_OPTIONS,
   buildRpcPayload,
   detectClearAttempts,
+  detectInvalidNumbers,
   type ClearAttempt,
+  type InvalidNumber,
   type ExistingGroupValues,
   type ExistingLegValues,
   type LegFormValues,
   type ReviewFormValues,
 } from '@/lib/review/payload'
+import { formatMobile } from '@/lib/phone'
+import { formatDateTime } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/database.types'
 
 type ExtractionStatus = Database['app']['Enums']['extraction_status']
@@ -70,6 +74,16 @@ function LowConfidenceNote({ path, confidence }: { path: string; confidence: unk
     <p className="mt-1 flex items-center gap-1 text-xs font-medium text-warning">
       <ShieldAlertIcon className="h-3.5 w-3.5 shrink-0" />
       Low confidence — check this against the transcript before accepting.
+    </p>
+  )
+}
+
+function InvalidNumberNote({ invalid }: { invalid: InvalidNumber | undefined }) {
+  if (!invalid) return null
+  return (
+    <p className="mt-1 text-xs font-medium text-danger">
+      &ldquo;{invalid.raw}&rdquo; is not a whole number of people. Type a whole number — a decimal
+      would be silently rounded down.
     </p>
   )
 }
@@ -119,6 +133,13 @@ export function ReviewForm({
     return map
   }, [clearAttempts])
 
+  const invalidNumbers = useMemo(() => detectInvalidNumbers(values), [values])
+  const invalidByField = useMemo(() => {
+    const map = new Map<string, InvalidNumber>()
+    for (const n of invalidNumbers) map.set(n.field, n)
+    return map
+  }, [invalidNumbers])
+
   const alreadyApplied = extractionStatus === 'accepted'
   const wasRejected = extractionStatus === 'rejected'
   const isBusy = pendingAction !== null
@@ -135,7 +156,7 @@ export function ReviewForm({
   }
 
   async function handleAccept() {
-    if (alreadyApplied || clearAttempts.length > 0) return
+    if (alreadyApplied || clearAttempts.length > 0 || invalidNumbers.length > 0) return
     setError(null)
     setPendingAction('accept')
 
@@ -176,7 +197,7 @@ export function ReviewForm({
             {primaryMobile ? (
               <span className="inline-flex items-center gap-1">
                 <PhoneIcon className="h-3.5 w-3.5" />
-                {primaryMobile}
+                {formatMobile(primaryMobile)}
               </span>
             ) : null}
             <span>Expected pax: {expectedPax}</span>
@@ -189,7 +210,7 @@ export function ReviewForm({
           <CardBody className="py-3 text-sm text-success">
             <p className="font-semibold">Already applied.</p>
             <p className="mt-0.5">
-              This extraction was accepted{reviewedAt ? ` on ${new Date(reviewedAt).toLocaleString('en-IN')}` : ''}
+              This extraction was accepted{reviewedAt ? ` on ${formatDateTime(reviewedAt)}` : ''}
               . apply_rsvp_extraction() refuses to re-apply an accepted extraction, so editing here
               cannot do anything further — go to the group directly for any further changes.
             </p>
@@ -280,11 +301,13 @@ export function ReviewForm({
               type="number"
               inputMode="numeric"
               min={0}
+              step={1}
               value={values.confirmedPax}
               onChange={(e) => updateField('confirmedPax', e.target.value)}
               disabled={alreadyApplied}
             />
             <LowConfidenceNote path={CONFIDENCE_PATHS.confirmedPax} confidence={confidence} />
+            <InvalidNumberNote invalid={invalidByField.get('confirmedPax')} />
             <ClearAttemptNote attempt={clearAttemptByField.get('confirmedPax')} />
           </div>
 
@@ -328,6 +351,7 @@ export function ReviewForm({
         confidence={confidence}
         disabled={alreadyApplied}
         clearAttemptByField={clearAttemptByField}
+        invalidByField={invalidByField}
         onChange={(field, value) => updateLeg('arrival', field, value)}
       />
 
@@ -338,6 +362,7 @@ export function ReviewForm({
         confidence={confidence}
         disabled={alreadyApplied}
         clearAttemptByField={clearAttemptByField}
+        invalidByField={invalidByField}
         onChange={(field, value) => updateLeg('departure', field, value)}
       />
 
@@ -387,7 +412,9 @@ export function ReviewForm({
               fullWidth
               onClick={handleAccept}
               loading={pendingAction === 'accept'}
-              disabled={alreadyApplied || clearAttempts.length > 0 || isBusy}
+              disabled={
+                alreadyApplied || clearAttempts.length > 0 || invalidNumbers.length > 0 || isBusy
+              }
             >
               Accept &amp; apply
             </Button>
@@ -406,6 +433,12 @@ export function ReviewForm({
           {clearAttempts.length > 0 ? (
             <p className="text-xs text-subtle">
               Accept is disabled while a cleared field above would silently keep its old value.
+            </p>
+          ) : null}
+          {invalidNumbers.length > 0 ? (
+            <p className="text-xs text-subtle">
+              Accept is disabled while a pax field is not a whole number:{' '}
+              {invalidNumbers.map((n) => n.label).join(', ')}.
             </p>
           ) : null}
         </CardBody>
@@ -438,6 +471,7 @@ function LegCard({
   confidence,
   disabled,
   clearAttemptByField,
+  invalidByField,
   onChange,
 }: {
   title: string
@@ -446,6 +480,7 @@ function LegCard({
   confidence: unknown
   disabled: boolean
   clearAttemptByField: Map<string, ClearAttempt>
+  invalidByField: Map<string, InvalidNumber>
   onChange: (field: keyof LegFormValues, value: string) => void
 }) {
   const path = (field: string) => CONFIDENCE_PATHS[`${direction}.${field}`]
@@ -557,11 +592,13 @@ function LegCard({
             type="number"
             inputMode="numeric"
             min={0}
+            step={1}
             value={values.pax}
             onChange={(e) => onChange('pax', e.target.value)}
             disabled={disabled}
           />
           <LowConfidenceNote path={path('pax')} confidence={confidence} />
+          <InvalidNumberNote invalid={invalidByField.get(clearKey('pax'))} />
           <ClearAttemptNote attempt={clearAttemptByField.get(clearKey('pax'))} />
         </div>
       </CardBody>

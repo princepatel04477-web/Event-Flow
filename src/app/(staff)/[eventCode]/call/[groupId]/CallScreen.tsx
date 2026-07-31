@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { format } from 'date-fns'
 
-import { Badge, type BadgeTone } from '@/components/ui/Badge'
+import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -18,15 +17,17 @@ import {
   InboxIcon,
   PhoneIcon,
 } from '@/components/icons'
-import { cn } from '@/lib/utils'
+import { cn, formatDateTime, formatDuration } from '@/lib/utils'
+import { rsvpStatusLabel, rsvpStatusTone } from '@/lib/rsvp'
 
 import { BackRow } from './BackRow'
 import { claimGroupForCall, releaseGroupAfterCall, startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
-import { formatMobile, normalizeMobile, telHref } from '@/lib/call/phone'
+import { dialTarget, formatMobile, type DialTarget } from '@/lib/phone'
 import { drainOutbox, listQueuedCompletions, queueCompletion } from '@/lib/call/outbox'
 import { clearStoredAttempt, getStoredAttempt, setStoredAttempt, type StoredCallAttempt } from '@/lib/call/session'
 import {
   CALL_OUTCOMES,
+  MAX_PLAUSIBLE_CALL_SEC,
   outcomeOption,
   type CallAttemptRow,
   type CallCompletionPayload,
@@ -47,15 +48,9 @@ export interface CallScreenProps {
 
 type Phase = 'idle' | 'awaiting_outcome' | 'submitted'
 
-const RSVP_TONES: Record<string, BadgeTone> = {
-  not_started: 'neutral',
-  attempted: 'info',
-  callback: 'info',
-  tentative: 'warning',
-  confirmed: 'success',
-  declined: 'danger',
-  unreachable: 'danger',
-}
+/** The honest outcome for "the dialer opened but no call happened". */
+const NOT_DIALLED_OUTCOME: CallOutcome = 'other'
+const NOT_DIALLED_NOTE = 'Attempt closed without a call — the dialer was cancelled or never connected.'
 
 export function CallScreen({
   eventId,
@@ -85,6 +80,7 @@ export function CallScreen({
   const [extending, setExtending] = useState(false)
 
   const [releasing, setReleasing] = useState(false)
+  const [releaseWarning, setReleaseWarning] = useState<string | null>(null)
   const [queuedCount, setQueuedCount] = useState(0)
 
   const [now, setNow] = useState(() => Date.now())
@@ -109,7 +105,16 @@ export function CallScreen({
         // tab) since we last stored this — nothing left to resume.
         clearStoredAttempt(group.id)
       } else {
-        setActiveAttempt(stored)
+        // Android frequently DESTROYS the page while the dialer is open, so
+        // this mount is itself "the caller came back" — `visibilitychange`
+        // will never fire for that trip. Stamp the return here if the dial
+        // fired in a session that stored `dialedAt`.
+        const resumed: StoredCallAttempt =
+          stored.dialedAt !== undefined && stored.returnedAt === undefined
+            ? { ...stored, returnedAt: Date.now() }
+            : stored
+        if (resumed !== stored) setStoredAttempt(resumed)
+        setActiveAttempt(resumed)
         setPhase('awaiting_outcome')
         return
       }
@@ -122,6 +127,8 @@ export function CallScreen({
         eventId,
         dialedNumber: inFlightAttempt.dialed_number,
         startedAt: inFlightAttempt.started_at,
+        // No dialedAt: this attempt was recovered from the server, so there
+        // is no trustworthy local clock reading for when the dial fired.
       }
       setStoredAttempt(entry)
       setActiveAttempt(entry)
@@ -137,6 +144,24 @@ export function CallScreen({
     return () => window.clearInterval(id)
   }, [])
 
+  // Record the moment the caller comes back from the dialer. That instant —
+  // not "when we finish typing notes", and certainly not "when the row was
+  // inserted" — is the end of the call for duration purposes.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== 'visible') return
+      setActiveAttempt((prev) => {
+        if (!prev || prev.dialedAt === undefined || prev.returnedAt !== undefined) return prev
+        const next = { ...prev, returnedAt: Date.now() }
+        setStoredAttempt(next)
+        return next
+      })
+    }
+
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+
   // Drain the offline outbox whenever we come back online, and once on mount
   // in case something was queued in an earlier session on this device.
   useEffect(() => {
@@ -150,7 +175,7 @@ export function CallScreen({
       if (!cancelled) setQueuedCount(remaining.length)
     }
 
-    drain()
+    void drain()
     window.addEventListener('online', drain)
     return () => {
       cancelled = true
@@ -164,8 +189,8 @@ export function CallScreen({
   const lockExpiringSoon = remainingMs !== null && remainingMs > 0 && remainingMs < 60_000
   const lockExpired = remainingMs !== null && remainingMs <= 0
 
-  const primaryDigits = normalizeMobile(group.primary_mobile)
-  const altDigits = normalizeMobile(group.alt_mobile)
+  const primaryTarget = dialTarget(group.primary_mobile)
+  const altTarget = dialTarget(group.alt_mobile)
 
   const pastAttempts = useMemo(
     () => attempts.filter((a) => a.id !== activeAttempt?.attemptId),
@@ -173,13 +198,32 @@ export function CallScreen({
   )
 
   async function handleStartCall(which: 'primary' | 'alt') {
-    const digits = which === 'primary' ? primaryDigits : altDigits
-    if (!digits) return
+    const target = which === 'primary' ? primaryTarget : altTarget
+    if (!target) return
 
     setStartError(null)
     setStarting(which)
 
-    const result = await startCallAttempt({ eventId, groupId: group.id, dialedNumber: digits })
+    let result: Awaited<ReturnType<typeof startCallAttempt>>
+    try {
+      result = await startCallAttempt({
+        eventId,
+        groupId: group.id,
+        dialedNumber: target.dialedNumber,
+        deviceStartedAt: new Date().toISOString(),
+      })
+    } catch {
+      // No data connection (a basement, venue Wi-Fi with no uplink) — the
+      // server action's fetch rejects. Without this catch, `setStarting(null)`
+      // and the dial itself were both skipped and the Call buttons spun
+      // forever with no error and no call.
+      setStarting(null)
+      setStartError(
+        'No connection, so this call could not be logged — and a call that is not logged is a call that never happened. ' +
+          'Move to where there is signal and try again.',
+      )
+      return
+    }
 
     setStarting(null)
 
@@ -192,8 +236,9 @@ export function CallScreen({
       attemptId: result.attempt.id,
       groupId: group.id,
       eventId,
-      dialedNumber: digits,
+      dialedNumber: target.dialedNumber,
       startedAt: result.attempt.started_at,
+      dialedAt: Date.now(),
     }
     setStoredAttempt(entry)
     setActiveAttempt(entry)
@@ -207,8 +252,25 @@ export function CallScreen({
     // The row is written and stashed BEFORE we navigate — this is the one
     // thing that must never be reordered. See the module doc in
     // lib/call/session.ts.
-    const href = telHref(digits)
-    if (href) window.location.href = href
+    window.location.href = target.href
+  }
+
+  /**
+   * Re-fire the dialer for an attempt that is already open. Deliberately
+   * does NOT create a second call_attempts row: backing out of the Android
+   * dialer and trying again is one attempt, not two.
+   */
+  function handleRedial() {
+    if (!activeAttempt) return
+    const target = dialTarget(activeAttempt.dialedNumber)
+    if (!target) return
+    setActiveAttempt((prev) => {
+      if (!prev) return prev
+      const next = { ...prev, dialedAt: Date.now(), returnedAt: undefined }
+      setStoredAttempt(next)
+      return next
+    })
+    window.location.href = target.href
   }
 
   async function handleExtendLock() {
@@ -218,29 +280,51 @@ export function CallScreen({
     if (result.ok) setLockedUntil(result.group.locked_until)
   }
 
-  async function handleConfirmSubmit() {
-    if (!activeAttempt || !outcome) return
-
-    setSaving(true)
-    setSubmitError(null)
+  function buildPayload(
+    chosen: CallOutcome,
+    chosenNotes: string | null,
+    chosenCallbackAt: string | null,
+  ): CallCompletionPayload | null {
+    if (!activeAttempt) return null
 
     const endedAt = new Date()
-    const startedMs = new Date(activeAttempt.startedAt).getTime()
-    const durationSec = Number.isFinite(startedMs)
-      ? Math.max(0, Math.round((endedAt.getTime() - startedMs) / 1000))
-      : 0
 
-    const payload: CallCompletionPayload = {
+    // Duration is the span from the dial firing to the caller coming back
+    // from the dialer — both read from THIS phone, in this session. When we
+    // do not have both (an attempt resumed from the server, a page that was
+    // never backgrounded), it is genuinely unknown and is written as null.
+    // The old code measured from the server insert timestamp, so an attempt
+    // resumed on Wednesday for a call dialled on Monday wrote 172800 seconds
+    // and then froze that value permanently.
+    let durationSec: number | null = null
+    if (activeAttempt.dialedAt !== undefined && activeAttempt.returnedAt !== undefined) {
+      const seconds = Math.round((activeAttempt.returnedAt - activeAttempt.dialedAt) / 1000)
+      if (seconds >= 0 && seconds <= MAX_PLAUSIBLE_CALL_SEC) durationSec = seconds
+    }
+
+    return {
       attemptId: activeAttempt.attemptId,
       eventId,
       eventCode,
       groupId: group.id,
-      outcome,
-      notes: notes.trim() ? notes.trim() : null,
-      callbackAt: outcome === 'callback' && callbackAt ? new Date(callbackAt).toISOString() : null,
+      outcome: chosen,
+      notes: chosenNotes,
+      callbackAt: chosenCallbackAt,
       endedAt: endedAt.toISOString(),
       durationSec,
     }
+  }
+
+  /** Re-read the outbox rather than incrementing — the store is keyed by
+   *  attemptId, so re-queuing the same completion is not a new item. */
+  async function refreshQueuedCount() {
+    const remaining = await listQueuedCompletions()
+    setQueuedCount(remaining.length)
+  }
+
+  async function sendCompletion(payload: CallCompletionPayload) {
+    setSaving(true)
+    setSubmitError(null)
 
     const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false
 
@@ -250,7 +334,7 @@ export function CallScreen({
       setSavedOffline(true)
       setSaving(false)
       setPhase('submitted')
-      setQueuedCount((c) => c + 1)
+      await refreshQueuedCount()
       return
     }
 
@@ -263,9 +347,14 @@ export function CallScreen({
         setPhase('submitted')
         return
       }
+      // NOT saved — and a zero-row update now reports that honestly instead
+      // of claiming success. Keep the outcome on the phone rather than
+      // losing it, stay on this screen, and say what happened.
+      await queueCompletion(payload)
       setSaving(false)
       setConfirming(false)
       setSubmitError(result.message)
+      await refreshQueuedCount()
     } catch {
       // Could not even reach the server — queue it rather than lose the outcome.
       await queueCompletion(payload)
@@ -273,21 +362,62 @@ export function CallScreen({
       setSavedOffline(true)
       setSaving(false)
       setPhase('submitted')
-      setQueuedCount((c) => c + 1)
+      await refreshQueuedCount()
     }
+  }
+
+  const callbackProblem = describeCallbackProblem(outcome, callbackAt)
+
+  async function handleConfirmSubmit() {
+    if (!activeAttempt || !outcome || callbackProblem) return
+
+    const payload = buildPayload(
+      outcome,
+      notes.trim() ? notes.trim() : null,
+      outcome === 'callback' && callbackAt ? new Date(callbackAt).toISOString() : null,
+    )
+    if (!payload) return
+
+    await sendCompletion(payload)
+  }
+
+  /**
+   * Close an attempt where no call actually took place.
+   *
+   * This exists because an attempt row with `outcome IS NULL` makes the
+   * family permanently un-dialable BY THIS CALLER: the page forces
+   * `awaiting_outcome` on every visit and the Call button only renders when
+   * idle. The old "Abandon" button just cleared sessionStorage and walked
+   * away, leaving that row behind — every caller who ever backed out of a
+   * dial bricked that family for themselves.
+   *
+   * It records `other` with a note stating plainly what happened, rather
+   * than inventing "no answer" for a call that was never placed.
+   */
+  async function handleCloseWithoutCall() {
+    if (!activeAttempt) return
+    const payload = buildPayload(NOT_DIALLED_OUTCOME, NOT_DIALLED_NOTE, null)
+    if (!payload) return
+    await sendCompletion({ ...payload, durationSec: null })
   }
 
   async function handleRelease() {
     setReleasing(true)
-    await releaseGroupAfterCall(eventId, group.id, eventCode)
+    setReleaseWarning(null)
+    const result = await releaseGroupAfterCall(eventId, group.id, eventCode)
+    if (!result.ok) {
+      // Do not navigate away telling them it worked when it did not.
+      setReleasing(false)
+      setReleaseWarning(result.message ?? 'This family could not be released.')
+      return
+    }
     router.push(`/${eventCode}/queue`)
   }
 
-  async function handleAbandon() {
+  /** Leave without calling. Only reachable while idle — there is no open attempt to strand. */
+  async function handleReleaseIdle() {
     clearStoredAttempt(group.id)
-    setReleasing(true)
-    await releaseGroupAfterCall(eventId, group.id, eventCode)
-    router.push(`/${eventCode}/queue`)
+    await handleRelease()
   }
 
   function handleCallAgain() {
@@ -295,8 +425,6 @@ export function CallScreen({
     setPhase('idle')
     setActiveAttempt(null)
   }
-
-  const rsvpTone = RSVP_TONES[group.rsvp_status] ?? 'neutral'
 
   return (
     <div className="flex flex-col gap-4">
@@ -334,6 +462,15 @@ export function CallScreen({
           </div>
         ) : null}
 
+        {releaseWarning ? (
+          <p
+            role="alert"
+            className="rounded-xl border border-warning bg-tint-warning px-4 py-3 text-sm font-medium text-warning"
+          >
+            {releaseWarning}
+          </p>
+        ) : null}
+
         {/* Group context */}
         <Card>
           <CardHeader>
@@ -343,8 +480,8 @@ export function CallScreen({
                 {group.group_type} · {formatPax(group)}
               </p>
             </CardTitle>
-            <Badge tone={rsvpTone} size="md">
-              {group.rsvp_status.replace('_', ' ')}
+            <Badge tone={rsvpStatusTone(group.rsvp_status)} size="md">
+              {rsvpStatusLabel(group.rsvp_status)}
             </Badge>
           </CardHeader>
           <CardBody className="flex flex-col gap-2 text-sm">
@@ -402,8 +539,8 @@ export function CallScreen({
         {/* Call action */}
         {phase === 'idle' ? (
           <CallButtons
-            primaryDigits={primaryDigits}
-            altDigits={altDigits}
+            primary={primaryTarget}
+            alt={altTarget}
             starting={starting}
             error={startError}
             onCall={handleStartCall}
@@ -416,6 +553,7 @@ export function CallScreen({
             outcome={outcome}
             notes={notes}
             callbackAt={callbackAt}
+            callbackProblem={callbackProblem}
             confirming={confirming}
             saving={saving}
             error={submitError}
@@ -425,8 +563,8 @@ export function CallScreen({
             onReviewSubmit={() => setConfirming(true)}
             onCancelConfirm={() => setConfirming(false)}
             onConfirm={handleConfirmSubmit}
-            onAbandon={handleAbandon}
-            abandoning={releasing}
+            onRedial={handleRedial}
+            onCloseWithoutCall={handleCloseWithoutCall}
           />
         ) : null}
 
@@ -459,7 +597,7 @@ export function CallScreen({
                   variant="secondary"
                   fullWidth
                   onClick={handleCallAgain}
-                  disabled={!primaryDigits && !altDigits}
+                  disabled={!primaryTarget && !altTarget}
                 >
                   Call again
                 </Button>
@@ -499,7 +637,7 @@ export function CallScreen({
                   <li key={attempt.id} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium text-fg">
-                        {format(new Date(attempt.started_at), 'd MMM, HH:mm')}
+                        {formatDateTime(attempt.started_at)}
                       </span>
                       {attempt.outcome ? (
                         <Badge tone={outcomeOption(attempt.outcome)?.tone ?? 'neutral'}>
@@ -511,13 +649,15 @@ export function CallScreen({
                     </div>
                     <p className="text-xs text-muted">
                       Dialed {formatMobile(attempt.dialed_number)}
-                      {attempt.duration_sec !== null ? ` · ${formatDuration(attempt.duration_sec)}` : ''}
+                      {attempt.duration_sec !== null
+                        ? ` · ${formatDuration(attempt.duration_sec)}`
+                        : ''}
                       {attempt.caller_id === viewerId ? ' · you' : ''}
                     </p>
                     {attempt.notes ? <p className="text-sm text-fg">{attempt.notes}</p> : null}
                     {attempt.callback_at ? (
                       <p className="text-xs text-info">
-                        Callback requested: {format(new Date(attempt.callback_at), "d MMM, HH:mm")}
+                        Callback requested: {formatDateTime(attempt.callback_at)}
                       </p>
                     ) : null}
                   </li>
@@ -540,17 +680,49 @@ export function CallScreen({
         </Card>
 
         {phase === 'idle' ? (
-          <button
-            type="button"
-            onClick={handleAbandon}
-            disabled={releasing}
-            className="tap self-center px-3 py-2 text-sm font-medium text-muted underline-offset-2 hover:text-fg hover:underline disabled:opacity-60"
+          <Button
+            variant="ghost"
+            onClick={handleReleaseIdle}
+            loading={releasing}
+            className="self-center"
           >
             Not calling right now — release this family
-          </button>
+          </Button>
         ) : null}
       </>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+/**
+ * A `callback` outcome with no time (or a time already gone) produces a
+ * family that never resurfaces: `v_rsvp_queue.next_callback_at` only counts
+ * `callback_at > now()`, and the row freezes the moment the outcome is
+ * written, so the missing time can never be added afterwards — by anyone.
+ */
+function describeCallbackProblem(outcome: CallOutcome | null, callbackAt: string): string | null {
+  if (outcome !== 'callback') return null
+  if (!callbackAt.trim()) {
+    return 'Pick when to call back. Without a time this family drops out of the callback list for good — the record freezes on save and the time can never be added.'
+  }
+  const when = new Date(callbackAt)
+  if (Number.isNaN(when.getTime())) return 'That callback time could not be read. Pick it again.'
+  if (when.getTime() <= Date.now()) {
+    return 'That time has already passed, so the family would never appear under booked callbacks. Pick a time in the future.'
+  }
+  return null
+}
+
+/** `datetime-local` wants "YYYY-MM-DDTHH:MM" in LOCAL time, not an ISO/UTC string. */
+function toDatetimeLocalValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
   )
 }
 
@@ -568,26 +740,26 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function CallButtons({
-  primaryDigits,
-  altDigits,
+  primary,
+  alt,
   starting,
   error,
   onCall,
 }: {
-  primaryDigits: string | null
-  altDigits: string | null
+  primary: DialTarget | null
+  alt: DialTarget | null
   starting: 'primary' | 'alt' | null
   error: string | null
   onCall: (which: 'primary' | 'alt') => void
 }) {
-  if (!primaryDigits && !altDigits) {
+  if (!primary && !alt) {
     return (
       <Card>
         <CardBody>
           <EmptyState
             icon={<PhoneIcon className="h-6 w-6" />}
-            title="No phone number on file"
-            description="This family has no primary or alternate mobile number recorded. Fix it in the Excel source and re-import before calling."
+            title="No dialable number on file"
+            description="Neither number on this family reduces to a valid mobile — rather than dial a guess, nothing is offered. Fix it in the Excel source and re-import before calling."
           />
         </CardBody>
       </Card>
@@ -597,7 +769,7 @@ function CallButtons({
   return (
     <Card>
       <CardBody className="flex flex-col gap-3">
-        {primaryDigits ? (
+        {primary ? (
           <Button
             size="lg"
             fullWidth
@@ -606,11 +778,11 @@ function CallButtons({
             disabled={starting !== null}
             onClick={() => onCall('primary')}
           >
-            Call {formatMobile(primaryDigits)}
+            Call {primary.label}
           </Button>
         ) : null}
 
-        {altDigits ? (
+        {alt ? (
           <Button
             variant="secondary"
             size="md"
@@ -620,8 +792,14 @@ function CallButtons({
             disabled={starting !== null}
             onClick={() => onCall('alt')}
           >
-            Call alternate {formatMobile(altDigits)}
+            Call alternate {alt.label}
           </Button>
+        ) : null}
+
+        {primary?.international || alt?.international ? (
+          <p className="text-xs text-muted">
+            This is an international number — it will be dialled exactly as stored, not as +91.
+          </p>
         ) : null}
 
         {error ? <p className="text-sm font-medium text-danger">{error}</p> : null}
@@ -635,6 +813,7 @@ function OutcomeCard({
   outcome,
   notes,
   callbackAt,
+  callbackProblem,
   confirming,
   saving,
   error,
@@ -644,13 +823,14 @@ function OutcomeCard({
   onReviewSubmit,
   onCancelConfirm,
   onConfirm,
-  onAbandon,
-  abandoning,
+  onRedial,
+  onCloseWithoutCall,
 }: {
   activeAttempt: StoredCallAttempt
   outcome: CallOutcome | null
   notes: string
   callbackAt: string
+  callbackProblem: string | null
   confirming: boolean
   saving: boolean
   error: string | null
@@ -660,8 +840,8 @@ function OutcomeCard({
   onReviewSubmit: () => void
   onCancelConfirm: () => void
   onConfirm: () => void
-  onAbandon: () => void
-  abandoning: boolean
+  onRedial: () => void
+  onCloseWithoutCall: () => void
 }) {
   if (confirming && outcome) {
     const option = outcomeOption(outcome)
@@ -735,12 +915,20 @@ function OutcomeCard({
         </div>
 
         {outcome === 'callback' ? (
-          <Input
-            type="datetime-local"
-            label="Call back at"
-            value={callbackAt}
-            onChange={(e) => onCallbackAtChange(e.target.value)}
-          />
+          <div>
+            <Input
+              type="datetime-local"
+              label="Call back at"
+              required
+              min={toDatetimeLocalValue(new Date())}
+              value={callbackAt}
+              onChange={(e) => onCallbackAtChange(e.target.value)}
+              aria-invalid={callbackProblem ? true : undefined}
+            />
+            {callbackProblem ? (
+              <p className="mt-1 text-sm font-medium text-danger">{callbackProblem}</p>
+            ) : null}
+          </div>
         ) : null}
 
         <Textarea
@@ -753,17 +941,25 @@ function OutcomeCard({
         {error ? <p className="text-sm font-medium text-danger">{error}</p> : null}
       </CardBody>
       <CardFooter className="flex flex-col gap-2">
-        <Button fullWidth disabled={!outcome} onClick={onReviewSubmit}>
+        <Button fullWidth disabled={!outcome || callbackProblem !== null} onClick={onReviewSubmit}>
           Save outcome
         </Button>
-        <button
-          type="button"
-          onClick={onAbandon}
-          disabled={abandoning}
-          className="tap self-center px-3 py-1.5 text-sm font-medium text-muted underline-offset-2 hover:text-fg hover:underline disabled:opacity-60"
-        >
-          Abandon — release without recording an outcome
-        </button>
+
+        {/* Two honest ways out of an open attempt, so nobody is ever forced
+            to invent an outcome and nobody can strand a null-outcome row
+            that hides the Call button from them forever. */}
+        <div className="flex w-full gap-2">
+          <Button variant="secondary" fullWidth onClick={onRedial} disabled={saving}>
+            Dial again
+          </Button>
+          <Button variant="ghost" fullWidth onClick={onCloseWithoutCall} loading={saving}>
+            No call happened
+          </Button>
+        </div>
+        <p className="text-center text-xs text-subtle">
+          &ldquo;No call happened&rdquo; closes this attempt as <em>Other</em> with a note saying
+          the dialer was cancelled. It is recorded, not erased.
+        </p>
       </CardFooter>
     </Card>
   )
@@ -777,13 +973,6 @@ function formatPax(group: GuestGroupRow): string {
   const confirmed = group.confirmed_pax
   if (confirmed !== null) return `${confirmed} confirmed pax`
   return `${group.expected_pax} expected pax`
-}
-
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  if (m === 0) return `${s}s`
-  return `${m}m ${s}s`
 }
 
 function formatCountdown(ms: number | null): string {

@@ -121,6 +121,43 @@ export function formatDateRange(
   return end
 }
 
+/**
+ * Format a `timestamptz` for display in the event's local reading.
+ *
+ * One implementation for the whole app: the call screen was using date-fns
+ * `format`, the review screens raw `toLocaleString`, and they disagreed on
+ * 12- vs 24-hour. Field staff compare "last attempt" on one screen with
+ * "callback at" on another, so those have to match.
+ */
+export function formatDateTime(
+  value: string | number | Date | null | undefined,
+  options: Intl.DateTimeFormatOptions = {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  },
+): string {
+  if (value === null || value === undefined || value === '') return '—'
+
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return new Intl.DateTimeFormat('en-IN', options).format(date)
+}
+
+/** "2m 14s" / "48s". Used for call durations, which may be unknown. */
+export function formatDuration(seconds: number | null | undefined): string {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) {
+    return 'duration not recorded'
+  }
+  const m = Math.floor(seconds / 60)
+  const s = Math.round(seconds % 60)
+  if (m === 0) return `${s}s`
+  return `${m}m ${s}s`
+}
+
 /** Counters come back from views as `number | null`. Render 0, never "null". */
 export function count(value: number | null | undefined): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0

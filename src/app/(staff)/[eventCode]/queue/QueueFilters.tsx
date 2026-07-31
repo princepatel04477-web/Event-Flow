@@ -85,13 +85,16 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
       />
 
       <div className="flex gap-2">
+        {/* "Callbacks due now" was a lie: v_rsvp_queue only ever exposes the
+            next callback that is still in the FUTURE, so nothing overdue can
+            appear here. Labelled for what it actually shows. */}
         <button
           type="button"
-          onClick={() => onChange({ ...filters, callbackDue: !filters.callbackDue })}
-          aria-pressed={filters.callbackDue}
-          className={cn(TOGGLE_BASE, filters.callbackDue ? CHIP_ACTIVE : CHIP_INACTIVE)}
+          onClick={() => onChange({ ...filters, callbackScheduled: !filters.callbackScheduled })}
+          aria-pressed={filters.callbackScheduled}
+          className={cn(TOGGLE_BASE, filters.callbackScheduled ? CHIP_ACTIVE : CHIP_INACTIVE)}
         >
-          Callbacks due now
+          Callback booked
         </button>
         <button
           type="button"

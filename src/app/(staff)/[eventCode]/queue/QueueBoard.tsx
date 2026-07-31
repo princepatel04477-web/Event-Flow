@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { UploadIcon, InboxIcon, ShieldAlertIcon } from '@/components/icons'
@@ -23,12 +23,22 @@ export interface QueueBoardProps {
   eventCode: string
 }
 
+type LoadState =
+  | { phase: 'loading' }
+  | { phase: 'ready'; rows: QueueGroupRow[] }
+  | { phase: 'error'; message: string; rows: QueueGroupRow[] | null }
+
 /**
  * Client-side board: reads filters from the URL, fetches `v_rsvp_queue`
- * under the viewer's own RLS, and keeps the list live via `postgres_changes`
- * on `guest_groups`. Refetches on any change rather than patching rows in
- * place — `attempt_count`, `next_callback_at` etc. are computed by the view,
- * not present on the raw `guest_groups` change payload.
+ * under the viewer's own RLS, and keeps the list live via `postgres_changes`.
+ * Refetches on any change rather than patching rows in place —
+ * `attempt_count`, `next_callback_at` etc. are computed by the view, not
+ * present on a raw change payload.
+ *
+ * REALTIME REQUIRES MIGRATION 20260731000800. Supabase ships an empty
+ * `supabase_realtime` publication; until that migration is pushed these
+ * subscriptions report SUBSCRIBED and then deliver nothing, forever. The
+ * board still works — it just will not self-update.
  */
 export function QueueBoard({ eventId, eventCode }: QueueBoardProps) {
   const router = useRouter()
@@ -38,17 +48,19 @@ export function QueueBoard({ eventId, eventCode }: QueueBoardProps) {
 
   const supabase = useMemo(() => createClient(), [])
 
-  const [rows, setRows] = useState<QueueGroupRow[] | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const [state, setState] = useState<LoadState>({ phase: 'loading' })
+  // Bumped by the Retry button to re-run the effect below.
+  const [reloadToken, setReloadToken] = useState(0)
+
+  const retry = useCallback(() => {
+    setState({ phase: 'loading' })
+    setReloadToken((n) => n + 1)
+  }, [])
 
   // One effect owns both the initial/filter-change fetch and the realtime
-  // subscription that re-triggers it. Kept together, with the fetch itself
+  // subscriptions that re-trigger it. Kept together, with the fetch itself
   // local to the effect, so there is a single place that decides when a
   // fresh read of `v_rsvp_queue` is needed.
-  //
-  // Refetches the whole list on any change rather than patching rows in
-  // place — `attempt_count`, `next_callback_at` etc. are computed by the
-  // view, not present on the raw `guest_groups` change payload.
   useEffect(() => {
     let cancelled = false
 
@@ -61,11 +73,22 @@ export function QueueBoard({ eventId, eventCode }: QueueBoardProps) {
       if (filters.side) {
         query = query.eq('side', filters.side)
       }
-      if (filters.callbackDue) {
-        query = query.lte('next_callback_at', new Date().toISOString())
+      if (filters.callbackScheduled) {
+        // `next_callback_at` is computed by the view as
+        // `min(callback_at) filter (where callback_at > now())` — evaluated
+        // against the SERVER clock, and already guaranteed to be in the
+        // future. So the only correct client-side test is "is there one",
+        // never a comparison against the phone's clock (which used to make
+        // this filter return nothing at all, since every value it can hold
+        // is already later than any honest `now`).
+        query = query.not('next_callback_at', 'is', null)
       }
       if (filters.hideLocked) {
         query = query.eq('is_locked', false)
+      }
+
+      if (filters.callbackScheduled) {
+        query = query.order('next_callback_at', { ascending: true })
       }
 
       const { data, error } = await query
@@ -75,21 +98,32 @@ export function QueueBoard({ eventId, eventCode }: QueueBoardProps) {
       if (cancelled) return
 
       if (error) {
-        setLoadError('Could not load the calling queue. Check your connection and try again.')
+        // Never leave the board on a spinner that can never resolve: an
+        // error is a terminal state with a way out, not "still loading".
+        setState((prev) => ({
+          phase: 'error',
+          message: 'Could not load the calling queue. Check your connection and try again.',
+          rows: prev.phase === 'ready' ? prev.rows : prev.phase === 'error' ? prev.rows : null,
+        }))
         return
       }
 
-      setLoadError(null)
-      setRows(data ?? [])
+      setState({ phase: 'ready', rows: data ?? [] })
     }
 
     void load()
 
-    // Realtime: every phone on the team shares this table, so a lock taken
+    // Realtime: every phone on the team shares this data, so a lock taken
     // (or an outcome logged) on another device shows up here without a pull
     // to refresh.
+    //
+    // BOTH tables matter. `attempt_count`, `last_outcome` and
+    // `next_callback_at` come entirely from `call_attempts`, and logging an
+    // outcome writes nothing to `guest_groups` (see migration 0200: "Nothing
+    // in this chain writes to guest_groups on its own"). Listening only to
+    // `guest_groups` left those three columns stale team-wide.
     const channel = supabase
-      .channel(`queue-guest-groups-${eventId}`)
+      .channel(`queue-${eventId}`)
       .on(
         'postgres_changes',
         {
@@ -102,13 +136,25 @@ export function QueueBoard({ eventId, eventCode }: QueueBoardProps) {
           void load()
         },
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'call_attempts',
+          filter: `event_id=eq.${eventId}`,
+        },
+        () => {
+          void load()
+        },
+      )
       .subscribe()
 
     return () => {
       cancelled = true
       void supabase.removeChannel(channel)
     }
-  }, [supabase, eventId, filters])
+  }, [supabase, eventId, filters, reloadToken])
 
   function handleFilterChange(next: QueueFilterState) {
     const params = filtersToSearchParams(next)
@@ -116,8 +162,8 @@ export function QueueBoard({ eventId, eventCode }: QueueBoardProps) {
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }
 
-  const isLoading = rows === null
   const filtersActive = hasActiveFilters(filters)
+  const rows = state.phase === 'ready' ? state.rows : state.phase === 'error' ? state.rows : null
 
   return (
     <div className="flex flex-col gap-4">
@@ -130,21 +176,29 @@ export function QueueBoard({ eventId, eventCode }: QueueBoardProps) {
 
       <QueueFilters filters={filters} onChange={handleFilterChange} />
 
-      {loadError ? (
+      {state.phase === 'error' ? (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-xl border border-danger bg-tint-danger px-4 py-3 text-sm font-medium text-danger"
+          className="flex flex-col gap-3 rounded-xl border border-danger bg-tint-danger px-4 py-3"
         >
-          <ShieldAlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{loadError}</span>
+          <div className="flex items-start gap-2 text-sm font-medium text-danger">
+            <ShieldAlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              {state.message}
+              {state.rows ? ' Showing the last list that loaded.' : ''}
+            </span>
+          </div>
+          <Button variant="secondary" fullWidth onClick={retry}>
+            Retry
+          </Button>
         </div>
       ) : null}
 
-      {isLoading ? (
+      {state.phase === 'loading' ? (
         <div className="flex justify-center py-12">
           <Spinner size="lg" />
         </div>
-      ) : rows.length === 0 ? (
+      ) : rows === null ? null : rows.length === 0 ? (
         filtersActive ? (
           <EmptyState
             icon={<InboxIcon className="h-7 w-7" />}

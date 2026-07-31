@@ -6,8 +6,17 @@ export type Side = Database['app']['Enums']['side']
 export type QueueFilterState = {
   statuses: RsvpStatus[]
   side: Side | null
-  /** `next_callback_at <= now()`. */
-  callbackDue: boolean
+  /**
+   * `next_callback_at is not null`.
+   *
+   * NOT "due now". `v_rsvp_queue` computes the column as
+   * `min(callback_at) filter (where callback_at > now())`, evaluated on the
+   * server, so every value it can ever hold is already in the future. The
+   * old `next_callback_at <= browserNow` test therefore matched nothing
+   * except under clock skew. The queue is sorted soonest-first when this is
+   * on, which is what a caller actually wants from it.
+   */
+  callbackScheduled: boolean
   hideLocked: boolean
 }
 
@@ -26,7 +35,7 @@ export const ALL_SIDES: Side[] = ['bride', 'groom', 'both', 'other']
 export const DEFAULT_FILTERS: QueueFilterState = {
   statuses: [],
   side: null,
-  callbackDue: false,
+  callbackScheduled: false,
   hideLocked: false,
 }
 
@@ -54,7 +63,7 @@ export function parseFilters(params: URLSearchParams): QueueFilterState {
   return {
     statuses,
     side,
-    callbackDue: params.get('callback') === 'due',
+    callbackScheduled: params.get('callback') === 'scheduled',
     hideLocked: params.get('hideLocked') === '1',
   }
 }
@@ -65,7 +74,7 @@ export function filtersToSearchParams(filters: QueueFilterState): URLSearchParam
 
   if (filters.statuses.length > 0) params.set('status', filters.statuses.join(','))
   if (filters.side) params.set('side', filters.side)
-  if (filters.callbackDue) params.set('callback', 'due')
+  if (filters.callbackScheduled) params.set('callback', 'scheduled')
   if (filters.hideLocked) params.set('hideLocked', '1')
 
   return params
@@ -75,7 +84,7 @@ export function hasActiveFilters(filters: QueueFilterState): boolean {
   return (
     filters.statuses.length > 0 ||
     filters.side !== null ||
-    filters.callbackDue ||
+    filters.callbackScheduled ||
     filters.hideLocked
   )
 }
