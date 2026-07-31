@@ -1,5 +1,7 @@
-'use client'
-
+// No 'use client' here on purpose: Field has no state and no hooks, so both
+// server and client components can render it — and, more importantly, server
+// code can import `fieldControlClasses` without it becoming a client
+// reference it cannot call.
 import type { ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
