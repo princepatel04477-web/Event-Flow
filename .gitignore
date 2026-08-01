@@ -42,3 +42,8 @@ next-env.d.ts
 
 # Obsidian vault UI state (churns on every pane change)
 eventflow/.obsidian/workspace.json
+
+# TestSprite scratch state. Written by the tool itself, which appends this
+# entry with Windows backslashes — gitignore only understands forward slashes,
+# so the pattern it writes never matches. Corrected here.
+testsprite_tests/tmp/

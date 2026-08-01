@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TC001",
+    "title": "get login page without session",
+    "description": "Verify that a GET request to /login without an active session returns a 200 status with the HTML sign-in form and accepts an optional next redirect parameter."
+  },
+  {
+    "id": "TC002",
+    "title": "get auth callback with valid code and next",
+    "description": "Verify that a GET request to /auth/callback with a valid code and a same-origin next parameter sets a session cookie and responds with a 307 redirect to the next URL."
+  },
+  {
+    "id": "TC003",
+    "title": "get auth callback with malicious next parameter",
+    "description": "Verify that a GET request to /auth/callback with a valid code but a non-same-origin next parameter sanitizes the redirect target and responds with a 307 redirect to /."
+  },
+  {
+    "id": "TC004",
+    "title": "get root with authenticated session",
+    "description": "Verify that a GET request to / with a valid authenticated session returns a 200 status with the HTML event picker or dashboard."
+  },
+  {
+    "id": "TC005",
+    "title": "get root without session",
+    "description": "Verify that a GET request to / without an authenticated session responds with a 307 redirect to /login."
+  },
+  {
+    "id": "TC006",
+    "title": "get event dashboard with authorized user",
+    "description": "Verify that a GET request to /{eventCode} with an authenticated user who is a member of the event returns a 200 status with the HTML dashboard and event counters."
+  },
+  {
+    "id": "TC007",
+    "title": "get event dashboard with unauthorized user",
+    "description": "Verify that a GET request to /{eventCode} with an authenticated user who is not a member of the event returns a 404 status indicating unknown event code or not-a-member response."
+  },
+  {
+    "id": "TC008",
+    "title": "get client guest list with client role",
+    "description": "Verify that a GET request to /{eventCode}/guests with an authenticated client role user returns a 200 status with the HTML guest list."
+  },
+  {
+    "id": "TC009",
+    "title": "get admin events with admin role",
+    "description": "Verify that a GET request to /admin/events with an authenticated admin session returns a 200 status with the HTML event list and create-event form."
+  },
+  {
+    "id": "TC010",
+    "title": "get admin events with non admin role",
+    "description": "Verify that a GET request to /admin/events with an authenticated event_team session returns a 307 redirect to /, denying access to non-admin users."
+  }
+]
