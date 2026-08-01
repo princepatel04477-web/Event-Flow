@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 
 import { createClient } from '@/lib/supabase/server'
 import type { Json } from '@/lib/supabase/database.types'
-import { friendlyRpcError } from '@/lib/errors'
+import { friendlyDbError, friendlyRpcError } from '@/lib/errors'
 import type { RpcPayload } from '@/lib/review/payload'
 
 export type ReviewActionResult = { ok: true } | { ok: false; error: string }
@@ -50,10 +50,11 @@ export async function rejectExtraction(
   extractionId: string,
   reviewNotes: string,
 ): Promise<ReviewActionResult> {
-  const notes = reviewNotes.trim()
-  if (!notes) {
-    return { ok: false, error: 'Add a short note explaining why this is being rejected.' }
-  }
+  // A blank note is allowed and gets a default. Discard is the caller's
+  // escape hatch for "that is not what they said" — putting a required text
+  // field in front of it, on a phone, in a corridor, is how you get people
+  // accepting a wrong extraction because it was the quicker button.
+  const notes = reviewNotes.trim() || 'Discarded at review — details re-entered manually.'
 
   const supabase = await createClient()
 
@@ -115,6 +116,65 @@ export async function rejectExtraction(
 
   revalidatePath(`/${eventCode}/review`)
   revalidatePath(`/${eventCode}/review/${extractionId}`)
+
+  return { ok: true }
+}
+
+/**
+ * Commit a manually typed RSVP — the path taken when a caller discards an
+ * extraction, or when there was never a recording to extract from.
+ *
+ * It routes through `apply_rsvp_extraction()` rather than updating
+ * `guest_groups` and `travel_legs` directly, for three reasons the direct
+ * path cannot give us: the group and its legs land in one transaction, the
+ * caller's lock is released by the same statement that writes the data, and
+ * the entry is auditable afterwards as a row someone typed (`model` is
+ * `'manual'`) rather than an unattributable UPDATE.
+ *
+ * The insert and the RPC are two round trips, so a failure between them
+ * leaves a `pending` extraction with `model = 'manual'` behind. That row is
+ * inert — it has written nothing to guest data — but it will appear in the
+ * review queue until someone applies or discards it.
+ */
+export async function applyManualEntry(
+  eventCode: string,
+  eventId: string,
+  groupId: string,
+  payload: RpcPayload,
+): Promise<ReviewActionResult> {
+  const supabase = await createClient()
+
+  const { data: extraction, error: insertError } = await supabase
+    .from('rsvp_extractions')
+    .insert({
+      event_id: eventId,
+      group_id: groupId,
+      // The payload is already in RPC shape, and the RPC overwrites `parsed`
+      // with what it was handed anyway — so what lands here is exactly what
+      // the human typed.
+      parsed: payload as unknown as Json,
+      confidence: {} as unknown as Json,
+      model: 'manual',
+    })
+    .select('id')
+    .single()
+
+  if (insertError || !extraction) {
+    return { ok: false, error: friendlyDbError(insertError) }
+  }
+
+  const { error } = await supabase.rpc('apply_rsvp_extraction', {
+    p_extraction_id: extraction.id,
+    p_payload: payload as unknown as Json,
+  })
+
+  if (error) {
+    return { ok: false, error: friendlyRpcError(error) }
+  }
+
+  revalidatePath(`/${eventCode}/review`)
+  revalidatePath(`/${eventCode}`)
+  revalidatePath(`/${eventCode}/queue`)
 
   return { ok: true }
 }

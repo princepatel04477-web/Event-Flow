@@ -6,7 +6,8 @@ import { ChevronLeftIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
 import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import {
-  buildInitialFormValues,
+  buildFieldStates,
+  initialValuesFrom,
   parseExtractionPayload,
   type ExistingGroupValues,
   type ExistingLegValues,
@@ -86,6 +87,19 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   // as "not found" rather than rendering a form with nothing behind it.
   if (!group) notFound()
 
+  // Who approved it — the read-only banner names a person, not a timestamp.
+  // A separate query rather than a join: `reviewed_by` points at auth.users,
+  // and profiles is the only table staff can read a name out of.
+  let reviewedByName: string | null = null
+  if (extraction.reviewed_by) {
+    const { data: reviewer } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', extraction.reviewed_by)
+      .maybeSingle()
+    reviewedByName = reviewer?.full_name ?? null
+  }
+
   let transcript: { text: string; language: string | null; confidence: number | null } | null = null
   if (extraction.transcript_id) {
     const { data: t } = await supabase
@@ -110,7 +124,16 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   const existingDeparture = toExistingLeg(departureLegs[0] ?? null)
 
   const parsed = parseExtractionPayload(extraction.parsed)
-  const initialValues = buildInitialFormValues(parsed, existingGroup, existingArrival, existingDeparture)
+  // One resolution pass drives band colouring, the changed markers and the
+  // prefills — including blanking anything the model could not hear clearly.
+  const fieldStates = buildFieldStates(
+    parsed,
+    existingGroup,
+    existingArrival,
+    existingDeparture,
+    extraction.confidence,
+  )
+  const initialValues = initialValuesFrom(fieldStates)
 
   return (
     <div className="flex flex-col gap-4">
@@ -124,15 +147,17 @@ export default async function ReviewDetailPage({ params }: PageProps) {
 
       <ReviewForm
         eventCode={event.code}
+        groupId={extraction.group_id}
         extractionId={extraction.id}
         extractionStatus={extraction.status}
         reviewedAt={extraction.reviewed_at}
+        reviewedByName={reviewedByName}
         reviewNotes={extraction.review_notes}
         headName={group.head_name}
         primaryMobile={group.primary_mobile}
         expectedPax={group.expected_pax}
-        confidence={extraction.confidence}
         transcript={transcript}
+        fieldStates={fieldStates}
         initialValues={initialValues}
         existingGroup={existingGroup}
         existingArrival={existingArrival}

@@ -108,7 +108,7 @@ export default async function ReviewListPage({ params, searchParams }: PageProps
               primary_mobile: string | null
             } | null
             const parsed = parseExtractionPayload(ex.parsed)
-            const { lowest, lowCount } = summarizeConfidence(ex.confidence)
+            const { lowest, flaggedCount, unclearCount } = summarizeConfidence(ex.confidence)
 
             return (
               <li key={ex.id}>
@@ -137,10 +137,10 @@ export default async function ReviewListPage({ params, searchParams }: PageProps
                       </div>
 
                       <div className="flex shrink-0 flex-col items-end gap-1">
-                        {lowCount > 0 ? (
-                          <Badge tone="warning">
-                            {lowCount} low-confidence
-                          </Badge>
+                        {unclearCount > 0 ? (
+                          <Badge tone="danger">{unclearCount} not heard</Badge>
+                        ) : flaggedCount > 0 ? (
+                          <Badge tone="warning">{flaggedCount} to check</Badge>
                         ) : (
                           <Badge tone="success">Looks solid</Badge>
                         )}

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Input } from '@/components/ui/Input'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { Textarea } from '@/components/ui/Textarea'
 import {
   ArrowDownCircleIcon,
@@ -589,7 +590,18 @@ export function CallScreen({
               )}
             </CardBody>
             <CardFooter className="flex flex-col gap-2">
-              <Button fullWidth variant="primary" onClick={handleRelease} loading={releasing}>
+              {/* Deliberately does NOT release the lock: the family stays
+                  yours while you review what the AI made of the call, and
+                  saving the review releases it in the same transaction that
+                  writes the RSVP. */}
+              <LinkButton
+                href={`/${eventCode}/call/${group.id}/review`}
+                variant="primary"
+                fullWidth
+              >
+                Review this call
+              </LinkButton>
+              <Button fullWidth variant="secondary" onClick={handleRelease} loading={releasing}>
                 Release family &amp; back to queue
               </Button>
               <div className="flex w-full gap-2">

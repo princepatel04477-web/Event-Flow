@@ -13,6 +13,12 @@ import type { Database } from '@/lib/supabase/database.types'
 // RSVP status labels/options live in @/lib/rsvp — one map for the queue, the
 // call screen and this form, which had each grown their own.
 import { RSVP_STATUS_LABELS, RSVP_STATUS_OPTIONS, type RsvpStatus } from '@/lib/rsvp'
+import {
+  CONFIDENCE_PATHS,
+  bandFor,
+  getConfidence,
+  type ConfidenceBand,
+} from '@/lib/review/confidence'
 
 export { RSVP_STATUS_LABELS, RSVP_STATUS_OPTIONS }
 export type { RsvpStatus }
@@ -151,11 +157,6 @@ export const EMPTY_LEG_FORM_VALUES: LegFormValues = {
   pax: '',
 }
 
-function toFormString(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) return ''
-  return String(value)
-}
-
 /** Postgres `time` comes back as "HH:MM:SS" — <input type="time"> wants "HH:MM". */
 export function toTimeInputValue(value: string | null | undefined): string {
   if (!value) return ''
@@ -184,38 +185,249 @@ export interface ExistingLegValues {
   point: string | null
 }
 
-function legFormValues(
-  parsedLeg: ExtractionLeg | null,
-  existing: ExistingLegValues | null,
-): LegFormValues {
+// ---------------------------------------------------------------------
+// Field metadata — one table the whole review screen derives from
+// ---------------------------------------------------------------------
+
+/** Every editable field, in the dotted form `CONFIDENCE_PATHS` already uses. */
+export type FieldKey =
+  | 'rsvpStatus'
+  | 'confirmedPax'
+  | 'side'
+  | 'remarks'
+  | 'arrival.mode'
+  | 'arrival.date'
+  | 'arrival.time'
+  | 'arrival.reference'
+  | 'arrival.point'
+  | 'arrival.pax'
+  | 'departure.mode'
+  | 'departure.date'
+  | 'departure.time'
+  | 'departure.reference'
+  | 'departure.point'
+  | 'departure.pax'
+
+export const FIELD_LABELS: Record<FieldKey, string> = {
+  rsvpStatus: 'RSVP status',
+  confirmedPax: 'Confirmed pax',
+  side: 'Side',
+  remarks: 'Remarks',
+  'arrival.mode': 'Arrival mode',
+  'arrival.date': 'Arrival date',
+  'arrival.time': 'Arrival time',
+  'arrival.reference': 'Arrival reference',
+  'arrival.point': 'Arrival point',
+  'arrival.pax': 'Arrival pax',
+  'departure.mode': 'Departure mode',
+  'departure.date': 'Departure date',
+  'departure.time': 'Departure time',
+  'departure.reference': 'Departure reference',
+  'departure.point': 'Departure point',
+  'departure.pax': 'Departure pax',
+}
+
+const LEG_FIELDS: (keyof LegFormValues)[] = [
+  'mode',
+  'date',
+  'time',
+  'reference',
+  'point',
+  'pax',
+]
+
+/** Read one field out of the form state by its dotted key. */
+export function getFormValue(values: ReviewFormValues, key: FieldKey): string {
+  const dot = key.indexOf('.')
+  if (dot === -1) return values[key as 'rsvpStatus' | 'confirmedPax' | 'side' | 'remarks']
+  const direction = key.slice(0, dot) as 'arrival' | 'departure'
+  return values[direction][key.slice(dot + 1) as keyof LegFormValues]
+}
+
+/** Write one field into the form state by its dotted key, immutably. */
+export function setFormValue(
+  values: ReviewFormValues,
+  key: FieldKey,
+  value: string,
+): ReviewFormValues {
+  const dot = key.indexOf('.')
+  if (dot === -1) return { ...values, [key]: value }
+  const direction = key.slice(0, dot) as 'arrival' | 'departure'
+  return { ...values, [direction]: { ...values[direction], [key.slice(dot + 1)]: value } }
+}
+
+/**
+ * Everything the screen needs to know about one field, resolved once on the
+ * server so the three bands (had before / heard now / transcript) all read
+ * from the same numbers instead of each recomputing them.
+ */
+export interface FieldState {
+  key: FieldKey
+  label: string
+  band: ConfidenceBand
+  /** The raw score, for the percentage chip. Null when the model gave none. */
+  score: number | null
+  /** What the model emitted, as a display string. Null when it emitted nothing. */
+  extracted: string | null
+  /** What the database holds today. Null when the field is unset. */
+  existing: string | null
+  /** What the input starts at. Blank for `unclear` — that is the whole point. */
+  initial: string
+  /**
+   * The model disagrees with the record. Only ever set for fields we actually
+   * pre-filled: flagging a disagreement on a value we deliberately hid would
+   * ask the reviewer to compare against something not on screen.
+   */
+  changed: boolean
+}
+
+export type FieldStates = Record<FieldKey, FieldState>
+
+function legValue(leg: ExtractionLeg | null, field: keyof LegFormValues): string | number | null {
+  if (!leg) return null
+  return leg[field as keyof ExtractionLeg] ?? null
+}
+
+function existingLegValue(
+  leg: ExistingLegValues | null,
+  field: keyof LegFormValues,
+): string | number | null {
+  if (!leg) return null
+  if (field === 'time') return toTimeInputValue(leg.time)
+  return leg[field as keyof ExistingLegValues] ?? null
+}
+
+/** Normalised comparison — "6" and 6 and " 6 " are the same answer. */
+function sameValue(a: string | null, b: string | null): boolean {
+  return (a ?? '').trim() === (b ?? '').trim()
+}
+
+function buildFieldState(
+  key: FieldKey,
+  rawExtracted: string | number | null,
+  rawExisting: string | number | null,
+  confidence: unknown,
+): FieldState {
+  const extracted = rawExtracted === null || rawExtracted === undefined ? null : String(rawExtracted)
+  const existing = rawExisting === null || rawExisting === undefined ? null : String(rawExisting)
+
+  const path = CONFIDENCE_PATHS[key] ?? key
+  // `side` is never extracted, so it has no score and no band of its own.
+  const hasExtracted = extracted !== null && extracted.trim() !== ''
+  const band: ConfidenceBand = key === 'side' ? 'absent' : bandFor(confidence, path, hasExtracted)
+  const score = key === 'side' ? null : getConfidence(confidence, path)
+
+  // An `unclear` field starts blank so the reviewer has to make a real
+  // decision. Everything else prefers the model's answer, falling back to
+  // what the record already holds.
+  const initial =
+    band === 'unclear' ? '' : hasExtracted ? String(extracted) : (existing ?? '')
+
   return {
-    mode: toFormString(parsedLeg?.mode ?? existing?.mode ?? null),
-    date: toFormString(parsedLeg?.date ?? existing?.date ?? null),
-    time: toTimeInputValue(toFormString(parsedLeg?.time ?? existing?.time ?? null) || null),
-    reference: toFormString(parsedLeg?.reference ?? existing?.reference ?? null),
-    point: toFormString(parsedLeg?.point ?? existing?.point ?? null),
-    pax: toFormString(parsedLeg?.pax ?? existing?.pax ?? null),
+    key,
+    label: FIELD_LABELS[key],
+    band,
+    score,
+    extracted,
+    existing,
+    initial,
+    changed: band !== 'unclear' && hasExtracted && !sameValue(extracted, existing),
   }
 }
 
 /**
- * Prefill the review form: the model's extraction wins where it has an
- * opinion, otherwise fall back to what is already on the group / leg today.
+ * Resolve every field's band, prefill and changed-flag in one pass.
+ *
+ * This is the function the review screen is really built on: `buildInitial-
+ * FormValues` below is just its `initial` column collected into the shape the
+ * inputs want.
+ */
+export function buildFieldStates(
+  parsed: ExtractionParsed,
+  existingGroup: ExistingGroupValues,
+  existingArrival: ExistingLegValues | null,
+  existingDeparture: ExistingLegValues | null,
+  confidence: unknown,
+): FieldStates {
+  const states = {} as FieldStates
+
+  states.rsvpStatus = buildFieldState(
+    'rsvpStatus',
+    parsed.rsvp_status,
+    existingGroup.rsvpStatus,
+    confidence,
+  )
+  states.confirmedPax = buildFieldState(
+    'confirmedPax',
+    parsed.confirmed_pax,
+    existingGroup.confirmedPax,
+    confidence,
+  )
+  // Reviewer-supplied only — the model never emits it, so it always shows the
+  // record's current value and never counts as "changed".
+  states.side = buildFieldState('side', null, existingGroup.side, confidence)
+  states.remarks = buildFieldState(
+    'remarks',
+    parsed.special_requests,
+    existingGroup.remarks,
+    confidence,
+  )
+
+  for (const [direction, parsedLeg, existingLeg] of [
+    ['arrival', parsed.arrival, existingArrival],
+    ['departure', parsed.departure, existingDeparture],
+  ] as const) {
+    for (const field of LEG_FIELDS) {
+      const key = `${direction}.${field}` as FieldKey
+      states[key] = buildFieldState(
+        key,
+        legValue(parsedLeg, field),
+        existingLegValue(existingLeg, field),
+        confidence,
+      )
+    }
+  }
+
+  return states
+}
+
+/** Collect the resolved `initial` values into the shape the inputs bind to. */
+export function initialValuesFrom(states: FieldStates): ReviewFormValues {
+  const legOf = (direction: 'arrival' | 'departure'): LegFormValues => ({
+    mode: states[`${direction}.mode`].initial,
+    date: states[`${direction}.date`].initial,
+    time: toTimeInputValue(states[`${direction}.time`].initial) || '',
+    reference: states[`${direction}.reference`].initial,
+    point: states[`${direction}.point`].initial,
+    pax: states[`${direction}.pax`].initial,
+  })
+
+  return {
+    rsvpStatus: states.rsvpStatus.initial,
+    confirmedPax: states.confirmedPax.initial,
+    side: states.side.initial,
+    remarks: states.remarks.initial,
+    arrival: legOf('arrival'),
+    departure: legOf('departure'),
+  }
+}
+
+/**
+ * Prefill the review form. Confidence-aware: fields the model could not hear
+ * clearly arrive blank rather than pre-filled with a doubtful value, because
+ * a reviewer waving through a wrong pre-fill is the exact failure this screen
+ * exists to prevent.
  */
 export function buildInitialFormValues(
   parsed: ExtractionParsed,
   existingGroup: ExistingGroupValues,
   existingArrival: ExistingLegValues | null,
   existingDeparture: ExistingLegValues | null,
+  confidence: unknown = null,
 ): ReviewFormValues {
-  return {
-    rsvpStatus: toFormString(parsed.rsvp_status ?? existingGroup.rsvpStatus),
-    confirmedPax: toFormString(parsed.confirmed_pax ?? existingGroup.confirmedPax),
-    side: toFormString(existingGroup.side),
-    remarks: toFormString(parsed.special_requests ?? existingGroup.remarks),
-    arrival: legFormValues(parsed.arrival, existingArrival),
-    departure: legFormValues(parsed.departure, existingDeparture),
-  }
+  return initialValuesFrom(
+    buildFieldStates(parsed, existingGroup, existingArrival, existingDeparture, confidence),
+  )
 }
 
 // ---------------------------------------------------------------------
@@ -425,4 +637,44 @@ export function detectClearAttempts(
   }
 
   return attempts
+}
+
+// ---------------------------------------------------------------------
+// Save guards
+// ---------------------------------------------------------------------
+
+/**
+ * Fields we blanked for low confidence that the reviewer has neither filled
+ * in nor consciously left alone.
+ *
+ * `acknowledged` holds the keys the reviewer explicitly ticked "not heard —
+ * leave as is" on. Blocking on this is what turns "not heard clearly" from a
+ * colour into a decision: the alternative is a caller scrolling past a red
+ * box and saving anyway.
+ */
+export function detectUnresolvedUnclear(
+  values: ReviewFormValues,
+  states: FieldStates,
+  acknowledged: ReadonlySet<string>,
+): FieldState[] {
+  return (Object.keys(states) as FieldKey[])
+    .map((key) => states[key])
+    .filter(
+      (state) =>
+        state.band === 'unclear' &&
+        normalize(getFormValue(values, state.key)) === null &&
+        !acknowledged.has(state.key),
+    )
+}
+
+/**
+ * A `confirmed` RSVP with no head count.
+ *
+ * Room allocation and vehicle fitting both divide by PAX, so a family marked
+ * confirmed with an unknown count silently breaks two later phases. Caught
+ * here rather than at allocation time, when the family is unreachable.
+ */
+export function detectMissingConfirmedPax(values: ReviewFormValues): boolean {
+  if (normalize(values.rsvpStatus) !== 'confirmed') return false
+  return parseIntOrNull(values.confirmedPax) === null
 }

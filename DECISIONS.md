@@ -5,6 +5,113 @@ made, so the next session does not re-litigate it.
 
 ---
 
+## 1 August 2026 — p1i review screen, p1j Excel export
+
+### The review route is event-scoped, and keyed by extraction not group
+
+The brief asked for `/team/calls/[groupId]/review`. Built as
+`/[eventCode]/call/[groupId]/review` instead. There is no `/team` segment in this
+app and adding one would put a guest-data screen outside the `[eventCode]` fence
+every other staff route sits behind — the EventSwitcher, `resolveEventByCode` and
+`requireStaff` all key off that segment, and CLAUDE.md rule #1 is that every table
+is fenced by `event_id`.
+
+Group-keyed and extraction-keyed are both right, for different readers. The caller
+thinks in families and arrives from the call screen, so the *entry point* takes a
+`groupId`; it resolves the group's outstanding extraction and redirects. The thing
+being approved is an extraction — two calls to one family are two separate
+decisions — so the *screen* stays at `/[eventCode]/review/[extractionId]`. When no
+extraction exists yet, the group route offers manual entry rather than 404ing.
+
+### A missing confidence score is not the same as a low one
+
+The brief's bands are `>= 0.85` normal, `0.60–0.85` amber, `< 0.60` **or null** red
+with an empty input. Implemented with a fourth band, `absent`.
+
+Taken literally, "null → red" paints every departure field red on a call that only
+covered arrival — the model emits no score for a field it never heard discussed,
+and a form of twelve red boxes teaches people to ignore red. So the split is on
+whether the model emitted a *value*: a value with no confidence behind it is an
+unbacked guess and is treated as `unclear` (red, blank, blocks saving); no value
+and no score means nobody discussed it, which gets no colouring and pre-fills from
+the record as before. The brief's actual failure mode — a caller waving through a
+wrong pre-fill — needs a pre-filled value to exist, and `absent` fields have none
+from the model.
+
+### "Not heard clearly" is a decision, not a colour
+
+A red field arrives blank and blocks **Confirm and save** until the reviewer either
+types a value or ticks "not heard — keep X" / "not heard — leave this empty". A red
+border alone is scrollable past; a disabled save button is not. The blanked field
+still displays what the model thought it heard ("it sounded like 6E 5074, but not
+confidently enough to fill in for you") — hiding the evidence entirely would make
+the transcript the only way to recover a value that was probably right.
+
+### Discard routes through a manual form that reuses the RPC
+
+There was no manual entry form in the repo. Built at
+`/[eventCode]/call/[groupId]/manual`, and it commits through
+`apply_rsvp_extraction()` against a `model = 'manual'` extraction row rather than
+updating `guest_groups` and `travel_legs` directly. That buys the three things a
+direct write cannot: group and legs in one transaction, the caller's lock released
+by the same statement that writes the data, and an auditable row showing a person
+typed this.
+
+Cost, accepted: the insert and the RPC are two round trips, so a failure between
+them leaves a `pending` manual extraction behind. It has written nothing to guest
+data, but it will sit in the review queue until someone clears it.
+
+Discard also no longer requires a rejection note — blank gets a default. Putting a
+required textarea in front of the "that is not what they said" escape hatch, on a
+phone, is how people end up accepting a wrong extraction because it was the quicker
+button.
+
+### Export dates are text, not date cells
+
+`DD/MM/YYYY` is written as a string. A real date cell is rendered in the *reader's*
+locale, so the same file shows 12/07 in Ahmedabad and 07/12 on a US-locale laptop.
+For a sheet whose job is telling a driver which day to turn up, an unambiguous fixed
+rendering beats a sortable one. Mobiles and room numbers are text cells with an
+explicit `@` number format for the same family of reasons — a bare 10-digit mobile
+read as a number comes back as `9.87654E+09`, and a leading zero vanishes.
+
+Pax counts stay numeric so the desk can sum a column.
+
+### The exporter writes hidden ids; the importer does not read them yet
+
+Every sheet carries `group_id` (and `guest_id` on Guests) in hidden columns, and
+`src/lib/import/identity.ts` matches a re-imported row back by id — including the
+case that motivates the whole thing: correcting a mobile the preview warned about
+must update the family, not fork a duplicate.
+
+That module is **not wired into the import pipeline**. `src/lib/actions/import.ts`
+is mid-rewrite in the working tree, and editing it here would collide with that
+work. Wiring is one call at the point where the current code computes
+`source_row_hash`: prefer `matchRowById`, fall back to the hash when it returns
+`no-id`. Note the third outcome — `unknown-id`, a well-formed id belonging to no
+family in this event — must surface as a preview warning, not fall back to hash
+matching, or a row pasted in from another event's sheet silently creates a family.
+
+### Verified without a test runner
+
+Both features were checked by throwaway scripts run under `npx tsx` — 30 assertions
+on the export (including writing a real `.xlsx`, reading it back, and confirming a
+mobile survives as 10-digit text with its hidden ids intact) and 40 on the review
+logic (band boundaries, blank-on-red, changed detection, every save guard, and that
+the payload carries the human's edit rather than the model's output). The scripts
+were deleted after running.
+
+No test runner was added: `vitest.config.ts` and a `tests/` tree already exist
+uncommitted in the working tree, and adding a second setup would conflict on
+`package.json`. The pure modules — `confidence.ts`, `payload.ts`, `workbook.ts`,
+`identity.ts` — are dependency-free and are the first things worth covering when
+that suite lands.
+
+**Still not done:** nothing has been exercised against a real database or a real
+Android phone, which CLAUDE.md §14 requires.
+
+---
+
 ## 31 July 2026 — p1d, role gating and event scoping
 
 ### Event scope lives in the URL, not in an `active_event` cookie

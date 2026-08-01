@@ -1,17 +1,15 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { acceptExtraction, rejectExtraction } from '@/lib/actions/review'
-import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
-import { PhoneIcon, ShieldAlertIcon } from '@/components/icons'
-import { CONFIDENCE_PATHS, getConfidence, LOW_CONFIDENCE_THRESHOLD } from '@/lib/review/confidence'
+import { PhoneIcon } from '@/components/icons'
 import {
   RSVP_STATUS_LABELS,
   RSVP_STATUS_OPTIONS,
@@ -22,30 +20,42 @@ import {
   buildRpcPayload,
   detectClearAttempts,
   detectInvalidNumbers,
+  detectMissingConfirmedPax,
+  detectUnresolvedUnclear,
+  setFormValue,
   type ClearAttempt,
+  type FieldKey,
+  type FieldStates,
   type InvalidNumber,
   type ExistingGroupValues,
   type ExistingLegValues,
-  type LegFormValues,
   type ReviewFormValues,
+  type RsvpStatus,
+  type Side,
+  type TravelMode,
 } from '@/lib/review/payload'
 import { formatMobile } from '@/lib/phone'
-import { formatDateTime } from '@/lib/utils'
+import { formatDate, formatDateTime } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/database.types'
+
+import { BeforeBand, TranscriptPanel } from './ReviewBands'
+import { FieldLabel, ReviewField } from './ReviewField'
 
 type ExtractionStatus = Database['app']['Enums']['extraction_status']
 
 export interface ReviewFormProps {
   eventCode: string
+  groupId: string
   extractionId: string
   extractionStatus: ExtractionStatus
   reviewedAt: string | null
+  reviewedByName: string | null
   reviewNotes: string | null
   headName: string
   primaryMobile: string | null
   expectedPax: number
-  confidence: unknown
   transcript: { text: string; language: string | null; confidence: number | null } | null
+  fieldStates: FieldStates
   initialValues: ReviewFormValues
   existingGroup: ExistingGroupValues
   existingArrival: ExistingLegValues | null
@@ -54,29 +64,16 @@ export interface ReviewFormProps {
   departureLegCount: number
 }
 
-/** Small amber/neutral confidence chip rendered next to a field label. */
-function ConfidenceBadge({ path, confidence }: { path: string; confidence: unknown }) {
-  const value = getConfidence(confidence, path)
-  if (value === null) return null
-  const low = value < LOW_CONFIDENCE_THRESHOLD
-  return (
-    <Badge tone={low ? 'warning' : 'neutral'} size="sm" className="font-mono">
-      {low ? <ShieldAlertIcon className="h-3 w-3" /> : null}
-      {Math.round(value * 100)}%
-    </Badge>
-  )
-}
+const labelFormatter =
+  <T extends string>(labels: Record<T, string>) =>
+  (value: string) =>
+    labels[value as T] ?? value
 
-function LowConfidenceNote({ path, confidence }: { path: string; confidence: unknown }) {
-  const value = getConfidence(confidence, path)
-  if (value === null || value >= LOW_CONFIDENCE_THRESHOLD) return null
-  return (
-    <p className="mt-1 flex items-center gap-1 text-xs font-medium text-warning">
-      <ShieldAlertIcon className="h-3.5 w-3.5 shrink-0" />
-      Low confidence — check this against the transcript before accepting.
-    </p>
-  )
-}
+const formatRsvp = labelFormatter<RsvpStatus>(RSVP_STATUS_LABELS)
+const formatSide = labelFormatter<Side>(SIDE_LABELS)
+const formatMode = labelFormatter<TravelMode>(TRAVEL_MODE_LABELS)
+const formatDay = (value: string) =>
+  formatDate(value, { day: 'numeric', month: 'short', year: 'numeric' }) ?? value
 
 function InvalidNumberNote({ invalid }: { invalid: InvalidNumber | undefined }) {
   if (!invalid) return null
@@ -100,15 +97,17 @@ function ClearAttemptNote({ attempt }: { attempt: ClearAttempt | undefined }) {
 
 export function ReviewForm({
   eventCode,
+  groupId,
   extractionId,
   extractionStatus,
   reviewedAt,
+  reviewedByName,
   reviewNotes,
   headName,
   primaryMobile,
   expectedPax,
-  confidence,
   transcript,
+  fieldStates,
   initialValues,
   existingGroup,
   existingArrival,
@@ -119,49 +118,63 @@ export function ReviewForm({
   const router = useRouter()
 
   const [values, setValues] = useState<ReviewFormValues>(initialValues)
+  const [acknowledged, setAcknowledged] = useState<ReadonlySet<string>>(new Set())
   const [notes, setNotes] = useState('')
-  const [pendingAction, setPendingAction] = useState<'accept' | 'reject' | null>(null)
+  const [pendingAction, setPendingAction] = useState<'accept' | 'discard' | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  const clearAttempts = useMemo(
-    () => detectClearAttempts(values, existingGroup, existingArrival, existingDeparture),
-    [values, existingGroup, existingArrival, existingDeparture],
-  )
-  const clearAttemptByField = useMemo(() => {
-    const map = new Map<string, ClearAttempt>()
-    for (const a of clearAttempts) map.set(a.field, a)
-    return map
-  }, [clearAttempts])
-
-  const invalidNumbers = useMemo(() => detectInvalidNumbers(values), [values])
-  const invalidByField = useMemo(() => {
-    const map = new Map<string, InvalidNumber>()
-    for (const n of invalidNumbers) map.set(n.field, n)
-    return map
-  }, [invalidNumbers])
 
   const alreadyApplied = extractionStatus === 'accepted'
   const wasRejected = extractionStatus === 'rejected'
   const isBusy = pendingAction !== null
 
-  function updateField<K extends keyof ReviewFormValues>(key: K, value: ReviewFormValues[K]) {
-    setValues((prev) => ({ ...prev, [key]: value }))
-  }
+  const clearAttempts = useMemo(
+    () => detectClearAttempts(values, existingGroup, existingArrival, existingDeparture),
+    [values, existingGroup, existingArrival, existingDeparture],
+  )
+  const clearAttemptByField = useMemo(
+    () => new Map(clearAttempts.map((a) => [a.field, a])),
+    [clearAttempts],
+  )
 
-  function updateLeg(direction: 'arrival' | 'departure', field: keyof LegFormValues, value: string) {
-    setValues((prev) => ({
-      ...prev,
-      [direction]: { ...prev[direction], [field]: value },
-    }))
-  }
+  const invalidNumbers = useMemo(() => detectInvalidNumbers(values), [values])
+  const invalidByField = useMemo(
+    () => new Map(invalidNumbers.map((n) => [n.field, n])),
+    [invalidNumbers],
+  )
+
+  const unresolved = useMemo(
+    () => detectUnresolvedUnclear(values, fieldStates, acknowledged),
+    [values, fieldStates, acknowledged],
+  )
+  const missingPax = useMemo(() => detectMissingConfirmedPax(values), [values])
+
+  const blocked =
+    alreadyApplied ||
+    clearAttempts.length > 0 ||
+    invalidNumbers.length > 0 ||
+    unresolved.length > 0 ||
+    missingPax
+
+  const update = useCallback((key: FieldKey, value: string) => {
+    setValues((prev) => setFormValue(prev, key, value))
+  }, [])
+
+  const acknowledge = useCallback((key: FieldKey, next: boolean) => {
+    setAcknowledged((prev) => {
+      const copy = new Set(prev)
+      if (next) copy.add(key)
+      else copy.delete(key)
+      return copy
+    })
+  }, [])
 
   async function handleAccept() {
-    if (alreadyApplied || clearAttempts.length > 0 || invalidNumbers.length > 0) return
+    if (blocked) return
     setError(null)
     setPendingAction('accept')
 
-    const payload = buildRpcPayload(values)
-    const result = await acceptExtraction(eventCode, extractionId, payload)
+    // What the human approved, not what the model said.
+    const result = await acceptExtraction(eventCode, extractionId, buildRpcPayload(values))
 
     if (!result.ok) {
       setError(result.error)
@@ -169,13 +182,13 @@ export function ReviewForm({
       return
     }
 
-    router.push(`/${eventCode}/review?done=accepted`)
+    router.push(`/${eventCode}/queue?done=applied`)
   }
 
-  async function handleReject() {
+  async function handleDiscard() {
     if (alreadyApplied) return
     setError(null)
-    setPendingAction('reject')
+    setPendingAction('discard')
 
     const result = await rejectExtraction(eventCode, extractionId, notes)
 
@@ -185,8 +198,24 @@ export function ReviewForm({
       return
     }
 
-    router.push(`/${eventCode}/review?done=rejected`)
+    // Rejecting writes nothing to guest data — hand straight over to the
+    // manual form so the caller can type what was actually said.
+    router.push(`/${eventCode}/call/${groupId}/manual?from=review`)
   }
+
+  /** Shared props for every field, so the guard wiring is written once. */
+  const fieldProps = (key: FieldKey) => ({
+    state: fieldStates[key],
+    acknowledged: acknowledged.has(key),
+    onAcknowledge: (next: boolean) => acknowledge(key, next),
+    disabled: alreadyApplied,
+    notes: (
+      <>
+        <InvalidNumberNote invalid={invalidByField.get(key)} />
+        <ClearAttemptNote attempt={clearAttemptByField.get(key)} />
+      </>
+    ),
+  })
 
   return (
     <div className="flex flex-col gap-4 pb-4">
@@ -210,9 +239,10 @@ export function ReviewForm({
           <CardBody className="py-3 text-sm text-success">
             <p className="font-semibold">Already applied.</p>
             <p className="mt-0.5">
-              This extraction was accepted{reviewedAt ? ` on ${formatDateTime(reviewedAt)}` : ''}
-              . apply_rsvp_extraction() refuses to re-apply an accepted extraction, so editing here
-              cannot do anything further — go to the group directly for any further changes.
+              Approved by {reviewedByName ?? 'an unknown reviewer'}
+              {reviewedAt ? ` on ${formatDateTime(reviewedAt)}` : ''}. This screen is read-only —
+              an applied extraction cannot be applied twice. Go to the group directly for any
+              further changes.
             </p>
           </CardBody>
         </Card>
@@ -221,126 +251,82 @@ export function ReviewForm({
       {wasRejected ? (
         <Card className="border-border-strong bg-surface-2">
           <CardBody className="py-3 text-sm text-fg">
-            <p className="font-semibold">Previously rejected.</p>
+            <p className="font-semibold">Previously discarded.</p>
             {reviewNotes ? <p className="mt-0.5 text-muted">Reason: {reviewNotes}</p> : null}
             <p className="mt-0.5 text-muted">
-              A rejected extraction can still be applied — the database does not block that. Review
-              carefully before accepting.
+              A discarded extraction can still be applied — the database does not block that.
+              Review carefully before saving.
             </p>
           </CardBody>
         </Card>
       ) : null}
 
-      {arrivalLegCount > 1 ? (
-        <LegCountWarning direction="arrival" count={arrivalLegCount} />
-      ) : null}
+      {arrivalLegCount > 1 ? <LegCountWarning direction="arrival" count={arrivalLegCount} /> : null}
       {departureLegCount > 1 ? (
         <LegCountWarning direction="departure" count={departureLegCount} />
       ) : null}
 
-      {transcript ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <p className="font-semibold text-fg">Transcript</p>
-              <p className="text-xs text-muted">
-                {transcript.language ? transcript.language.toUpperCase() : 'Language unknown'}
-                {typeof transcript.confidence === 'number'
-                  ? ` · STT confidence ${Math.round(transcript.confidence * 100)}%`
-                  : ''}
-              </p>
-            </CardTitle>
-          </CardHeader>
-          <CardBody>
-            <p className="max-h-56 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap text-fg">
-              {transcript.text}
-            </p>
-          </CardBody>
-        </Card>
-      ) : (
-        <Card flat className="border border-dashed border-border">
-          <CardBody className="py-3 text-sm text-muted">
-            No transcript is attached to this extraction. Review the fields below on their own.
-          </CardBody>
-        </Card>
-      )}
+      {/* Band (a) — what the record held before this call. */}
+      <BeforeBand group={existingGroup} arrival={existingArrival} departure={existingDeparture} />
 
+      {/* Band (b) — what we heard, editable. */}
       <Card>
         <CardHeader>
           <CardTitle>
-            <p className="font-semibold text-fg">RSVP</p>
+            <p className="font-semibold text-fg">What we heard</p>
+            <p className="text-xs text-muted">
+              Edit anything that is wrong. What you save is what gets written.
+            </p>
           </CardTitle>
         </CardHeader>
         <CardBody className="flex flex-col gap-4">
-          <div>
+          <ReviewField {...fieldProps('rsvpStatus')} format={formatRsvp}>
             <Select
-              label={
-                <span className="inline-flex items-center gap-2">
-                  RSVP status
-                  <ConfidenceBadge path={CONFIDENCE_PATHS.rsvpStatus} confidence={confidence} />
-                </span>
-              }
+              label={<FieldLabel state={fieldStates.rsvpStatus}>RSVP status</FieldLabel>}
               value={values.rsvpStatus}
-              onChange={(e) => updateField('rsvpStatus', e.target.value)}
+              onChange={(e) => update('rsvpStatus', e.target.value)}
               disabled={alreadyApplied}
               placeholder="Not set"
               options={RSVP_STATUS_OPTIONS.map((v) => ({ value: v, label: RSVP_STATUS_LABELS[v] }))}
             />
-            <LowConfidenceNote path={CONFIDENCE_PATHS.rsvpStatus} confidence={confidence} />
-            <ClearAttemptNote attempt={clearAttemptByField.get('rsvpStatus')} />
-          </div>
+          </ReviewField>
 
-          <div>
+          <ReviewField {...fieldProps('confirmedPax')}>
             <Input
-              label={
-                <span className="inline-flex items-center gap-2">
-                  Confirmed pax
-                  <ConfidenceBadge path={CONFIDENCE_PATHS.confirmedPax} confidence={confidence} />
-                </span>
-              }
+              label={<FieldLabel state={fieldStates.confirmedPax}>Confirmed pax</FieldLabel>}
               type="number"
               inputMode="numeric"
               min={0}
               step={1}
               value={values.confirmedPax}
-              onChange={(e) => updateField('confirmedPax', e.target.value)}
+              onChange={(e) => update('confirmedPax', e.target.value)}
               disabled={alreadyApplied}
+              error={missingPax ? 'How many people are coming?' : null}
             />
-            <LowConfidenceNote path={CONFIDENCE_PATHS.confirmedPax} confidence={confidence} />
-            <InvalidNumberNote invalid={invalidByField.get('confirmedPax')} />
-            <ClearAttemptNote attempt={clearAttemptByField.get('confirmedPax')} />
-          </div>
+          </ReviewField>
 
-          <div>
+          <ReviewField {...fieldProps('side')} format={formatSide}>
             <Select
-              label="Side"
+              label={<FieldLabel state={fieldStates.side}>Side</FieldLabel>}
               hint="Not captured by the AI — set this yourself if you know it."
               value={values.side}
-              onChange={(e) => updateField('side', e.target.value)}
+              onChange={(e) => update('side', e.target.value)}
               disabled={alreadyApplied}
               placeholder="Not set"
               options={SIDE_OPTIONS.map((v) => ({ value: v, label: SIDE_LABELS[v] }))}
             />
-            <ClearAttemptNote attempt={clearAttemptByField.get('side')} />
-          </div>
+          </ReviewField>
 
-          <div>
+          <ReviewField {...fieldProps('remarks')}>
             <Textarea
-              label={
-                <span className="inline-flex items-center gap-2">
-                  Remarks
-                  <ConfidenceBadge path={CONFIDENCE_PATHS.remarks} confidence={confidence} />
-                </span>
-              }
+              label={<FieldLabel state={fieldStates.remarks}>Remarks</FieldLabel>}
               hint="Mapped from the AI's special_requests field onto guest_groups.remarks."
               value={values.remarks}
-              onChange={(e) => updateField('remarks', e.target.value)}
+              onChange={(e) => update('remarks', e.target.value)}
               disabled={alreadyApplied}
               rows={3}
             />
-            <LowConfidenceNote path={CONFIDENCE_PATHS.remarks} confidence={confidence} />
-            <ClearAttemptNote attempt={clearAttemptByField.get('remarks')} />
-          </div>
+          </ReviewField>
         </CardBody>
       </Card>
 
@@ -348,35 +334,57 @@ export function ReviewForm({
         title="Arrival"
         direction="arrival"
         values={values.arrival}
-        confidence={confidence}
+        fieldProps={fieldProps}
+        fieldStates={fieldStates}
         disabled={alreadyApplied}
-        clearAttemptByField={clearAttemptByField}
-        invalidByField={invalidByField}
-        onChange={(field, value) => updateLeg('arrival', field, value)}
+        onChange={update}
       />
 
       <LegCard
         title="Departure"
         direction="departure"
         values={values.departure}
-        confidence={confidence}
+        fieldProps={fieldProps}
+        fieldStates={fieldStates}
         disabled={alreadyApplied}
-        clearAttemptByField={clearAttemptByField}
-        invalidByField={invalidByField}
-        onChange={(field, value) => updateLeg('departure', field, value)}
+        onChange={update}
       />
+
+      {/* Band (c) — the evidence, one tap away. */}
+      <TranscriptPanel transcript={transcript} />
+
+      {!alreadyApplied && (unresolved.length > 0 || missingPax) ? (
+        <Card className="border-danger/40 bg-tint-danger">
+          <CardBody className="flex flex-col gap-1 py-3 text-sm text-danger">
+            <p className="font-semibold">Saving is blocked until these are decided.</p>
+            {missingPax ? (
+              <p>
+                <span className="font-medium">How many people are coming?</span> A confirmed family
+                with no head count breaks room allocation later.
+              </p>
+            ) : null}
+            {unresolved.length > 0 ? (
+              <p>
+                Not heard clearly, still undecided:{' '}
+                <span className="font-medium">{unresolved.map((f) => f.label).join(', ')}</span>.
+                Type what they said, or tick &ldquo;not heard&rdquo; on each.
+              </p>
+            ) : null}
+          </CardBody>
+        </Card>
+      ) : null}
 
       {clearAttempts.length > 0 ? (
         <Card className="border-danger/40 bg-tint-danger">
           <CardBody className="py-3 text-sm text-danger">
             <p className="font-semibold">
-              {clearAttempts.length} field{clearAttempts.length === 1 ? '' : 's'} can&apos;t be cleared
-              this way.
+              {clearAttempts.length} field{clearAttempts.length === 1 ? '' : 's'} can&apos;t be
+              cleared this way.
             </p>
             <p className="mt-0.5">
-              apply_rsvp_extraction() keeps the existing value whenever a field is left blank — there
-              is no way to null a field out through this screen. Either type a replacement value, or
-              restore what was there before, for each field flagged above.
+              The save keeps the existing value whenever a field is left blank — there is no way to
+              null a field out through this screen. Either type a replacement value, or restore what
+              was there before, for each field flagged above.
             </p>
           </CardBody>
         </Card>
@@ -389,16 +397,14 @@ export function ReviewForm({
           </CardTitle>
         </CardHeader>
         <CardBody className="flex flex-col gap-4">
-          <div>
-            <Textarea
-              label="Reason for rejection"
-              hint="Only used if you reject. Ignored on accept."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              disabled={alreadyApplied}
-              rows={2}
-            />
-          </div>
+          <Textarea
+            label="Reason for discarding"
+            hint="Only used if you discard. Ignored when you save."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            disabled={alreadyApplied}
+            rows={2}
+          />
 
           {error ? (
             <p role="alert" className="text-sm font-medium text-danger">
@@ -412,32 +418,25 @@ export function ReviewForm({
               fullWidth
               onClick={handleAccept}
               loading={pendingAction === 'accept'}
-              disabled={
-                alreadyApplied || clearAttempts.length > 0 || invalidNumbers.length > 0 || isBusy
-              }
+              disabled={blocked || isBusy}
             >
-              Accept &amp; apply
+              Confirm and save
             </Button>
             <Button
               size="lg"
               variant="danger"
               fullWidth
-              onClick={handleReject}
-              loading={pendingAction === 'reject'}
+              onClick={handleDiscard}
+              loading={pendingAction === 'discard'}
               disabled={alreadyApplied || isBusy}
             >
-              Reject
+              Discard and enter manually
             </Button>
           </div>
 
-          {clearAttempts.length > 0 ? (
-            <p className="text-xs text-subtle">
-              Accept is disabled while a cleared field above would silently keep its old value.
-            </p>
-          ) : null}
           {invalidNumbers.length > 0 ? (
             <p className="text-xs text-subtle">
-              Accept is disabled while a pax field is not a whole number:{' '}
+              Saving is disabled while a pax field is not a whole number:{' '}
               {invalidNumbers.map((n) => n.label).join(', ')}.
             </p>
           ) : null}
@@ -447,7 +446,13 @@ export function ReviewForm({
   )
 }
 
-function LegCountWarning({ direction, count }: { direction: 'arrival' | 'departure'; count: number }) {
+function LegCountWarning({
+  direction,
+  count,
+}: {
+  direction: 'arrival' | 'departure'
+  count: number
+}) {
   return (
     <Card className="border-warning/40 bg-tint-warning">
       <CardBody className="py-3 text-sm text-warning">
@@ -455,9 +460,8 @@ function LegCountWarning({ direction, count }: { direction: 'arrival' | 'departu
           {count} {direction} legs on file.
         </p>
         <p className="mt-0.5">
-          apply_rsvp_extraction() only ever edits the oldest {direction} leg (first one added). Any
-          later {direction} leg for this group will not change here — edit it directly if it needs
-          fixing.
+          Saving only ever edits the oldest {direction} leg (first one added). Any later{' '}
+          {direction} leg for this group will not change here — edit it directly if it needs fixing.
         </p>
       </CardBody>
     </Card>
@@ -468,23 +472,20 @@ function LegCard({
   title,
   direction,
   values,
-  confidence,
+  fieldStates,
+  fieldProps,
   disabled,
-  clearAttemptByField,
-  invalidByField,
   onChange,
 }: {
   title: string
   direction: 'arrival' | 'departure'
-  values: LegFormValues
-  confidence: unknown
+  values: { mode: string; date: string; time: string; reference: string; point: string; pax: string }
+  fieldStates: FieldStates
+  fieldProps: (key: FieldKey) => Omit<Parameters<typeof ReviewField>[0], 'children' | 'format'>
   disabled: boolean
-  clearAttemptByField: Map<string, ClearAttempt>
-  invalidByField: Map<string, InvalidNumber>
-  onChange: (field: keyof LegFormValues, value: string) => void
+  onChange: (key: FieldKey, value: string) => void
 }) {
-  const path = (field: string) => CONFIDENCE_PATHS[`${direction}.${field}`]
-  const clearKey = (field: string) => `${direction}.${field}`
+  const key = (field: string) => `${direction}.${field}` as FieldKey
 
   return (
     <Card>
@@ -494,113 +495,69 @@ function LegCard({
         </CardTitle>
       </CardHeader>
       <CardBody className="flex flex-col gap-4">
-        <div>
+        <ReviewField {...fieldProps(key('mode'))} format={formatMode}>
           <Select
-            label={
-              <span className="inline-flex items-center gap-2">
-                Mode
-                <ConfidenceBadge path={path('mode')} confidence={confidence} />
-              </span>
-            }
+            label={<FieldLabel state={fieldStates[key('mode')]}>Mode</FieldLabel>}
             value={values.mode}
-            onChange={(e) => onChange('mode', e.target.value)}
+            onChange={(e) => onChange(key('mode'), e.target.value)}
             disabled={disabled}
             placeholder="Not set"
             options={TRAVEL_MODE_OPTIONS.map((v) => ({ value: v, label: TRAVEL_MODE_LABELS[v] }))}
           />
-          <LowConfidenceNote path={path('mode')} confidence={confidence} />
-          <ClearAttemptNote attempt={clearAttemptByField.get(clearKey('mode'))} />
-        </div>
+        </ReviewField>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Input
-              label={
-                <span className="inline-flex items-center gap-2">
-                  Date
-                  <ConfidenceBadge path={path('date')} confidence={confidence} />
-                </span>
-              }
-              type="date"
-              value={values.date}
-              onChange={(e) => onChange('date', e.target.value)}
-              disabled={disabled}
-            />
-            <LowConfidenceNote path={path('date')} confidence={confidence} />
-            <ClearAttemptNote attempt={clearAttemptByField.get(clearKey('date'))} />
-          </div>
-          <div>
-            <Input
-              label={
-                <span className="inline-flex items-center gap-2">
-                  Time
-                  <ConfidenceBadge path={path('time')} confidence={confidence} />
-                </span>
-              }
-              type="time"
-              value={values.time}
-              onChange={(e) => onChange('time', e.target.value)}
-              disabled={disabled}
-            />
-            <LowConfidenceNote path={path('time')} confidence={confidence} />
-            <ClearAttemptNote attempt={clearAttemptByField.get(clearKey('time'))} />
-          </div>
-        </div>
-
-        <div>
+        <ReviewField {...fieldProps(key('date'))} format={formatDay}>
           <Input
-            label={
-              <span className="inline-flex items-center gap-2">
-                Reference
-                <ConfidenceBadge path={path('reference')} confidence={confidence} />
-              </span>
-            }
+            label={<FieldLabel state={fieldStates[key('date')]}>Date</FieldLabel>}
+            type="date"
+            value={values.date}
+            onChange={(e) => onChange(key('date'), e.target.value)}
+            disabled={disabled}
+          />
+        </ReviewField>
+
+        <ReviewField {...fieldProps(key('time'))}>
+          <Input
+            label={<FieldLabel state={fieldStates[key('time')]}>Time</FieldLabel>}
+            type="time"
+            value={values.time}
+            onChange={(e) => onChange(key('time'), e.target.value)}
+            disabled={disabled}
+          />
+        </ReviewField>
+
+        <ReviewField {...fieldProps(key('reference'))}>
+          <Input
+            label={<FieldLabel state={fieldStates[key('reference')]}>Reference</FieldLabel>}
             hint="Flight / train number, PNR — whatever was actually said."
             value={values.reference}
-            onChange={(e) => onChange('reference', e.target.value)}
+            onChange={(e) => onChange(key('reference'), e.target.value)}
             disabled={disabled}
           />
-          <LowConfidenceNote path={path('reference')} confidence={confidence} />
-          <ClearAttemptNote attempt={clearAttemptByField.get(clearKey('reference'))} />
-        </div>
+        </ReviewField>
 
-        <div>
+        <ReviewField {...fieldProps(key('point'))}>
           <Input
-            label={
-              <span className="inline-flex items-center gap-2">
-                Point
-                <ConfidenceBadge path={path('point')} confidence={confidence} />
-              </span>
-            }
+            label={<FieldLabel state={fieldStates[key('point')]}>Point</FieldLabel>}
             hint="Airport, station, or pickup/drop location."
             value={values.point}
-            onChange={(e) => onChange('point', e.target.value)}
+            onChange={(e) => onChange(key('point'), e.target.value)}
             disabled={disabled}
           />
-          <LowConfidenceNote path={path('point')} confidence={confidence} />
-          <ClearAttemptNote attempt={clearAttemptByField.get(clearKey('point'))} />
-        </div>
+        </ReviewField>
 
-        <div>
+        <ReviewField {...fieldProps(key('pax'))}>
           <Input
-            label={
-              <span className="inline-flex items-center gap-2">
-                Pax on this leg
-                <ConfidenceBadge path={path('pax')} confidence={confidence} />
-              </span>
-            }
+            label={<FieldLabel state={fieldStates[key('pax')]}>Pax on this leg</FieldLabel>}
             type="number"
             inputMode="numeric"
             min={0}
             step={1}
             value={values.pax}
-            onChange={(e) => onChange('pax', e.target.value)}
+            onChange={(e) => onChange(key('pax'), e.target.value)}
             disabled={disabled}
           />
-          <LowConfidenceNote path={path('pax')} confidence={confidence} />
-          <InvalidNumberNote invalid={invalidByField.get(clearKey('pax'))} />
-          <ClearAttemptNote attempt={clearAttemptByField.get(clearKey('pax'))} />
-        </div>
+        </ReviewField>
       </CardBody>
     </Card>
   )
