@@ -90,10 +90,23 @@ export default async function AdminEventsPage() {
       </section>
 
       {!error && events.length > 0 ? (
-        <section aria-labelledby="export-heading" className="flex flex-col gap-3">
-          <h2 id="export-heading" className="text-lg font-semibold text-fg">
-            Export
+        <section aria-labelledby="tools-heading" className="flex flex-col gap-3">
+          <h2 id="tools-heading" className="text-lg font-semibold text-fg">
+            Tools
           </h2>
+
+          <Link href="/admin/hotels" className="block">
+            <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
+              <CardBody className="py-3">
+                <p className="font-semibold text-fg">Hotels and rooms</p>
+                <p className="mt-0.5 text-sm text-muted">
+                  Set up hotels, add rooms in bulk, and recover allocations from the imported
+                  sheet.
+                </p>
+              </CardBody>
+            </Card>
+          </Link>
+
           <Link href="/admin/export" className="block">
             <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
               <CardBody className="py-3">
