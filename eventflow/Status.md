@@ -1,57 +1,87 @@
 ---
 tags: [status]
-updated: 2026-07-31
+updated: 2026-08-02
 ---
 
 # Status
 
-Back to [[EventFlow]]. As of **31 July 2026**.
+Back to [[EventFlow]]. As of **2 August 2026**.
 
 ## Done
 
 **`p1a` — Database schema, RLS, audit triggers.**
-7 migrations, ~1,663 lines. Covers all 19 SRS sections, not just Phase 1.
+7 migrations + 1 realtime migration. Covers all 19 SRS sections.
 See [[Schema Overview]].
 
 **`p1b` — `test_security.sql`, 8 tests.**
-Cross-event insert blocked, client sees nothing in base tables, a phone claiming 2020 gets
-stamped with real server time, room capacity guard fires, two callers cannot lock the same
-group. See [[Security Tests]].
+Cross-event insert blocked, client sees nothing in base tables, phone clock
+overwritten, room capacity guard fires, lock collision prevented. See [[Security Tests]].
 
-## Repo state — read before writing code
+**`p1c` — Excel import PREVIEW (parse + warn + display).**
+Full parse pipeline in `src/lib/import/` — 9 files: `parse.ts`, `knownSheet.ts`,
+`layout.ts`, `families.ts`, `cells.ts`, `normalize.ts`, `mapper.ts`, `rows.ts`,
+`hash.ts`. Mobile normalisation, idempotent re-import via `source_row_hash` +
+head-name fallback matching. Preview page at `/import` shows `SummaryBar`,
+`FamilyList`, and `WarningsList`. Guarantee #5 tracked in code.
+**The database commit path does not exist yet.** `src/lib/actions/import.ts` is
+read-only (counts existing families/guests only). The write is gated on a single
+`app.commit_guest_import()` Postgres function — one transaction, one outcome. See
+the "Why no commit path" header in [[Excel Import]].
 
-> [!warning] The application does not exist yet
-> The repo contains SQL only. The next code written is the first application code.
+**`p1d` — Auth, event switching, role routing.**
+Supabase PKCE OAuth. Login form + callback route. Middleware refreshes sessions.
+Three route groups: `(admin)`, `(staff)`, plus `(auth)` for login.
+`requireStaff()` / `requireAdmin()` page guards. `BottomTabs` adapts to role
+(4 admin / 3 event_team / none for client). `EventSwitcher` for admin.
+`/admin/events` — event list + create form. Full [[DECISIONS.md]] record.
+**Client guest profile cards are built here** — see `/[eventCode]/guests`.
+See [[Roles and Access]].
 
-- No `package.json`, no `supabase/` directory, no Next.js app
-- **Not a git repository** — `git init` is still pending
-- Migration files sit at the **repo root**, not in `supabase/migrations/`
-- `CALLING_MASTER_LIST.xlsx` is **not in the repo** — `p1c` needs it
-- The migrations have **not been applied to the live Supabase project**
+**`p1e` — Calling queue.**
+`v_rsvp_queue` + `claim_group()` rendered as `QueueBoard` with `QueueRow` and
+`QueueFilters`. Realtime on `guest_groups` + `call_attempts` via migration 0800
+(`replica identity full`). Filter by status, search by name, sort by priority.
+See [[Guests and RSVP]].
 
-That last point matters. `p1a` and `p1b` were verified against a separate Postgres 16
-instance. The live EventFlow project runs **Postgres 17** and is not linked. Re-run
-[[Security Tests|test_security.sql]] there after the first push. See [[Supabase Project]].
+**`p1f` — Call screen.**
+`tel:` dial + outcome logging. Claim → dial → outcome. `sessionStorage`-backed
+resume for Android page-state loss. Offline outbox via IndexedDB. Strict dial
+(10-digit Indian numbers only, no silent truncation to wrong number).
+See [[RSVP Capture Pipeline]].
 
-## Next up
+**`p1h` extraction model + `p1i` review screen.**
+`src/lib/review/` — `payload.ts`, `confidence.ts`. Review queue at `/review`,
+detail form at `/review/[extractionId]`. `ReviewForm` with amber highlights
+below 0.8 confidence. Payload translation (`special_requests` → `remarks`).
+See [[Extraction Contract]].
 
-**`p1c` — Excel import.** The line that turns an empty database into 238 real families.
-Column mapper, mobile normalisation, idempotent by row hash, preview before write.
-See [[Excel Import]].
-
-Then, in order:
+## Still to do (Phase 1 leftovers)
 
 | | |
 |---|---|
-| `p1d` | auth, event switching, role routing |
-| `p1e` | calling queue |
-| `p1f` | call screen |
-| `p1g` | native call-recording module |
-| `p1h` | upload → transcribe → extract |
-| `p1i` | review screen |
+| Import commit | Write `app.commit_guest_import()` — the one thing standing between preview and data |
+| `p1g` | Native call-recording Capacitor module — see [[Open Questions]] |
 | `p1j` | Excel export |
 
-See [[Roadmap]] for phases 2–5.
+## Phase 2 — Rooms (current)
+
+The client profile cards (`/[eventCode]/guests`) are built. `GuestCard` shows:
+name, family head, side/type/pax badges, arrival leg, departure leg, hotel +
+room number ("Room not allocated yet" if none), hamper + return gift status.
+
+What remains: the **allocation backend**. The import parser captures room/bed
+columns as `OPTIONAL_COLUMNS` but nothing writes them to `room_assignments`.
+The `GuestCard` renders what the view returns — once rows exist, the cards
+light up with no frontend change.
+
+## Repo state
+
+- 8 git commits on `master`, from scaffold through p1d
+- ~97 TypeScript/TSX files
+- Supabase project `xktxnkuzplhzxkevwrcj` (Varunya Technologies, ap-northeast-2)
+- Postgres 17.6.1.155
+- `CALLING_MASTER_LIST.xlsx` is **not in the repo**
+- The realtime migration (0800) is written but **not applied** — live sync is inert until `supabase db push`
 
 ## Working rules
 
@@ -60,3 +90,7 @@ See [[Roadmap]] for phases 2–5.
 - Record every non-obvious decision in `DECISIONS.md` as it is made
 - If a task isn't finished, **simplify it on the spot** rather than borrowing from the next one
 - After feature freeze, the answer to every "can we also add…" is "after the event"
+
+## Related
+
+[[Roadmap]] · [[Schema Overview]] · [[DECISIONS.md (vault note)|DECISIONS.md]]

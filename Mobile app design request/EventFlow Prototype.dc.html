@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/organic-dfda3664-cbb8-4b8b-9262-6ae86b005946/styles.css">
+<script src="_ds/organic-dfda3664-cbb8-4b8b-9262-6ae86b005946/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0;background:#2a2119}
+.ef{--disp:'Caprasimo',Georgia,serif;--body:'Figtree',ui-sans-serif,system-ui,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+.ef-light{--paper:#f6efe1;--band:#eee5d0;--surface:#fbf7ec;--s2:#ebe1ca;--ink:#20222b;--muted:#4a5568;--subtle:#5f6a79;--rule:rgba(32,34,43,.09);--rules:rgba(32,34,43,.18);--red:#9a1c1c;--redS:#7c1414;--redT:#fbe9e7;--green:#1e6f43;--greenT:#e6f2e9;--warn:#a35408;--warnT:#f9edd2;--info:#0369a1;--infoT:#e2f1fb;--brand:#c67139;--brandD:#9c5527;--brandFg:#fff9f2;--btnFg:#f6efe1}
+.ef-dark{--paper:#151a22;--band:#1a212c;--surface:#1a212c;--s2:#232b38;--ink:#e8e6df;--muted:#9aa4b2;--subtle:#8b96a3;--rule:rgba(232,230,223,.09);--rules:rgba(232,230,223,.2);--red:#f0716f;--redS:#f58a88;--redT:#3b1414;--green:#7fd7a4;--greenT:#12331f;--warn:#fcd34d;--warnT:#3b2f12;--info:#7cc4ec;--infoT:#12293a;--brand:#d98d55;--brandD:#e5a373;--brandFg:#241409;--btnFg:#151a22}
+.ef :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.ef ::selection{background:rgba(198,113,57,.35)}
+.ef input,.ef select,.ef textarea,.ef button{font-family:var(--body)}
+.ef input::placeholder,.ef textarea::placeholder{color:var(--subtle)}
+@keyframes efFade{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.ef *{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div class="ef ef-light {{ themeClass }}" style="min-height:100vh;display:flex;justify-content:center;font-family:var(--body);color:var(--ink)">
+<div style="width:100%;max-width:480px;min-height:100vh;background:var(--paper);display:flex;flex-direction:column;position:relative">
+
+<sc-if value="{{ rLogin }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:24px 16px 48px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="text-align:center;margin-bottom:8px"><div style="font-family:var(--disp);font-size:32px;line-height:1.1">EventFlow</div><div style="color:var(--muted);font-size:16px;margin-top:8px">Sign in to your event.</div></div>
+<div style="background:var(--warnT);border:1px solid var(--rules);border-radius:16px;padding:12px 16px;margin:20px 0 16px;font-size:14px;color:var(--warn);display:flex;gap:10px;align-items:flex-start"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span>Your sign-in link has expired. Enter your details below or ask your admin for a new link.</span></div>
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:20px 16px;display:flex;flex-direction:column;gap:16px">
+<label style="display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600;color:var(--muted)">Email or phone<input placeholder="you@example.com" style="min-height:48px;font-size:16px;padding:0 16px;border-radius:999px;border:1px solid var(--rules);background:var(--paper);color:var(--ink)"></input></label>
+<label style="display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600;color:var(--muted)">Password<input type="password" placeholder="••••••••" style="min-height:48px;font-size:16px;padding:0 16px;border-radius:999px;border:1px solid var(--rules);background:var(--paper);color:var(--ink)"></input></label>
+<button onClick="{{ goDash }}" style="min-height:48px;border:none;border-radius:999px;background:var(--ink);color:var(--btnFg);font-size:16px;font-weight:700;cursor:pointer;transition:background 100ms" style-active="opacity:.85">Sign in</button>
+</div>
+<p style="color:var(--subtle);font-size:14px;text-align:center;margin:16px 8px 0;line-height:1.5">Accounts are created by an event admin. There is no self sign-up.</p>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasHeader }}" hint-placeholder-val="{{ false }}">
+<div style="position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--surface) 95%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--rule);padding:10px 16px;display:flex;align-items:center;gap:10px;min-height:56px">
+<sc-if value="{{ hasBack }}" hint-placeholder-val="{{ false }}"><button onClick="{{ goBack }}" aria-label="Back" style="width:44px;height:44px;flex:none;border:none;background:transparent;color:var(--ink);cursor:pointer;border-radius:999px;display:flex;align-items:center;justify-content:center" style-hover="background:var(--s2)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button></sc-if>
+<div style="flex:1;min-width:0"><div style="font-size:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ headerTitle }}</div><div style="font-size:12px;color:var(--subtle);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ headerSub }}</div></div>
+<sc-if value="{{ showChrome }}" hint-placeholder-val="{{ false }}">
+<button onClick="{{ noop }}" title="Switch event" style="display:flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--rules);background:var(--surface);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--s2)"><span style="font-family:var(--mono)">AARDIYA</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></button>
+<sc-if value="{{ isAdminRole }}" hint-placeholder-val="{{ false }}"><button onClick="{{ goAdmin }}" title="Admin" aria-label="Admin" style="width:40px;height:40px;flex:none;border:1px solid var(--rules);background:var(--surface);color:var(--muted);cursor:pointer;border-radius:12px;display:flex;align-items:center;justify-content:center" style-hover="background:var(--s2)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7m0-4V3m8 18v-9m0-4V3m8 18v-5m0-4V3M1 14h6m2-6h6m2 8h6"></path></svg></button></sc-if>
+</sc-if>
+<button onClick="{{ toggleTheme }}" title="Theme" aria-label="Toggle theme" style="width:40px;height:40px;flex:none;border:1px solid var(--rules);background:var(--surface);color:var(--muted);cursor:pointer;border-radius:999px;display:flex;align-items:center;justify-content:center" style-hover="background:var(--s2)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"></path></svg></button>
+</div>
+<sc-if value="{{ showSync }}" hint-placeholder-val="{{ false }}"><div style="margin:12px 16px 0;display:inline-flex"><button onClick="{{ noop }}" style="display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--rules);background:var(--warnT);color:var(--warn);font-size:13px;font-weight:600;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v6l4 2"></path><circle cx="12" cy="12" r="9.5"></circle></svg><span style="font-family:var(--mono)">{{ queued }}</span> waiting to upload · call outcomes</button></div></sc-if>
+</sc-if>
+
+<sc-if value="{{ rDash }}" hint-placeholder-val="{{ false }}">
+<div style="padding:20px 16px 96px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="margin-bottom:16px;border-bottom:1px solid var(--rule);padding-bottom:8px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Dashboard</div><div style="font-family:var(--disp);font-size:24px;margin-top:4px">Today at a glance</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<sc-for list="{{ stats }}" as="s" hint-placeholder-count="8">
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:14px;min-height:112px;display:flex;flex-direction:column;gap:8px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:13px;color:var(--muted);font-weight:600">{{ s.label }}</span><span style="width:30px;height:30px;flex:none;border-radius:10px;background:{{ s.tint }};color:{{ s.fg }};display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="{{ s.icon }}"></path></svg></span></div><div style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:34px;font-weight:700;color:{{ s.fg }};line-height:1">{{ s.value }}</div><div style="font-size:12px;color:var(--subtle)">{{ s.note }}</div></div>
+</sc-for>
+</div>
+<p style="color:var(--subtle);font-size:13px;margin:16px 4px 0;line-height:1.5">Counters are read live from the register. A zero means nothing recorded yet.</p>
+</div>
+</sc-if>
+
+<sc-if value="{{ rQueue }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 96px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="margin-bottom:12px;border-bottom:1px solid var(--rule);padding-bottom:8px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Calling queue</div><div style="font-family:var(--disp);font-size:24px;margin-top:4px">Families to call</div></div>
+<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:4px">
+<sc-for list="{{ qChips }}" as="c" hint-placeholder-count="4"><button onClick="{{ c.pick }}" style="flex:none;min-height:36px;padding:0 14px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;transition:background 100ms;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button></sc-for>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:14px">
+<sc-for list="{{ sideChips }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.pick }}" style="min-height:32px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button></sc-for>
+</div>
+<sc-if value="{{ hasQueueRows }}" hint-placeholder-val="{{ true }}">
+<div style="border-left:2px solid var(--red);border-radius:0 16px 16px 0;overflow:hidden;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);border-right:1px solid var(--rule)">
+<sc-for list="{{ queue }}" as="f" hint-placeholder-count="6">
+<button onClick="{{ f.open }}" style="display:flex;width:100%;text-align:left;align-items:center;gap:12px;min-height:64px;padding:10px 14px;border:none;cursor:pointer;transition:background 100ms;background:{{ f.band }};color:var(--ink)" style-active="background:var(--s2)">
+<div style="flex:1;min-width:0"><div style="font-family:var(--disp);font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.head }}</div><div style="font-size:13px;color:var(--muted);margin-top:2px;display:flex;gap:6px;align-items:baseline"><span style="font-family:var(--mono);font-variant-numeric:tabular-nums">{{ f.pax }} PAX</span><span>·</span><span>{{ f.meta }}</span></div></div>
+<span style="flex:none;font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid {{ f.pillBd }};background:{{ f.pillBg }};color:{{ f.pillFg }}">{{ f.status }}</span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ queueEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border:2px dashed var(--rules);border-radius:16px;padding:32px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px"><span style="width:48px;height:48px;border-radius:999px;background:var(--band);display:flex;align-items:center;justify-content:center;color:var(--muted)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg></span><div style="font-family:var(--disp);font-size:20px">No families match these filters</div><div style="color:var(--muted);font-size:14px">The "{{ qStatus }}" filter is hiding the rest of the register.</div><button onClick="{{ clearFilters }}" style="margin-top:4px;min-height:44px;padding:0 20px;border-radius:999px;border:1px solid var(--rules);background:var(--surface);color:var(--ink);font-size:15px;font-weight:600;cursor:pointer" style-hover="background:var(--s2)">Clear filters</button></div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ rCall }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 96px;display:flex;flex-direction:column;gap:14px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><div><div style="font-family:var(--disp);font-size:22px">{{ callF.head }}</div><div style="font-size:14px;color:var(--muted)"><span style="font-family:var(--mono)">{{ callF.mobile }}</span> · {{ callF.city }}</div></div><span style="flex:none;font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;background:var(--warnT);color:var(--warn);border:1px solid var(--rules);font-family:var(--mono);font-variant-numeric:tabular-nums">⏱ 12:40 left</span></div>
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;overflow:hidden">
+<div style="padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Group context</span><span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid {{ callF.pillBd }};background:{{ callF.pillBg }};color:{{ callF.pillFg }}">{{ callF.status }}</span></div>
+<div style="padding:6px 16px 12px">
+<sc-for list="{{ callFields }}" as="r" hint-placeholder-count="4"><div style="display:flex;justify-content:space-between;gap-column:12px;gap:12px;padding:9px 0;border-bottom:1px solid var(--rule);font-size:15px"><span style="color:var(--muted)">{{ r.k }}</span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:{{ r.fg }}">{{ r.v }}</span></div></sc-for>
+<div style="margin-top:10px;background:var(--s2);border-radius:12px;padding:10px 12px;font-size:14px;color:var(--muted);line-height:1.5">{{ callF.remarks }}</div>
+</div></div>
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;overflow:hidden"><div style="padding:12px 16px;border-bottom:1px solid var(--rule);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Travel</div>
+<div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:center"><span style="width:32px;height:32px;flex:none;border-radius:999px;background:var(--infoT);color:var(--info);display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m0 0-6-6m6 6 6-6"></path></svg></span><div style="font-size:15px"><span style="font-weight:600">Arrives</span> <span style="font-family:var(--mono);font-variant-numeric:tabular-nums">12 Nov · 14:05</span> · Air AI-611 · Udaipur T1</div></div>
+<div style="display:flex;gap:10px;align-items:center"><span style="width:32px;height:32px;flex:none;border-radius:999px;background:var(--warnT);color:var(--warn);display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0-6 6m6-6 6 6"></path></svg></span><div style="font-size:15px"><span style="font-weight:600">Departs</span> <span style="color:var(--subtle)">Not yet confirmed</span></div></div>
+</div></div>
+<sc-if value="{{ notSaved }}" hint-placeholder-val="{{ true }}">
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px">
+<button onClick="{{ noop }}" style="min-height:56px;border:none;border-radius:999px;background:var(--ink);color:var(--btnFg);font-size:17px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px" style-active="opacity:.85"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .8 2.9a2 2 0 0 1-.5 2.1L8.1 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.4 1.9.7 2.9.8a2 2 0 0 1 1.6 2z"></path></svg>Call {{ callF.headShort }}</button>
+<button onClick="{{ noop }}" style="min-height:44px;border:1px solid var(--rules);border-radius:999px;background:var(--surface);color:var(--ink);font-size:15px;font-weight:600;cursor:pointer" style-hover="background:var(--s2)">Call alternate · <span style="font-family:var(--mono)">{{ callF.altMobile }}</span></button>
+<div style="border-top:1px solid var(--rule);padding-top:12px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Outcome</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<sc-for list="{{ outcomes }}" as="o" hint-placeholder-count="8"><button onClick="{{ o.pick }}" style="min-height:48px;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;transition:background 100ms;border:1px solid {{ o.bd }};background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button></sc-for>
+</div>
+<sc-if value="{{ isCallback }}" hint-placeholder-val="{{ false }}"><label style="display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600;color:var(--muted);margin-top:12px">Call back at<input type="datetime-local" style="min-height:48px;font-size:16px;padding:0 14px;border-radius:14px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);font-family:var(--mono)"></input></label></sc-if>
+<label style="display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600;color:var(--muted);margin-top:12px">Notes<textarea rows="2" placeholder="What was said…" style="font-size:16px;padding:12px 14px;border-radius:14px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);resize:vertical"></textarea></label>
+</div>
+<button onClick="{{ saveOutcome }}" style="min-height:48px;border:none;border-radius:999px;background:var(--ink);color:var(--btnFg);font-size:16px;font-weight:700;cursor:pointer" style-active="opacity:.85">Save outcome</button>
+<div style="display:flex;gap:8px"><button onClick="{{ noop }}" style="flex:1;min-height:44px;border:1px solid var(--rules);border-radius:999px;background:var(--surface);color:var(--ink);font-size:15px;font-weight:600;cursor:pointer" style-hover="background:var(--s2)">Dial again</button><button onClick="{{ noop }}" style="flex:1;min-height:44px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:15px;font-weight:600;cursor:pointer" style-hover="background:var(--s2)">No call happened</button></div>
+<p style="font-size:13px;color:var(--subtle);margin:0;text-align:center">Records freeze on save. Check the outcome before saving.</p>
+</div>
+</sc-if>
+<sc-if value="{{ saved }}" hint-placeholder-val="{{ false }}">
+<div style="background:var(--greenT);border:1px solid var(--rules);border-radius:16px;padding:20px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center"><span style="width:44px;height:44px;border-radius:999px;background:var(--green);color:var(--paper);display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span><div style="font-family:var(--disp);font-size:20px;color:var(--green)">Outcome saved</div><div style="font-size:14px;color:var(--muted)">Marked <b>{{ savedOutcome }}</b>. The row is unlocked for the next caller.</div><button onClick="{{ releaseBack }}" style="margin-top:4px;min-height:48px;padding:0 22px;border:none;border-radius:999px;background:var(--ink);color:var(--btnFg);font-size:16px;font-weight:700;cursor:pointer">Release family &amp; back to queue</button></div>
+</sc-if>
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;overflow:hidden"><div style="padding:12px 16px;border-bottom:1px solid var(--rule);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Previous attempts</div>
+<sc-for list="{{ attempts }}" as="a" hint-placeholder-count="2"><div style="padding:12px 16px;border-bottom:1px solid var(--rule);background:{{ a.band }}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px;color:var(--muted)">{{ a.when }}</span><span style="font-size:12px;font-weight:700;padding:3px 9px;border-radius:8px;border:1px solid {{ a.bd }};background:{{ a.bg }};color:{{ a.fg }}">{{ a.outcome }}</span></div><div style="font-size:14px;color:var(--muted);margin-top:4px">{{ a.note }}</div></div></sc-for>
+</div>
+<div style="border:2px dashed var(--rules);border-radius:16px;padding:16px;text-align:center;color:var(--subtle);font-size:14px">Call recording will appear here in a future version.</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ rImport }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 96px;display:flex;flex-direction:column;gap:14px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:600;color:var(--muted)"><span style="width:24px;height:24px;border-radius:999px;background:var(--ink);color:var(--btnFg);display:flex;align-items:center;justify-content:center;font-family:var(--mono)">1</span>Upload<span style="flex:1;border-top:1px solid var(--rules)"></span><span style="width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);background:{{ step2Bg }};color:{{ step2Fg }};border:1px solid var(--rules)">2</span>Preview</div>
+<sc-if value="{{ importStep1 }}" hint-placeholder-val="{{ true }}">
+<div style="border:2px dashed var(--rules);border-radius:16px;padding:36px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px"><span style="width:52px;height:52px;border-radius:999px;background:var(--band);color:var(--muted);display:flex;align-items:center;justify-content:center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0-12 4 4m-4-4L8 7M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg></span><div style="font-family:var(--disp);font-size:20px">Upload the guest Excel</div><div style="color:var(--muted);font-size:14px;max-width:280px;line-height:1.5">.xlsx with the standard headers. Rows dated before the event's first day are flagged, not skipped.</div><button onClick="{{ toPreview }}" style="margin-top:6px;min-height:48px;padding:0 24px;border:none;border-radius:999px;background:var(--ink);color:var(--btnFg);font-size:16px;font-weight:700;cursor:pointer">Choose file</button></div>
+</sc-if>
+<sc-if value="{{ importStep2 }}" hint-placeholder-val="{{ false }}">
+<div style="background:var(--redT);border:1px solid var(--rules);border-radius:16px;padding:14px 16px"><div style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--red);margin-bottom:8px">Needs a human</div><div style="display:flex;flex-direction:column;gap:6px;font-size:15px"><div style="display:flex;justify-content:space-between"><span style="color:var(--red);font-weight:600">Orphan rows</span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--red);font-weight:700">2</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--warn);font-weight:600">No phone number</span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--warn);font-weight:700">5</span></div></div></div>
+<div style="border-bottom:1px solid var(--rule);padding-bottom:6px;font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">What the file contains</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+<sc-for list="{{ importStats }}" as="s" hint-placeholder-count="6"><div style="background:{{ s.bg }};border:1px solid var(--rule);border-radius:14px;padding:10px 12px"><div style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:22px;font-weight:700;color:{{ s.fg }}">{{ s.value }}</div><div style="font-size:12px;color:var(--muted)">{{ s.label }}</div></div></sc-for>
+</div>
+<div style="border-left:2px solid var(--red);border-radius:0 16px 16px 0;overflow:hidden;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);border-right:1px solid var(--rule)">
+<sc-for list="{{ previewRows }}" as="p" hint-placeholder-count="4"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:52px;padding:8px 14px;background:{{ p.band }}"><div><div style="font-family:var(--disp);font-size:17px">{{ p.head }}</div><div style="font-size:13px;color:var(--muted)">{{ p.meta }}</div></div><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px;color:var(--muted)">{{ p.pax }} PAX</span></div></sc-for>
+</div>
+<div style="background:var(--warnT);border:1px solid var(--rules);border-radius:14px;padding:12px 14px;font-size:14px;color:var(--warn);line-height:1.5"><b>Row 41:</b> guest "Pinky" has no family head — will import as its own group unless fixed in the sheet.</div>
+<p style="font-size:13px;color:var(--subtle);margin:0">Nothing is written until you confirm.</p>
+<button onClick="{{ confirmImport }}" style="min-height:48px;border:none;border-radius:999px;background:var(--ink);color:var(--btnFg);font-size:16px;font-weight:700;cursor:pointer">Confirm import · <span style="font-family:var(--mono)">46</span> families</button>
+<button onClick="{{ backToUpload }}" style="min-height:44px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:15px;font-weight:600;cursor:pointer" style-hover="background:var(--s2)">Back to upload</button>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ rReview }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 96px;display:flex;flex-direction:column;gap:14px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="border-bottom:1px solid var(--rule);padding-bottom:8px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Review extraction</div><div style="font-family:var(--disp);font-size:22px;margin-top:4px">Call with Harish Mehta</div><div style="font-size:13px;color:var(--subtle);margin-top:2px">AI-extracted from a <span style="font-family:var(--mono)">4:12</span> recording · check anything amber</div></div>
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px">
+<sc-for list="{{ reviewFields }}" as="r" hint-placeholder-count="4">
+<div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:center"><label style="font-size:14px;font-weight:600;color:var(--muted)">{{ r.label }}</label><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;font-family:var(--mono);background:{{ r.chipBg }};color:{{ r.chipFg }};border:1px solid var(--rule)">{{ r.conf }}%</span></div><input value="{{ r.value }}" readOnly="{{ true }}" style="min-height:48px;font-size:16px;padding:0 14px;border-radius:14px;background:var(--paper);color:var(--ink);border:1px solid {{ r.inputBd }}"></input><sc-if value="{{ r.low }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:var(--warn)">Low confidence — check this against the transcript.</div></sc-if></div>
+</sc-for>
+<div style="background:var(--redT);border:1px solid var(--rules);border-radius:14px;padding:12px 14px;font-size:14px;color:var(--red);line-height:1.5">The alternate number <span style="font-family:var(--mono)">98290-4413</span> is 9 digits — invalid. Saving will clear this attempt's alternate.</div>
+</div>
+<button onClick="{{ acceptReview }}" style="min-height:48px;border:none;border-radius:999px;background:var(--ink);color:var(--btnFg);font-size:16px;font-weight:700;cursor:pointer">Accept &amp; write to register</button>
+<button onClick="{{ goQueueBtn }}" style="min-height:44px;border:1px solid var(--rules);border-radius:999px;background:var(--surface);color:var(--red);font-size:15px;font-weight:600;cursor:pointer" style-hover="background:var(--redT)">Reject extraction</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ rRooms }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 96px;display:flex;flex-direction:column;gap:14px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="border-bottom:1px solid var(--rule);padding-bottom:8px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Rooms</div><div style="font-family:var(--disp);font-size:22px;margin-top:4px">Tap a guest, then tap a room.</div><div style="font-size:13px;color:var(--subtle);margin-top:2px">Two taps to move.</div></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<sc-for list="{{ unplacedChips }}" as="g" hint-placeholder-count="4"><button onClick="{{ g.pick }}" style="min-height:38px;padding:0 14px;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer;transition:background 100ms;border:1px solid {{ g.bd }};background:{{ g.bg }};color:{{ g.fg }}">{{ g.name }}</button></sc-for>
+<sc-if value="{{ noUnplaced }}" hint-placeholder-val="{{ false }}"><span style="font-size:14px;color:var(--green);font-weight:600;padding:8px 4px">Everyone is placed ✓</span></sc-if>
+</div>
+<sc-for list="{{ rooms }}" as="r" hint-placeholder-count="3">
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;overflow:hidden">
+<div style="padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-size:16px;font-weight:600">{{ r.hotel }} · <span style="font-family:var(--mono);font-variant-numeric:tabular-nums">{{ r.num }}</span></div><span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;font-family:var(--mono);font-variant-numeric:tabular-nums;background:{{ r.occBg }};color:{{ r.occFg }};border:1px solid var(--rule)">{{ r.occLabel }}</span></div>
+<sc-for list="{{ r.occRows }}" as="o" hint-placeholder-count="2"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:48px;padding:6px 16px;background:{{ o.band }}"><div style="display:flex;align-items:center;gap:8px;font-size:15px"><span>{{ o.name }}</span><sc-if value="{{ o.isHead }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--s2);color:var(--muted)">HEAD</span></sc-if></div><button onClick="{{ o.release }}" style="min-height:36px;padding:0 12px;border-radius:999px;border:none;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--s2)">Release</button></div></sc-for>
+<sc-if value="{{ hasPicked }}" hint-placeholder-val="{{ false }}"><button onClick="{{ r.add }}" style="display:block;width:100%;min-height:44px;border:none;border-top:1px dashed var(--rules);background:var(--greenT);color:var(--green);font-size:15px;font-weight:700;cursor:pointer">+ Add {{ pickedName }} here</button></sc-if>
+<sc-if value="{{ r.asking }}" hint-placeholder-val="{{ false }}"><div style="background:var(--redT);border-top:1px solid var(--rules);padding:14px 16px;display:flex;flex-direction:column;gap:10px"><div style="font-size:14px;color:var(--red);font-weight:600">This puts the room over capacity. A reason goes on the audit trail.</div><input placeholder="Reason (e.g. family insisted, extra mattress)" style="min-height:44px;font-size:16px;padding:0 14px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink)"></input><div style="display:flex;gap:8px"><button onClick="{{ r.addAnyway }}" style="flex:1;min-height:44px;border:none;border-radius:999px;background:var(--red);color:#fff;font-size:15px;font-weight:700;cursor:pointer">Add anyway</button><button onClick="{{ cancelOver }}" style="flex:1;min-height:44px;border:1px solid var(--rules);border-radius:999px;background:var(--surface);color:var(--ink);font-size:15px;font-weight:600;cursor:pointer">Cancel</button></div></div></sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ rFleet }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 96px;display:flex;flex-direction:column;gap:14px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--rule);padding-bottom:8px"><div><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Fleet</div><div style="font-family:var(--disp);font-size:22px;margin-top:4px"><span style="font-family:var(--mono);font-variant-numeric:tabular-nums">{{ fleetCount }}</span> vehicles</div></div><button onClick="{{ toggleAddFleet }}" style="min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--rules);background:var(--surface);color:var(--ink);font-size:14px;font-weight:700;cursor:pointer" style-hover="background:var(--s2)">{{ addFleetLabel }}</button></div>
+<sc-if value="{{ addFleet }}" hint-placeholder-val="{{ false }}">
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Quick add</div>
+<sc-for list="{{ vehicleTypes }}" as="v" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px;min-height:48px"><div style="flex:1"><div style="font-size:15px;font-weight:600">{{ v.label }}</div><div style="font-size:13px;color:var(--subtle)">{{ v.cap }}</div></div><select style="min-height:44px;padding:0 10px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);font-size:16px;font-family:var(--mono)"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select><button onClick="{{ noop }}" style="min-height:44px;padding:0 16px;border-radius:999px;border:none;background:var(--ink);color:var(--btnFg);font-size:14px;font-weight:700;cursor:pointer">Add</button></div></sc-for>
+</div>
+</sc-if>
+<sc-for list="{{ fleet }}" as="v" hint-placeholder-count="3">
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:14px 16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-size:16px;font-weight:600">{{ v.label }}</div><span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:{{ v.bg }};color:{{ v.fg }};border:1px solid var(--rule)">{{ v.status }}</span></div><div style="font-size:14px;color:var(--muted);margin-top:6px;display:flex;flex-direction:column;gap:3px"><span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums">{{ v.capacity }}</span> seats + luggage</span><span>{{ v.detail }}</span></div><button onClick="{{ noop }}" style="margin-top:8px;min-height:36px;padding:0 12px;border-radius:999px;border:none;background:transparent;color:var(--red);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--redT)">Remove</button></div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ rTrips }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 96px;display:flex;flex-direction:column;gap:14px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="border-bottom:1px solid var(--rule);padding-bottom:8px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Trips</div><div style="font-family:var(--disp);font-size:22px;margin-top:4px">Review, then commit.</div><div style="font-size:13px;color:var(--subtle);margin-top:2px">Nothing is written until you commit.</div></div>
+<div style="display:flex;background:var(--s2);border-radius:999px;padding:4px;gap:4px">
+<sc-for list="{{ tripTabs }}" as="t" hint-placeholder-count="2"><button onClick="{{ t.pick }}" style="flex:1;min-height:40px;border:none;border-radius:999px;font-size:15px;font-weight:700;cursor:pointer;transition:background 100ms;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button></sc-for>
+</div>
+<div style="display:flex;gap:14px;font-size:14px;color:var(--muted);padding:0 4px"><span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink)">2</span> trips</span><span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink)">8/10</span> seats used</span><span style="color:var(--red)"><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700">4</span> unplaced</span></div>
+<sc-for list="{{ trips }}" as="t" hint-placeholder-count="2">
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;overflow:hidden"><div style="padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:16px;font-weight:600">{{ t.vehicle }}</div><div style="font-size:13px;color:var(--subtle)">{{ t.driver }} · {{ t.pickup }} · <span style="font-family:var(--mono);font-variant-numeric:tabular-nums">{{ t.time }}</span></div></div><span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--s2);color:var(--muted);font-family:var(--mono);font-variant-numeric:tabular-nums">{{ t.seats }}</span></div>
+<div style="padding:10px 16px;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ t.groups }}" as="g" hint-placeholder-count="2"><div style="background:var(--s2);border-radius:12px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;font-size:14px"><span style="font-family:var(--disp);font-size:15px">{{ g.name }}</span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)">{{ g.pax }} PAX · {{ g.time }}</span></div></sc-for>
+</div></div>
+</sc-for>
+<div style="background:var(--redT);border:1px solid var(--rules);border-radius:16px;padding:14px 16px"><div style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--red);margin-bottom:6px">Could not place</div><div style="font-size:14px;color:var(--red);line-height:1.6">Contractor family · <span style="font-family:var(--mono)">4 PAX</span> · lands <span style="font-family:var(--mono)">02:10</span> — no driver available overnight.</div></div>
+<sc-if value="{{ notCommitted }}" hint-placeholder-val="{{ true }}"><button onClick="{{ commitPlan }}" style="min-height:56px;border:none;border-radius:999px;background:var(--ink);color:var(--btnFg);font-size:17px;font-weight:700;cursor:pointer">Commit plan</button></sc-if>
+<sc-if value="{{ committed }}" hint-placeholder-val="{{ false }}"><div style="background:var(--greenT);border:1px solid var(--rules);border-radius:16px;padding:16px;text-align:center;color:var(--green);font-weight:700;font-size:16px">Plan committed ✓</div><button onClick="{{ goFleetBtn }}" style="min-height:44px;border:1px solid var(--rules);border-radius:999px;background:var(--surface);color:var(--ink);font-size:15px;font-weight:600;cursor:pointer" style-hover="background:var(--s2)">Back to fleet</button></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ rDepart }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 96px;display:flex;flex-direction:column;gap:14px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="border-bottom:1px solid var(--rule);padding-bottom:8px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Departures</div><div style="font-family:var(--disp);font-size:22px;margin-top:4px">Record a walk-up departure</div></div>
+<input value="{{ departQ }}" onChange="{{ setDepartQ }}" placeholder="Search by name or room number" style="min-height:48px;font-size:16px;padding:0 18px;border-radius:999px;border:1px solid var(--rules);background:var(--surface);color:var(--ink)"></input>
+<sc-if value="{{ noDepartSel }}" hint-placeholder-val="{{ true }}">
+<div style="border-left:2px solid var(--red);border-radius:0 16px 16px 0;overflow:hidden;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);border-right:1px solid var(--rule)">
+<sc-for list="{{ departResults }}" as="g" hint-placeholder-count="4"><button onClick="{{ g.pick }}" style="display:flex;width:100%;text-align:left;align-items:center;gap:10px;min-height:56px;padding:8px 14px;border:none;cursor:pointer;transition:background 100ms;background:{{ g.band }};color:var(--ink)" style-active="background:var(--s2)"><div style="flex:1;min-width:0"><div style="font-family:var(--disp);font-size:17px">{{ g.name }}</div><div style="font-size:13px;color:var(--muted)"><span style="font-family:var(--mono);font-variant-numeric:tabular-nums">{{ g.room }}</span> · {{ g.hotel }} · from import</div></div><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px;color:var(--muted)">{{ g.pax }} PAX</span></button></sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ hasDepartSel }}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{ departFormShown }}" hint-placeholder-val="{{ false }}">
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-family:var(--disp);font-size:19px">{{ departName }}</div><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px;color:var(--muted)">{{ departRoom }}</span></div>
+<div style="background:var(--warnT);border:1px solid var(--rules);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--warn)">A departure leg already exists from the import. The newer human entry wins.</div>
+<div style="display:flex;gap:10px"><label style="flex:1;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Date<input type="date" style="min-height:48px;font-size:16px;padding:0 12px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);font-family:var(--mono)"></input></label><label style="flex:1;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Time<input type="time" style="min-height:48px;font-size:16px;padding:0 12px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);font-family:var(--mono)"></input></label></div>
+<label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Mode<select style="min-height:48px;font-size:16px;padding:0 12px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink)"><option>Air</option><option>Train</option><option>Bus</option><option>Cab</option><option>Self drive</option></select></label>
+<div style="display:flex;gap:10px"><label style="flex:1;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Reference<input placeholder="AI-612" style="min-height:48px;font-size:16px;padding:0 12px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);font-family:var(--mono)"></input></label><label style="width:88px;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">PAX<input value="3" style="min-height:48px;font-size:16px;padding:0 12px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);font-family:var(--mono);font-variant-numeric:tabular-nums"></input></label></div>
+<label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Drop point<input placeholder="Udaipur Airport T1" style="min-height:48px;font-size:16px;padding:0 12px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink)"></input></label>
+<div style="background:var(--s2);border:1px solid var(--warn);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:10px"><div style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--warn)">Cab expense</div><div style="display:flex;gap:10px"><label style="flex:1;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Amount (₹)<input placeholder="1,400" style="min-height:44px;font-size:16px;padding:0 12px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);font-family:var(--mono);font-variant-numeric:tabular-nums"></input></label><label style="flex:1;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Payment<select style="min-height:44px;font-size:16px;padding:0 12px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink)"><option>Cash</option><option>UPI</option><option>Vendor bill</option></select></label></div></div>
+<button onClick="{{ saveDeparture }}" style="min-height:48px;border:none;border-radius:999px;background:var(--ink);color:var(--btnFg);font-size:16px;font-weight:700;cursor:pointer">Save departure</button>
+<button onClick="{{ cancelDepart }}" style="min-height:44px;border:none;border-radius:999px;background:transparent;color:var(--muted);font-size:15px;font-weight:600;cursor:pointer" style-hover="background:var(--s2)">Cancel</button>
+</div>
+</sc-if>
+<sc-if value="{{ departSaved }}" hint-placeholder-val="{{ false }}">
+<div style="background:var(--greenT);border:1px solid var(--rules);border-radius:16px;padding:20px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px"><span style="width:44px;height:44px;border-radius:999px;background:var(--green);color:var(--paper);display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span><div style="font-family:var(--disp);font-size:20px;color:var(--green)">Departure saved</div><div style="font-size:14px;color:var(--muted)">{{ departName }} is accounted for on the way out.</div><button onClick="{{ goTripsBtn }}" style="min-height:44px;padding:0 18px;border:1px solid var(--rules);border-radius:999px;background:var(--surface);color:var(--ink);font-size:15px;font-weight:600;cursor:pointer" style-hover="background:var(--s2)">Arrange a vehicle</button></div>
+</sc-if>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ rClient }}" hint-placeholder-val="{{ false }}">
+<div style="padding:20px 16px 48px;display:flex;flex-direction:column;gap:16px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="border-bottom:1px solid var(--rule);padding-bottom:10px"><div style="font-family:var(--disp);font-size:26px">Your guest list</div><div style="font-size:14px;color:var(--muted);margin-top:4px"><span style="font-family:var(--mono);font-variant-numeric:tabular-nums">7</span> guests across <span style="font-family:var(--mono);font-variant-numeric:tabular-nums">2</span> families</div></div>
+<sc-for list="{{ clientFamilies }}" as="fam" hint-placeholder-count="2">
+<div style="display:flex;flex-direction:column;gap:10px"><div style="font-family:var(--disp);font-size:19px">{{ fam.head }} family</div>
+<sc-for list="{{ fam.guests }}" as="g" hint-placeholder-count="3">
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:14px 16px"><div style="font-size:16px;font-weight:600">{{ g.name }}</div>
+<div style="margin-top:8px;display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px"><span style="color:var(--muted)">Room</span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums">{{ g.room }}</span></div><div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px"><span style="color:var(--muted)">Arrival</span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right">{{ g.arr }}</span></div><div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;font-size:14px"><span style="color:var(--muted)">Departure</span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:{{ g.depFg }}">{{ g.dep }}</span></div></div></div>
+</sc-for>
+</div>
+</sc-for>
+<p style="font-size:13px;color:var(--subtle);line-height:1.6;margin:0">Details appear here as the event team records them. A blank line means not shared yet.</p>
+</div>
+</sc-if>
+
+<sc-if value="{{ rAdminEvents }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 48px;display:flex;flex-direction:column;gap:14px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="border-bottom:1px solid var(--rule);padding-bottom:8px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Admin</div><div style="font-family:var(--disp);font-size:24px;margin-top:4px">Events</div></div>
+<sc-for list="{{ adminEvents }}" as="e" hint-placeholder-count="2">
+<button onClick="{{ e.open }}" style="display:flex;width:100%;text-align:left;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:14px 16px;cursor:pointer;color:var(--ink);transition:background 100ms" style-hover="background:var(--s2)"><div style="flex:1;min-width:0"><div style="font-size:18px;font-weight:600">{{ e.name }}</div><div style="font-size:14px;color:var(--muted);margin-top:2px">{{ e.couple }}</div><div style="display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap"><span style="font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--s2);color:var(--muted);font-family:var(--mono)">{{ e.code }}</span><span style="font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:{{ e.stBg }};color:{{ e.stFg }}">{{ e.st }}</span><span style="font-size:13px;color:var(--subtle);font-family:var(--mono);font-variant-numeric:tabular-nums">{{ e.dates }}</span></div></div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="color:var(--subtle);flex:none"><path d="m9 6 6 6-6 6"></path></svg></button>
+</sc-for>
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Create an event</div>
+<label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Event name<input placeholder="Aarav weds Diya" style="min-height:48px;font-size:16px;padding:0 14px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink)"></input></label>
+<label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Code<input placeholder="aardiya" style="min-height:48px;font-size:16px;padding:0 14px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);font-family:var(--mono)"></input><span style="font-size:12px;color:var(--subtle);font-weight:400">Staff will type this — it becomes <span style="font-family:var(--mono)">AARDIYA</span></span></label>
+<div style="display:flex;gap:10px"><label style="flex:1;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Bride<input style="min-height:48px;font-size:16px;padding:0 14px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink)"></input></label><label style="flex:1;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Groom<input style="min-height:48px;font-size:16px;padding:0 14px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink)"></input></label></div>
+<div style="display:flex;gap:10px"><label style="flex:1;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">First day<input type="date" style="min-height:48px;font-size:16px;padding:0 12px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);font-family:var(--mono)"></input></label><label style="flex:1;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Last day<input type="date" style="min-height:48px;font-size:16px;padding:0 12px;border-radius:12px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);font-family:var(--mono)"></input></label></div>
+<button onClick="{{ noop }}" style="min-height:48px;border:none;border-radius:999px;background:var(--ink);color:var(--btnFg);font-size:16px;font-weight:700;cursor:pointer">Create event</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ rAdminDash }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 48px;display:flex;flex-direction:column;gap:14px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="border-bottom:1px solid var(--rule);padding-bottom:8px;display:flex;justify-content:space-between;align-items:flex-end;gap:10px"><div><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Admin · Aarav weds Diya</div><div style="font-family:var(--disp);font-size:24px;margin-top:4px">Event dashboard</div></div><div style="display:flex;gap:6px"><button onClick="{{ goLedgerBtn }}" style="min-height:38px;padding:0 13px;border-radius:999px;border:1px solid var(--rules);background:var(--surface);color:var(--ink);font-size:13px;font-weight:700;cursor:pointer" style-hover="background:var(--s2)">Ledger</button><button onClick="{{ goMsgsBtn }}" style="min-height:38px;padding:0 13px;border-radius:999px;border:1px solid var(--rules);background:var(--surface);color:var(--ink);font-size:13px;font-weight:700;cursor:pointer" style-hover="background:var(--s2)">Messages</button></div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<sc-for list="{{ adminStats }}" as="s" hint-placeholder-count="4">
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:14px;min-height:100px;display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;color:var(--muted);font-weight:600">{{ s.label }}</span><div style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:32px;font-weight:700;color:{{ s.fg }};line-height:1">{{ s.value }}</div><div style="font-size:12px;color:var(--subtle)">{{ s.note }}</div></div>
+</sc-for>
+</div>
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;overflow:hidden"><div style="padding:12px 16px;border-bottom:1px solid var(--rule);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Today's movements</div>
+<sc-for list="{{ movements }}" as="m" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 16px;background:{{ m.band }}"><span style="width:28px;height:28px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;background:{{ m.iconBg }};color:{{ m.iconFg }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="{{ m.icon }}"></path></svg></span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px;font-weight:700">{{ m.time }}</span><div style="flex:1;min-width:0;font-size:14px"><span style="font-weight:600">{{ m.name }}</span> <span style="color:var(--subtle)">· {{ m.detail }}</span></div><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--s2);color:var(--muted)">{{ m.pax }}</span></div></sc-for>
+</div>
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;overflow:hidden"><div style="padding:12px 16px;border-bottom:1px solid var(--rule);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Needs attention</div>
+<div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ gaps }}" as="g" hint-placeholder-count="4"><button onClick="{{ g.go }}" style="display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:0 14px;border:1px solid var(--rules);border-radius:999px;background:var(--surface);color:var(--ink);font-size:15px;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:var(--s2)"><span>{{ g.label }}</span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px;background:{{ g.bg }};color:{{ g.fg }}">{{ g.count }}</span></button></sc-for>
+</div></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ rLedger }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 48px;display:flex;flex-direction:column;gap:14px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:20px 16px;text-align:center"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Travel ledger</div><div style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:34px;font-weight:700;margin-top:6px">38 of 46</div><div style="font-size:14px;color:var(--muted);margin-top:2px">families balanced · <span style="color:var(--red);font-weight:700"><span style="font-family:var(--mono);font-variant-numeric:tabular-nums">8</span> still here</span></div></div>
+<div style="display:flex;gap:8px;overflow-x:auto">
+<sc-for list="{{ ledgerChips }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.pick }}" style="flex:none;min-height:36px;padding:0 14px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button></sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ ledgerRows }}" as="r" hint-placeholder-count="5"><button onClick="{{ noop }}" style="display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;min-height:52px;padding:0 16px;border:1px solid var(--rules);border-radius:999px;background:var(--surface);color:var(--ink);font-size:15px;cursor:pointer;transition:background 100ms" style-hover="background:var(--s2)"><span style="display:flex;align-items:center;gap:8px;min-width:0"><span style="font-family:var(--disp);font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--s2);color:var(--muted);flex:none">{{ r.pax }}</span></span><span style="flex:none;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:{{ r.bg }};color:{{ r.fg }}">{{ r.st }}</span></button></sc-for>
+</div>
+<button onClick="{{ noop }}" style="min-height:44px;border:1px solid var(--rules);border-radius:999px;background:var(--surface);color:var(--ink);font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px" style-hover="background:var(--s2)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Export to Excel</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ rMsgs }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 16px 48px;display:flex;flex-direction:column;gap:14px;animation:efFade 150ms cubic-bezier(0.23,1,0.32,1)">
+<div style="border-bottom:1px solid var(--rule);padding-bottom:8px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Admin · Aarav weds Diya</div><div style="font-family:var(--disp);font-size:24px;margin-top:4px">Messages</div></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<sc-for list="{{ msgTemplates }}" as="t" hint-placeholder-count="3"><button onClick="{{ noop }}" style="min-height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--rules);background:var(--surface);color:var(--ink);font-size:14px;font-weight:600;cursor:pointer" style-hover="background:var(--s2)">{{ t.name }}</button></sc-for>
+</div>
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Compose</div>
+<textarea rows="4" style="font-size:16px;padding:12px 14px;border-radius:14px;border:1px solid var(--rules);background:var(--paper);color:var(--ink);resize:vertical">Namaste! Your pickup is confirmed: Innova Crysta at 14:30 from Udaipur Airport T1. Driver Mohan Lal, 98290-11223.</textarea>
+<div style="font-size:14px;color:var(--muted)">Sends to <span style="font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink)">6</span> families arriving today with a committed vehicle.</div>
+<button onClick="{{ noop }}" style="min-height:48px;border:none;border-radius:999px;background:var(--ink);color:var(--btnFg);font-size:16px;font-weight:700;cursor:pointer">Send · with confirm</button>
+</div>
+<div style="background:var(--surface);border:1px solid var(--rules);border-radius:16px;overflow:hidden"><div style="padding:12px 16px;border-bottom:1px solid var(--rule);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Sent log</div>
+<sc-for list="{{ msgLog }}" as="m" hint-placeholder-count="3"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:50px;padding:8px 16px;background:{{ m.band }};font-size:14px"><div style="min-width:0"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</div><div style="color:var(--subtle);font-size:13px">to <span style="font-family:var(--mono);font-variant-numeric:tabular-nums">{{ m.to }}</span> families</div></div><span style="font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);flex:none">{{ m.when }}</span></div></sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showTabs }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--surface);border-top:1px solid var(--rule);display:flex;z-index:30">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="6">
+<button onClick="{{ t.go }}" aria-label="{{ t.label }}" style="flex:1;min-height:60px;border:none;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 0;color:{{ t.fg }};transition:color 100ms"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.icon }}"></path></svg><span style="font-size:10px;font-weight:700">{{ t.label }}</span></button>
+</sc-for>
+</div>
+</sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 430, &quot;height&quot;: 900}, &quot;theme&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;light&quot;, &quot;dark&quot;], &quot;default&quot;: &quot;light&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Appearance&quot;}, &quot;role&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;admin&quot;, &quot;event_team&quot;, &quot;client&quot;], &quot;default&quot;: &quot;admin&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Prototype&quot;}, &quot;queuedWrites&quot;: {&quot;editor&quot;: &quot;int&quot;, &quot;default&quot;: 3, &quot;min&quot;: 0, &quot;max&quot;: 20, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Prototype&quot;}}">
+class Component extends DCLogic {
+  state = {
+    route: 'login', themeOverride: null,
+    qStatus: 'All', qSide: 'All',
+    callId: 2, outcome: null, saved: false, savedOutcome: '',
+    importStep: 1, tripsTab: 'Arrivals', committed: false,
+    picked: null, overAsk: null, addFleet: false,
+    departQ: '', departSel: null, departSaved: false,
+    families: [
+      {id:1, head:'Rajesh Sharma', side:'Groom', city:'Jaipur', pax:6, attempts:2, status:'Confirmed', mobile:'98290 11445', alt:'94140 22781'},
+      {id:2, head:'Harish Mehta', side:'Bride', city:'Ahmedabad', pax:4, attempts:1, status:'Callback', mobile:'99250 44120', alt:'98980 71034', cb:'Today · 6:30 pm'},
+      {id:3, head:'Venkat Iyer', side:'Bride', city:'Chennai', pax:3, attempts:0, status:'Not started', mobile:'98410 33872', alt:'—'},
+      {id:4, head:'Gurpreet Khanna', side:'Groom', city:'Delhi', pax:5, attempts:3, status:'Tentative', mobile:'98110 90276', alt:'99990 12034', locked:true},
+      {id:5, head:'Anand Deshpande', side:'Groom', city:'Pune', pax:2, attempts:2, status:'Declined', mobile:'98220 55901', alt:'—'},
+      {id:6, head:'Farida Contractor', side:'Bride', city:'Mumbai', pax:4, attempts:4, status:'Unreachable', mobile:'98200 78123', alt:'99300 44567'},
+      {id:7, head:'Om Prakash Agarwal', side:'Groom', city:'Kolkata', pax:7, attempts:1, status:'Attempted', mobile:'98300 12459', alt:'90070 88213'},
+      {id:8, head:'Nirmala Reddy', side:'Bride', city:'Hyderabad', pax:3, attempts:1, status:'Confirmed', mobile:'98490 60218', alt:'—'}
+    ],
+    rooms: [
+      {id:'r1', hotel:'Taj Aravali', num:'210', cap:3, occ:[{name:'Rajesh Sharma', head:true},{name:'Sunita Sharma'},{name:'Aarav Sharma'}]},
+      {id:'r2', hotel:'Taj Aravali', num:'211', cap:2, occ:[{name:'Harish Mehta', head:true},{name:'Meena Mehta'}]},
+      {id:'r3', hotel:'Trident', num:'118', cap:4, occ:[{name:'Nirmala Reddy', head:true}]},
+      {id:'r4', hotel:'Trident', num:'119', cap:2, occ:[]}
+    ],
+    unplaced: ['Kavita Sharma','Om Prakash Agarwal','Sunita Agarwal','Venkat Iyer']
+  };
+  P = {
+    neutral: {bg:'var(--paper)', fg:'var(--muted)', bd:'var(--rules)'},
+    active: {bg:'var(--ink)', fg:'var(--btnFg)', bd:'var(--ink)'},
+    attention: {bg:'var(--redT)', fg:'var(--red)', bd:'var(--rule)'},
+    done: {bg:'var(--greenT)', fg:'var(--green)', bd:'var(--rule)'}
+  };
+  tone(s) {
+    if (s === 'Confirmed' || s === 'Delivered' || s === 'Balanced') return this.P.done;
+    if (s === 'Declined' || s === 'Unreachable' || s === 'Over capacity' || s === 'Departure missing') return this.P.attention;
+    if (s === 'Assigned') return this.P.active;
+    return this.P.neutral;
+  }
+  go(route) { this.setState({route, saved:false, outcome:null}); }
+  renderVals() {
+    const s = this.state, p = this.props;
+    const role = p.role ?? 'admin';
+    const dark = (s.themeOverride ?? p.theme ?? 'light') === 'dark';
+    let route = role === 'client' ? 'client' : s.route;
+    if (role === 'client' && route !== 'client') route = 'client';
+    const band = i => i % 2 ? 'var(--band)' : 'var(--paper)';
+    const chip = (label, sel, pick) => ({label, pick,
+      bg: sel ? 'var(--brand)' : 'var(--surface)', fg: sel ? 'var(--brandFg)' : 'var(--muted)', bd: sel ? 'var(--brand)' : 'var(--rules)'});
+    const statuses = ['All','Not started','Attempted','Callback','Tentative','Confirmed','Declined','Unreachable'];
+    const queueSrc = s.families.filter(f =>
+      (s.qStatus === 'All' || f.status === s.qStatus) && (s.qSide === 'All' || f.side === s.qSide));
+    const queue = queueSrc.map((f, i) => {
+      const t = this.tone(f.status);
+      return {head: f.head, pax: f.pax, band: band(i),
+        meta: (f.attempts ? f.attempts + (f.attempts === 1 ? ' attempt' : ' attempts') : 'no attempts') + ' · ' + f.side + (f.locked ? ' · Locked' : '') + (f.cb ? ' · ' + f.cb : ''),
+        status: f.status, pillBg: t.bg, pillFg: t.fg, pillBd: t.bd,
+        open: () => this.setState({route:'call', callId:f.id, saved:false, outcome:null})};
+    });
+    const cf = s.families.find(f => f.id === s.callId) || s.families[1];
+    const cft = this.tone(cf.status);
+    const outcomeList = ['Confirmed','Callback','Tentative','Declined','Unreachable','No answer','Busy','Other'];
+    const tabDefs = [
+      {id:'dash', label:'Home', icon:'M3 10.5 12 3l9 7.5V21h-6v-6h-6v6H3z'},
+      {id:'queue', label:'Queue', icon:'M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .8 2.9a2 2 0 0 1-.5 2.1L8.1 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.4 1.9.7 2.9.8a2 2 0 0 1 1.6 2z'},
+      {id:'import', label:'Import', icon:'M12 3v12m0-12 4 4m-4-4L8 7M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2', adminOnly:true},
+      {id:'review', label:'Review', icon:'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'},
+      {id:'rooms', label:'Rooms', icon:'M2 4v16m0-6h20v6m0-6V9a3 3 0 0 0-3-3H9v6M2 14h20'},
+      {id:'fleet', label:'Fleet', icon:'M5 17H3v-4l2-6h12l2 6h2v4h-2M7 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0m6 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0M5 11h14'},
+      {id:'trips', label:'Trips', icon:'M6 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm12-8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM9 16h4a4 4 0 0 0 4-4v-1'},
+      {id:'depart', label:'Depart', icon:'M12 19V5m0 0-6 6m6-6 6 6'}
+    ].filter(t => role === 'admin' || !t.adminOnly);
+    const routeOf = {dash:'dash', queue:'queue', import:'import', review:'review', rooms:'rooms', fleet:'fleet', trips:'trips', depart:'depart'};
+    const staffRoutes = ['dash','queue','call','import','review','rooms','fleet','trips','depart'];
+    const adminRoutes = ['admin','adminDash','ledger','msgs'];
+    const headerTitles = {admin:'Admin · Events', adminDash:'Aarav weds Diya', ledger:'Travel ledger', msgs:'Messages', client:'Aarav weds Diya', call:'Call family'};
+    const dashStats = [
+      {label:'Total groups', value:'46', note:'from import + manual', tone:'ink', icon:'M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8m11 10v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'},
+      {label:'Total pax', value:'182', note:'guests expected', tone:'ink', icon:'M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8'},
+      {label:'RSVP confirmed', value:'31', note:'families said yes', tone:'green', icon:'M20 6 9 17l-5-5'},
+      {label:'RSVP pending', value:'11', note:'still to call', tone:'warn', icon:'M12 6v6l4 2M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20'},
+      {label:'Arrivals today', value:'12', note:'legs landing', tone:'info', icon:'M12 5v14m0 0-6-6m6 6 6-6'},
+      {label:'Departures today', value:'4', note:'legs leaving', tone:'info', icon:'M12 19V5m0 0-6 6m6-6 6 6'},
+      {label:'Hampers delivered', value:'18', note:'of 34 required', tone:'green', icon:'M20 12v9H4v-9M2 7h20v5H2zM12 21V7m0 0H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zm0 0h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z'},
+      {label:'Hampers pending', value:'16', note:'assigned or waiting', tone:'warn', icon:'M12 6v6l4 2M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20'}
+    ].map(x => ({...x,
+      fg: x.tone === 'green' ? 'var(--green)' : x.tone === 'warn' ? 'var(--warn)' : x.tone === 'info' ? 'var(--info)' : 'var(--ink)',
+      tint: x.tone === 'green' ? 'var(--greenT)' : x.tone === 'warn' ? 'var(--warnT)' : x.tone === 'info' ? 'var(--infoT)' : 'var(--s2)'}));
+    const rooms = this.state.rooms.map(r => {
+      const over = r.occ.length > r.cap, free = r.cap - r.occ.length;
+      return {hotel: r.hotel, num: r.num,
+        occLabel: r.occ.length + '/' + r.cap + (over ? ' · OVER' : ' · ' + free + ' free'),
+        occBg: over ? 'var(--redT)' : 'var(--s2)', occFg: over ? 'var(--red)' : 'var(--muted)',
+        occRows: r.occ.map((o, i) => ({name: o.name, isHead: !!o.head, band: band(i),
+          release: () => this.setState(st => ({rooms: st.rooms.map(x => x.id === r.id ? {...x, occ: x.occ.filter(y => y.name !== o.name)} : x), unplaced: [...st.unplaced, o.name]}))})),
+        asking: s.overAsk === r.id,
+        add: () => {
+          if (!s.picked) return;
+          if (r.occ.length >= r.cap) { this.setState({overAsk: r.id}); return; }
+          this.doPlace(r.id);
+        },
+        addAnyway: () => this.doPlace(r.id)};
+    });
+    const departGuests = [
+      {name:'Rajesh Sharma', room:'210', hotel:'Taj Aravali', pax:6},
+      {name:'Harish Mehta', room:'211', hotel:'Taj Aravali', pax:4},
+      {name:'Nirmala Reddy', room:'118', hotel:'Trident', pax:3},
+      {name:'Gurpreet Khanna', room:'—', hotel:'Not placed', pax:5}
+    ];
+    const dq = s.departQ.trim().toLowerCase();
+    const departResults = departGuests
+      .filter(g => !dq || g.name.toLowerCase().includes(dq) || g.room.includes(dq))
+      .map((g, i) => ({...g, band: band(i), pick: () => this.setState({departSel: g.name + '|' + g.room, departSaved: false})}));
+    const dsel = s.departSel ? s.departSel.split('|') : null;
+    const ledgerData = [
+      {name:'Rajesh Sharma', pax:6, st:'Balanced'},
+      {name:'Nirmala Reddy', pax:3, st:'Balanced'},
+      {name:'Farida Contractor', pax:4, st:'Departure missing'},
+      {name:'Om Prakash Agarwal', pax:7, st:'No arrival'},
+      {name:'Harish Mehta', pax:4, st:'Balanced'},
+      {name:'Gurpreet Khanna', pax:5, st:'Departure missing'}
+    ];
+    const lf = s.ledgerF || 'All';
+    const ledgerRows = ledgerData
+      .filter(r => lf === 'All' || (lf === 'Missing departure' && r.st === 'Departure missing') || (lf === 'No arrival' && r.st === 'No arrival'))
+      .map(r => {
+        const t = r.st === 'Balanced' ? this.P.done : r.st === 'Departure missing' ? this.P.attention : {bg:'var(--warnT)', fg:'var(--warn)'};
+        return {...r, bg: t.bg, fg: t.fg};
+      });
+    return {
+      themeClass: dark ? 'ef-dark' : '',
+      toggleTheme: () => this.setState({themeOverride: dark ? 'light' : 'dark'}),
+      noop: () => {},
+      rLogin: route === 'login', rDash: route === 'dash', rQueue: route === 'queue', rCall: route === 'call',
+      rImport: route === 'import', rReview: route === 'review', rRooms: route === 'rooms', rFleet: route === 'fleet',
+      rTrips: route === 'trips', rDepart: route === 'depart', rClient: route === 'client',
+      rAdminEvents: route === 'admin', rAdminDash: route === 'adminDash', rLedger: route === 'ledger', rMsgs: route === 'msgs',
+      hasHeader: route !== 'login',
+      hasBack: route === 'call' || adminRoutes.includes(route),
+      goBack: () => this.go(route === 'call' ? 'queue' : route === 'admin' ? 'dash' : route === 'adminDash' ? 'admin' : 'adminDash'),
+      headerTitle: headerTitles[route] || 'Aarav weds Diya',
+      headerSub: adminRoutes.includes(route) ? 'Admin console' : '12–15 Nov 2026 · Udaipur · The Leela',
+      showChrome: staffRoutes.includes(route) && route !== 'call',
+      isAdminRole: role === 'admin',
+      goAdmin: () => this.go('admin'),
+      showSync: (p.queuedWrites ?? 3) > 0 && (route === 'queue' || route === 'call'),
+      queued: p.queuedWrites ?? 3,
+      goDash: () => this.go('dash'),
+      stats: dashStats,
+      qChips: statuses.map(x => chip(x, s.qStatus === x, () => this.setState({qStatus: x}))),
+      sideChips: ['All','Bride','Groom'].map(x => chip(x === 'All' ? 'Both sides' : x + ' side', s.qSide === x, () => this.setState({qSide: x}))),
+      queue, hasQueueRows: queue.length > 0, queueEmpty: queue.length === 0, qStatus: s.qStatus,
+      clearFilters: () => this.setState({qStatus:'All', qSide:'All'}),
+      callF: {head: cf.head, headShort: cf.head.split(' ')[0], mobile: cf.mobile, altMobile: cf.alt, city: cf.city,
+        status: cf.status, pillBg: cft.bg, pillFg: cft.fg, pillBd: cft.bd,
+        remarks: 'Prefers evening calls. Vegetarian hampers only. Speaks Hindi and Gujarati.'},
+      callFields: [
+        {k:'Side', v: cf.side, fg:'var(--ink)'},
+        {k:'City', v: cf.city, fg:'var(--ink)'},
+        {k:'PAX', v: String(cf.pax), fg:'var(--ink)'},
+        {k:'Priority', v:'High · close family', fg:'var(--ink)'},
+        {k:'Callback booked', v: cf.cb || 'Not yet confirmed', fg: cf.cb ? 'var(--warn)' : 'var(--subtle)'}
+      ],
+      outcomes: outcomeList.map(o => ({label: o,
+        bg: s.outcome === o ? 'var(--brand)' : 'var(--paper)', fg: s.outcome === o ? 'var(--brandFg)' : 'var(--ink)',
+        bd: s.outcome === o ? 'var(--brand)' : 'var(--rules)', pick: () => this.setState({outcome: o})})),
+      isCallback: s.outcome === 'Callback',
+      notSaved: !s.saved, saved: s.saved, savedOutcome: s.savedOutcome,
+      saveOutcome: () => {
+        if (!s.outcome) return;
+        const map = {Confirmed:'Confirmed', Callback:'Callback', Tentative:'Tentative', Declined:'Declined', Unreachable:'Unreachable'};
+        this.setState(st => ({saved:true, savedOutcome: st.outcome,
+          families: st.families.map(f => f.id === st.callId ? {...f, status: map[st.outcome] || 'Attempted', attempts: f.attempts + 1, locked:false} : f)}));
+      },
+      releaseBack: () => this.go('queue'),
+      attempts: [
+        {when:'Yesterday 7:14 pm', outcome:'Callback', note:'Asked to call after dinner. Booked for today 6:30 pm.', band: band(0), ...this.P.neutral},
+        {when:'Mon 11:02 am', outcome:'No answer', note:'Rang out twice.', band: band(1), ...this.P.neutral}
+      ].map(a => { const t = this.tone(a.outcome); return {...a, bg:t.bg, fg:t.fg, bd:t.bd}; }),
+      importStep1: s.importStep === 1, importStep2: s.importStep === 2,
+      step2Bg: s.importStep === 2 ? 'var(--ink)' : 'var(--surface)', step2Fg: s.importStep === 2 ? 'var(--btnFg)' : 'var(--subtle)',
+      toPreview: () => this.setState({importStep: 2}),
+      backToUpload: () => this.setState({importStep: 1}),
+      confirmImport: () => this.go('queue'),
+      importStats: [
+        {label:'Families', value:'46', bg:'var(--surface)', fg:'var(--ink)'},
+        {label:'Guests', value:'182', bg:'var(--surface)', fg:'var(--ink)'},
+        {label:'Not started', value:'38', bg:'var(--surface)', fg:'var(--ink)'},
+        {label:'Tentative', value:'6', bg:'var(--surface)', fg:'var(--ink)'},
+        {label:'No arrival date', value:'9', bg:'var(--warnT)', fg:'var(--warn)'},
+        {label:'Blank rows skipped', value:'3', bg:'var(--surface)', fg:'var(--subtle)'}
+      ],
+      previewRows: [
+        {head:'Rajesh Sharma', meta:'Groom · Jaipur', pax:6},
+        {head:'Harish Mehta', meta:'Bride · Ahmedabad', pax:4},
+        {head:'Venkat Iyer', meta:'Bride · Chennai', pax:3},
+        {head:'Gurpreet Khanna', meta:'Groom · Delhi', pax:5}
+      ].map((x, i) => ({...x, band: band(i)})),
+      reviewFields: [
+        {label:'Outcome', value:'Confirmed', conf:96, low:false},
+        {label:'PAX confirmed', value:'4', conf:91, low:false},
+        {label:'Mobile (alternate)', value:'98290-4413', conf:71, low:true},
+        {label:'Arrival date', value:'12 Nov, afternoon', conf:64, low:true}
+      ].map(r => ({...r,
+        chipBg: r.low ? 'var(--warnT)' : 'var(--s2)', chipFg: r.low ? 'var(--warn)' : 'var(--muted)',
+        inputBd: r.low ? 'var(--warn)' : 'var(--rules)'})),
+      acceptReview: () => this.go('queue'), goQueueBtn: () => this.go('queue'),
+      rooms,
+      unplacedChips: s.unplaced.map(n => ({name: n,
+        bg: s.picked === n ? 'var(--brand)' : 'var(--surface)', fg: s.picked === n ? 'var(--brandFg)' : 'var(--ink)',
+        bd: s.picked === n ? 'var(--brand)' : 'var(--rules)',
+        pick: () => this.setState({picked: s.picked === n ? null : n, overAsk: null})})),
+      noUnplaced: s.unplaced.length === 0,
+      hasPicked: !!s.picked, pickedName: s.picked || '',
+      cancelOver: () => this.setState({overAsk: null}),
+      fleetCount: 3, addFleet: s.addFleet,
+      addFleetLabel: s.addFleet ? 'Close' : '+ Add',
+      toggleAddFleet: () => this.setState({addFleet: !s.addFleet}),
+      vehicleTypes: [
+        {label:'Innova Crysta', cap:'6 seats + luggage'},
+        {label:'Dzire', cap:'4 seats + luggage'},
+        {label:'Tempo Traveller', cap:'12 seats + luggage'}
+      ],
+      fleet: [
+        {label:'Innova Crysta · RJ14 CV 2211', status:'Assigned', capacity:'6', detail:'Mohan Lal · Shree Travels'},
+        {label:'Dzire · RJ45 AB 8890', status:'Available', capacity:'4', detail:'Ramesh Gurjar · Shree Travels'},
+        {label:'Tempo Traveller · RJ27 TA 4102', status:'Unavailable', capacity:'12', detail:'In service until 13 Nov'}
+      ].map(v => {
+        const t = v.status === 'Available' ? this.P.done : v.status === 'Assigned' ? {bg:'var(--warnT)', fg:'var(--warn)'} : this.P.neutral;
+        return {...v, bg: t.bg, fg: t.fg};
+      }),
+      tripTabs: ['Arrivals','Departures'].map(x => ({label: x,
+        bg: s.tripsTab === x ? 'var(--brand)' : 'transparent', fg: s.tripsTab === x ? 'var(--brandFg)' : 'var(--muted)',
+        pick: () => this.setState({tripsTab: x})})),
+      trips: (s.tripsTab === 'Arrivals' ? [
+        {vehicle:'Innova Crysta · RJ14 CV 2211', driver:'Mohan Lal', pickup:'Airport T1', time:'14:30', seats:'5/6',
+         groups:[{name:'Sharma', pax:3, time:'14:05'},{name:'Iyer', pax:2, time:'14:20'}]},
+        {vehicle:'Dzire · RJ45 AB 8890', driver:'Ramesh Gurjar', pickup:'Railway Stn', time:'16:10', seats:'3/4',
+         groups:[{name:'Reddy', pax:3, time:'15:45'}]}
+      ] : [
+        {vehicle:'Dzire · RJ45 AB 8890', driver:'Ramesh Gurjar', pickup:'Taj Aravali', time:'09:15', seats:'3/4',
+         groups:[{name:'Reddy', pax:3, time:'11:40'}]},
+        {vehicle:'Innova Crysta · RJ14 CV 2211', driver:'Mohan Lal', pickup:'Trident', time:'07:30', seats:'4/6',
+         groups:[{name:'Deshpande', pax:2, time:'09:05'},{name:'Mehta', pax:2, time:'10:00'}]}
+      ]),
+      notCommitted: !s.committed, committed: s.committed,
+      commitPlan: () => this.setState({committed: true}),
+      goFleetBtn: () => this.go('fleet'),
+      departQ: s.departQ,
+      setDepartQ: e => this.setState({departQ: e.target.value, departSel: null, departSaved: false}),
+      departResults,
+      noDepartSel: !dsel, hasDepartSel: !!dsel,
+      departFormShown: !!dsel && !s.departSaved,
+      departSaved: s.departSaved,
+      departName: dsel ? dsel[0] : '', departRoom: dsel ? 'Room ' + dsel[1] : '',
+      saveDeparture: () => this.setState({departSaved: true}),
+      cancelDepart: () => this.setState({departSel: null}),
+      goTripsBtn: () => this.go('trips'),
+      clientFamilies: [
+        {head:'Harish Mehta', guests:[
+          {name:'Harish Mehta', room:'Taj Aravali · 211', arr:'12 Nov · 14:05 · AI-611', dep:'15 Nov · 10:00 · AI-612', depFg:'var(--ink)'},
+          {name:'Meena Mehta', room:'Taj Aravali · 211', arr:'12 Nov · 14:05 · AI-611', dep:'15 Nov · 10:00 · AI-612', depFg:'var(--ink)'},
+          {name:'Kiara Mehta', room:'Taj Aravali · 211', arr:'12 Nov · 14:05 · AI-611', dep:'Not shared yet', depFg:'var(--subtle)'}
+        ]},
+        {head:'Prakash Mehta', guests:[
+          {name:'Prakash Mehta', room:'Not shared yet', arr:'13 Nov · 11:20 · Train 12986', dep:'Not shared yet', depFg:'var(--subtle)'},
+          {name:'Asha Mehta', room:'Not shared yet', arr:'13 Nov · 11:20 · Train 12986', dep:'Not shared yet', depFg:'var(--subtle)'}
+        ]}
+      ],
+      adminEvents: [
+        {name:'Aarav weds Diya', couple:'Aarav Malhotra · Diya Kapoor', code:'AARDIYA', st:'Active', stBg:'var(--greenT)', stFg:'var(--green)', dates:'12–15 Nov 2026', open: () => this.go('adminDash')},
+        {name:'Rohan weds Isha', couple:'Rohan Bajaj · Isha Shetty', code:'ROHISH', st:'No dates', stBg:'var(--warnT)', stFg:'var(--warn)', dates:'—', open: () => this.go('adminDash')}
+      ],
+      adminStats: [
+        {label:'Families balanced', value:'38/46', note:'travel ledger', fg:'var(--green)'},
+        {label:'Still here', value:'8', note:'no departure yet', fg:'var(--red)'},
+        {label:'Arrivals today', value:'12', note:'legs landing', fg:'var(--info)'},
+        {label:'Hampers pending', value:'16', note:'of 34 required', fg:'var(--warn)'}
+      ],
+      movements: [
+        {time:'14:05', name:'Sharma', detail:'Air AI-611 · T1', pax:'6', dir:'in'},
+        {time:'14:20', name:'Iyer', detail:'Air 6E-334 · T1', pax:'3', dir:'in'},
+        {time:'15:45', name:'Reddy', detail:'Train 12986 · Stn', pax:'3', dir:'in'},
+        {time:'10:00', name:'Mehta', detail:'Air AI-612 · T1', pax:'2', dir:'out'}
+      ].map((m, i) => ({...m, band: band(i),
+        icon: m.dir === 'in' ? 'M12 5v14m0 0-6-6m6 6 6-6' : 'M12 19V5m0 0-6 6m6-6 6 6',
+        iconBg: m.dir === 'in' ? 'var(--infoT)' : 'var(--warnT)', iconFg: m.dir === 'in' ? 'var(--info)' : 'var(--warn)'})),
+      gaps: [
+        {label:'Confirmed · no room', count:'3', bg:'var(--redT)', fg:'var(--red)', go: () => this.go('rooms')},
+        {label:'Arriving today · no vehicle', count:'1', bg:'var(--redT)', fg:'var(--red)', go: () => this.go('trips')},
+        {label:'No departure recorded', count:'8', bg:'var(--warnT)', fg:'var(--warn)', go: () => this.go('ledger')},
+        {label:'Hampers pending', count:'16', bg:'var(--warnT)', fg:'var(--warn)', go: () => this.go('dash')}
+      ],
+      goLedgerBtn: () => this.go('ledger'), goMsgsBtn: () => this.go('msgs'),
+      ledgerChips: ['All','Missing departure','No arrival'].map(x => chip(x, (s.ledgerF || 'All') === x, () => this.setState({ledgerF: x}))),
+      ledgerRows,
+      msgTemplates: [{name:'Room allocation'},{name:'Pickup details'},{name:'Departure reminder'}],
+      msgLog: [
+        {name:'Pickup details · Innova 14:30', to:'6', when:'Today 12:02'},
+        {name:'Room allocation · Taj Aravali', to:'14', when:'Yesterday 18:40'},
+        {name:'Welcome + venue map', to:'42', when:'10 Nov 09:15'}
+      ].map((m, i) => ({...m, band: band(i)})),
+      showTabs: staffRoutes.includes(route) && route !== 'call',
+      tabs: tabDefs.map(t => ({label: t.label, icon: t.icon,
+        fg: route === routeOf[t.id] ? 'var(--brand)' : 'var(--subtle)',
+        go: () => this.go(routeOf[t.id])}))
+    };
+  }
+  doPlace(roomId) {
+    this.setState(st => ({
+      rooms: st.rooms.map(r => r.id === roomId ? {...r, occ: [...r.occ, {name: st.picked}]} : r),
+      unplaced: st.unplaced.filter(n => n !== st.picked),
+      picked: null, overAsk: null
+    }));
+  }
+}
+</script>
+</body>
+</html>

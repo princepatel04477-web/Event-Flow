@@ -1,0 +1,1179 @@
+[
+  {
+    "id": "TC001",
+    "title": "Admin logs in and reaches the admin experience",
+    "description": "This verifies that an admin can sign in successfully and is routed into the admin experience with access to admin context.",
+    "category": "Auth & Role Routing",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the admin experience is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify admin-level access context is available"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Staff creates a delivery proof record with a server timestamp",
+    "description": "This verifies that staff can create a delivery record and capture proof that is stored as an immutable, server-stamped record.",
+    "category": "Delivery Proof Capture",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the delivery proof experience"
+      },
+      {
+        "type": "action",
+        "description": "Create a delivery record"
+      },
+      {
+        "type": "action",
+        "description": "Capture an in-app proof photo"
+      },
+      {
+        "type": "action",
+        "description": "Save the proof record"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the delivery proof record is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a timestamped proof entry is visible"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Staff claims an RSVP group and logs a call attempt",
+    "description": "This verifies that staff can claim a queue item and create a call attempt record before continuing the RSVP workflow.",
+    "category": "RSVP Calling Operations",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the RSVP queue"
+      },
+      {
+        "type": "action",
+        "description": "Claim a group from the queue"
+      },
+      {
+        "type": "action",
+        "description": "Start a call attempt for the claimed group"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the group is locked to the current user"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the call attempt is recorded"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Create and commit an RSVP call update from the queue",
+    "description": "This test verifies that an event team member can claim a group from the RSVP queue, record the call outcome, and commit the extracted RSVP update.",
+    "category": "RSVP Queue Claim and Review",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the RSVP queue"
+      },
+      {
+        "type": "action",
+        "description": "Claim a guest group from the queue"
+      },
+      {
+        "type": "action",
+        "description": "Log a call attempt for the claimed group"
+      },
+      {
+        "type": "action",
+        "description": "Capture or attach in-app audio for the call"
+      },
+      {
+        "type": "action",
+        "description": "Review the extracted RSVP fields"
+      },
+      {
+        "type": "action",
+        "description": "Commit the RSVP update"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the updated RSVP record is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the call attempt is recorded"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC005",
+    "title": "Client logs in and receives read-only access",
+    "description": "This verifies that a client can sign in successfully and is routed into a read-only client experience.",
+    "category": "Auth & Role Routing",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the client experience is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify read-only client views are available"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "Assign a guest group to an available room",
+    "description": "This test verifies that an event team member can complete a room assignment when the room has enough capacity and no booking conflict exists.",
+    "category": "Room Assignment & Capacity",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the room assignment page"
+      },
+      {
+        "type": "action",
+        "description": "Choose a guest group and an available room"
+      },
+      {
+        "type": "action",
+        "description": "Set valid stay dates for the assignment"
+      },
+      {
+        "type": "action",
+        "description": "Save the assignment"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new room assignment is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the room occupancy is updated"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "Staff assigns a group to a room when capacity allows",
+    "description": "This verifies that staff can complete a room assignment successfully when the target room has enough capacity and no overlap conflict.",
+    "category": "Room Assignment",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the room assignment experience"
+      },
+      {
+        "type": "action",
+        "description": "Select a guest group to assign"
+      },
+      {
+        "type": "action",
+        "description": "Select a room with sufficient capacity"
+      },
+      {
+        "type": "action",
+        "description": "Commit the room assignment"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the room assignment is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the assignment is confirmed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC008",
+    "title": "Create a delivery record with in-app proof capture",
+    "description": "This test verifies that a staff member can create a delivery and attach a proof photo that is stored as an immutable record with a server-stamped timestamp.",
+    "category": "Delivery Proofs",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the deliveries page"
+      },
+      {
+        "type": "action",
+        "description": "Create a delivery record"
+      },
+      {
+        "type": "action",
+        "description": "Capture a proof photo in the app"
+      },
+      {
+        "type": "action",
+        "description": "Save the proof"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the proof record is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the proof shows a recorded timestamp"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC009",
+    "title": "Admin imports a guest list and commits a previewed batch",
+    "description": "This verifies that an admin can preview an Excel guest list import and commit the batch successfully.",
+    "category": "Excel Import",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the guest list import experience"
+      },
+      {
+        "type": "action",
+        "description": "Upload a valid Excel guest list"
+      },
+      {
+        "type": "action",
+        "description": "Preview the import batch"
+      },
+      {
+        "type": "action",
+        "description": "Commit the import batch"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify imported guest records are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a successful import confirmation is visible"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC010",
+    "title": "Prevent double-booking the same room",
+    "description": "This test verifies that a second assignment cannot overlap an existing booking for the same room.",
+    "category": "Room Assignment & Capacity",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the room assignment page"
+      },
+      {
+        "type": "action",
+        "description": "Create an assignment for a room over a chosen date range"
+      },
+      {
+        "type": "action",
+        "description": "Start another assignment for the same room"
+      },
+      {
+        "type": "action",
+        "description": "Set overlapping stay dates for the second assignment"
+      },
+      {
+        "type": "action",
+        "description": "Save the second assignment"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a booking conflict validation error is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify only the original room assignment is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC011",
+    "title": "Import an Excel guest list and commit the previewed changes",
+    "description": "This test verifies that an admin can preview an Excel import, commit it, and see a created batch with row counts.",
+    "category": "Idempotent Import",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the import page"
+      },
+      {
+        "type": "action",
+        "description": "Upload a valid guest list file"
+      },
+      {
+        "type": "action",
+        "description": "Review the import preview"
+      },
+      {
+        "type": "action",
+        "description": "Commit the import batch"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the import batch is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the import results show row counts"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC012",
+    "title": "Staff captures audio, reviews extraction, and commits the RSVP update",
+    "description": "This verifies that staff can transcribe a call recording, review extracted RSVP fields, edit them if needed, and commit the update.",
+    "category": "RSVP Calling Operations",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the RSVP queue"
+      },
+      {
+        "type": "action",
+        "description": "Claim a group from the queue"
+      },
+      {
+        "type": "action",
+        "description": "Start a call attempt for the claimed group"
+      },
+      {
+        "type": "action",
+        "description": "Capture an audio note for the call"
+      },
+      {
+        "type": "action",
+        "description": "Run transcription on the captured audio"
+      },
+      {
+        "type": "action",
+        "description": "Review the extracted RSVP fields"
+      },
+      {
+        "type": "action",
+        "description": "Commit the RSVP update"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the RSVP update is committed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the committed RSVP status is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC013",
+    "title": "Block assigning a group above room capacity",
+    "description": "This test verifies that an assignment is rejected when the guest group size exceeds the room capacity and no booking is created.",
+    "category": "Room Assignment & Capacity",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the room assignment page"
+      },
+      {
+        "type": "action",
+        "description": "Choose a guest group whose size exceeds the selected room capacity"
+      },
+      {
+        "type": "action",
+        "description": "Set valid stay dates for the assignment"
+      },
+      {
+        "type": "action",
+        "description": "Save the assignment"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a capacity validation error is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify no new room assignment is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC014",
+    "title": "Admin re-imports the same guest list without duplicating records",
+    "description": "This verifies that re-importing the same Excel guest list is handled idempotently and does not create duplicate records.",
+    "category": "Excel Import",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the guest list import experience"
+      },
+      {
+        "type": "action",
+        "description": "Upload a valid Excel guest list"
+      },
+      {
+        "type": "action",
+        "description": "Preview the import batch"
+      },
+      {
+        "type": "action",
+        "description": "Commit the import batch"
+      },
+      {
+        "type": "action",
+        "description": "Upload the same Excel guest list again"
+      },
+      {
+        "type": "action",
+        "description": "Preview the import batch"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the re-import preview shows no duplicate inserts"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the batch can be committed without creating duplicate records"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC015",
+    "title": "Re-import the same Excel file without creating duplicate records",
+    "description": "This test verifies that importing the same source file again preserves existing rows and results in no duplicate changes.",
+    "category": "Idempotent Import",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the import page"
+      },
+      {
+        "type": "action",
+        "description": "Upload a valid guest list file"
+      },
+      {
+        "type": "action",
+        "description": "Review the import preview"
+      },
+      {
+        "type": "action",
+        "description": "Commit the import batch"
+      },
+      {
+        "type": "action",
+        "description": "Upload the same guest list file again"
+      },
+      {
+        "type": "action",
+        "description": "Review the second import preview"
+      },
+      {
+        "type": "action",
+        "description": "Commit the second import batch"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the second import indicates no new changes or only skipped rows"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the existing imported rows remain present"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC016",
+    "title": "Staff is blocked from double-booking a room",
+    "description": "This verifies that an overlapping room assignment is rejected when the room is already occupied during the same time window.",
+    "category": "Room Assignment",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the room assignment experience"
+      },
+      {
+        "type": "action",
+        "description": "Select a guest group to assign"
+      },
+      {
+        "type": "action",
+        "description": "Select a room that is already booked for the same time window"
+      },
+      {
+        "type": "action",
+        "description": "Commit the room assignment"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a room conflict error is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the assignment is not created"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC017",
+    "title": "Open the client read-only event view",
+    "description": "This test verifies that a client can log in and see event-specific read-only information without edit controls.",
+    "category": "Client Read-Only Views",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the client event view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify event-specific read-only content is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify edit controls are not available"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC018",
+    "title": "Prevent two devices from claiming the same RSVP group",
+    "description": "This test verifies that a group already claimed in the queue cannot be claimed again from another browser session or device.",
+    "category": "RSVP Queue Claim and Review",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the RSVP queue"
+      },
+      {
+        "type": "action",
+        "description": "Claim a guest group from the queue"
+      },
+      {
+        "type": "action",
+        "description": "Refresh the queue view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the claimed group is no longer available in the queue"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the group is shown as locked or assigned to the current user"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC019",
+    "title": "Prevent a client from opening another event's view",
+    "description": "This test verifies that a client can only access their own event context and cannot view another event through the routed experience.",
+    "category": "Client Read-Only Views",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to another event view from the client experience"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an access restriction message is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the other event content is not shown"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC020",
+    "title": "Prevent a client from accessing base tables",
+    "description": "This test verifies that a client cannot open internal data views that are not part of the read-only experience.",
+    "category": "Client Read-Only Views",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to an internal data view from the client experience"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an access restriction message is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the restricted data view is not shown"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC021",
+    "title": "Show validation errors for malformed import mappings",
+    "description": "This test verifies that malformed Excel columns or missing required mappings are rejected before any import is committed.",
+    "category": "Idempotent Import",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the import page"
+      },
+      {
+        "type": "action",
+        "description": "Upload a file with missing required columns"
+      },
+      {
+        "type": "action",
+        "description": "Review the import preview"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an import validation error is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify no import batch is committed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC022",
+    "title": "Keep delivery proof immutable after creation",
+    "description": "This test verifies that an existing proof cannot be edited or removed after it has been saved.",
+    "category": "Delivery Proofs",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the deliveries page"
+      },
+      {
+        "type": "action",
+        "description": "Open an existing proof record"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to edit the proof details"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to remove the proof record"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the proof remains present"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify editing or deletion is blocked"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC023",
+    "title": "Invalid credentials keep the user on the login screen",
+    "description": "This verifies that an invalid sign-in attempt is rejected and no authenticated experience is entered.",
+    "category": "Auth & Role Routing",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login field with invalid credentials"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with invalid credentials"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a login error is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the login screen remains visible"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC024",
+    "title": "Reject a proof captured from the gallery",
+    "description": "This test verifies that a proof requirement is not satisfied when a gallery-selected image is used instead of an in-app capture.",
+    "category": "Delivery Proofs",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the deliveries page"
+      },
+      {
+        "type": "action",
+        "description": "Create a delivery record"
+      },
+      {
+        "type": "action",
+        "description": "Select a gallery image for proof"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to save the proof"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a proof validation error is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the delivery remains unverified"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC025",
+    "title": "Staff sees transcription failure state for unsupported audio",
+    "description": "This verifies that an unsupported or corrupted audio recording is surfaced as a failed transcription instead of being silently accepted.",
+    "category": "RSVP Calling Operations",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the RSVP queue"
+      },
+      {
+        "type": "action",
+        "description": "Claim a group from the queue"
+      },
+      {
+        "type": "action",
+        "description": "Start a call attempt for the claimed group"
+      },
+      {
+        "type": "action",
+        "description": "Capture an audio note for the call"
+      },
+      {
+        "type": "action",
+        "description": "Run transcription on the captured audio"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a transcription failure state is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the RSVP note remains uncommitted"
+      }
+    ],
+    "priority": "Low"
+  }
+]

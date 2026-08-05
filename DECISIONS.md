@@ -5,6 +5,47 @@ made, so the next session does not re-litigate it.
 
 ---
 
+## 3 August 2026 — Q1 design foundation (ledger system)
+
+### Scope: the brief's route map did not exist yet
+
+The brief named `/team/deliveries` as the reference screen and listed
+`/admin/rooms`, `/client`. None of those routes exist — the app is built as
+`/[eventCode]/…` and hamper delivery is Phase 3 (no screen yet). Q1's reference
+screen is therefore the **calling queue** (`/[eventCode]/queue`), the app's real
+one-handed-at-speed screen with a 238-family list. The delivery vocabulary is
+defined in full now so the Q2 deliveries screen can be built without re-deciding
+words or colours.
+
+### The status vocabulary is one module, `src/lib/status.ts`
+
+Previously `rsvp.ts` held only RSVP labels/tones; screens had drifted between
+"Callback" and "Callback due". Now `status.ts` is the single source for all four
+families (RSVP, delivery, ledger, room) with fixed wording and a four-tone
+system (`neutral` / `active` ink-stamp / `attention` red / `done` green).
+`rsvp.ts` is a thin re-export so existing consumers keep their imports.
+
+### Red and green are locked to meaning
+
+Ledger red = attention only (overdue, unbalanced, over-capacity, destructive).
+Ledger green = completed only (delivered, confirmed, balanced). The focus ring
+is ink in both themes, not red — a focus outline is not an attention state.
+`Badge.tsx` (5 tones incl. indigo/blue/amber) still exists and is used across 21
+screens; deleting it and migrating those usages is Q2, recorded, not done here.
+
+### Two behaviour notes found during the visual pass — fixed separately, not here
+
+1. **`/design-system` is a public route.** It is a static evidence page
+   rendering every primitive in isolation. It ships as `○ /design-system`
+   (static). It is dev tooling, harmless (no data, no auth), and documented as
+   such; Q2 can delete it or gate it.
+2. **The queue's attention rows are not sorted to the top.** Red (unreachable,
+   declined) rows currently sit inside priority tiers; the default sort does not
+   surface them. Surfacing attention first (or an attention count in the header)
+   is a behaviour change and belongs in a logic pass, not this visual one.
+
+---
+
 ## 31 July 2026 — p1d, role gating and event scoping
 
 ### Event scope lives in the URL, not in an `active_event` cookie

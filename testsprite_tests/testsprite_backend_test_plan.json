@@ -1,0 +1,32 @@
+[
+  {
+    "id": "TC001",
+    "title": "postapiauthloginwithvalidadmincredentials",
+    "description": "Verify that POST /api/auth/login with valid admin credentials returns 200 with an authenticated session or JWT, and subsequent GET requests return admin routing context with full access."
+  },
+  {
+    "id": "TC002",
+    "title": "geteventscopedrecordswithvalideventcontext",
+    "description": "Verify that GET requests for event-scoped records return only rows for the current event, and POST requests with matching event_id create records successfully, enforcing multi-tenancy and fencing."
+  },
+  {
+    "id": "TC003",
+    "title": "getapirsvpqueueandclaimgroup",
+    "description": "Verify that GET /api/rsvp/queue returns prioritized groups needing contact, and POST /api/rsvp/claim_group locks a group exclusively, preventing concurrent claims."
+  },
+  {
+    "id": "TC004",
+    "title": "getapiroomshotelsandassignments",
+    "description": "Verify that GET /api/rooms/hotels and /api/rooms/rooms return available inventory, and POST /api/rooms/assignments enforces capacity and prevents overlapping bookings."
+  },
+  {
+    "id": "TC005",
+    "title": "postapideliveriesanddeliveryproofs",
+    "description": "Verify that POST /api/deliveries with in-app photo capture creates delivery records, and POST /api/delivery_proofs creates immutable, server-stamped proof records."
+  },
+  {
+    "id": "TC006",
+    "title": "postapiimportpreviewandcommit",
+    "description": "Verify that POST /api/import/preview returns a preview of inserts, updates, and skips, and POST /api/import/commit commits the import preserving idempotency via source-row hashes."
+  }
+]

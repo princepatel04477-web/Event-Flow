@@ -40,5 +40,28 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Excel guest-list data — real phone numbers. Never enters git.
+*.xlsx
+*.xls
+
+# Local tooling / IDE / AI-assistant state — never shared.
+/.idea/
+/.commandcode/
+/.claude/
+/.testsprite/
+/testsprite_tests/tmp/
+
 # Obsidian vault UI state (churns on every pane change)
 eventflow/.obsidian/workspace.json
+
+# Android signing (M10) — keystore and credentials never enter the repo.
+*.jks
+*.keystore
+android/keystore.properties
+android/app/release/
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+
+testsprite_tests\tmp\config.json

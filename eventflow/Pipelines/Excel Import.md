@@ -5,7 +5,15 @@ updated: 2026-07-31
 
 # Excel Import
 
-Back to [[EventFlow]]. **Task `p1c` — the next thing to build.**
+Back to [[EventFlow]]. **Task `p1c` — preview done, commit pending.**
+
+> [!warning] The database write path does not exist yet
+> The parse pipeline, preview UI, mobile normalisation, column mapper, and idempotent
+> matching are all built and working. What is missing: `app.commit_guest_import()`,
+> a single Postgres function that inserts `import_batches`, `import_rows`,
+> `guest_groups`, and the head `guests` row in one transaction. An earlier
+> supabase-js commit path was removed — it could not be atomic and had no
+> protection against overwriting RSVP status the calling team had already set.
 
 > [!info] Why this is first
 > This is the line that turns an empty database into 238 real families. Nothing downstream

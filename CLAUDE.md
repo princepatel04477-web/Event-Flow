@@ -89,6 +89,86 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f test_security.sql
 Once the Next.js app exists, record its `dev` / `build` / `lint` / `test` commands here —
 this section is the first place a new session looks.
 
+### Mobile (Capacitor)
+
+**Mode: REMOTE SHELL (M2-ALT).** The static-export audit returned HEAVY, so the APK is a
+native shell over the deployed site, not a static bundle. **Offline support is NOT available
+in this mode** — venue Wi-Fi is a single point of failure until M9 lands a client data layer.
+The deployed URL is a placeholder in `capacitor.config.ts` (`<DEPLOYED_APP_URL>`) — set
+`CAP_REMOTE_URL` (or edit the config) before building the release APK.
+
+**Toolchain (working as of Aug 2026):** JDK 26 at `C:\Program Files\Java\jdk-26.0.2`, Android
+SDK at `C:\Users\rebel\AppData\Local\Android\Sdk`, Android Studio JBR (25). The Gradle wrapper
+was bumped to **9.4.0** (8.14.3 cannot run on Java 26). `android/gradle.properties` pins
+`org.gradle.java.home` to Gradle's auto-downloaded **Temurin 21** and enables toolchain
+auto-download — the locally-installed JDK 26 is too new for AGP 8.13's `JdkImageTransform`.
+Do not revert those three settings or the build breaks.
+
+```bash
+# find LAN IP (the machine running next dev)
+#   Windows:  ipconfig | findstr IPv4
+#   macOS:    ipconfig getifaddr en0
+#   Linux:    hostname -I
+export CAP_DEV_HOST=192.168.1.42
+
+# build the debug APK (env vars must be set in the same shell)
+set JAVA_HOME=C:\Program Files\Java\jdk-26.0.2
+set ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk
+set ANDROID_SDK_ROOT=%LOCALAPPDATA%\Android\Sdk
+cd android && gradlew.bat assembleDebug      # -> app/build/outputs/apk/debug/app-debug.apk
+
+# live reload on handset (M5): edits show up ~2s, no APK rebuild
+npm run mobile:dev
+
+# production: point capacitor.config.ts at the real URL, then
+npm run mobile            # next build + cap sync android
+cd android && gradlew.bat assembleRelease    # -> app/build/outputs/apk/release/app-release-unsigned.apk
+```
+
+Debug vs release: `capacitor.config.dev.ts` enables cleartext for LAN http. The release
+manifest must never contain `usesCleartextTraffic` — grep `android/app/src/main/AndroidManifest.xml`
+before shipping.
+
+Native code (M6 dialer, M7 recorder, M8 camera proof) lives in
+`android/app/src/main/java/com/eventops/app/`. Any change there requires a full APK rebuild —
+OTA (M11) ships JS/HTML/CSS only.
+
+### Release build (M10) — run on a machine with Android Studio + JDK
+
+1. `keytool` the keystore, store it OUTSIDE the repo in two places.
+   Copy `android/keystore.properties.example` → `android/keystore.properties`.
+2. Wire `signingConfigs` in `android/app/build.gradle` to read that file; the
+   build must fail loudly if it is missing — never fall back to debug signing
+   for a release build.
+3. Release build: `minifyEnabled true`, `shrinkResources true`, ProGuard keep
+   rules for Capacitor plugin classes + `CallPlugin` (reflection-based plugin
+   registration breaks under R8). Verify the release manifest has NO
+   `usesCleartextTraffic` and NO `debuggable`.
+4. Upload the ProGuard mapping file to Sentry for readable release traces.
+5. Install page lives at `public/install.html`; copy it + the APK into the
+   `delivery-proofs`-style public bucket (or any static host) and share the URL.
+   Do NOT distribute the APK as a WhatsApp attachment — it gets compressed,
+   renamed, and staff end up on mismatched versions.
+6. In-app version check: on launch, fetch a `version.json` from the bucket;
+   if installed versionCode is behind, show a non-dismissible update prompt
+   linking to the install page.
+
+### OTA hotfix channel (M11)
+
+- Ships **JS/HTML/CSS only** via `@capgo/capacitor-updater` (self-hosted on a
+  storage bucket). Any change to native code (`CallPlugin`, permissions,
+  `AndroidManifest`, gradle, a new Capacitor plugin) requires a full APK
+  redistribution — plan native changes to be finished before distribution day.
+- `autoUpdate` is OFF; `OtaUpdater` drives `getLatest → download → next` on
+  app resume so the bundle stages for the next background/restart, never a
+  mid-session hot-swap.
+- Rollback: previous bundles are kept; the /debug screen can reset to the last
+  good bundle.
+- Release script: `node scripts/ota-release.mjs <versionName> [versionCode]`
+  (builds `out/`, zips, uploads to the bucket, writes `manifest.json`). Only
+  runnable once `out/` exists — i.e. after M2 lands. In remote-shell mode the
+  deployed site is the source of truth.
+
 ---
 
 ## 4. Stack (locked — do not re-litigate)

@@ -171,6 +171,13 @@ export type Database = {
             foreignKeyName: "call_attempts_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "call_attempts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -262,6 +269,13 @@ export type Database = {
             foreignKeyName: "call_recordings_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "call_recordings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -341,6 +355,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliverables_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
           },
           {
             foreignKeyName: "deliverables_event_id_fkey"
@@ -461,6 +482,13 @@ export type Database = {
             foreignKeyName: "delivery_proofs_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "delivery_proofs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -498,6 +526,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_members_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
           },
           {
             foreignKeyName: "event_members_event_id_fkey"
@@ -632,6 +667,13 @@ export type Database = {
             foreignKeyName: "guest_groups_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "guest_groups_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -681,6 +723,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guests_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
           },
           {
             foreignKeyName: "guests_event_id_fkey"
@@ -758,6 +807,13 @@ export type Database = {
             foreignKeyName: "hotels_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "hotels_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -824,6 +880,13 @@ export type Database = {
             foreignKeyName: "import_batches_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "import_batches_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -880,6 +943,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_rows_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
           },
           {
             foreignKeyName: "import_rows_event_id_fkey"
@@ -960,6 +1030,13 @@ export type Database = {
             foreignKeyName: "message_templates_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "message_templates_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -1027,6 +1104,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
           },
           {
             foreignKeyName: "messages_event_id_fkey"
@@ -1172,6 +1256,13 @@ export type Database = {
             foreignKeyName: "room_assignments_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "room_assignments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -1271,6 +1362,13 @@ export type Database = {
             foreignKeyName: "rooms_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "rooms_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -1346,6 +1444,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsvp_extractions_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
           },
           {
             foreignKeyName: "rsvp_extractions_event_id_fkey"
@@ -1430,6 +1535,13 @@ export type Database = {
             foreignKeyName: "transcripts_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "transcripts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -1509,6 +1621,13 @@ export type Database = {
             foreignKeyName: "travel_legs_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "travel_legs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -1570,6 +1689,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_passengers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
           },
           {
             foreignKeyName: "trip_passengers_event_id_fkey"
@@ -1688,6 +1814,13 @@ export type Database = {
             foreignKeyName: "trips_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "trips_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -1741,6 +1874,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_types_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
           },
           {
             foreignKeyName: "vehicle_types_event_id_fkey"
@@ -1812,6 +1952,13 @@ export type Database = {
             foreignKeyName: "vehicles_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "vehicles_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -1861,10 +2008,41 @@ export type Database = {
             foreignKeyName: "guests_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "guests_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
         ]
+      }
+      v_event_attention: {
+        Row: {
+          arrivals_no_vehicle: number | null
+          confirmed_no_room: number | null
+          event_id: string | null
+          hampers_pending: number | null
+          no_departure: number | null
+        }
+        Insert: {
+          arrivals_no_vehicle?: never
+          confirmed_no_room?: never
+          event_id?: string | null
+          hampers_pending?: never
+          no_departure?: never
+        }
+        Update: {
+          arrivals_no_vehicle?: never
+          confirmed_no_room?: never
+          event_id?: string | null
+          hampers_pending?: never
+          no_departure?: never
+        }
+        Relationships: []
       }
       v_event_dashboard: {
         Row: {
@@ -1947,6 +2125,13 @@ export type Database = {
             foreignKeyName: "guest_groups_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "guest_groups_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "v_event_dashboard"
             referencedColumns: ["event_id"]
           },
@@ -1969,6 +2154,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_groups_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
           },
           {
             foreignKeyName: "guest_groups_event_id_fkey"
@@ -2043,7 +2235,25 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commit_guest_import: {
+        Args: {
+          p_event_id: string
+          p_filename: string
+          p_kind: string
+          p_rows: Json
+        }
+        Returns: Json
+      }
       release_group: { Args: { p_group_id: string }; Returns: undefined }
+      upsert_import_leg: {
+        Args: {
+          p_direction: Database["app"]["Enums"]["travel_direction"]
+          p_event_id: string
+          p_group_id: string
+          p_leg: Json
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

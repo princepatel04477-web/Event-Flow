@@ -5,7 +5,7 @@ updated: 2026-07-31
 
 # Schema Overview
 
-Back to [[EventFlow]]. Seven migrations, applied in filename order.
+Back to [[EventFlow]]. Eight migrations, applied in filename order.
 
 | Migration | Contents |
 |---|---|
@@ -16,6 +16,7 @@ Back to [[EventFlow]]. Seven migrations, applied in filename order.
 | `0500_rls` | [[Tenancy and RLS]] — every policy, plus storage buckets |
 | `0600_views_rpc` | [[Views and RPCs]] |
 | `0700_seed` | vehicle types, message templates, bootstrap notes |
+| `0800_realtime` | `guest_groups` + `call_attempts` → publication, `replica identity full` |
 
 ## Table map
 

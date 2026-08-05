@@ -252,7 +252,21 @@ export function CallScreen({
     // The row is written and stashed BEFORE we navigate — this is the one
     // thing that must never be reordered. See the module doc in
     // lib/call/session.ts.
-    window.location.href = target.href
+    //
+    // M6: on native, dial through the CallPlugin for direct dial + automatic
+    // call-state events; on web (or plugin failure) fall back to tel:.
+    const isNative = typeof window !== 'undefined' && Boolean((window as any).Capacitor)
+    if (isNative) {
+      try {
+        const { Call } = await import('@/lib/call/plugin')
+        await Call.dial({ phoneNumber: target.dialedNumber })
+        void Call.startListening()
+      } catch {
+        window.location.href = target.href
+      }
+    } else {
+      window.location.href = target.href
+    }
   }
 
   /**

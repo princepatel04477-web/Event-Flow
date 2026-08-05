@@ -1,6 +1,6 @@
 ---
 tags: [moc, home]
-updated: 2026-07-31
+updated: 2026-08-02
 ---
 
 # EventFlow
@@ -14,6 +14,7 @@ Google Forms, manual calling records, and manual room/hamper/logistics tracking.
 ## Start here
 
 - [[Project Brief]] — what this is, who uses it, scale
+- [[Prince's Brief (2026-08-05)]] — the product owner's plain-terms requirements, per module
 - [[Status]] — what is done, what is next
 - [[Stack Decisions]] — locked choices, do not re-litigate
 - [[Roadmap]] — p1a → p1j, then phases 2–5
@@ -33,13 +34,19 @@ Per-area detail: [[Guests and RSVP]] · [[Rooms and Assignments]] ·
 
 ## Pipelines
 
-- [[Excel Import]] — the next thing to build (`p1c`)
+- [[Excel Import]] — preview done, commit RPC pending (`p1c`)
 - [[RSVP Capture Pipeline]] — dial → record → transcribe → extract → review → commit
 - [[Extraction Contract]] — the JSON shape, and how it maps to the RPC
+
+## Phase 2 (current)
+
+- [[Phase 2 - Client Profile Cards]] — what's built, what's next
+- [[Rooms and Assignments]] — schema is done, allocation backend pending
 
 ## Ops
 
 - [[Supabase Project]] — refs, versions, commands
+- [[Decisions]] — architecture and product decisions (vault mirror of DECISIONS.md)
 - [[Security Tests]] — what `test_security.sql` actually proves
 - [[Known Traps]] — things already learned the hard way
 - [[Open Questions]] — two unresolved items

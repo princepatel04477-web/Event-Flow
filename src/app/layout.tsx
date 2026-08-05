@@ -1,7 +1,18 @@
 import type { Metadata, Viewport } from 'next'
 import type { ReactNode } from 'react'
 
+import { NativeBridge } from '@/components/native/NativeBridge'
+import { OfflineBanner } from '@/components/native/OfflineBanner'
+import { OtaUpdater } from '@/components/native/OtaUpdater'
+import { SentryErrorBoundary } from '@/components/native/SentryErrorBoundary'
+import { initSentry } from '@/lib/sentry'
+
 import './globals.css'
+
+// Install Sentry global handlers on the client before anything renders.
+if (typeof window !== 'undefined') {
+  initSentry()
+}
 
 export const metadata: Metadata = {
   title: {
@@ -34,9 +45,18 @@ export const viewport: Viewport = {
 // Android phone and needs nothing from the network at the venue.
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className="h-full">
+    // suppressHydrationWarning: the Android WebView injects a style
+    // attribute with --safe-area-inset-* vars onto <html> (viewport-fit
+    // cover) before React hydrates. The server cannot know those values, so
+    // we let React keep the WebView's version instead of erroring.
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <body className="min-h-dvh bg-bg font-sans text-base text-fg antialiased">
-        {children}
+        <SentryErrorBoundary>
+          <NativeBridge />
+          <OtaUpdater />
+          <OfflineBanner />
+          {children}
+        </SentryErrorBoundary>
       </body>
     </html>
   )

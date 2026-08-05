@@ -1,12 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
-import { UploadIcon, InboxIcon, ShieldAlertIcon } from '@/components/icons'
+import { UploadIcon, InboxIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { Spinner } from '@/components/ui/Spinner'
+import { ErrorState } from '@/components/ui/ErrorState'
+import { LoadingRows } from '@/components/ui/LoadingRows'
+import { SectionHead } from '@/components/ui/SectionHead'
 import { createClient } from '@/lib/supabase/client'
 import { QueueFilters } from './QueueFilters'
 import { QueueRow, type QueueGroupRow } from './QueueRow'
@@ -176,37 +179,27 @@ export function QueueBoard({ eventId, eventCode, canImport }: QueueBoardProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-xl font-semibold text-fg">Calling queue</h2>
-        <p className="mt-0.5 text-sm text-muted">
-          Sorted by priority. Tap a family to claim it and open the call.
-        </p>
-      </div>
+      <SectionHead
+        eyebrow="Calling queue"
+        title="Families to call"
+      />
 
       <QueueFilters filters={filters} onChange={handleFilterChange} />
 
       {state.phase === 'error' ? (
-        <div
-          role="alert"
-          className="flex flex-col gap-3 rounded-xl border border-danger bg-tint-danger px-4 py-3"
-        >
-          <div className="flex items-start gap-2 text-sm font-medium text-danger">
-            <ShieldAlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              {state.message}
-              {state.rows ? ' Showing the last list that loaded.' : ''}
-            </span>
-          </div>
-          <Button variant="secondary" fullWidth onClick={retry}>
-            Retry
-          </Button>
-        </div>
+        <ErrorState
+          title={state.message}
+          description={
+            state.rows
+              ? 'Showing the last list that loaded. Your changes were saved.'
+              : undefined
+          }
+          onRetry={retry}
+        />
       ) : null}
 
       {state.phase === 'loading' ? (
-        <div className="flex justify-center py-12">
-          <Spinner size="lg" />
-        </div>
+        <LoadingRows count={8} />
       ) : rows === null ? null : rows.length === 0 ? (
         filtersActive ? (
           <EmptyState
@@ -242,16 +235,37 @@ export function QueueBoard({ eventId, eventCode, canImport }: QueueBoardProps) {
           />
         )
       ) : (
-        <ul className="flex flex-col gap-2">
-          {rows.map((row) => (
+        <ol
+          className="list-fade relative ml-3 flex flex-col gap-px"
+          aria-label="Families to call"
+        >
+          {/* The ledger's margin rule: one continuous red line down the
+              leading edge of the list. Attention states break into it.
+              The 12px left margin gives the band room to read as ruled
+              paper, not a border. */}
+          <span
+            aria-hidden
+            className="absolute top-1 bottom-1 -left-3 w-0.5 rounded-full bg-ledger-red"
+          />
+          {rows.map((row, index) => (
             <li key={row.group_id ?? `${row.head_name}-${row.primary_mobile}`}>
-              <QueueRow row={row} eventCode={eventCode} />
+              <ListRowWrap banded={index % 2 === 1}>
+                <QueueRow row={row} eventCode={eventCode} />
+              </ListRowWrap>
             </li>
           ))}
-        </ul>
+        </ol>
       )}
     </div>
   )
+}
+
+/**
+ * The alternating paper band lives on the list item, not inside QueueRow:
+ * the row itself is one shape everywhere; the list decides the banding.
+ */
+function ListRowWrap({ banded, children }: { banded: boolean; children: ReactNode }) {
+  return <div className={banded ? 'bg-paper-band' : 'bg-paper'}>{children}</div>
 }
 
 export default QueueBoard

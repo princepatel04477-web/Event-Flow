@@ -20,6 +20,41 @@ export interface MobileResult {
 }
 
 /**
+ * A number rendered in scientific notation, as text: "9.425155093E9",
+ * "9.42516E+09". Excel does this to any numeric cell whose column is too
+ * narrow, and CSV/clipboard exports bake the rendering in permanently.
+ */
+const EXPONENTIAL_TEXT = /^[+-]?(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/
+
+/**
+ * Expand an exponential-notation string to its digits — but ONLY when the
+ * mantissa carries at least as many significant digits as the expanded number
+ * has, i.e. when the rendering was lossless.
+ *
+ * "9.425155093E9" -> "9425155093": mantissa has all 10 digits, so this is the
+ * same number, just displayed badly.
+ *
+ * "9.42516E+09"   -> rejected: Number() would happily return 9425160000, a
+ * real, dialable, WRONG Indian mobile. Excel threw four digits away when it
+ * rendered the cell and nothing can bring them back. A blank number costs a
+ * caller one lookup; a plausible wrong number gets a stranger dialled at
+ * 9pm and an RSVP logged against the wrong family.
+ */
+function expandExponential(s: string): { digits: string } | { lossy: true } {
+  const m = EXPONENTIAL_TEXT.exec(s)
+  if (!m) return { lossy: true }
+
+  const value = Number(s)
+  if (!Number.isSafeInteger(value)) return { lossy: true }
+
+  const mantissaDigits = `${m[1]}${m[2] ?? ''}`.replace(/^0+/, '').length
+  const expanded = Math.abs(value).toString()
+  if (mantissaDigits < expanded.length) return { lossy: true }
+
+  return { digits: expanded }
+}
+
+/**
  * Strip spaces/dashes/brackets/dots, a leading +91 or 0 country/trunk
  * prefix, and the trailing ".0" Excel's number formatting leaves on a
  * mobile number that was stored as a numeric cell.
@@ -35,6 +70,12 @@ export function normaliseMobile(raw: unknown): MobileResult {
   let s: string
   if (typeof raw === 'number') {
     if (!Number.isFinite(raw)) return { value: null, reason: 'not a number' }
+    // A double big enough to have lost integer precision cannot be trusted to
+    // still be the number that was typed in. 10- and 12-digit mobiles are
+    // ~1e10, nowhere near 2^53, so this only ever fires on garbage.
+    if (!Number.isSafeInteger(Math.trunc(raw))) {
+      return { value: null, reason: `too large to be a phone number (${raw})` }
+    }
     // Excel stores phone numbers as doubles; a genuine 10-digit number never
     // has a real fractional part, so truncate rather than round.
     s = Math.trunc(raw).toString()
@@ -45,6 +86,17 @@ export function normaliseMobile(raw: unknown): MobileResult {
   if (!s) return { value: null, reason: null }
 
   const original = s
+
+  if (EXPONENTIAL_TEXT.test(s)) {
+    const expanded = expandExponential(s)
+    if ('lossy' in expanded) {
+      return {
+        value: null,
+        reason: `is in exponential form ("${original}") and has lost digits — retype it in the sheet as text`,
+      }
+    }
+    s = expanded.digits
+  }
 
   // A text cell exported from Excel can carry a literal ".0" / ".00".
   s = s.replace(/\.0+$/, '')

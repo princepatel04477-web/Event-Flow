@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG-ONLY manifest overlay (M5 Part A step 3).
+
+  Enables cleartext traffic for the LAN live-reload loop (http://<LAN_IP>:3000).
+  This file lives in src/debug and is merged ONLY into debug builds — the
+  release manifest must never contain usesCleartextTraffic. Grep the merged
+  release manifest before shipping to prove it is absent.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:usesCleartextTraffic="true"
+        tools:targetApi="28" />
+</manifest>

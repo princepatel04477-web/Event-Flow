@@ -1,6 +1,6 @@
 ---
 tags: [ops, infrastructure]
-updated: 2026-07-31
+updated: 2026-08-02
 ---
 
 # Supabase Project
@@ -17,11 +17,39 @@ Back to [[EventFlow]].
 | Region | ap-northeast-2 |
 | Postgres | **17.6.1.155** |
 | Created | 30 July 2026 |
-| Linked to repo | **no** |
+| Linked to repo | `supabase link --project-ref xktxnkuzplhzxkevwrcj` ✓ |
 
 > [!warning] Postgres 17, not 16
 > Docs say the schema was verified on Postgres 16 — that was a separate instance. The live
 > project is 17. Re-run [[Security Tests|test_security.sql]] after the first push.
+
+## First-time setup — done
+
+```
+npx supabase init ✓
+npx supabase link --project-ref xktxnkuzplhzxkevwrcj ✓
+npx supabase db push ✓
+```
+
+Migrations live in `supabase/migrations/`:
+
+| File | Contents |
+|---|---|
+| `20260731000100_foundation.sql` | extensions, enums, tenancy, access helpers, audit, guards |
+| `20260731000200_guests_rsvp.sql` | groups, guests, travel legs, call chain |
+| `20260731000300_rooms_deliverables.sql` | hotels, rooms, assignments, deliverables, proofs |
+| `20260731000400_logistics_messaging.sql` | vehicles, trips, templates, messages, import audit |
+| `20260731000500_rls.sql` | every RLS policy, storage buckets |
+| `20260731000600_views_rpc.sql` | 4 views, 3 RPCs |
+| `20260731000700_seed.sql` | vehicle types, message templates, bootstrap notes |
+| `20260731000800_realtime.sql` | `guest_groups` + `call_attempts` → publication, `replica identity full` |
+
+> [!danger] Realtime migration (0800) is NOT applied
+> The file exists in `supabase/migrations/` but has not been pushed. Live sync
+> is inert until `npx supabase db push`. Publishing only `guest_groups` would
+> leave call-attempt counters stale on every other phone — both tables need to
+> be in the publication. Both use `replica identity full` so DELETEs carry
+> `event_id` in the payload.
 
 ## The CLI is not on PATH
 
@@ -37,18 +65,6 @@ npx supabase orgs list
 > This machine has had more than one Supabase account logged in. `npx supabase orgs list`
 > should say **Varunya Technologies**. If it says anything else, run `npx supabase login`
 > before touching migrations.
-
-## First-time setup — not yet done
-
-```bash
-npx supabase init
-npx supabase link --project-ref xktxnkuzplhzxkevwrcj
-mkdir -p supabase/migrations && mv 2026*.sql supabase/migrations/
-npx supabase db push
-```
-
-Migration files currently sit at the **repo root**, not in `supabase/migrations/`, so
-`db push` will not see them until they move.
 
 ## Storage buckets
 

@@ -6,8 +6,11 @@ import type { ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
 import {
+  BuildingIcon,
+  CarIcon,
   ClipboardCheckIcon,
   GridIcon,
+  PlaneIcon,
   PhoneIcon,
   UploadIcon,
 } from '@/components/icons'
@@ -37,9 +40,29 @@ const REVIEW: Tab = {
   label: 'Review',
   icon: <ClipboardCheckIcon className="h-6 w-6" />,
 }
+const ROOMS: Tab = {
+  segment: 'rooms',
+  label: 'Rooms',
+  icon: <BuildingIcon className="h-6 w-6" />,
+}
+const FLEET: Tab = {
+  segment: 'fleet',
+  label: 'Fleet',
+  icon: <CarIcon className="h-6 w-6" />,
+}
+const LOGISTICS: Tab = {
+  segment: 'logistics',
+  label: 'Trips',
+  icon: <PlaneIcon className="h-6 w-6" />,
+}
+const DEPARTURES: Tab = {
+  segment: 'departures',
+  label: 'Depart',
+  icon: <BuildingIcon className="h-6 w-6" />,
+}
 const DASHBOARD: Tab = {
   segment: '',
-  label: 'Dashboard',
+  label: 'Home',
   icon: <GridIcon className="h-6 w-6" />,
 }
 
@@ -51,9 +74,8 @@ const DASHBOARD: Tab = {
  * already standing on is decoration that costs 4.75rem of a 360px screen.
  */
 const TABS_BY_ACCESS: Record<TabAccess, Tab[]> = {
-  admin: [QUEUE, IMPORT, REVIEW, DASHBOARD],
-  // Import is admin-only by product decision, so event_team gets three.
-  event_team: [QUEUE, REVIEW, DASHBOARD],
+  admin: [QUEUE, IMPORT, REVIEW, ROOMS, FLEET, LOGISTICS, DEPARTURES, DASHBOARD],
+  event_team: [QUEUE, REVIEW, ROOMS, FLEET, LOGISTICS, DEPARTURES, DASHBOARD],
   client: [],
 }
 
@@ -67,6 +89,10 @@ const GRID_COLS: Record<number, string> = {
   2: 'grid-cols-2',
   3: 'grid-cols-3',
   4: 'grid-cols-4',
+  5: 'grid-cols-5',
+  6: 'grid-cols-6',
+  7: 'grid-cols-7',
+  8: 'grid-cols-8',
 }
 
 export interface BottomTabsProps {

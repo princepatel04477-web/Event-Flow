@@ -29,7 +29,7 @@ export interface QueueFiltersProps {
 const CHIP_BASE =
   'tap min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold transition-colors'
 const CHIP_ACTIVE = 'border-transparent bg-brand text-brand-fg'
-const CHIP_INACTIVE = 'border-border-strong bg-surface text-fg hover:bg-surface-2'
+const CHIP_INACTIVE = 'border-rule-strong bg-surface text-ink hover:bg-surface-2'
 
 const TOGGLE_BASE =
   'tap min-h-11 flex-1 rounded-xl border px-3 text-sm font-semibold transition-colors'

@@ -79,6 +79,44 @@ export function rsvpFromRemarks(remarks: unknown): RemarksRsvpHint {
   return null
 }
 
+/**
+ * The only three RSVP states an import may produce.
+ *
+ * 'confirmed' is deliberately absent and this is not an oversight: a
+ * confirmation comes from a reviewed phone call and nothing else. Ringing
+ * these 238 families IS Phase 1 — an import that pre-confirmed them would
+ * delete the work rather than schedule it. Anything that maps a sheet cell to
+ * 'confirmed' is a bug.
+ */
+export type ImportRsvpStatus = 'not_started' | 'declined' | 'tentative'
+
+/**
+ * `Remark` -> rsvp_status for the KNOWN CALLING_MASTER_LIST layout.
+ *
+ * Exactly two rules, both substring, both case-insensitive:
+ *   "not coming" -> declined
+ *   "not sure"   -> tentative
+ *   anything else -> not_started
+ *
+ * Narrower on purpose than `rsvpFromRemarks` above, which serves the unknown-
+ * sheet fallback path where the remarks column could be anything and a fuzzy
+ * guess is the best available. Here the vocabulary is known, and the cost of
+ * over-matching is asymmetric: a false 'declined' quietly drops a family off
+ * the calling queue and nobody notices until they arrive at the venue. So
+ * "cancelled", "maybe", "won't attend" and friends stay 'not_started' — the
+ * remark itself is still imported, and the caller reads it before dialling.
+ */
+export function importRsvpStatus(remark: unknown): ImportRsvpStatus {
+  if (remark === null || remark === undefined) return 'not_started'
+  const s = String(remark).trim().toLowerCase()
+  if (!s) return 'not_started'
+
+  if (/not\s*coming/.test(s)) return 'declined'
+  if (/not\s*sure/.test(s)) return 'tentative'
+
+  return 'not_started'
+}
+
 /** Trims to null-or-non-empty-string. Casing is preserved for display. */
 export function normaliseText(raw: unknown): string | null {
   if (raw === null || raw === undefined) return null

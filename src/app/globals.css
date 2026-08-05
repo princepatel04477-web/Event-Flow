@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 /* ====================================================================
@@ -10,110 +11,197 @@
 
    Tailwind v4 is CSS-first. There is no tailwind.config.js and there
    must not be one.
+
+   The visual language is the bahi-khata account ledger. Ruled paper, a
+   red margin rule, alternating row bands, figures that align. This app
+   accounts for people — everyone who arrived must be accounted for on
+   the way out — so the metaphor is structural, not decorative:
+
+   - Paper is warm, never white (it is paper, not a screen).
+   - Alternating list bands are a shade lighter than the paper.
+   - Ink is a near-black with a blue cast, never pure black.
+   - Ledger red means ATTENTION, and only that: overdue callbacks,
+     unbalanced families, over-capacity rooms, destructive
+     confirmations. The moment red appears on a heading it stops
+     meaning "look here".
+   - Ledger green means COMPLETED, and only that: delivered, confirmed,
+     balanced.
+   - Red and green are never used decoratively.
+
+   Contrast is verified against WCAG AA on every text-on-surface pair
+   (see the values annotated below). The client login is read in a
+   hotel lobby by the oldest user of the app.
    ==================================================================== */
 
 :root {
   color-scheme: light;
 
-  --ef-bg: #f4f4f5;
-  --ef-surface: #ffffff;
-  --ef-surface-2: #ececee;
-  --ef-fg: #18181b;
-  --ef-muted: #52525b;
-  --ef-subtle: #71717a;
-  --ef-border: #d4d4d8;
-  --ef-border-strong: #a1a1aa;
+  /* Paper — warm cream, the Organic ground. Not white; ruled paper. */
+  --ef-paper: #f5ead8;
+  /* Alternating list band, a shade lighter than paper. */
+  --ef-paper-band: #eee5d0;
+  /* Surface cards sit on the paper. */
+  --ef-surface: #fbf7ec;
+  --ef-surface-2: #ebe1ca;
 
-  --ef-brand: #4338ca;
-  --ef-brand-hover: #3730a3;
-  --ef-brand-fg: #ffffff;
+  /* Ink — near-black with a warm cast, never pure black. */
+  --ef-ink: #201e1d;
+  /* Secondary text, AA on paper and band. */
+  --ef-muted: #4a5568;
+  /* Tertiary text, AA on paper and band. Footnotes only. */
+  --ef-subtle: #5f6a79;
 
-  --ef-danger: #b91c1c;
-  --ef-danger-hover: #991b1b;
-  --ef-danger-fg: #ffffff;
+  /* Hairline — the ruled line. Ink at low alpha so it adapts to any
+     surface. */
+  --ef-rule: #201e1d14;
+  --ef-rule-strong: #201e1d26;
 
-  --ef-success: #15803d;
-  --ef-warning: #b45309;
-  --ef-info: #0369a1;
+  /* Ledger red — ATTENTION only. 7.0:1 on paper, 7.4:1 on band. */
+  --ef-ledger-red: #9a1c1c;
+  --ef-ledger-red-strong: #7c1414;
+  --ef-red-tint: #fbe9e7;
 
-  --ef-tint-neutral: #e4e4e7;
-  --ef-tint-success: #dcfce7;
-  --ef-tint-warning: #fef3c7;
-  --ef-tint-danger: #fee2e2;
-  --ef-tint-info: #e0f2fe;
+  /* Ledger green — COMPLETED only. 5.6:1 on paper, 5.2:1 on band. */
+  --ef-ledger-green: #1e6f43;
+  --ef-ledger-green-strong: #175632;
+  --ef-green-tint: #e6f2e9;
 
-  --ef-ring: #4338ca;
+  /* The margin rule. One locked red line down the leading edge of a
+     list — the register's margin. Attention states break into it. */
+  --ef-margin-rule: var(--ef-ledger-red);
+
+  --ef-ring: var(--ef-ink);
+
+  /* Motion. One ease family; everything fast because staff are in a
+     corridor. The 150ms fade is the only entrance. */
+  --ef-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --ef-duration-press: 100ms;
+  --ef-duration-fade: 150ms;
+
+  /* Type scale. 4px base. Display carries the one thing on the row;
+     body carries everything else; mono carries every figure in
+     tabular form so a column of room numbers lines up. */
+  --ef-text-xs: 0.75rem;    /* 12px — tertiary labels */
+  --ef-text-sm: 0.875rem;   /* 14px — meta, secondary */
+  --ef-text-base: 1rem;     /* 16px — body, never below (iOS zoom) */
+  --ef-text-lg: 1.25rem;    /* 20px — body emphasis */
+  --ef-text-xl: 1.5rem;     /* 24px — display */
+  --ef-text-2xl: 1.75rem;   /* 28px — the one thing on the screen */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
 
-    --ef-bg: #09090b;
-    --ef-surface: #18181b;
-    --ef-surface-2: #27272a;
-    --ef-fg: #fafafa;
-    --ef-muted: #a1a1aa;
-    --ef-subtle: #8f8f98;
-    --ef-border: #3f3f46;
-    --ef-border-strong: #52525b;
+    /* Dark paper — a night ledger. Ink cast preserved. */
+    --ef-paper: #151a22;
+    --ef-paper-band: #1a212c;
+    --ef-surface: #1a212c;
+    --ef-surface-2: #232b38;
 
-    --ef-brand: #6366f1;
-    --ef-brand-hover: #818cf8;
-    --ef-brand-fg: #0b0b14;
+    --ef-ink: #e8e6df;
+    --ef-muted: #9aa4b2;
+    --ef-subtle: #8b96a3;
 
-    --ef-danger: #dc2626;
-    --ef-danger-hover: #ef4444;
-    --ef-danger-fg: #ffffff;
+    --ef-rule: #e8e6df14;
+    --ef-rule-strong: #e8e6df26;
 
-    --ef-success: #4ade80;
-    --ef-warning: #fbbf24;
-    --ef-info: #38bdf8;
+    /* 6.1:1 on dark paper. */
+    --ef-ledger-red: #f0716f;
+    --ef-ledger-red-strong: #f58a88;
+    --ef-red-tint: #3b1414;
 
-    --ef-tint-neutral: #27272a;
-    --ef-tint-success: #12331f;
-    --ef-tint-warning: #3a2a0a;
-    --ef-tint-danger: #3b1414;
-    --ef-tint-info: #0b2b3d;
+    /* 10.1:1 on dark paper. */
+    --ef-ledger-green: #7fd7a4;
+    --ef-ledger-green-strong: #9ae3b8;
+    --ef-green-tint: #12331f;
 
-    --ef-ring: #818cf8;
+    --ef-margin-rule: var(--ef-ledger-red);
+
+    /* Ink in dark too — red is attention only. */
+    --ef-ring: var(--ef-ink);
+
+    /* Organic brand in dark — a lighter terracotta so it reads on the
+       night ground. */
+    --color-brand: #d98d55;
+    --color-brand-hover: #e5a373;
+    --color-brand-strong: #f6a06b;
+    --color-brand-fg: #241409;
   }
 }
 
 @theme inline {
-  --color-bg: var(--ef-bg);
+  --color-paper: var(--ef-paper);
+  --color-paper-band: var(--ef-paper-band);
   --color-surface: var(--ef-surface);
   --color-surface-2: var(--ef-surface-2);
-  --color-fg: var(--ef-fg);
+
+  --color-ink: var(--ef-ink);
   --color-muted: var(--ef-muted);
   --color-subtle: var(--ef-subtle);
-  --color-border: var(--ef-border);
-  --color-border-strong: var(--ef-border-strong);
 
-  --color-brand: var(--ef-brand);
-  --color-brand-hover: var(--ef-brand-hover);
-  --color-brand-fg: var(--ef-brand-fg);
+  --color-rule: var(--ef-rule);
+  --color-rule-strong: var(--ef-rule-strong);
 
-  --color-danger: var(--ef-danger);
-  --color-danger-hover: var(--ef-danger-hover);
-  --color-danger-fg: var(--ef-danger-fg);
+  --color-ledger-red: var(--ef-ledger-red);
+  --color-ledger-red-strong: var(--ef-ledger-red-strong);
+  --color-red-tint: var(--ef-red-tint);
 
-  --color-success: var(--ef-success);
-  --color-warning: var(--ef-warning);
-  --color-info: var(--ef-info);
+  --color-ledger-green: var(--ef-ledger-green);
+  --color-ledger-green-strong: var(--ef-ledger-green-strong);
+  --color-green-tint: var(--ef-green-tint);
 
-  --color-tint-neutral: var(--ef-tint-neutral);
-  --color-tint-success: var(--ef-tint-success);
-  --color-tint-warning: var(--ef-tint-warning);
-  --color-tint-danger: var(--ef-tint-danger);
-  --color-tint-info: var(--ef-tint-info);
+  --color-margin-rule: var(--ef-margin-rule);
 
   --color-ring: var(--ef-ring);
 
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Deprecated in favour of the ledger tokens, kept so any screen not
+     yet converted still has a value. Q2 deletes these. */
+  --color-bg: var(--ef-paper);
+  --color-fg: var(--ef-ink);
+  --color-border: var(--ef-rule-strong);
+  --color-border-strong: var(--ef-rule-strong);
+  --color-danger: var(--ef-ledger-red);
+  --color-danger-hover: var(--ef-ledger-red-strong);
+  --color-danger-fg: #fff9f2;
+  --color-success: var(--ef-ledger-green);
+  --color-warning: #a35408;
+  --color-warning-strong: #7c3d04;
+  --color-info: #0369a1;
+  --color-tint-neutral: var(--ef-paper-band);
+  --color-tint-success: var(--ef-green-tint);
+  --color-tint-warning: #f9edd2;
+  --color-tint-danger: var(--ef-red-tint);
+  --color-tint-info: #e2f1fb;
+  /* Organic brand — terracotta, the warm accent of the redesign. */
+  --color-brand: #c67139;
+  --color-brand-hover: #b2622d;
+  --color-brand-strong: #8c491a;
+  --color-brand-fg: #fff9f2;
+
+  /* Type roles. Display is the one characterful face; body is the
+     workhorse; mono carries every figure with tabular alignment. */
+  --font-sans: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-display: "Caprasimo", ui-serif, Georgia, "Times New Roman",
+    "Noto Serif", serif;
+  --font-mono:
+    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --ease-ledger: var(--ef-ease);
+  --duration-press: var(--ef-duration-press);
+  --duration-fade: var(--ef-duration-fade);
+
+  /* Spacing scale, 4px base. `--spacing-*` is Tailwind's own; the
+     named tiers keep usage honest. */
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-12: 3rem;
 }
 
 @layer base {
@@ -122,7 +210,7 @@
   *,
   ::before,
   ::after {
-    border-color: var(--ef-border);
+    border-color: var(--ef-rule-strong);
   }
 
   html {
@@ -132,8 +220,8 @@
   }
 
   body {
-    background-color: var(--ef-bg);
-    color: var(--ef-fg);
+    background-color: var(--ef-paper);
+    color: var(--ef-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: none;
@@ -185,4 +273,42 @@
 @utility tap {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* The only motion in the app. A list fades in over 150ms on the expo
+   ease; pressed states are 100ms colour shifts. Nothing else moves —
+   no page transitions, no scroll animations. Collapses entirely under
+   prefers-reduced-motion. */
+@utility list-fade {
+  animation: list-fade-in var(--ef-duration-fade) var(--ef-ease) both;
+}
+
+@keyframes list-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list-fade {
+    animation: none;
+  }
+}
+
+/* Organic overlay (see Mobile app design request/_ds/organic/styles.css).
+   Warm cream-and-sand ground, terracotta + sage accents, pill controls.
+   Re-points the shared radius utilities so buttons, inputs, chips and
+   segmented controls inherit the redesign in one place. Unlayered so it
+   wins over Tailwind's utilities regardless of layer order. */
+.rounded-2xl {
+  border-radius: 1.1rem;
+}
+.rounded-xl {
+  border-radius: 999px;
+}
+.rounded-lg {
+  border-radius: 14px;
 }

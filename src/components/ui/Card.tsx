@@ -12,7 +12,7 @@ export function Card({ flat = false, className, children, ...props }: CardProps)
     <div
       className={cn(
         'overflow-hidden rounded-2xl',
-        !flat && 'border border-border bg-surface',
+        !flat && 'border border-border bg-surface shadow-sm',
         className,
       )}
       {...props}

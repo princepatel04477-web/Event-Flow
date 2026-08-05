@@ -3,10 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { Badge } from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Spinner'
+import { ListRow } from '@/components/ui/ListRow'
+import { StatusPill } from '@/components/ui/StatusPill'
 import { claimGroupAction } from '@/lib/actions/queue'
-import { rsvpStatusLabel, rsvpStatusTone } from '@/lib/rsvp'
+import { rsvpStatusLabel } from '@/lib/rsvp'
+import { statusTone } from '@/lib/status'
 import { cn, formatDateTime } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -18,10 +20,15 @@ export interface QueueRowProps {
 }
 
 /**
- * One family in the calling queue. The whole card is the tap target — always
+ * One family in the calling queue. The whole row is the tap target — always
  * tappable, locked or not, because `claim_group()` is re-entrant for its
  * current holder. The server decides whether the tap wins; this component
  * just relays the answer.
+ *
+ * The family name is the one thing on this row that matters, so it is the
+ * display face at 18px — readable at arm's length by a caller with a phone
+ * against one ear. The figures (pax, attempts, callback time) are tabular
+ * mono so a column of them lines up.
  */
 export function QueueRow({ row, eventCode }: QueueRowProps) {
   const router = useRouter()
@@ -53,40 +60,40 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
     setConflict(result.message)
   }
 
+  const meta = (
+    <>
+      <span>
+        <span className="font-mono tabular-nums">{pax}</span> pax
+      </span>
+      {' · '}
+      <span>
+        <span className="font-mono tabular-nums">{attemptCount}</span>{' '}
+        {attemptCount === 1 ? 'attempt' : 'attempts'}
+      </span>
+      {isLocked ? <span> · Locked</span> : null}
+      {nextCallbackAt ? (
+        <span> · Callback {formatDateTime(nextCallbackAt)}</span>
+      ) : null}
+    </>
+  )
+
   return (
     <div className="flex flex-col gap-1.5">
-      <button
-        type="button"
-        onClick={handleTap}
+      <ListRow
+        identifier={headName}
+        meta={meta}
+        right={
+          <StatusPill tone={statusTone(status)}>{rsvpStatusLabel(status)}</StatusPill>
+        }
+        onPress={handleTap}
         disabled={!groupId || pending}
         aria-busy={pending || undefined}
-        className={cn(
-          'tap flex w-full items-center gap-3 rounded-2xl border bg-surface px-4 py-3.5 text-left transition-colors',
-          'hover:bg-surface-2 active:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-70',
-          isLocked ? 'border-warning' : 'border-border',
-        )}
       >
-        <div className="min-w-0 flex-1">
-          <span className="block truncate text-base font-semibold text-fg">{headName}</span>
-          <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted">
-            <span>{pax} pax</span>
-            <span>
-              {attemptCount} {attemptCount === 1 ? 'attempt' : 'attempts'}
-            </span>
-            {nextCallbackAt ? <span>Callback {formatDateTime(nextCallbackAt)}</span> : null}
-          </span>
-        </div>
-
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <Badge tone={rsvpStatusTone(status)}>{rsvpStatusLabel(status)}</Badge>
-          {isLocked ? <Badge tone="warning">Locked</Badge> : null}
-        </div>
-
         {pending ? <Spinner size="sm" label="Claiming" /> : null}
-      </button>
+      </ListRow>
 
       {conflict ? (
-        <p role="alert" className="px-1 text-sm font-medium text-warning">
+        <p role="alert" className={cn('px-1 text-sm font-medium text-muted')}>
           {conflict}
         </p>
       ) : null}

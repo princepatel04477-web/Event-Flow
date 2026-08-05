@@ -8,12 +8,33 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "types:gen": "npx supabase gen types typescript --linked > src/lib/supabase/database.types.ts"
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:fixture": "node scripts/build-test-fixture.mts",
+    "types:gen": "npx supabase gen types typescript --linked > src/lib/supabase/database.types.ts",
+    "mobile": "next build && npx cap sync android",
+    "mobile:dev": "next dev & npx cap run android --livereload",
+    "mobile:prod": "npx cap sync android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/camera": "^8.2.2",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/device": "^8.0.3",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/network": "^8.0.1",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
+    "@capgo/capacitor-updater": "^8.51.3",
+    "@sentry/capacitor": "^4.2.0",
+    "@sentry/react": "^10.60.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.111.0",
     "date-fns": "^4.4.0",
+    "dexie": "^4.4.4",
     "idb": "^8.0.3",
     "next": "16.2.12",
     "react": "19.2.4",
@@ -30,6 +51,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

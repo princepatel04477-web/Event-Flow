@@ -41,6 +41,25 @@ function isBlankCell(value: unknown): boolean {
   return value === null || value === undefined || String(value).trim() === ''
 }
 
+/**
+ * `blankrows: true` is load-bearing, not a preference.
+ *
+ * With `blankrows: false` SheetJS removes blank rows from the array, and every
+ * row after a gap then has an array index one lower than its real position in
+ * the sheet. The row numbers in the preview — the numbers an operator uses to
+ * find and fix a cell — would silently drift down by one per blank row. Blank
+ * rows are instead kept here and filtered afterwards, so `sheetRowNumber`
+ * always means the row number Excel shows in its own left-hand gutter.
+ */
+function readGrid(worksheet: XLSX.WorkSheet): unknown[][] {
+  return XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+    header: 1,
+    raw: true,
+    defval: null,
+    blankrows: true,
+  })
+}
+
 /** Reads the first sheet of a workbook into raw rows, skipping blank ones. */
 export async function parseWorkbook(file: File): Promise<ParsedSheet> {
   const buffer = await file.arrayBuffer()
@@ -51,23 +70,17 @@ export async function parseWorkbook(file: File): Promise<ParsedSheet> {
     throw new Error('That workbook has no sheets.')
   }
 
-  const worksheet = workbook.Sheets[sheetName]
-  const grid = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
-    header: 1,
-    raw: true,
-    defval: null,
-    blankrows: false,
-  })
+  const grid = readGrid(workbook.Sheets[sheetName])
 
   if (grid.length === 0) {
     throw new Error(`"${sheetName}" is empty.`)
   }
 
   const [headerRow, ...dataRows] = grid
-  const headers = headerRow.map((h) => (isBlankCell(h) ? null : String(h)))
+  const headers = (headerRow ?? []).map((h) => (isBlankCell(h) ? null : String(h)))
 
   const rows: RawSheetRow[] = dataRows
-    .map((cells, i) => ({ sheetRowNumber: i + 2, cells }))
+    .map((cells, i) => ({ sheetRowNumber: i + 2, cells: cells ?? [] }))
     .filter((row) => row.cells.some((c) => !isBlankCell(c)))
 
   return {
@@ -76,6 +89,98 @@ export async function parseWorkbook(file: File): Promise<ParsedSheet> {
     rows,
     suggestedMapping: autoDetectMapping(headers),
   }
+}
+
+// ---------------------------------------------------------------------------
+// Known-layout path — CALLING_MASTER_LIST.xlsx
+// ---------------------------------------------------------------------------
+
+/**
+ * Sheet1, NOT Sheet7.
+ *
+ * Both sheets carry the family list, but only Sheet1 carries the `Romm` and
+ * `bed` columns that Phase 2 backfills room allocation from. Importing from
+ * Sheet7 loses them, and the sheet is not re-uploaded — it is hand-maintained
+ * and will have moved on by then.
+ */
+export const KNOWN_SHEET_NAME = 'Sheet1'
+
+export class SheetNotFoundError extends Error {
+  readonly availableSheets: string[]
+  readonly wanted: string
+
+  constructor(wanted: string, availableSheets: string[]) {
+    super(
+      availableSheets.length === 0
+        ? 'That workbook has no sheets.'
+        : `That workbook has no sheet named "${wanted}". It has: ${availableSheets
+            .map((s) => `"${s}"`)
+            .join(', ')}. Rename the tab, or map the columns by hand.`,
+    )
+    this.name = 'SheetNotFoundError'
+    this.wanted = wanted
+    this.availableSheets = availableSheets
+  }
+}
+
+export interface SheetGrid {
+  sheetName: string
+  availableSheets: string[]
+  /** Every row of the used range, blank rows included, in sheet order. */
+  grid: unknown[][]
+}
+
+/**
+ * Reads ONE named sheet into a raw grid. Never falls back to "the first
+ * sheet" — a workbook whose tab has been renamed is a workbook whose shape we
+ * cannot vouch for, and silently importing the wrong tab is worse than
+ * stopping and saying which tabs exist.
+ */
+export async function readSheetGrid(
+  file: File,
+  sheetName: string = KNOWN_SHEET_NAME,
+): Promise<SheetGrid> {
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: false })
+
+  const availableSheets = [...workbook.SheetNames]
+  const match = availableSheets.find((n) => n === sheetName)
+    ?? availableSheets.find((n) => n.trim().toLowerCase() === sheetName.trim().toLowerCase())
+
+  if (!match) throw new SheetNotFoundError(sheetName, availableSheets)
+
+  return { sheetName: match, availableSheets, grid: readGrid(workbook.Sheets[match]) }
+}
+
+export interface SheetRows {
+  headers: (string | null)[]
+  /** Non-blank data rows below the header, with true sheet row numbers. */
+  rows: RawSheetRow[]
+  /** Blank rows below the header that were skipped — counted, not hidden. */
+  blankRowsSkipped: number
+}
+
+/**
+ * Splits a raw grid into a header row and the data rows below it, keeping
+ * true 1-based sheet row numbers and counting what was skipped.
+ */
+export function toSheetRows(grid: unknown[][], headerRowIndex: number): SheetRows {
+  const headerRow = grid[headerRowIndex] ?? []
+  const headers = headerRow.map((h) => (isBlankCell(h) ? null : String(h)))
+
+  const rows: RawSheetRow[] = []
+  let blankRowsSkipped = 0
+
+  for (let i = headerRowIndex + 1; i < grid.length; i++) {
+    const cells = grid[i] ?? []
+    if (!cells.some((c) => !isBlankCell(c))) {
+      blankRowsSkipped++
+      continue
+    }
+    rows.push({ sheetRowNumber: i + 1, cells })
+  }
+
+  return { headers, rows, blankRowsSkipped }
 }
 
 /**

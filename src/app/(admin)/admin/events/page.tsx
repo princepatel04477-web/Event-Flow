@@ -113,7 +113,7 @@ function EventRowCard({ event }: { event: EventRow }) {
   return (
     <Card className="transition-colors hover:bg-surface-2">
       <Link
-        href={`/${event.code}`}
+        href={`/admin/events/${event.code}`}
         className="tap flex min-h-16 items-center gap-3 px-4 py-3"
       >
         <span className="min-w-0 flex-1">

@@ -1,6 +1,6 @@
 ---
 tags: [roadmap, planning]
-updated: 2026-07-31
+updated: 2026-08-02
 ---
 
 # Roadmap
@@ -13,30 +13,53 @@ The whole point. Everything else is downstream of knowing who is coming.
 
 | Task | What it is | State |
 |---|---|---|
-| `p1a` | Schema, RLS, audit triggers | done |
-| `p1b` | `test_security.sql` | done |
-| `p1c` | [[Excel Import]] from `CALLING_MASTER_LIST.xlsx` | **next** |
-| `p1d` | Auth, event switching, role routing | |
-| `p1e` | Calling queue — `v_rsvp_queue` + `claim_group()` | |
-| `p1f` | Call screen — `tel:` dial + outcome logging | |
-| `p1g` | Native call-recording module (Capacitor) | |
-| `p1h` | Upload → transcribe → extract | |
-| `p1i` | Review screen | |
-| `p1j` | Excel export | |
+| `p1a` | Schema, RLS, audit triggers | ✅ done |
+| `p1b` | `test_security.sql` | ✅ done |
+| `p1c` | [[Excel Import]] — parse + preview | ✅ done (preview only — commit RPC pending) |
+| `p1d` | Auth, event switching, role routing + client profile cards | ✅ done |
+| `p1e` | Calling queue — `v_rsvp_queue` + `claim_group()` + realtime | ✅ done |
+| `p1f` | Call screen — `tel:` dial + outcome logging + offline outbox | ✅ done |
+| `p1g` | Native call-recording module (Capacitor) | ❌ not started |
+| `p1h` | Extraction model + payload translation | ✅ done (review screen built alongside) |
+| `p1i` | Review screen | ✅ done |
+| `p1j` | Excel export | ❌ not started |
 
 `p1g` is the one task whose *shape* is uncertain — see [[Open Questions]].
 
-## Later phases
+**The import commit (database write) is the single largest remaining Phase 1 item:**
+`app.commit_guest_import()` — one Postgres function, one transaction. The parse
+pipeline, preview UI, mobile normalisation, and idempotent matching are all done.
 
-| Phase | Scope | Schema |
-|---|---|---|
-| 2 | Rooms | [[Rooms and Assignments]] — tables exist |
-| 3 | Hampers & return gifts | [[Deliverables and Proofs]] — tables exist |
-| 4 | Logistics & departure | [[Logistics]] — tables exist |
-| 5 | Ship — WhatsApp, admin dashboard, APK, dry run, training | [[Messaging and Import]] |
+## Phase 2 — Rooms (current)
 
-Every table for phases 2–5 already exists with `event_id` on it. The UI does not. This was
-deliberate — see [[Tenancy and RLS]].
+| Scope | Schema |
+|---|---|
+| [[Rooms and Assignments]] — allocation backend, hotel/room management UI | Tables exist. `GuestCard` renders hotel/room but shows "not allocated yet". Import parser captures room/bed columns as `OPTIONAL_COLUMNS`. |
+
+The client profile cards at `/[eventCode]/guests` are built and working. What
+remains: writing room assignments to the database (the allocation backend) and
+building the staff-facing room management UI.
+
+## Phase 3
+
+| Scope | Schema |
+|---|---|
+| Hampers & return gifts | [[Deliverables and Proofs]] — tables exist |
+
+## Phase 4
+
+| Scope | Schema |
+|---|---|
+| Logistics & departure | [[Logistics]] — tables exist |
+
+## Phase 5
+
+| Scope | Schema |
+|---|---|
+| Ship — WhatsApp, admin dashboard, APK, dry run, training | [[Messaging and Import]] |
+
+Every table for phases 2–5 already exists with `event_id` on it. The UI does not.
+This was deliberate — see [[Tenancy and RLS]].
 
 ## Scope cuts, in order, if time runs short
 

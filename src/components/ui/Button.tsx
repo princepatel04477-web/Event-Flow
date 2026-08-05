@@ -23,10 +23,10 @@ const BASE =
   'disabled:cursor-not-allowed disabled:opacity-55 aria-disabled:opacity-55'
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'border-transparent bg-brand text-brand-fg hover:bg-brand-hover active:bg-brand-hover',
-  secondary: 'border-border bg-surface text-fg hover:bg-surface-2 active:bg-surface-2',
-  danger: 'border-transparent bg-danger text-danger-fg hover:bg-danger-hover active:bg-danger-hover',
-  ghost: 'border-transparent bg-transparent text-fg hover:bg-surface-2 active:bg-surface-2',
+  primary: 'border-transparent bg-ink text-paper hover:bg-ink/90 active:opacity-85',
+  secondary: 'border-rule-strong bg-surface text-ink hover:bg-surface-2 active:bg-surface-2',
+  danger: 'border-transparent bg-ledger-red text-paper hover:bg-ledger-red-strong active:bg-ledger-red-strong',
+  ghost: 'border-transparent bg-transparent text-ink hover:bg-surface-2 active:bg-surface-2',
 }
 
 const SIZES: Record<ButtonSize, string> = {
