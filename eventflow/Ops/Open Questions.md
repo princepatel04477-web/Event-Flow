@@ -5,7 +5,7 @@ updated: 2026-07-31
 
 # Open Questions
 
-Back to [[EventFlow]]. Two unresolved items. Only the first can change the *shape* of the
+Back to [[Nuvent]]. Two unresolved items. Only the first can change the *shape* of the
 build rather than just its schedule.
 
 ## 1. Call recording on Android 13+ — untested

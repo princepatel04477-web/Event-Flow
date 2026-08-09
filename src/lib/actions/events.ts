@@ -56,6 +56,12 @@ export type CreateEventState = {
     startsOn: string
     endsOn: string
   }
+  /** Set on success: the event code + the two access codes, shown once. */
+  created?: {
+    eventCode: string
+    teamCode: string
+    clientCode: string
+  }
 }
 
 function text(value: FormDataEntryValue | null): string {
@@ -181,7 +187,7 @@ export async function createEvent(
       ends_on: orNull(values.endsOn),
       created_by: user.id,
     })
-    .select('code')
+    .select('code, id')
     .single()
 
   if (error) {
@@ -204,11 +210,52 @@ export async function createEvent(
     return { error: friendlyDbError(error), fieldErrors: {}, values }
   }
 
+  // Generate both access codes and store them hashed. The plaintext is
+  // returned once (below) so the admin can share it; it is never stored.
+  const { createHash } = await import('node:crypto')
+  const { generateAccessCode } = await import('@/lib/auth/codes')
+  const teamCode = generateAccessCode('team')
+  const clientCode = generateAccessCode('client')
+  const teamHash = createHash('sha256').update(teamCode.replace('-', '')).digest('hex')
+  const clientHash = createHash('sha256').update(clientCode.replace('-', '')).digest('hex')
+
+  const { error: codeErr } = await supabase.from('event_access_codes').insert([
+    {
+      event_id: data!.id,
+      role: 'team',
+      code_hash: teamHash,
+      code_prefix: 'E',
+      last_four: teamCode.slice(-4),
+      created_by: user.id,
+    },
+    {
+      event_id: data!.id,
+      role: 'client',
+      code_hash: clientHash,
+      code_prefix: 'C',
+      last_four: clientCode.slice(-4),
+      created_by: user.id,
+    },
+  ])
+
+  if (codeErr) {
+    return { error: 'The event was created but its access codes could not be saved. Create them in the event admin screen.', fieldErrors: {}, values }
+  }
+
   // Every layout above reads the viewer's event list — the front door, the
   // event switcher, this page. Drop the lot rather than guess which.
   revalidatePath('/', 'layout')
 
-  // `redirect` throws, so it must stay outside any try/catch. `data.code` is
-  // what the database actually stored; prefer it over what we sent.
-  redirect(`/${data?.code ?? values.code}`)
+  // Return the codes to the form so the admin can share them ONCE. They
+  // are never persisted in plaintext; this is the single reveal.
+  return {
+    error: null,
+    fieldErrors: {},
+    values,
+    created: {
+      eventCode: data?.code ?? values.code,
+      teamCode,
+      clientCode,
+    },
+  }
 }

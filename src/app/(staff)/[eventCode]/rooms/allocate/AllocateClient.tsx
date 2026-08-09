@@ -21,6 +21,8 @@ import {
   UsersIcon,
 } from '@/components/icons'
 
+import { RoomSuggestPanel } from './RoomSuggestPanel'
+
 interface Props {
   eventId: string
   eventCode: string
@@ -119,6 +121,10 @@ export function AllocateClient({ eventId, eventCode, data }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* R2: top-3 suggestions per unallocated family — the engine suggests,
+          a human confirms. Rendered above the single-plan review. */}
+      <RoomSuggestPanel eventId={eventId} />
+
       <div>
         <h2 className="text-xl font-semibold text-fg">Room allocation</h2>
         <p className="mt-0.5 text-sm text-muted">

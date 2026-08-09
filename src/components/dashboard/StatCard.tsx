@@ -1,77 +1,88 @@
-import type { ReactNode } from 'react'
+import Link from 'next/link'
+import type { CSSProperties } from 'react'
 
-import { Card } from '@/components/ui/Card'
 import { cn, formatCount } from '@/lib/utils'
 
 export type StatTone = 'neutral' | 'success' | 'warning' | 'info'
 
 export interface StatCardProps {
   label: string
-  value: number | null | undefined
-  icon?: ReactNode
+  value: number | string | null | undefined
   tone?: StatTone
   /** Small line under the number — units, or what "today" means. */
   note?: string
+  /** Makes the whole tile a link to the screen this counter is about. */
+  href?: string
+  style?: CSSProperties
   className?: string
 }
 
 const TONES: Record<StatTone, string> = {
-  neutral: 'text-fg',
-  success: 'text-success',
-  warning: 'text-warning',
-  info: 'text-info',
-}
-
-const ICON_TONES: Record<StatTone, string> = {
-  neutral: 'bg-tint-neutral text-muted',
-  success: 'bg-tint-success text-success',
-  warning: 'bg-tint-warning text-warning',
-  info: 'bg-tint-info text-info',
+  neutral: 'text-ink',
+  success: 'text-ledger-green',
+  warning: 'text-brand',
+  info: 'text-muted',
 }
 
 /**
- * One dashboard counter. Big enough to read at arm's length and to tap by
- * mistake without consequence — these are read-only.
+ * One dashboard counter.
+ *
+ * A counter is a question ("how many are still pending?") and the answer is
+ * always on another screen, so the whole tile is the target — 96px of it,
+ * which is a thumb-sized hit area without a separate "view" affordance.
+ *
+ * No icon. The mockup drops them deliberately: six tiles in a 2-column grid
+ * on a 390px screen, each with a glyph, reads as a toolbar rather than a
+ * set of figures, and the figure is the only thing anyone is here to read.
  */
 export function StatCard({
   label,
   value,
-  icon,
   tone = 'neutral',
   note,
+  href,
+  style,
   className,
 }: StatCardProps) {
-  return (
-    <Card className={cn('h-full', className)}>
-      <div className="flex min-h-28 flex-col justify-between gap-2 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <span className="text-sm leading-tight font-medium text-muted">{label}</span>
-          {icon ? (
-            <span
-              className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-                ICON_TONES[tone],
-              )}
-              aria-hidden
-            >
-              {icon}
-            </span>
-          ) : null}
-        </div>
+  const body = (
+    <>
+      <span className="eyebrow leading-tight">{label}</span>
+      <span className={cn('figure block text-3xl leading-none font-medium', TONES[tone])}>
+        {typeof value === 'string' ? value : formatCount(value)}
+      </span>
+      {note ? (
+        <span className="block text-xs leading-snug text-muted">{note}</span>
+      ) : (
+        // Reserves the note's line so a tile with a note and a tile without
+        // still line their figures up across the grid.
+        <span aria-hidden className="block text-xs leading-snug">
+          &nbsp;
+        </span>
+      )}
+    </>
+  )
 
-        <div>
-          <span
-            className={cn(
-              'block text-4xl leading-none font-bold tabular-nums',
-              TONES[tone],
-            )}
-          >
-            {formatCount(value)}
-          </span>
-          {note ? <span className="mt-1 block text-xs text-subtle">{note}</span> : null}
-        </div>
-      </div>
-    </Card>
+  const shell = cn(
+    'list-fade flex min-h-24 flex-col justify-between gap-2 rounded-xl',
+    'border border-rule bg-surface p-3.5',
+    href &&
+      'tap cursor-pointer transition-colors duration-press ease-ledger ' +
+        'hover:bg-surface-2 active:bg-surface-2',
+    className,
+  )
+
+  if (href) {
+    return (
+      <Link href={href} style={style} className={shell}>
+        {body}
+      </Link>
+    )
+  }
+
+  return (
+    <div style={style} className={shell}>
+      {body}
+    </div>
   )
 }
 

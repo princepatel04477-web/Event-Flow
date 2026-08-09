@@ -5,7 +5,7 @@ updated: 2026-08-02
 
 # Decisions
 
-Back to [[EventFlow]]. Non-obvious decisions, newest first. Mirrors the root
+Back to [[Nuvent]]. Non-obvious decisions, newest first. Mirrors the root
 `DECISIONS.md` and is kept in sync manually. The root file is the source of
 truth for git history; this note is for vault search and cross-linking.
 

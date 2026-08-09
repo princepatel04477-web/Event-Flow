@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brand palette for the native shell.
+
+  Without this file the app inherited Capacitor's library defaults — Material
+  indigo (#3F51B5) — so the launch theme, recents-screen title bar and any
+  system-drawn chrome were stock-template blue while the app itself is dark
+  teal. Resources declared here override the library's by name.
+
+  Keep in sync with `themeColor` in src/app/layout.tsx and the StatusBar /
+  SplashScreen colours in capacitor.config.ts.
+-->
+<resources>
+    <!-- The app ground. Matches themeColor '#071a1d'. -->
+    <color name="colorPrimary">#071a1d</color>
+    <color name="colorPrimaryDark">#041214</color>
+    <!-- Cream, used for text and accents on the dark ground. -->
+    <color name="colorAccent">#f5ead8</color>
+
+    <!-- Splash background: identical to the app ground, so launch is a single
+         continuous colour rather than a pale flash that swaps to dark. -->
+    <color name="nuventSplashBackground">#071a1d</color>
+</resources>

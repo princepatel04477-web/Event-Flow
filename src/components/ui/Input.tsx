@@ -47,7 +47,7 @@ export function Input({
         required={required}
         aria-invalid={error ? true : undefined}
         aria-describedby={fieldDescribedBy(inputId, hint, error)}
-        className={cn(fieldControlClasses(Boolean(error)), 'min-h-12 py-2.5', className)}
+        className={cn(fieldControlClasses(Boolean(error)), 'min-h-14 py-3.5', className)}
         {...props}
       />
     </Field>

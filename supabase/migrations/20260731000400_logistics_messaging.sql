@@ -9,7 +9,7 @@
 -- default_capacity is PAX WITH LUGGAGE, not the sticker seat count.
 -- ---------------------------------------------------------------------
 
-create table public.vehicle_types (
+create table if not exists public.vehicle_types (
   id                uuid primary key default gen_random_uuid(),
   event_id          uuid references public.events (id) on delete cascade,
   name              text not null,
@@ -22,9 +22,9 @@ create table public.vehicle_types (
   unique (id, event_id)
 );
 
-create unique index vehicle_types_global_name_uq
+create unique index if not exists vehicle_types_global_name_uq
   on public.vehicle_types (name) where event_id is null;
-create unique index vehicle_types_event_name_uq
+create unique index if not exists vehicle_types_event_name_uq
   on public.vehicle_types (event_id, name) where event_id is not null;
 
 comment on column public.vehicle_types.default_capacity is
@@ -35,7 +35,7 @@ comment on column public.vehicle_types.default_capacity is
 -- Never hardcoded: every event has a different set of cars.
 -- ---------------------------------------------------------------------
 
-create table public.vehicles (
+create table if not exists public.vehicles (
   id               uuid primary key default gen_random_uuid(),
   event_id         uuid not null references public.events (id) on delete cascade,
   vehicle_type_id  uuid references public.vehicle_types (id) on delete set null,
@@ -53,13 +53,13 @@ create table public.vehicles (
   unique (id, event_id)
 );
 
-create index on public.vehicles (event_id, status);
+create index if not exists vehicles_event_status_idx on public.vehicles (event_id, status);
 
 -- ---------------------------------------------------------------------
 -- TRIPS + PASSENGERS
 -- ---------------------------------------------------------------------
 
-create table public.trips (
+create table if not exists public.trips (
   id              uuid primary key default gen_random_uuid(),
   event_id        uuid not null references public.events (id) on delete cascade,
   vehicle_id      uuid,
@@ -88,10 +88,10 @@ create table public.trips (
     references public.vehicles (id, event_id) on delete set null
 );
 
-create index on public.trips (event_id, direction, scheduled_at);
-create index on public.trips (event_id, status);
+create index if not exists trips_event_direction_idx on public.trips (event_id, direction, scheduled_at);
+create index if not exists trips_event_status_idx on public.trips (event_id, status);
 
-create table public.trip_passengers (
+create table if not exists public.trip_passengers (
   id             uuid primary key default gen_random_uuid(),
   event_id       uuid not null references public.events (id) on delete cascade,
   trip_id        uuid not null,
@@ -106,9 +106,9 @@ create table public.trip_passengers (
     references public.travel_legs (id, event_id) on delete set null
 );
 
-create unique index trip_passengers_leg_uq
+create unique index if not exists trip_passengers_leg_uq
   on public.trip_passengers (travel_leg_id) where travel_leg_id is not null;
-create index on public.trip_passengers (trip_id);
+create index if not exists trip_passengers_trip_idx on public.trip_passengers (trip_id);
 
 -- Keep trips.seats_used honest without the app having to remember.
 create or replace function app.recount_trip_seats()
@@ -130,6 +130,7 @@ begin
 end;
 $$;
 
+drop trigger if exists trip_passengers_recount on public.trip_passengers;
 create trigger trip_passengers_recount
   after insert or update or delete on public.trip_passengers
   for each row execute function app.recount_trip_seats();
@@ -138,7 +139,7 @@ create trigger trip_passengers_recount
 -- WHATSAPP MESSAGING
 -- ---------------------------------------------------------------------
 
-create table public.message_templates (
+create table if not exists public.message_templates (
   id          uuid primary key default gen_random_uuid(),
   event_id    uuid references public.events (id) on delete cascade,  -- null = global
   key         text not null,               -- rsvp_invite, room_allocated, ...
@@ -151,12 +152,12 @@ create table public.message_templates (
   updated_at  timestamptz not null default now()
 );
 
-create unique index message_templates_global_uq
+create unique index if not exists message_templates_global_uq
   on public.message_templates (key, language) where event_id is null;
-create unique index message_templates_event_uq
+create unique index if not exists message_templates_event_uq
   on public.message_templates (event_id, key, language) where event_id is not null;
 
-create table public.messages (
+create table if not exists public.messages (
   id                  uuid primary key default gen_random_uuid(),
   event_id            uuid not null references public.events (id) on delete cascade,
   group_id            uuid,
@@ -178,15 +179,15 @@ create table public.messages (
   foreign key (guest_id, event_id) references public.guests (id, event_id) on delete set null
 );
 
-create index on public.messages (event_id, status, queued_at desc);
-create index on public.messages (event_id, group_id);
-create index on public.messages (provider_message_id);
+create index if not exists messages_event_status_idx on public.messages (event_id, status, queued_at desc);
+create index if not exists messages_event_group_idx on public.messages (event_id, group_id);
+create index if not exists messages_provider_message_idx on public.messages (provider_message_id);
 
 -- ---------------------------------------------------------------------
 -- EXCEL IMPORT — idempotent by row_hash
 -- ---------------------------------------------------------------------
 
-create table public.import_batches (
+create table if not exists public.import_batches (
   id            uuid primary key default gen_random_uuid(),
   event_id      uuid not null references public.events (id) on delete cascade,
   kind          text not null,                 -- guests | rooms | rsvp | logistics
@@ -203,7 +204,7 @@ create table public.import_batches (
   completed_at  timestamptz
 );
 
-create table public.import_rows (
+create table if not exists public.import_rows (
   id          uuid primary key default gen_random_uuid(),
   event_id    uuid not null references public.events (id) on delete cascade,
   batch_id    uuid not null references public.import_batches (id) on delete cascade,
@@ -219,8 +220,8 @@ create table public.import_rows (
     references public.guest_groups (id, event_id) on delete set null
 );
 
-create index on public.import_rows (batch_id, row_number);
-create index on public.import_rows (event_id, row_hash);
+create index if not exists import_rows_batch_idx on public.import_rows (batch_id, row_number);
+create index if not exists import_rows_event_hash_idx on public.import_rows (event_id, row_hash);
 
 select app.attach_standard_triggers('public.vehicle_types');
 select app.attach_standard_triggers('public.vehicles');

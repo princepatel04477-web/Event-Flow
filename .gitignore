@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.test.example
 
 # vercel
 .vercel
@@ -65,3 +66,35 @@ android/.gradle/
 android/local.properties
 
 testsprite_tests\tmp\config.json
+
+# ---------------------------------------------------------------------
+# Real guest data. `backups/` holds full database dumps produced by
+# scripts/backup-data.mjs — 558 phone numbers and 710 names in the one
+# that existed when this line was added. Same rule as *.xlsx above:
+# personal data never enters git.
+# ---------------------------------------------------------------------
+/backups/
+
+# Test and tooling output
+/test-results/
+/playwright-report/
+/.playwright-mcp/
+/e2e/perf-*.md
+/e2e/routes-*.json
+
+# Scratch files and captured console/error dumps from debugging sessions
+/all-console-errors.txt
+/playwright-err.txt
+/scratchpad_err.txt
+/scratch_preview_orig.tsx
+/scratchpad_foundation_head.sql
+/*.zip
+
+# Screenshots captured while debugging screens (regenerate as needed)
+/arrivals.png
+/board.png
+/deliveries.png
+/deliveries2.png
+/fleet.png
+/queue.png
+/rooms.png

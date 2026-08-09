@@ -5,6 +5,81 @@ made, so the next session does not re-litigate it.
 
 ---
 
+## 7 August 2026 — Guest list: windowed rendering + server-side search
+
+### `/guests` is now a windowed client list, not a server-rendered card wall
+
+The old page rendered every `client_guest_profiles` row as a card — 26s at 543
+guests, of which the DB was ~5ms. It is now a client component (`GuestsClient`)
+that loads all rows once (cached in `useStableData`) and renders a **windowed**
+list: a fixed-height 76px row per family, only the rows near the viewport
+mounted (+overscan). The scroll container is the full list height, so every
+row is reachable by scrolling — the DOM never mounts them all. First paint
+dropped from 26s to ~3s at 645 families.
+
+The row is compact (name, family, room, phone, chevron) and links to the
+family's RSVP record — the operational "profile". The rich variable-height
+card detail lives there, not in the list.
+
+### The list reads a new RPC (`search_guest_profiles`), NOT the view
+
+`client_guest_profiles` is the deliberate data-minimization boundary for the
+client role and has no `group_id` (so no profile link) and no phone. The list
+needed both. So a new staff-facing RPC reads `guest_groups` → `guests` under
+the caller's own RLS (a client login still gets zero rows — no new exposure),
+returns the view shape + `group_id` + `phone`, and serves BOTH the full list
+(p_limit large) and capped search (p_limit 50). The view is untouched.
+
+### Search is server-side, trgm-indexed, and starts from `guest_groups`
+
+Partial-match (`ILIKE '%term%'`) on head name, guest name, and primary mobile,
+backed by `pg_trgm` GIN indexes (1800). Devanagari needs no special handling —
+ILIKE is case-insensitive for Latin; Devanagari has no case. **The query starts
+from `guest_groups`, LEFT JOIN `guests`** — the first version started from
+`guests` and silently dropped families whose head had no guest row ("arpit"
+was unsearchable). A group with no guest row now emits one result (guest_name
+= head_name).
+
+### `resetTestData` protects the SEED-543 scale fixture
+
+The seed (scripts/seed-543.mjs) adds ~543 deterministic families so the suite
+runs at real scale — the 26s bug only existed at scale. The reset used to
+delete them mid-run, dropping the suite to ~100 guests. The reset now pins
+SEED-543 groups exactly like proof-pinned and call-attempt-pinned ones. The
+suite passes twice back-to-back at 648+ families with the seed intact.
+
+### T0.4's contract is the count, not the DOM
+
+The old assertion "every imported family is visible in the DOM" is what forced
+the 26s render. It is removed and documented: the new contract is (a) first
+paint < 5s at 543+ families (3s is the venue target; the dev machine's cloud
+RTT needs headroom), (b) the displayed count equals the real family count in
+the DB (proving all data loaded without all rows in the DOM), (c) only a
+window of rows is mounted, (d) search finds a guest NOT on the first page,
+(e) that guest's profile opens. The `<5000` automated budget vs the 3s venue
+target is a deliberate, documented difference.
+
+### T0.7's throwaway families get a recognisable prefix
+
+`createPendingDeliverable` now names its throwaway family `E2E-PROOF-<ts>`
+(was `TMP-DELIVERY-`). The proofs stay insert-only and permanent — that
+guarantee is correct — but the pinned families are identifiable and
+excludable (`countProofPinnedFamilies`, `PROOF_PREFIX`), so they stop
+polluting the working set the other tests count.
+
+### Migration 1800's function is not itself re-runnable against the post-1803 DB
+
+1800 `create or replace`s `search_guest_profiles(uuid, text)`; 1801/1802/1803
+drop and re-create it with changed `returns table` columns (42P13 forces the
+drop). The migration LEDGER is what makes re-pushing safe — an applied
+migration is never re-executed, and `supabase db push` reports "Remote
+database is up to date". Re-running 1800's body by hand against the live DB
+(after 1803) would silently create a second `(uuid, text)` function with the
+old shape. This is a known, documented limitation of the drop-then-create
+pattern for return-type changes, not a live hazard — the ledger guards it.
+
+---
+
 ## 3 August 2026 — Q1 design foundation (ledger system)
 
 ### Scope: the brief's route map did not exist yet
@@ -240,3 +315,322 @@ happened"** finalises as `other` with an explanatory note.
   depend on real Android page-lifecycle behaviour a laptop browser will not reproduce.
 - `import_batches.status` can now be `'completed_with_errors'`. The column is free-form
   and nothing reads it yet — flag it if an admin screen ever enumerates statuses.
+
+---
+
+## NuventPhone design pass
+
+Imported from the Claude Design project `NuventPhone.dc.html` and applied across the
+app. The mockup is the source of truth for the visual system; where it and the built
+app disagreed on *behaviour*, the app won.
+
+### The app no longer follows the OS colour scheme
+
+Two grounds, and the skin is a property of **who is looking**, not of a system setting:
+
+- **Staff** — a fixed dark teal (`#071A1D`) with a brass accent. Staff work corridors,
+  car parks and banquet halls after dark; a cream screen at full brightness is a torch
+  in the face. Fixed rather than OS-following so one caller's screen looks like the
+  next caller's when they compare a row over someone's shoulder.
+- **Client** — warm paper (`#F4EFE4`), scoped by `[data-theme='client']`, set in
+  `(staff)/[eventCode]/layout.tsx` from the already-resolved `access`.
+
+Both grounds define the **same token names**, so no component branches on role to get
+its colours right. This replaced the previous OS-following light/dark pair from the
+bahi-khata pass.
+
+Brass (`#C9A96B`) is the accent, not a status. Verdigris (`#4FC1A0`) still means
+COMPLETED and signal (`#F2705F`) still means ATTENTION — that rule is unchanged and
+still absolute. Every text-on-surface pair is annotated with its measured ratio in
+`globals.css`; all pass WCAG AA, most AAA. The client ground needs *different* hexes
+for red/green/brass because the dark-ground values sit at 1.7:1 on cream.
+
+### Fonts are self-hosted, not linked
+
+The mockup links four Google fonts. `next/font/google` in `app/layout.tsx` downloads and
+fingerprints them at build time and serves them from our own origin, so venue Wi-Fi is
+never in the critical path and there is no layout shift when they land. The previous
+"no webfont at all" rule was solving the same problem with a bigger hammer.
+
+`IBM_Plex_Sans_Devanagari` is loaded on purpose and sits immediately after
+`IBM_Plex_Sans` in the stack: family names arrive off the sheet in Devanagari and sit
+inline with Latin on the same row. Without it, half the register renders in whatever the
+Android WebView happens to ship.
+
+### Shape carries meaning
+
+A **rounded rectangle commits** (buttons, fields, cards — radius 12/14/16px). A **full
+pill filters or labels** (`Chip`, `StatusPill`, `Badge`). Keeping the shapes apart means
+a caller can tell what a control does before reading it. This reverses the previous
+"Organic overlay", which made `rounded-xl` a 999px pill and put buttons and chips in the
+same shape. Radii are set as Tailwind `--radius-*` theme variables, **not** as
+`@utility` overrides of the built-in names.
+
+Cormorant Garamond is allowed in exactly three places: screen titles (`PageTitle`,
+`StickyHeader variant="screen"`), the couple's names, and the seal. It is never used for
+a figure (no tabular set) and never for a family name (no Devanagari cut). `EmptyState`
+and `ErrorState` were moved *off* it — untracked at 20px on the night ground its
+hairlines vanish on a cheap LCD, and those are the sentences someone reads when
+something has broken.
+
+### Sealed is still; queued breathes
+
+The delivery run draws its two states to differ in more than colour: sealed is filled,
+solid-bordered, motionless and carries **no** action; queued is unfilled, dashed,
+breathing and carries the only button. A hamper is delivered because a photo exists, so
+"done" has to look like a record and "not done" like a blank waiting to be filled.
+
+`breathe` is the only infinite animation in the app and it carries meaning. Everything
+collapses under `prefers-reduced-motion`, and nothing depends on motion to convey state.
+
+### Rooms became a tile grid
+
+168 rooms as a vertical list of cards is not a phone screen. Now: hotel tabs → a
+4-column grid of tiles (room number + one occupancy dot per bed) → a bottom sheet for
+detail, assignment and release. The two-tap move (select guest, tap room) and the
+capacity-override and release flows are unchanged; only the surface changed. Tile states
+differ in **hatching, border weight and dot pattern** as well as hue — a grid of 168
+tiles separated by colour alone is unreadable to a colour-blind coordinator.
+
+### The tab bar is text-only
+
+Six slots, mono labels under a state dot, no glyphs: Board · Queue · Rooms · Runs ·
+Arrivals · More. Six icons on a 360px bar are six icons nobody can tell apart at arm's
+length, and every one of these sections is a noun a caller already says out loud. The
+More sheet keeps its glyphs — a full row has space for both. Board leads because that is
+where a shift starts.
+
+### Fixed on the way through
+
+- `DeliveryList`'s delivered badge used `bg-tint-ok text-ok`, tokens that have never
+  existed — it was rendering unstyled. Now `StampPill`.
+- The queue's contacted-progress bar is **suppressed while a filter is on**: the
+  denominator would otherwise be "families matching this filter", and a bar whose
+  denominator moves when you tap a chip is a bar that lies.
+- `AttentionPanel` moved to `components/dashboard/` and is now shared by the staff board
+  and the admin dashboard instead of existing only on the latter.
+
+### Not done in this pass
+
+- **The mockup's fleet manifest expander.** It shows a per-vehicle passenger manifest and
+  a PLANNED → DISPATCHED → COMPLETED tracker; `readFleet` loads vehicle inventory only,
+  with no trip join. That is a data feature, not a design one.
+- **The mockup's in-app camera screen** (viewfinder, corner brackets, shutter). The built
+  capture path hands off to the native rear camera via the Capacitor plugin, which is the
+  correct behaviour and cannot be skinned — only the surrounding confirm/seal screens
+  were restyled.
+- **Nothing verified on a real Android phone**, and only `/login` and `/design-system`
+  were viewed in a browser — the rest are behind auth and were verified by `tsc`,
+  `eslint` and `next build` only.
+
+---
+
+## 2026-08-09 — The APK ran as a browser tab, and the dial button did nothing
+
+Two symptoms reported: the app "opens like a site in a browser" when the dev server is
+running, and calls could not be made. They turned out to share a root cause plus a set of
+latent bugs that would have bitten on event day.
+
+### Root cause: the app was never launched
+
+The APK was correctly built, installed, and pointed at the right LAN IP the whole time.
+Nobody was launching it — the LAN URL was being opened in Chrome by hand. A browser tab
+renders the identical site (remote-shell mode) but has **no native bridge**, so the `Call`
+plugin does not exist and every native path silently degrades.
+
+The reason nobody launched it: `"mobile:dev": "next dev & npx cap run android --livereload"`.
+npm runs scripts through cmd.exe on Windows, where `&` is a **sequential** separator, not
+POSIX backgrounding. `next dev` never exits, so the Capacitor launch step was unreachable
+dead text. The script started a server and launched nothing, every time.
+
+**Decision:** `mobile:dev` is now `scripts/mobile-dev.mjs` — a Node script, because shell
+backgrounding is not portable and this repo has to work on Windows. It auto-detects the LAN
+IP (skipping Hyper-V/WSL virtual adapters, which are not routable from the phone), waits for
+the server to actually answer before syncing, and **only rebuilds when the baked server URL
+changed**. A Gradle build is ~2.5 minutes; a loop that pays that on every run is a loop
+nobody uses.
+
+### Why the dial did nothing
+
+`openExternalUrl()` used `window.open(url, '_system')`. Two independent faults:
+
+1. `'_system'` is a **Cordova** target. Capacitor 8 does not implement it.
+2. The dial fires *after* `await startCallAttempt(...)`. That round-trip expires the
+   transient user activation, so the browser treats the `window.open` as an unsolicited
+   popup and blocks it. **A blocked popup returns `null` — it does not throw.** The
+   `try/catch` fallback to `location.assign` therefore never ran. The tap did nothing,
+   logged nothing, and showed no error.
+
+**Decision:** `@capacitor/app-launcher` on native (Android resolves the tel: intent without
+touching the WebView, so the cookie session survives), plain `location.href` on web (a
+navigation is not a popup, so it needs no user activation). Never `window.open` for a
+system scheme.
+
+### The other things that were wrong
+
+- **No `<queries>` block.** Targeting SDK 36, package-visibility filtering makes
+  `resolveActivity()` return null for `tel:` even with a dialer installed. Added DIAL/CALL/VIEW
+  + `tel` scheme.
+- **`CALL_PHONE` was declared but never requested.** `dial()` only *checked* the permission,
+  so direct dial was unreachable and every call was permanently downgraded to the
+  confirm-screen dialer. Now requested on first use.
+- **The `ACTION_DIAL` fallback had no try/catch** — an `ActivityNotFoundException` escaped,
+  the `PluginCall` was never resolved, and the JS promise hung forever.
+- **`Boolean(window.Capacitor)` is not a native check.** `@capacitor/core` installs that
+  global in browsers too, so all five call sites believed Chrome was native. Replaced with
+  `isNativePlatform()` in `src/lib/native/platform.ts`. This also means
+  `capacitor-storage.ts` had been routing browser sessions through the Preferences web shim
+  rather than the localStorage branch written for them — native behaviour is unchanged,
+  browsers re-login once.
+- **`allowNavigation` was documented backwards.** It is the allowlist of hosts the WebView
+  may navigate to *itself*; `tel:*`/`mailto:*` entries were inert (it matches on host, and a
+  tel: URI has none) but taught the mechanism wrong. Removed.
+- **A trailing space in `CAP_SERVER_URL`** (`set VAR=value ` in cmd keeps it) was baked into
+  `capacitor.config.json` as `"http://192.168.29.44:3000 "` and passed to `Uri.parse()`
+  unmodified. The config now trims. The default port was also 8000 against a dev server on
+  3000, so any sync without the env var baked a dead URL.
+- **`capacitor.config.dev.ts` was orphaned** — no script, no CLI flag, no gradle file read it
+  (the Capacitor CLI only reads `capacitor.config.ts`), its default IP was stale, and its
+  `allowNavigation` list was narrower than the base config. Deleted.
+- **The `CapacitorUpdater` config block shipped into the APK with the package uninstalled.**
+  Inert, but it reads as "OTA is wired" to anyone inspecting the build. Removed until the
+  dependency comes back.
+
+### Why it also *looked* like a website
+
+Some of this is architectural — M2-ALT remote shell means the WebView loads the live site.
+But the avoidable tells were fixed:
+
+- StatusBar was `style: 'LIGHT'` on cream `#f5ead8`. Capacitor's `'LIGHT'` means **dark
+  text**, so the icons were dark-on-dark over the app's dark teal `#071a1d`. Now `'DARK'`
+  (light icons) with matching colours.
+- The splash was cream and the app is dark teal, so launch flashed pale then swapped —
+  the most "web page loading" moment in the product. Splash is now the same colour, set via
+  the core-splashscreen `windowSplashScreenBackground` attribute rather than the
+  pre-core-splashscreen `android:background` the template used.
+- The theme inherited Capacitor's library defaults (Material indigo `#3F51B5`). Added
+  `android/app/src/main/res/values/colors.xml` with the brand palette.
+- With no local bundle, an unreachable server showed Chromium's own grey error page. Added
+  `public/offline.html` wired via `server.errorPath`.
+
+### Verified on the handset
+
+Built, installed, and launched on the real phone. The app comes up in the WebView loading
+`http://192.168.29.44:3000/_next/...` — no address bar, edge-to-edge dark teal, white
+status-bar icons. `adb shell cmd package resolve-activity` confirms `tel:` resolves to
+Google Dialer. **The dial itself still needs a manual test with a SIM and a logged-in
+staff account** — that cannot be driven from adb.
+
+### Known, not fixed
+
+- `Capacitor/Console: Uncaught TypeError: Cannot read properties of undefined (reading
+  'triggerEvent')` on every launch. Native `notifyListeners(..., retainUntilConsumed=true)`
+  calls a JS API Capacitor 8 removed; most likely `@sentry/capacitor` 4.2.0. It does not
+  blank the WebView and the app loads past it, but it may suppress some native→JS events.
+- `Call.startListening()` is invoked but nothing registers `addListener('callStarted' |
+  'callEnded')`, so the call-state/duration pipeline is still dead. Duration comes from the
+  `dialedAt`/`returnedAt` wall clock.
+- A stranded `call_attempts` row with `outcome IS NULL` still hides the Call button for that
+  caller; the escape hatches are "Dial again" and "No call happened".
+
+---
+
+## 2026-08-09 — Supabase round-trip work (Phases 1-5)
+
+### Phase 1 was based on a premise that is not true in this repo
+
+The brief said Cloudflare Pages runs in Mumbai and asked for Smart Placement.
+**There is no Cloudflare deployment.** No `wrangler.toml`, no
+`@cloudflare/next-on-pages`, no `@opennextjs/cloudflare`, no `pages.dev`, no
+deploy config of any kind; `capacitor.config.ts` still carries
+`<DEPLOYED_APP_URL>` as a placeholder. Without one of those adapters a Pages
+build could not serve this app's SSR at all. Confirmed with the user: nothing
+is deployed yet, and the ~150ms Mumbai figure was projected rather than
+measured. No Workers exist, so there is no execution region to report or move.
+
+### Measuring this correctly took three attempts, and the first two lied
+
+1. **Wrong event.** The perf harness resolved the event code from
+   `E2E_EVENT_ID` and pointed BOTH sessions at it. The admin credentials and
+   the team access code belong to different events (`SHARMA26` vs
+   `SAMPLE2026`), so the team session was measured rendering a not-found for
+   an event it cannot see: 17ms, which read as "team is already fast". The
+   real figure was ~240ms. The harness now derives the event from where each
+   login lands, and asserts the route rendered rather than redirected.
+2. **Wrong metric (TTFB).** This app has 11 `loading.tsx` files, so every
+   route streams. `responseStart - requestStart` measures the shell flush, and
+   stayed flat at ~17-25ms on routes whose data took 240ms.
+3. **Wrong metric again (browser load).** Wall-clock to the `load` event on an
+   emulated Pixel 5 is ~600ms of JS parse and hydration on top of the server
+   render — removing a 175ms round trip moved it by less than run-to-run
+   noise.
+
+The metric that actually answers the question is the **HTML document fetch**
+(`e2e/measure-routes.mjs`): the stream does not end until every server await
+has resolved, and no browser work is in the number.
+
+### Two bugs found in my own change before it shipped
+
+- **PostgREST does not say "does not exist".** The fallback for "the merged
+  view has not been created yet" tested for `42P01` / `/does not exist/`.
+  PostgREST answers an unknown relation with **`PGRST205`** and the wording
+  "Could not find the table 'public.v_event_board' in the schema cache". That
+  fell through to the failure branch, `readDashboard` returned null, and the
+  board rendered its "Could not load the numbers" card on every load. Both
+  codes are now accepted; any other error is still reported as a real failure.
+- **The event cache was a tenancy leak.** `getEventByCode` runs under RLS, so
+  a row means "visible to YOU" and null means "not visible to YOU" — both are
+  facts about the viewer. A cache keyed on the event code alone would hand one
+  viewer's row to another and let a non-member render a header for an event
+  they cannot see (CLAUDE.md §5.1). The key now carries an opaque per-session
+  fingerprint derived from the session cookies, so two sessions can never
+  share an entry. The fingerprint is never trusted as a claim — it only picks
+  a cache bucket, and RLS still fences the read behind it.
+
+### What changed
+
+- **`lib/request-cache.ts`** — per-request memo via React `cache()`, storing
+  successes only. Nullish results are passed through uncached, because a
+  memoised null is exactly what got the previous `cache()` attempt reverted.
+  **Measured caveat: it does not dedupe across the layout/page boundary** —
+  those render from separate route-segment chunks and hold separate module
+  instances, so `perRequest` alone still left 2 reads per request. It is kept
+  because it is correct and cheap, but it is not what produced the win.
+- **`getEventByCode` TTL cache (30s, per session)** — the layout and the page
+  each resolve the event, at ~175ms apiece. Warm across requests, so the
+  steady state is zero round trips for the lookup.
+- **Middleware checks the code JWT first** — `auth.getUser()` can only ever
+  answer null for a team/client session, and all 10-20 staff are code
+  sessions. The JWT is verified locally, so that branch now costs no network.
+  An admin still falls through to `getUser()`, which must keep revalidating.
+- **`v_event_board`** (migration `20260809120000`) merges `v_event_dashboard`
+  and `v_event_attention` into one row. Both scanned `events` and both
+  computed `hampers_pending`. `security_invoker = true`, matching both source
+  views; no policy, grant or RPC touched; the old views are left in place.
+  **NOT YET APPLIED** — the Supabase MCP server disconnected mid-session and
+  the CLI needs an interactive DB password. The read path falls back to the
+  two legacy views (in parallel) until it lands, so deploy order is free.
+- **The dashboard page reads the board once** rather than calling
+  `readDashboard` + `readAttention`, which issued the underlying read twice.
+
+### Verified
+
+Acceptance 100/100, EVENT-READY YES. Unit 95/95. Two new identity tests pass:
+twelve rounds of overlapping admin+team requests to the same route, asserting
+neither ever renders the other's identity, plus an anonymous/authenticated
+interleave proving "no session" never becomes sticky.
+
+Document-fetch timings, caches on, dev machine → Supabase Seoul: team routes
+~208-236ms, admin routes ~780-863ms. The admin path is still ~4 round trips —
+`auth.getUser()` plus `profiles`/`event_members`, resolved twice per request —
+and is the obvious next target. It was left alone because caching an identity
+across requests is the one change here that could weaken a guard, and the
+brief forbids that.
+
+**No honest before/after timing table exists for the same metric.** The
+`NUVENT_PERF_BASELINE=1` switch disables the caches this work added, but it
+also disables the 30s dashboard TTL cache that predates it, so it measures
+"no caching at all" rather than the original state. Reconstructing the true
+baseline would mean reverting onto a working tree with heavy uncommitted work,
+which was attempted once via `git stash` and immediately rolled back after it
+reverted `middleware.ts` to a pre-code-auth commit.

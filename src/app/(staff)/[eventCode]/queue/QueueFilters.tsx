@@ -27,12 +27,12 @@ export interface QueueFiltersProps {
 }
 
 const CHIP_BASE =
-  'tap min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold transition-colors'
+  'tap min-h-12 shrink-0 rounded-full border px-4 text-sm font-semibold transition-colors active:opacity-80'
 const CHIP_ACTIVE = 'border-transparent bg-brand text-brand-fg'
-const CHIP_INACTIVE = 'border-rule-strong bg-surface text-ink hover:bg-surface-2'
+const CHIP_INACTIVE = 'border-rule-strong bg-surface text-ink hover:bg-surface-2 active:bg-surface-2'
 
 const TOGGLE_BASE =
-  'tap min-h-11 flex-1 rounded-xl border px-3 text-sm font-semibold transition-colors'
+  'tap min-h-12 flex-1 rounded-xl border px-3 text-sm font-semibold transition-colors active:opacity-80'
 
 /**
  * Filter bar for the calling queue. Deliberately dumb — it only reads the

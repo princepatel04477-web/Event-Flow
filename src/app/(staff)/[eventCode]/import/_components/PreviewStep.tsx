@@ -8,16 +8,27 @@ import { Card, CardBody } from '@/components/ui/Card'
 import type { CommitResult } from '@/lib/actions/import'
 import { commitImport } from '@/lib/actions/import'
 import type { ImportContext } from '@/lib/actions/import'
-import type { KnownSheetSuccess } from '@/lib/import/knownSheet'
+import type { ParsedFamilySheet } from '@/lib/import/families'
+import type { LayoutNote } from '@/lib/import/layout'
 
 import { FamilyList } from './FamilyList'
 import { SummaryBar } from './SummaryBar'
 import { WarningsList } from './WarningsList'
 
+/** The shared success shape both the known-layout and contacts paths produce. */
+export interface PreviewOutcome {
+  sheetName: string
+  /** 1-based row number the headers were found on. */
+  headerRowNumber: number
+  /** Optional-column notes, for the preview's info lines. */
+  notes: LayoutNote[]
+  result: ParsedFamilySheet
+}
+
 export interface PreviewStepProps {
   eventId: string
   fileName: string
-  outcome: KnownSheetSuccess
+  outcome: PreviewOutcome
   context: ImportContext
   onCommitted: () => void
 }
@@ -50,8 +61,9 @@ export function PreviewStep({
     setCommitError(null)
     try {
       const payload = result.families.map((f) => ({
+        rowNumber: f.sourceRowIndex,
+        raw: f.raw,
         familyNumber: f.familyNumber,
-        hash: f.hash,
         headName: f.headName,
         primaryMobile: f.primaryMobile,
         place: f.place,

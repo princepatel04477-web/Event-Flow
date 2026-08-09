@@ -5,7 +5,7 @@ import { useRef, useState } from 'react'
 import { UploadIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
-import { parseKnownWorkbook, type KnownSheetOutcome } from '@/lib/import/knownSheet'
+import { parseImportFile, type ImportOutcome } from '@/lib/import/knownSheet'
 import { KNOWN_SHEET_NAME } from '@/lib/import/parse'
 
 export interface UploadStepProps {
@@ -14,7 +14,7 @@ export interface UploadStepProps {
   /** `events.ends_on`. Nullable in the schema; the parser handles its absence. */
   eventEndsOn: string | null
   /** Called for both a clean parse and a layout mismatch — both are results. */
-  onResult: (fileName: string, outcome: KnownSheetOutcome) => void
+  onResult: (fileName: string, outcome: ImportOutcome) => void
   /** Called when the file could not be read at all (wrong tab, corrupt file). */
   onError: (message: string) => void
 }
@@ -36,7 +36,7 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
 
     setBusy(true)
     try {
-      const outcome = await parseKnownWorkbook(file, {
+      const outcome = await parseImportFile(file, {
         eventStartsOn,
         eventEndsOn,
       })
@@ -66,8 +66,12 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
         <div>
           <p className="text-base font-semibold text-fg">Choose the calling list</p>
           <p className="mt-1 text-sm text-muted">
-            .xlsx or .xls. The <span className="font-medium text-fg">{KNOWN_SHEET_NAME}</span> tab is
-            the one that gets read — it is the only one carrying the room and bed columns.
+            .xlsx or .xls. A full CALLING MASTER LIST (the{' '}
+            <span className="font-medium text-fg">{KNOWN_SHEET_NAME}</span> tab) is read in full —
+            travel, rooms, pax. A plain list with just{' '}
+            <span className="font-medium text-fg">Name</span> and{' '}
+            <span className="font-medium text-fg">Contact</span> columns works too — each row
+            becomes one guest to call.
           </p>
           <p className="mt-1 text-sm text-muted">
             The file is read on this phone and is not uploaded anywhere.

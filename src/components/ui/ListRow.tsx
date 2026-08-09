@@ -4,8 +4,13 @@ import { cn } from '@/lib/utils'
 
 interface ListRowBaseProps {
   /**
-   * The one thing on this row that matters. Rendered large (display face)
-   * so it is readable at arm's length in a corridor.
+   * The one thing on this row that matters — nearly always a family name.
+   *
+   * Set in the sans face, not the display serif: these names arrive off
+   * the Excel sheet in Devanagari, and Cormorant Garamond has no
+   * Devanagari cut, so a serif identifier would render half the register
+   * in one family and half in a fallback. The display face is reserved
+   * for screen titles and the seal, which are Latin by construction.
    */
   identifier: ReactNode
   /** Secondary line under the identifier — meta, never a number. */
@@ -28,12 +33,12 @@ type DivListRowProps = ListRowBaseProps & Omit<HTMLAttributes<HTMLDivElement>, k
 export type ListRowProps = ButtonListRowProps | DivListRowProps
 
 /**
- * The ledger's row: alternating paper bands, the identifier on the left in
- * the display face, optional right meta, and a pressed state. The red
- * margin rule lives on the list container, not on the rows — one continuous
- * rule, not a per-row decoration. A row carries at most one pill; secondary
- * facts (a lock, a callback time) belong in the meta line so every row in
- * the register keeps the same height.
+ * The register's row: identifier on the left, optional right meta, a
+ * pressed state, and a minimum height that clears a thumb.
+ *
+ * A row carries at most one pill; secondary facts (a lock, a callback
+ * time) belong in the meta line so every row in the register keeps the
+ * same height and the eye can run down the column of pills.
  */
 export function ListRow({
   identifier,
@@ -48,7 +53,7 @@ export function ListRow({
   const inner = (
     <>
       <div className="min-w-0 flex-1">
-        <span className="block font-display text-lg leading-snug text-ink">
+        <span className="block text-lg leading-snug font-medium text-ink">
           {identifier}
         </span>
         {meta ? (
@@ -65,10 +70,9 @@ export function ListRow({
   )
 
   const rowClass = cn(
-    'tap relative flex min-h-14 items-center gap-3 px-3 py-2.5',
-    'bg-paper text-left',
+    'tap relative flex min-h-14 items-center gap-3 px-3 py-3 text-left',
     onPress && !disabled
-      ? 'cursor-pointer transition-colors duration-100 active:bg-paper-band'
+      ? 'cursor-pointer transition-colors duration-press ease-ledger active:bg-surface-2'
       : undefined,
     disabled && 'opacity-60',
     className,
@@ -80,7 +84,7 @@ export function ListRow({
         type="button"
         onClick={onPress}
         disabled={disabled}
-        className={rowClass}
+        className={cn(rowClass, 'w-full')}
         {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}
       >
         {inner}

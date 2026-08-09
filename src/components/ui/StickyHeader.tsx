@@ -10,10 +10,17 @@ export interface StickyHeaderProps {
   /** Renders a 44px back target on the left. */
   backHref?: string
   backLabel?: string
-  /** Actions pinned to the right of the title row. */
+  /** Actions or a figure pinned to the right of the title row. */
   right?: ReactNode
   /** A second row under the title — filters, tabs, a search box. */
   children?: ReactNode
+  /**
+   * `screen` is the section title: Cormorant, wide-tracked, uppercase —
+   * "CALL QUEUE", "ROOMS", "FLEET". `entity` is a specific thing you have
+   * drilled into (a family, a room), which is set in the sans face
+   * because those names are frequently Devanagari.
+   */
+  variant?: 'screen' | 'entity'
   className?: string
 }
 
@@ -28,38 +35,59 @@ export function StickyHeader({
   backLabel = 'Back',
   right,
   children,
+  variant = 'screen',
   className,
 }: StickyHeaderProps) {
   return (
     <header
       className={cn(
-        'sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur-sm pt-safe px-safe',
+        'sticky top-0 z-30 border-b border-rule bg-paper/95 backdrop-blur-sm pt-safe px-safe',
         className,
       )}
     >
-      <div className="mx-auto flex w-full max-w-[480px] items-center gap-2 px-3 py-2">
+      <div className="mx-auto flex w-full max-w-[480px] items-center gap-2 px-4 py-2.5">
         {backHref ? (
           <Link
             href={backHref}
             aria-label={backLabel}
-            className="tap -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-fg hover:bg-surface-2"
+            className="tap -ml-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted hover:bg-surface-2 active:bg-surface-2"
           >
             <ChevronLeftIcon className="h-6 w-6" />
           </Link>
         ) : null}
 
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg leading-tight font-semibold text-fg">{title}</h1>
+          <h1
+            className={cn(
+              'truncate text-ink',
+              variant === 'screen'
+                ? 'font-display text-xl leading-none font-medium tracking-[0.14em] uppercase'
+                : 'text-lg leading-tight font-medium',
+            )}
+          >
+            {title}
+          </h1>
           {subtitle ? (
-            <p className="truncate text-sm leading-tight text-muted">{subtitle}</p>
+            <p
+              className={cn(
+                'truncate leading-tight text-muted',
+                variant === 'screen' ? 'mt-1.5 text-sm' : 'mt-0.5 font-mono text-xs',
+              )}
+            >
+              {subtitle}
+            </p>
           ) : null}
         </div>
 
-        {right ? <div className="flex shrink-0 items-center gap-1">{right}</div> : null}
+        {right ? (
+          <div className="flex shrink-0 items-center gap-1.5 font-mono text-xs text-muted">
+            {right}
+          </div>
+        ) : null}
       </div>
 
       {children ? (
-        <div className="mx-auto w-full max-w-[480px] px-3 pb-2">{children}</div>
+        <div className="mx-auto w-full max-w-[480px] px-4 pb-3">{children}</div>
       ) : null}
     </header>
   )

@@ -42,6 +42,7 @@ import { z } from 'zod'
 
 import { getEventAccess } from '@/lib/supabase/queries'
 import { createClient } from '@/lib/supabase/server'
+import type { Json } from '@/lib/supabase/database.types'
 
 /**
  * Why this is asked at all, rather than assumed:
@@ -119,14 +120,19 @@ const legSchema = z.object({
 })
 
 /**
- * One family as the preview parsed it. The server re-derives `rowHash` from
- * the identifying cells rather than trusting anything the client computed —
- * a forged hash would let a client force an "update" onto a family it does
- * not own. Hash inputs match src/lib/import/hash.ts.
+ * One family as the preview parsed it. Field names match the contract
+ * documented in supabase/migrations/20260805001000_import_commit.sql — the
+ * SQL reads `groupCode`, `city`, `rowNumber` and `raw`, so sending the
+ * preview's own `familyNumber`/`place` names would drop them on the floor.
+ * The server re-derives `rowHash` from the identifying cells rather than
+ * trusting anything the client computed — a forged hash would let a client
+ * force an "update" onto a family it does not own. Hash inputs match
+ * src/lib/import/hash.ts.
  */
 const commitFamilySchema = z.object({
+  rowNumber: z.number(),
+  raw: z.record(z.string(), z.unknown()),
   familyNumber: z.string(),
-  hash: z.string(),
   headName: z.string().nullable(),
   primaryMobile: z.string().nullable(),
   place: z.string().nullable(),
@@ -136,6 +142,12 @@ const commitFamilySchema = z.object({
   arrival: legSchema,
   departure: legSchema,
 })
+
+/** Sheet cells are JSON-able (strings, numbers, null) — a safe cast at the
+ *  boundary to satisfy the RPC's `Json` argument type. */
+function toJson(value: Record<string, unknown>): Json {
+  return value as unknown as Json
+}
 
 export interface CommitResult {
   ok: boolean
@@ -170,9 +182,22 @@ export async function commitImport(
   }
 
   // Re-derive each row's hash server-side (identity = group code + head name
-  // + primary mobile, exactly as src/lib/import/hash.ts does).
+  // + primary mobile, exactly as src/lib/import/hash.ts does). The rest of
+  // the shape matches the SQL contract in migration 0010: groupCode/city are
+  // the names the function reads, so the preview's familyNumber/place are
+  // translated here, not sent under their own names.
   const rows = parsed.data.map((f) => ({
-    ...f,
+    rowNumber: f.rowNumber,
+    raw: toJson(f.raw),
+    canImport: f.canImport,
+    blockReason: f.blockReason,
+    headName: f.headName,
+    groupCode: f.familyNumber,
+    primaryMobile: f.primaryMobile,
+    expectedPax: f.expectedPax,
+    city: f.place,
+    arrival: f.arrival,
+    departure: f.departure,
     rowHash: rowHashServer({
       groupCode: f.familyNumber,
       headName: f.headName ?? '',

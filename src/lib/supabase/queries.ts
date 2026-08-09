@@ -2,7 +2,100 @@ import 'server-only'
 
 import { notFound, redirect } from 'next/navigation'
 
+import { cookies } from 'next/headers'
+
 import { createClient } from './server'
+import { getSessionClaims } from '@/lib/auth/server'
+import { CODE_AUTH_COOKIE } from '@/lib/auth/cookies'
+import { perRequest } from '@/lib/request-cache'
+import { ttlCache } from '@/lib/ttl-cache'
+
+/**
+ * Events are reference data: a name, a code and two dates, set when the event
+ * is created and effectively fixed for its lifetime. Every staff route
+ * resolves the event TWICE — the layout for the header, the page for its
+ * guard — and each resolution was a full round trip to Seoul (~175ms
+ * measured), which cost more than everything the page actually renders.
+ *
+ * A per-request memo alone does not fix it: measured, `perRequest` still left
+ * 2 reads per request, so the layout and page do not share a React cache
+ * scope here. This TTL cache is warm ACROSS requests, so the steady state is
+ * zero round trips for the event lookup.
+ *
+ * SCOPED PER SESSION, DELIBERATELY. `getEventByCode` runs under RLS, so a
+ * null means "not visible to YOU", and a row means "visible to you" — both are
+ * facts about the VIEWER, not about the event. A cache keyed on the code alone
+ * would hand one viewer's row to another, letting a non-member render an event
+ * header for an event they cannot see. That is the tenancy fence in CLAUDE.md
+ * §5.1, so the key carries a per-session fingerprint and two sessions can
+ * never share an entry.
+ *
+ * Still not an auth cache: access is resolved per request by getEventAccess,
+ * and RLS fences every read regardless. The only thing cached is the row a
+ * given session already proved it was allowed to read.
+ *
+ * 30s, matching the dashboard counters. Worst case a renamed event shows its
+ * old name in the header for 30 seconds.
+ */
+const eventCache = ttlCache<unknown>(30_000)
+
+/**
+ * Measurement switch. `NUVENT_PERF_BASELINE=1` disables the caches added by
+ * the round-trip work, so the SAME build can be timed with and without them
+ * (see e2e/measure-routes.mjs). Never set it in production: it only ever makes
+ * the app slower, never less correct.
+ */
+export const PERF_BASELINE = process.env.NUVENT_PERF_BASELINE === '1'
+
+/**
+ * A stable, opaque per-session key for cache partitioning.
+ *
+ * Reads the session cookies directly — no network, no verification, because
+ * this value is NEVER trusted as a claim. It only decides which cache bucket a
+ * read lands in. A forged cookie gets its own bucket and still reads nothing:
+ * the query behind the cache runs under RLS either way.
+ *
+ * Returns 'anon' when there is no session, which is correct — an anonymous
+ * read is fenced to the anonymous bucket.
+ */
+async function sessionScope(): Promise<string> {
+  const jar = await cookies()
+  const parts: string[] = []
+  for (const c of jar.getAll()) {
+    // The code-auth JWT, and Supabase's GoTrue token cookies (sb-<ref>-auth-token,
+    // possibly chunked as .0/.1).
+    if (c.name === CODE_AUTH_COOKIE || (c.name.startsWith('sb-') && c.name.includes('auth-token'))) {
+      parts.push(`${c.name}=${c.value}`)
+    }
+  }
+  if (parts.length === 0) return 'anon'
+
+  // Cheap non-cryptographic digest — this is a map key, not a security token.
+  const joined = parts.sort().join('|')
+  let h = 2166136261
+  for (let i = 0; i < joined.length; i += 1) {
+    h ^= joined.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return (h >>> 0).toString(36)
+}
+
+/** Per-phase timing for the route's session/guard reads (instrument-first). */
+function phaseTiming(label: string) {
+  const marks: Record<string, number> = {}
+  let last = performance.now()
+  return {
+    mark(name: string) {
+      const now = performance.now()
+      marks[name] = Math.round(now - last)
+      last = now
+    },
+    report() {
+      const parts = Object.entries(marks).map(([k, v]) => `${k}:${v}ms`)
+      console.log(`[perf] ${label} phases :: ${parts.join(' · ')}`)
+    },
+  }
+}
 
 // Re-exported from `@/lib/events/paths`, which carries no `server-only` mark
 // so the event switcher (a client component) can reach `eventHomePath`.
@@ -34,11 +127,51 @@ export type Viewer = {
  * Returns null when there is no session.
  */
 export async function getViewer(): Promise<Viewer | null> {
+  // Memoised per request: the layout calls this for the nav and several pages
+  // call it again. A null (no session) is never cached — see request-cache.ts.
+  return perRequest('viewer', getViewerUncached)
+}
+
+async function getViewerUncached(): Promise<Viewer | null> {
+  const timing = phaseTiming('route :: getViewer')
+
+  // Code-auth session (team/client): no GoTrue user exists, but the claims
+  // ARE the identity. Build the viewer from them so team/client pages that
+  // call getViewer() (RSVP, call, review) do not bounce to /login.
+  const claims = await getSessionClaims()
+  timing.mark('claims')
+  if (claims) {
+    const supabase = await createClient()
+    const { data: event } = await supabase
+      .from('events')
+      .select('name, code')
+      .eq('id', claims.eventId)
+      .maybeSingle()
+    timing.mark('event')
+    if (!event) return null
+    return {
+      userId: claims.accessCodeId,
+      email: null,
+      fullName: claims.staffMemberId ?? null,
+      isAdmin: false,
+      memberships: [
+        {
+          eventId: claims.eventId,
+          eventName: event.name,
+          eventCode: event.code,
+          role: claims.appRole === 'team' ? 'event_team' : 'client',
+        },
+      ],
+    }
+  }
+
   const supabase = await createClient()
+  timing.mark('client-create')
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  timing.mark('getUser')
   if (!user) return null
 
   const [{ data: profile }, { data: members }] = await Promise.all([
@@ -52,6 +185,7 @@ export async function getViewer(): Promise<Viewer | null> {
       .select('event_id, role, events(name, code)')
       .order('created_at', { ascending: true }),
   ])
+  timing.mark('profile+memberships')
 
   // `is_active` is not decoration. `app.is_admin()` is
   // `global_role = 'admin' AND p.is_active` (migration 0100), and deactivating
@@ -91,24 +225,45 @@ export async function getViewer(): Promise<Viewer | null> {
       role: 'event_team' as const,
     }))
   }
+  timing.mark('admin-events')
 
-  return {
+  const viewer: Viewer = {
     userId: user.id,
     email: user.email ?? null,
     fullName: profile?.full_name ?? null,
     isAdmin,
     memberships,
   }
+  timing.report()
+  return viewer
 }
 
 /** Resolve an event by its short code, or null if the viewer cannot see it. */
 export async function getEventByCode(code: string) {
+  return perRequest(`event:${code}`, async () => {
+    const key = `event:${code}:${await sessionScope()}`
+    const hit = PERF_BASELINE ? undefined : eventCache.get(key)
+    if (hit !== undefined) return hit as Awaited<ReturnType<typeof getEventByCodeUncached>>
+
+    const row = await getEventByCodeUncached(code)
+    // Only cache a hit. Caching a miss would make a freshly created event 404
+    // for 30s, and a miss is the more sensitive of the two answers.
+    if (row) eventCache.set(key, row)
+    return row
+  })
+}
+
+async function getEventByCodeUncached(code: string) {
+  const timing = phaseTiming('route :: resolveEventByCode')
   const supabase = await createClient()
+  timing.mark('client-create')
   const { data } = await supabase
     .from('events')
     .select('*')
     .eq('code', code)
     .maybeSingle()
+  timing.mark('request')
+  timing.report()
   return data
 }
 
@@ -149,11 +304,31 @@ export type EventAccess = 'admin' | 'event_team' | 'client' | 'none'
  * user the truth, never to decide whether a write is allowed.
  */
 export async function getEventAccess(eventId: string): Promise<EventAccess> {
+  // Memoised per request per event: the layout resolves access for the nav,
+  // then requireStaff/requireAdmin resolves it again inside the page.
+  // 'none' is a real answer (not nullish), so it caches — correctly: it cannot
+  // change within one request.
+  return perRequest(`access:${eventId}`, () => getEventAccessUncached(eventId))
+}
+
+async function getEventAccessUncached(eventId: string): Promise<EventAccess> {
+  const timing = phaseTiming('route :: getEventAccess')
+  // Code-auth session (team/client) — the claims carry the role and event.
+  const claims = await getSessionClaims()
+  timing.mark('claims')
+  if (claims) {
+    if (claims.eventId !== eventId) return 'none'
+    return claims.appRole === 'team' ? 'event_team' : 'client'
+  }
+
+  // GoTrue session (admin) — resolve via profiles/event_members.
   const supabase = await createClient()
+  timing.mark('client-create')
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  timing.mark('getUser')
   if (!user) return 'none'
 
   const [{ data: profile }, { data: member }] = await Promise.all([
@@ -169,14 +344,18 @@ export async function getEventAccess(eventId: string): Promise<EventAccess> {
       .eq('user_id', user.id)
       .maybeSingle(),
   ])
+  timing.mark('profile+membership')
 
   // Both halves of `app.is_admin()`. A deactivated admin falls through to
   // their `event_members` row — usually none, so 'none' — which is exactly
   // what the database would answer.
-  if (profile?.global_role === 'admin' && profile.is_active) return 'admin'
-  if (member?.role === 'event_team') return 'event_team'
-  if (member?.role === 'client') return 'client'
-  return 'none'
+  let result: EventAccess
+  if (profile?.global_role === 'admin' && profile.is_active) result = 'admin'
+  else if (member?.role === 'event_team') result = 'event_team'
+  else if (member?.role === 'client') result = 'client'
+  else result = 'none'
+  timing.report()
+  return result
 }
 
 /** admin or event_team on this event — i.e. `app.is_staff(event_id)`. */

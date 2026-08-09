@@ -2,7 +2,7 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "EventFlow"
+project_id = "Nuvent"
 
 [api]
 enabled = true
@@ -412,3 +412,9 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# Code-based login. Callers have no JWT yet (that is the point of the
+# function), so the platform must not require one. The function performs
+# its own hash lookup + rate limiting and mints the session JWT.
+[functions.verify-access-code]
+verify_jwt = false

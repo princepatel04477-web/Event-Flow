@@ -16,7 +16,21 @@
     </style>
 
 
+    <!--
+      Launch theme. Parent is androidx core-splashscreen, whose API is the
+      `windowSplashScreen*` attributes — the template only set
+      `android:background="@drawable/splash"`, which is the pre-core-splashscreen
+      way and left the stock 480x320 Capacitor placeholder image showing on a
+      pale ground. Using a solid brand colour makes launch one continuous colour
+      into the app instead of a pale flash that swaps to dark.
+
+      `postSplashScreenTheme` is what the activity becomes after the splash;
+      without it the launch theme stayed applied. AppTheme.NoActionBar was
+      declared by the template and used by nothing until now.
+    -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/nuventSplashBackground</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:background">@color/nuventSplashBackground</item>
     </style>
 </resources>

@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback, useState } from 'react'
 
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { Spinner } from '@/components/ui/Spinner'
 import { LinkButton } from '@/components/ui/LinkButton'
 import {
   ShieldAlertIcon,
@@ -21,6 +20,8 @@ import {
   type VehicleForPacking,
   type LogisticsProposal,
 } from '@/lib/actions/logistics'
+import { traceFetch } from '@/lib/perf'
+import { useStableData } from '@/lib/use-stable-data'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -28,102 +29,141 @@ interface Props {
 }
 
 type Tab = 'arrivals' | 'departures'
-type Phase =
-  | { stage: 'loading' }
-  | { stage: 'ready'; legs: TravelLegForLogistics[]; vehicles: VehicleForPacking[]; proposal: LogisticsProposal | null; committed: boolean; commitError: string | null }
-  | { stage: 'error'; message: string }
-  | { stage: 'empty'; message: string }
+
+interface LogisticsData {
+  legs: TravelLegForLogistics[]
+  vehicles: VehicleForPacking[]
+  proposal: LogisticsProposal | null
+}
 
 export function LogisticsClient({ eventId }: Props) {
   const [tab, setTab] = useState<Tab>('arrivals')
-  const [phase, setPhase] = useState<Phase>({ stage: 'loading' })
   const [saving, setSaving] = useState(false)
-  const [loaded, setLoaded] = useState<Set<Tab>>(new Set())
+  const [committed, setCommitted] = useState(false)
+  const [commitError, setCommitError] = useState<string | null>(null)
 
-  const direction = tab === 'arrivals' ? 'arrival' : 'departure'
+  const loadFor = useCallback(
+    (dir: 'arrival' | 'departure'): Promise<LogisticsData | { empty: string }> =>
+      traceFetch(`logistics :: readData(${dir})`, async () => {
+        const [legs, vehicles] = await Promise.all([
+          readUnplacedTravelLegs(eventId, dir),
+          readAvailableVehicles(eventId),
+        ])
 
-  const load = useCallback(async (dir: 'arrival' | 'departure') => {
-    setPhase({ stage: 'loading' })
-    try {
-      const [legs, vehicles] = await Promise.all([
-        readUnplacedTravelLegs(eventId, dir),
-        readAvailableVehicles(eventId),
-      ])
+        if (legs.length === 0 || vehicles.length === 0) {
+          const msg = legs.length === 0 && vehicles.length === 0
+            ? 'No travel legs need transport and no vehicles are available.'
+            : legs.length === 0
+              ? `No ${dir} legs need transport right now.`
+              : 'No vehicles available — add vehicles to the fleet first.'
+          return { empty: msg }
+        }
 
-      if (legs.length === 0 || vehicles.length === 0) {
-        const msg = legs.length === 0 && vehicles.length === 0
-          ? 'No travel legs need transport and no vehicles are available.'
-          : legs.length === 0
-            ? `No ${dir} legs need transport right now.`
-            : 'No vehicles available — add vehicles to the fleet first.'
-        setPhase({ stage: 'empty', message: msg })
-        return
-      }
+        const proposal = await traceFetch(`logistics :: packTrips(${dir})`, () =>
+          packTrips(legs, vehicles),
+        )
+        return { legs, vehicles, proposal }
+      }),
+    [eventId],
+  )
 
-      const proposal = await packTrips(legs, vehicles)
-      setPhase({ stage: 'ready', legs, vehicles, proposal, committed: false, commitError: null })
-    } catch {
-      setPhase({ stage: 'error', message: 'Could not load logistics data.' })
-    }
-  }, [eventId])
+  // One cached fetch per direction, so flipping the arrivals/departures tabs
+  // renders from cache on the second visit instead of re-querying Supabase.
+  // The departure direction is mounted lazily — fetching both directions on
+  // first load would do ~12s of cumulative work just to show one tab.
+  const arrivals = useStableData<LogisticsData | { empty: string }>(
+    `logistics:arrival:${eventId}`,
+    () => loadFor('arrival'),
+  )
+  const departures = useStableData<LogisticsData | { empty: string }>(
+    `logistics:departure:${eventId}`,
+    () => loadFor('departure'),
+    // Mount only once the user opens the departures tab; until then the
+    // fetch would be wasted work on a screen nobody is looking at.
+    { disabled: tab !== 'departures' },
+  )
+
+  const active = tab === 'arrivals' ? arrivals : departures
 
   const handleTabSwitch = useCallback((newTab: Tab) => {
     setTab(newTab)
-    const newDir = newTab === 'arrivals' ? 'arrival' : 'departure'
-    if (!loaded.has(newTab)) {
-      setLoaded((prev) => new Set(prev).add(newTab))
-      load(newDir)
-    } else {
-      load(newDir)
-    }
-  }, [loaded, load])
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { load('arrival') }, [load])
+    setCommitted(false)
+    setCommitError(null)
+  }, [])
 
   const handleCommit = async () => {
-    if (phase.stage !== 'ready' || !phase.proposal) return
+    const data = active.data
+    if (!data || 'empty' in data || !data.proposal) return
     setSaving(true)
-    const result = await commitTrips(eventId, phase.proposal)
+    const result = await commitTrips(eventId, data.proposal)
     if (result.ok) {
-      setPhase({ ...phase, committed: true, commitError: null })
+      setCommitted(true)
+      setCommitError(null)
     } else {
-      setPhase({ ...phase, commitError: result.error })
+      setCommitError(result.error)
     }
     setSaving(false)
   }
 
-  if (phase.stage === 'loading') {
+  if (active.loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner size="md" />
+      <div className="flex flex-col gap-4">
+        <div>
+          <div className="h-6 w-32 rounded bg-rule-strong" />
+          <div className="mt-1.5 h-4 w-56 rounded bg-rule" />
+        </div>
+        <div className="flex rounded-xl border border-border bg-surface p-1">
+          <div className="h-11 flex-1 rounded-lg bg-rule" />
+          <div className="h-11 flex-1 rounded-lg" />
+        </div>
+        <div className="rounded-xl border border-border bg-surface px-4 py-3">
+          <div className="h-4 w-1/3 rounded bg-rule" />
+        </div>
+        {Array.from({ length: 3 }, (_, i) => (
+          <div key={i} className="rounded-2xl border border-border bg-surface p-4">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-2/5 rounded bg-rule-strong" />
+              <div className="h-5 w-14 rounded-full bg-rule" />
+            </div>
+            <div className="mt-2 h-4 w-1/3 rounded bg-rule" />
+            <div className="mt-3 space-y-1.5">
+              <div className="h-4 w-3/4 rounded bg-rule" />
+              <div className="h-4 w-2/3 rounded bg-rule" />
+              <div className="h-4 w-1/2 rounded bg-rule" />
+            </div>
+          </div>
+        ))}
       </div>
     )
   }
 
-  if (phase.stage === 'error') {
+  const data = active.data
+
+  if (active.error) {
     return (
       <EmptyState
         icon={<ShieldAlertIcon className="h-7 w-7" />}
         title="Could not load logistics"
-        description={phase.message}
-        action={<Button onClick={() => load(direction)}>Retry</Button>}
+        description="Could not load logistics data."
+        action={<Button onClick={active.reload}>Retry</Button>}
       />
     )
   }
 
-  if (phase.stage === 'empty') {
+  if (!data || 'empty' in data) {
+    const message =
+      data && 'empty' in data ? data.empty : 'No travel legs or vehicles on file yet.'
     return (
       <EmptyState
         icon={<UsersIcon className="h-7 w-7" />}
         title="Nothing to plan"
-        description={phase.message}
-        action={<Button onClick={() => load(direction)}>Refresh</Button>}
+        description={message}
+        action={<Button onClick={active.reload}>Refresh</Button>}
       />
     )
   }
 
-  const { proposal, committed, commitError } = phase
+  const { proposal } = data
 
   return (
     <div className="flex flex-col gap-4">
@@ -144,10 +184,10 @@ export function LogisticsClient({ eventId }: Props) {
             type="button"
             onClick={() => handleTabSwitch(t)}
             className={cn(
-              'tap flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
+              'tap flex min-h-12 flex-1 items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold transition-colors active:opacity-80',
               tab === t
                 ? 'bg-brand text-brand-fg'
-                : 'text-muted hover:text-fg',
+                : 'text-muted hover:text-fg active:bg-surface-2',
             )}
           >
             {t === 'arrivals' ? 'Arrivals' : 'Departures'}

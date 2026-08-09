@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { PhoneIcon } from '@/components/icons'
+import { Badge } from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Spinner'
-import { ListRow } from '@/components/ui/ListRow'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { claimGroupAction } from '@/lib/actions/queue'
 import { rsvpStatusLabel } from '@/lib/rsvp'
-import { statusTone } from '@/lib/status'
+import { statusTone, type StatusTone } from '@/lib/status'
 import { cn, formatDateTime } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -20,15 +21,30 @@ export interface QueueRowProps {
 }
 
 /**
- * One family in the calling queue. The whole row is the tap target — always
- * tappable, locked or not, because `claim_group()` is re-entrant for its
- * current holder. The server decides whether the tap wins; this component
- * just relays the answer.
+ * The leading-edge rule. Only the two ends of the funnel earn a colour:
+ * confirmed (done with) and unreachable/declined (a live gap). Everything
+ * in between is work in progress and gets the neutral rule — if four of
+ * seven statuses light up the edge, the edge has stopped saying anything.
+ */
+const EDGE_TONES: Record<string, StatusTone> = {
+  confirmed: 'done',
+  declined: 'attention',
+  unreachable: 'attention',
+}
+
+/**
+ * One family in the calling queue.
  *
- * The family name is the one thing on this row that matters, so it is the
- * display face at 18px — readable at arm's length by a caller with a phone
- * against one ear. The figures (pax, attempts, callback time) are tabular
- * mono so a column of them lines up.
+ * The whole card is the tap target — always tappable, locked or not,
+ * because `claim_group()` is re-entrant for its current holder. The server
+ * decides whether the tap wins; this component just relays the answer.
+ *
+ * The call button inside it is deliberately a second, smaller target on the
+ * same destination rather than a `tel:` shortcut: the row must write a
+ * `call_attempts` row BEFORE the dialer backgrounds the WebView (see the
+ * call screen), so there is no path from this list straight to the phone
+ * app. What it buys is a thumb-sized affordance that says "this row is a
+ * phone call" without the caller having to know the whole card is live.
  */
 export function QueueRow({ row, eventCode }: QueueRowProps) {
   const router = useRouter()
@@ -37,11 +53,16 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
 
   const groupId = row.group_id
   const headName = row.head_name?.trim() || 'Unnamed family'
+  const mobile = row.primary_mobile?.trim() || null
+  const side = row.side?.trim() || null
   const pax = row.confirmed_pax ?? row.expected_pax ?? 0
   const status = row.rsvp_status ?? 'not_started'
   const attemptCount = row.attempt_count ?? 0
   const isLocked = row.is_locked ?? false
   const nextCallbackAt = row.next_callback_at
+
+  const edge = EDGE_TONES[status] ?? 'neutral'
+  const disabled = !groupId || pending
 
   async function handleTap() {
     if (!groupId || pending) return
@@ -60,40 +81,73 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
     setConflict(result.message)
   }
 
-  const meta = (
-    <>
-      <span>
-        <span className="font-mono tabular-nums">{pax}</span> pax
-      </span>
-      {' · '}
-      <span>
-        <span className="font-mono tabular-nums">{attemptCount}</span>{' '}
-        {attemptCount === 1 ? 'attempt' : 'attempts'}
-      </span>
-      {isLocked ? <span> · Locked</span> : null}
-      {nextCallbackAt ? (
-        <span> · Callback {formatDateTime(nextCallbackAt)}</span>
-      ) : null}
-    </>
-  )
-
   return (
-    <div className="flex flex-col gap-1.5">
-      <ListRow
-        identifier={headName}
-        meta={meta}
-        right={
-          <StatusPill tone={statusTone(status)}>{rsvpStatusLabel(status)}</StatusPill>
-        }
-        onPress={handleTap}
-        disabled={!groupId || pending}
+    <div
+      className={cn(
+        'list-fade overflow-hidden rounded-xl border border-rule bg-surface',
+        edge === 'done' && 'border-l-[3px] border-l-ledger-green',
+        edge === 'attention' && 'border-l-[3px] border-l-ledger-red',
+        edge === 'neutral' && 'border-l-[3px] border-l-rule-strong',
+        disabled && pending && 'opacity-70',
+      )}
+    >
+      <button
+        type="button"
+        onClick={handleTap}
+        disabled={disabled}
         aria-busy={pending || undefined}
+        className="tap w-full px-3.5 py-3.5 text-left transition-colors duration-press ease-ledger active:bg-surface-2 disabled:cursor-not-allowed"
       >
-        {pending ? <Spinner size="sm" label="Claiming" /> : null}
-      </ListRow>
+        <div className="flex items-start justify-between gap-2.5">
+          <div className="min-w-0">
+            {/* Sans, not the display serif — these names arrive in
+                Devanagari off the sheet and Cormorant has no Devanagari. */}
+            <span className="block text-lg leading-snug font-medium text-ink">
+              {headName}
+            </span>
+            {mobile ? (
+              <span className="mt-0.5 block font-mono text-sm text-muted tabular-nums">
+                {mobile}
+              </span>
+            ) : null}
+          </div>
+
+          <span
+            aria-hidden
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-brand/45 bg-brand-tint text-brand"
+          >
+            {pending ? <Spinner size="sm" label={null} /> : <PhoneIcon className="h-5 w-5" />}
+          </span>
+        </div>
+
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          {side ? <Badge>{side}</Badge> : null}
+          <span className="figure text-sm text-ink">{pax} pax</span>
+          <span className="figure text-sm text-muted">
+            · {attemptCount} {attemptCount === 1 ? 'attempt' : 'attempts'}
+          </span>
+          <StatusPill tone={statusTone(status)} className="ml-auto">
+            {rsvpStatusLabel(status)}
+          </StatusPill>
+        </div>
+
+        {/* Secondary facts get their own ruled line so the chip row above
+            keeps the same height on every card in the register. */}
+        {isLocked || nextCallbackAt ? (
+          <div className="mt-2.5 flex flex-wrap gap-x-3 border-t border-rule pt-2.5 font-mono text-xs text-brand">
+            {isLocked ? <span>Locked by another caller</span> : null}
+            {nextCallbackAt ? (
+              <span>Callback {formatDateTime(nextCallbackAt)}</span>
+            ) : null}
+          </div>
+        ) : null}
+      </button>
 
       {conflict ? (
-        <p role="alert" className={cn('px-1 text-sm font-medium text-muted')}>
+        <p
+          role="alert"
+          className="border-t border-ledger-red/25 bg-red-tint px-3.5 py-2.5 text-sm font-medium text-ledger-red"
+        >
           {conflict}
         </p>
       ) : null}

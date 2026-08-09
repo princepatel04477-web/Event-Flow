@@ -1,16 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { UploadIcon, InboxIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
+import { staggerDelay } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { LoadingRows } from '@/components/ui/LoadingRows'
-import { SectionHead } from '@/components/ui/SectionHead'
+import { PageTitle } from '@/components/ui/PageTitle'
 import { createClient } from '@/lib/supabase/client'
+import { traceFetch } from '@/lib/perf'
 import { QueueFilters } from './QueueFilters'
 import { QueueRow, type QueueGroupRow } from './QueueRow'
 import {
@@ -103,9 +104,11 @@ export function QueueBoard({ eventId, eventCode, canImport }: QueueBoardProps) {
         query = query.order('next_callback_at', { ascending: true })
       }
 
-      const { data, error } = await query
-        .order('priority', { ascending: false })
-        .order('head_name', { ascending: true })
+      const { data, error } = await traceFetch('queue :: v_rsvp_queue', () =>
+        query
+          .order('priority', { ascending: false })
+          .order('head_name', { ascending: true }),
+      )
 
       if (cancelled) return
 
@@ -177,12 +180,43 @@ export function QueueBoard({ eventId, eventCode, canImport }: QueueBoardProps) {
   const filtersActive = hasActiveFilters(filters)
   const rows = state.phase === 'ready' ? state.rows : state.phase === 'error' ? state.rows : null
 
+  // Progress across the whole calling list. Suppressed while a filter is on:
+  // the denominator would then be "families matching this filter", and a
+  // progress bar whose denominator moves when you tap a chip is a bar that
+  // lies. Better no bar than a wrong one.
+  const progress =
+    !filtersActive && rows !== null && rows.length > 0
+      ? {
+          contacted: rows.filter((r) => (r.rsvp_status ?? 'not_started') !== 'not_started')
+            .length,
+          total: rows.length,
+        }
+      : null
+
   return (
     <div className="flex flex-col gap-4">
-      <SectionHead
-        eyebrow="Calling queue"
-        title="Families to call"
-      />
+      <PageTitle right="Priority ↓">Call queue</PageTitle>
+
+      {progress ? (
+        <div>
+          <p className="flex items-baseline gap-2">
+            <span className="figure text-base font-medium text-brand">
+              {progress.contacted} of {progress.total}
+            </span>
+            <span className="text-sm text-muted">contacted</span>
+          </p>
+          <div
+            className="mt-2.5 h-1 overflow-hidden rounded-full bg-surface-2"
+            role="img"
+            aria-label={`${progress.contacted} of ${progress.total} families contacted`}
+          >
+            <div
+              className="h-full rounded-full bg-linear-to-r from-brand to-ledger-green transition-[width] duration-500 ease-ledger"
+              style={{ width: `${(progress.contacted / progress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <QueueFilters filters={filters} onChange={handleFilterChange} />
 
@@ -235,37 +269,28 @@ export function QueueBoard({ eventId, eventCode, canImport }: QueueBoardProps) {
           />
         )
       ) : (
-        <ol
-          className="list-fade relative ml-3 flex flex-col gap-px"
-          aria-label="Families to call"
-        >
-          {/* The ledger's margin rule: one continuous red line down the
-              leading edge of the list. Attention states break into it.
-              The 12px left margin gives the band room to read as ruled
-              paper, not a border. */}
-          <span
-            aria-hidden
-            className="absolute top-1 bottom-1 -left-3 w-0.5 rounded-full bg-ledger-red"
-          />
-          {rows.map((row, index) => (
-            <li key={row.group_id ?? `${row.head_name}-${row.primary_mobile}`}>
-              <ListRowWrap banded={index % 2 === 1}>
+        <>
+          <ol className="flex flex-col gap-2.5" aria-label="Families to call">
+            {rows.map((row, index) => (
+              <li
+                key={row.group_id ?? `${row.head_name}-${row.primary_mobile}`}
+                style={staggerDelay(index)}
+              >
                 <QueueRow row={row} eventCode={eventCode} />
-              </ListRowWrap>
-            </li>
-          ))}
-        </ol>
+              </li>
+            ))}
+          </ol>
+
+          {/* The one thing about this screen worth knowing, said once at the
+              bottom rather than in a tooltip nobody opens. */}
+          <p className="pt-1 text-center text-xs leading-relaxed text-muted">
+            Attempt count is counted, never stored — two offline phones cannot drift
+            it.
+          </p>
+        </>
       )}
     </div>
   )
-}
-
-/**
- * The alternating paper band lives on the list item, not inside QueueRow:
- * the row itself is one shape everywhere; the list decides the banding.
- */
-function ListRowWrap({ banded, children }: { banded: boolean; children: ReactNode }) {
-  return <div className={banded ? 'bg-paper-band' : 'bg-paper'}>{children}</div>
 }
 
 export default QueueBoard

@@ -5,13 +5,13 @@ updated: 2026-08-02
 
 # Supabase Project
 
-Back to [[EventFlow]].
+Back to [[Nuvent]].
 
 ## The project
 
 | | |
 |---|---|
-| Name | EventFlow |
+| Name | Nuvent |
 | Ref | `xktxnkuzplhzxkevwrcj` |
 | Org | Varunya Technologies (`cuwsovksnpfsoaonyteg`) |
 | Region | ap-northeast-2 |

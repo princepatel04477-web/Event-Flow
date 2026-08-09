@@ -6,7 +6,7 @@ status: locked
 
 # Stack Decisions
 
-Back to [[EventFlow]].
+Back to [[Nuvent]].
 
 > [!warning] Locked
 > These are settled. Do not re-open them mid-build; the deadline has no room for a stack change.

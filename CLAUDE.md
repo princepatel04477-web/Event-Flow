@@ -61,7 +61,7 @@ Supabase project (cloud):
 
 | | |
 |---|---|
-| Project | EventFlow |
+| Project | Nuvent |
 | Ref | `xktxnkuzplhzxkevwrcj` |
 | Org | Varunya Technologies (`cuwsovksnpfsoaonyteg`) |
 | Region | ap-northeast-2 |
@@ -94,43 +94,62 @@ this section is the first place a new session looks.
 **Mode: REMOTE SHELL (M2-ALT).** The static-export audit returned HEAVY, so the APK is a
 native shell over the deployed site, not a static bundle. **Offline support is NOT available
 in this mode** — venue Wi-Fi is a single point of failure until M9 lands a client data layer.
-The deployed URL is a placeholder in `capacitor.config.ts` (`<DEPLOYED_APP_URL>`) — set
-`CAP_REMOTE_URL` (or edit the config) before building the release APK.
+The WebView URL comes from **`CAP_SERVER_URL`** (there is no `CAP_REMOTE_URL`; that name
+appeared only in this file). It defaults to `http://localhost:3000`, and `<DEPLOYED_APP_URL>`
+is still a placeholder — set `CAP_SERVER_URL` before building the release APK.
 
-**Toolchain (working as of Aug 2026):** JDK 26 at `C:\Program Files\Java\jdk-26.0.2`, Android
-SDK at `C:\Users\rebel\AppData\Local\Android\Sdk`, Android Studio JBR (25). The Gradle wrapper
-was bumped to **9.4.0** (8.14.3 cannot run on Java 26). `android/gradle.properties` pins
-`org.gradle.java.home` to Gradle's auto-downloaded **Temurin 21** and enables toolchain
-auto-download — the locally-installed JDK 26 is too new for AGP 8.13's `JdkImageTransform`.
-Do not revert those three settings or the build breaks.
+#### Running it on a phone — read this before anything else
 
 ```bash
-# find LAN IP (the machine running next dev)
-#   Windows:  ipconfig | findstr IPv4
-#   macOS:    ipconfig getifaddr en0
-#   Linux:    hostname -I
-export CAP_DEV_HOST=192.168.1.42
-
-# build the debug APK (env vars must be set in the same shell)
-set JAVA_HOME=C:\Program Files\Java\jdk-26.0.2
-set ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk
-set ANDROID_SDK_ROOT=%LOCALAPPDATA%\Android\Sdk
-cd android && gradlew.bat assembleDebug      # -> app/build/outputs/apk/debug/app-debug.apk
-
-# live reload on handset (M5): edits show up ~2s, no APK rebuild
-npm run mobile:dev
-
-# production: point capacitor.config.ts at the real URL, then
-npm run mobile            # next build + cap sync android
-cd android && gradlew.bat assembleRelease    # -> app/build/outputs/apk/release/app-release-unsigned.apk
+npm run mobile:dev        # the ONLY supported way to run on a handset
 ```
 
-Debug vs release: `capacitor.config.dev.ts` enables cleartext for LAN http. The release
-manifest must never contain `usesCleartextTraffic` — grep `android/app/src/main/AndroidManifest.xml`
-before shipping.
+That script (`scripts/mobile-dev.mjs`) detects the LAN IP, starts `next dev` on 0.0.0.0,
+waits for it to answer, rebuilds + installs **only if the baked URL changed**, and launches
+`com.nuvent.app/.MainActivity`. Override the IP with `CAP_DEV_HOST` if auto-detection picks a
+virtual adapter.
+
+**Do NOT open the LAN URL in the phone's browser, and do NOT run
+`adb shell am start -a android.intent.action.VIEW -d http://...`.** Both give you a Chrome tab,
+not the app. In a browser tab there is no native bridge, so `Capacitor.isNativePlatform()` is
+false, the `Call` plugin does not exist, and dialing degrades to browser behaviour. This has
+cost the project a full debugging session already — see "Known traps".
+
+`npm run mobile:launch` just re-launches the installed APK without touching the build.
+
+**Toolchain (verified Aug 2026):** the only JDK installed is **JDK 17** at
+`C:\Program Files\Java\jdk-17` — an earlier note here claimed JDK 26 at `jdk-26.0.2`, which
+does not exist on this machine. JAVA_HOME only launches the Gradle wrapper; the build itself
+runs on the Temurin 21 pinned by `org.gradle.java.home` in `android/gradle.properties`
+(auto-downloaded to `~/.gradle/jdks`). Android SDK at
+`C:\Users\rebel\AppData\Local\Android\Sdk`. Gradle wrapper **9.4.0**. Do not revert the
+`gradle.properties` toolchain settings or the build breaks.
+
+```bash
+# manual debug build (mobile:dev does this for you)
+export JAVA_HOME="C:/Program Files/Java/jdk-17"
+export ANDROID_HOME="$LOCALAPPDATA/Android/Sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+cd android && ./gradlew.bat assembleDebug    # -> app/build/outputs/apk/debug/app-debug.apk
+
+# production: set the real URL, then
+CAP_SERVER_URL=https://<real-host> npm run mobile   # next build + cap sync android
+cd android && ./gradlew.bat assembleRelease
+```
+
+If `adb install` fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, the installed build was
+signed with a different debug keystore — `adb uninstall com.nuvent.app` first. That clears the
+session, so the phone needs one re-login.
+
+Debug vs release cleartext: **`android/app/src/debug/AndroidManifest.xml`** adds
+`usesCleartextTraffic` and is merged into debug builds only. (An earlier note credited
+`capacitor.config.dev.ts` — that file was orphaned, read by nothing, and has been deleted.)
+The release manifest must never contain `usesCleartextTraffic` — grep the **merged** manifest
+under `android/app/build/intermediates/merged_manifest/` before shipping, not just the source.
 
 Native code (M6 dialer, M7 recorder, M8 camera proof) lives in
-`android/app/src/main/java/com/eventops/app/`. Any change there requires a full APK rebuild —
+`android/app/src/main/java/com/nuvent/app/` — the package was renamed from `com.eventops.app`.
+Any change there, to `AndroidManifest.xml`, or to the plugin list requires a full APK rebuild —
 OTA (M11) ships JS/HTML/CSS only.
 
 ### Release build (M10) — run on a machine with Android Studio + JDK
@@ -223,6 +242,21 @@ Enforced at the **database level**, not in application code. Do not weaken them.
    only a human-reviewed commit becomes data. Fields below ~0.8 confidence render amber.
    Nothing auto-writes. `apply_rsvp_extraction()` is the only path from AI output into
    guest data.
+9. **Paired attribution columns — `_staff` siblings.** A code-auth (team) session has no
+   `auth.uid()`; its identity is the selected `staff_members.id`. Every attribution column
+   (`locked_by`, `caller_id`, `created_by`, `uploaded_by`, `assigned_by`, `imported_by`)
+   therefore has a nullable `_staff` sibling (`locked_by_staff`, `caller_id_staff`, ...) with
+   `ON DELETE RESTRICT` to `staff_members(id)`. `delivery_proofs` set the precedent
+   (`captured_by` + `captured_by_staff`). Rules:
+   - A `CHECK` (`num_nonnulls(pair) <= 1`, or `= 1` where the column was NOT NULL) makes
+     double-attribution impossible — "who did this" is always answerable.
+   - A `BEFORE INSERT` trigger (`app.route_attribution`) writes the staff column for a
+     team session (`jwt_staff_member_id` present) and the auth column for an admin.
+   - `claim_group` / `release_group` write/clear the lock pair.
+   - Read paths (the call/RSVP "in-flight" checks, "you" labels, the export's `deliveredBy`)
+     resolve whichever column is populated — never assume one.
+   - Do NOT re-point these to a single FK: a team id is not an auth user and vice versa
+     (the original `23503`). Add a sibling column, don't drop the FK.
 
 ---
 
@@ -402,7 +436,7 @@ Verified against the migrations. Do not go looking for things in this list — t
   capacity guard fires, two callers can't lock the same group.
 
 Both were verified against a Postgres 16 instance. **Neither has been applied to the live
-EventFlow project**, which runs Postgres 17 — re-run `test_security.sql` there after the
+Nuvent project**, which runs Postgres 17 — re-run `test_security.sql` there after the
 first `db push`.
 
 **Next up**
@@ -437,6 +471,32 @@ first `db push`.
   It is why the native Capacitor module exists.
 - **`delivery_proofs` insert requires `captured_by = auth.uid()`** in the RLS check. Setting
   it to anyone else fails, even for an admin.
+- **A browser tab is not the app, and it silently fakes being one.** Opening the LAN URL in
+  Chrome (or `am start -a VIEW -d <url>`) looks like the product but has no native bridge.
+  Always launch via `npm run mobile:dev`. See "Running it on a phone" above.
+- **`window.Capacitor` exists in the browser too.** `@capacitor/core` installs the global
+  everywhere, so `Boolean(window.Capacitor)` is NOT a native check — it was true in Chrome and
+  five call sites branched on it. Use `isNativePlatform()` from `src/lib/native/platform.ts`
+  (wraps `Capacitor.isNativePlatform()`).
+- **Never fire `tel:` from `window.open()`.** Two reasons: `'_system'` is a Cordova target that
+  Capacitor 8 does not implement, and the dial happens *after* `await startCallAttempt(...)`,
+  which expires the transient user activation — so the browser blocks it as a popup. **A blocked
+  popup returns `null`, it does not throw**, so a `try/catch` fallback never runs and the tap
+  silently does nothing. Go through `openExternalUrl()` in `src/lib/native/navigation.ts`
+  (AppLauncher on native, `location.href` on web).
+- **`<queries>` is required for `tel:` on API 30+.** This app targets 36. Without the
+  `<queries>` block in `AndroidManifest.xml`, `resolveActivity()` returns null even though a
+  dialer is installed, and the dial fails with nothing in logcat.
+- **`allowNavigation` is an allowlist of hosts the WebView MAY navigate to itself** — it is not
+  a way to mark URLs as "hand to the OS". It once listed `tel:*`/`mailto:*` with a comment
+  claiming the opposite. It IS how you stop the LAN dev URL from opening in the system browser
+  when `androidScheme` is `https` and `server.url` is `http`.
+- **`set VAR=value ` in cmd.exe keeps the trailing space.** `CAP_SERVER_URL` was baked into
+  `capacitor.config.json` as `"http://192.168.29.44:3000 "`. Capacitor `Uri.parse()`s it
+  unmodified. The config now `.trim()`s; do not remove that.
+- **npm scripts run through cmd.exe on Windows, where `&` is sequential, not backgrounding.**
+  `"next dev & npx cap run android"` started the server and never launched anything. Use a
+  Node script (`scripts/mobile-dev.mjs`), not shell backgrounding.
 
 ---
 

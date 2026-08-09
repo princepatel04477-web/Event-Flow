@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { SectionHead } from '@/components/ui/SectionHead'
+import { isNativePlatform } from '@/lib/native/platform'
 import { queuedProofCount, stuckProofs, type QueuedProof } from '@/lib/proof-queue'
 import { supabase } from '@/lib/supabase/client'
 
@@ -36,7 +37,10 @@ export default function DebugPage() {
 
   useEffect(() => {
     async function load() {
-      const isNative = Boolean((window as any).Capacitor)
+      // Not `Boolean(window.Capacitor)` — that global exists in browsers too,
+      // so the debug screen reported every browser as native and then called
+      // App.getInfo(), which only resolves in the APK.
+      const isNative = isNativePlatform()
 
       let appVersion = 'web'
       let capacitorVersion = 'web'

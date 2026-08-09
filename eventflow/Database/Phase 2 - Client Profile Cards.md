@@ -5,7 +5,7 @@ updated: 2026-08-02
 
 # Phase 2 — Client Profile Cards
 
-Back to [[EventFlow]]. Current position within Phase 2.
+Back to [[Nuvent]]. Current position within Phase 2.
 
 ## What's built
 

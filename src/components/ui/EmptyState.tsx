@@ -43,7 +43,10 @@ export function EmptyState({
         </span>
       ) : null}
 
-      <h2 className="font-display text-lg text-ink text-balance">{title}</h2>
+      {/* Sans, not the display serif — see the note in ErrorState. The three
+          places Cormorant is allowed are screen titles, the couple's names
+          and the seal. */}
+      <h2 className="text-lg font-medium text-balance text-ink">{title}</h2>
 
       {description ? (
         <p className="max-w-sm text-base leading-relaxed text-muted text-pretty">

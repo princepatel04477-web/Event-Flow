@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
 import { resolveEventByCode, requireStaff } from '@/lib/supabase/queries'
-import { DeparturesClient } from './DeparturesClient'
+import { DeparturesBoard } from './DeparturesBoard'
 
 export const metadata: Metadata = {
   title: 'Departures',
@@ -19,5 +19,5 @@ export default async function DeparturesPage({ params }: PageProps) {
 
   await requireStaff(event.id, event.code)
 
-  return <DeparturesClient eventId={event.id} eventCode={event.code} />
+  return <DeparturesBoard eventId={event.id} eventCode={event.code} />
 }

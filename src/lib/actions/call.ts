@@ -258,7 +258,7 @@ export async function releaseGroupAfterCall(
 
   const { data } = await supabase
     .from('guest_groups')
-    .select('locked_by, locked_until')
+    .select('locked_by, locked_by_staff, locked_until')
     .eq('id', groupId)
     .eq('event_id', eventId)
     .maybeSingle()
@@ -266,7 +266,9 @@ export async function releaseGroupAfterCall(
   revalidatePath(`/${eventCode}/queue`)
 
   const stillLocked = Boolean(
-    data?.locked_by && data.locked_until && new Date(data.locked_until).getTime() > Date.now(),
+    (data?.locked_by || data?.locked_by_staff) &&
+      data.locked_until &&
+      new Date(data.locked_until).getTime() > Date.now(),
   )
 
   if (stillLocked) {

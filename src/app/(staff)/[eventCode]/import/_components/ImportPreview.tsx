@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { LinkButton } from '@/components/ui/LinkButton'
 import type { ImportContext } from '@/lib/actions/import'
-import type { KnownSheetFailure, KnownSheetOutcome } from '@/lib/import/knownSheet'
+import type { ImportOutcome, KnownSheetFailure } from '@/lib/import/knownSheet'
 
 import { PreviewStep } from './PreviewStep'
 import { UploadStep } from './UploadStep'
@@ -40,10 +40,10 @@ export function ImportPreview({
   context,
 }: ImportPreviewProps) {
   const [fileName, setFileName] = useState('')
-  const [outcome, setOutcome] = useState<KnownSheetOutcome | null>(null)
+  const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  function handleResult(name: string, next: KnownSheetOutcome) {
+  function handleResult(name: string, next: ImportOutcome) {
     setFileName(name)
     setOutcome(next)
     setError(null)

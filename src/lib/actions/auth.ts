@@ -1,10 +1,12 @@
 'use server'
 
+import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase/server'
 import { safeRedirectPath } from '@/lib/utils'
+import { CODE_AUTH_COOKIE, STAFF_MEMBER_COOKIE } from '@/lib/auth/cookies'
 
 /**
  * Shape returned to the login form by `useActionState`.
@@ -54,11 +56,16 @@ export async function signIn(
 /**
  * Sign out and return to /login.
  *
- * Safe to use directly as a `<form action={signOut}>` target.
+ * Clears both the GoTrue session (admin) and the code-auth cookie
+ * (team/client). Safe to use directly as a `<form action={signOut}>`.
  */
 export async function signOut(): Promise<void> {
   const supabase = await createClient()
   await supabase.auth.signOut()
+
+  const cookieStore = await cookies()
+  cookieStore.delete(CODE_AUTH_COOKIE)
+  cookieStore.delete(STAFF_MEMBER_COOKIE)
 
   revalidatePath('/', 'layout')
   redirect('/login')

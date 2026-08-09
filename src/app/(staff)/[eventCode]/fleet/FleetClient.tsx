@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 
-import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
+import { PageTitle } from '@/components/ui/PageTitle'
+import { StatusPill } from '@/components/ui/StatusPill'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { Spinner } from '@/components/ui/Spinner'
 import { CarIcon, PlusIcon, ShieldAlertIcon } from '@/components/icons'
 import {
   readFleet,
@@ -15,41 +15,35 @@ import {
   type FleetData,
   type VehicleRow,
 } from '@/lib/actions/fleet'
+import { useStableData } from '@/lib/use-stable-data'
+import type { StatusTone } from '@/lib/status'
+import { traceFetch } from '@/lib/perf'
 
 interface Props {
   eventId: string
 }
 
-type Phase =
-  | { stage: 'loading' }
-  | { stage: 'ready'; data: FleetData; actionError: string | null }
-  | { stage: 'error'; message: string }
-
-const STATUS_META: Record<string, { label: string; tone: 'success' | 'warning' | 'neutral' }> = {
-  available: { label: 'Available', tone: 'success' },
-  assigned: { label: 'Assigned', tone: 'warning' },
-  unavailable: { label: 'Unavailable', tone: 'neutral' },
+/**
+ * Assigned is the ACTIVE tone, not a warning: a vehicle with a trip on it
+ * is the system working. Unavailable is the one that needs eyes — a
+ * vehicle you were counting on that cannot move is a gap in the plan.
+ */
+const STATUS_META: Record<string, { label: string; tone: StatusTone }> = {
+  available: { label: 'Available', tone: 'done' },
+  assigned: { label: 'Assigned', tone: 'active' },
+  unavailable: { label: 'Unavailable', tone: 'attention' },
 }
 
 export function FleetClient({ eventId }: Props) {
-  const [phase, setPhase] = useState<Phase>({ stage: 'loading' })
   const [showAdd, setShowAdd] = useState(false)
   const [quickCounts, setQuickCounts] = useState<Record<string, number>>({})
   const [actionError, setActionError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(async () => {
-    setPhase({ stage: 'loading' })
-    try {
-      const data = await readFleet(eventId)
-      setPhase({ stage: 'ready', data, actionError: null })
-    } catch {
-      setPhase({ stage: 'error', message: 'Could not load fleet data.' })
-    }
-  }, [eventId])
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void load() }, [load])
+  const { data, loading, error, reload } = useStableData<FleetData>(
+    `fleet:${eventId}`,
+    () => traceFetch('fleet :: readFleet', () => readFleet(eventId)),
+  )
 
   const handleQuickAdd = async (typeId: string | null) => {
     const count = quickCounts[typeId ?? '__none__'] ?? 1
@@ -58,7 +52,7 @@ export function FleetClient({ eventId }: Props) {
     const result = await quickAddVehicles(eventId, typeId, count, null)
     if (result.ok) {
       setQuickCounts((prev) => ({ ...prev, [typeId ?? '__none__']: 0 }))
-      await load()
+      await reload()
     } else {
       setActionError(result.error)
     }
@@ -69,43 +63,49 @@ export function FleetClient({ eventId }: Props) {
     setSaving(true)
     const result = await deleteVehicle(vehicleId)
     if (result.ok) {
-      await load()
+      await reload()
     } else {
       setActionError(result.error)
     }
     setSaving(false)
   }
 
-  if (phase.stage === 'loading') {
+  if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner size="md" />
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-6 w-24 rounded bg-rule-strong" />
+            <div className="mt-1.5 h-4 w-32 rounded bg-rule" />
+          </div>
+          <div className="h-11 w-20 rounded-xl bg-rule" />
+        </div>
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="rounded-2xl border border-border bg-surface p-4">
+            <div className="h-5 w-2/5 rounded bg-rule-strong" />
+            <div className="mt-2 h-4 w-1/4 rounded bg-rule" />
+            <div className="mt-2 h-4 w-1/3 rounded bg-rule" />
+          </div>
+        ))}
       </div>
     )
   }
 
-  if (phase.stage === 'error') {
+  if (error || !data) {
     return (
       <EmptyState
         icon={<ShieldAlertIcon className="h-7 w-7" />}
         title="Could not load fleet"
-        description={phase.message}
-        action={<Button onClick={load}>Retry</Button>}
+        description={error instanceof Error ? error.message : 'Could not load fleet data.'}
+        action={<Button onClick={reload}>Retry</Button>}
       />
     )
   }
 
-  const { data } = phase
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-fg">Fleet</h2>
-          <p className="mt-0.5 text-sm text-muted">
-            {data.vehicles.length} vehicle{data.vehicles.length !== 1 ? 's' : ''} on the ground
-          </p>
-        </div>
+        <PageTitle right={`${data.vehicles.length} on the ground`}>Fleet</PageTitle>
         <Button
           variant="secondary"
           size="md"
@@ -116,10 +116,18 @@ export function FleetClient({ eventId }: Props) {
         </Button>
       </div>
 
+      <p className="text-sm leading-snug text-muted">
+        Capacity shown is people carried <span className="text-brand">with luggage</span>, not
+        the sticker seat count.
+      </p>
+
       {actionError && (
-        <div className="rounded-xl border border-tint-danger bg-tint-danger px-4 py-3 text-sm text-danger">
+        <p
+          role="alert"
+          className="rounded-xl border border-ledger-red/40 bg-red-tint px-3.5 py-3 text-sm text-ledger-red"
+        >
           {actionError}
-        </div>
+        </p>
       )}
 
       {/* Quick-add panel */}
@@ -217,10 +225,11 @@ export function FleetClient({ eventId }: Props) {
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {data.vehicles.map((v) => (
+          {data.vehicles.map((v, i) => (
             <VehicleCard
               key={v.id}
               vehicle={v}
+              index={i}
               onRemove={() => handleRemove(v.id)}
               removing={saving}
             />
@@ -231,69 +240,105 @@ export function FleetClient({ eventId }: Props) {
   )
 }
 
+/**
+ * One vehicle.
+ *
+ * The registration is set like a numberplate — mono, brass, letter-spaced —
+ * because in the car park that string is how a driver is found, not the
+ * label. The capacity figure is the luggage-adjusted one and the sticker
+ * count is demoted to a struck-through aside: a 20-seater traveller carries
+ * 17 people once their suitcases are in, and dispatching to the sticker
+ * number is how a family gets left standing at the airport.
+ */
 function VehicleCard({
   vehicle,
+  index,
   onRemove,
   removing,
 }: {
   vehicle: VehicleRow
+  index: number
   onRemove: () => void
   removing: boolean
 }) {
   const status = STATUS_META[vehicle.status] ?? STATUS_META.available
 
   return (
-    <Card>
-      <CardBody>
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center gap-2">
-              <h3 className="font-semibold text-fg">{vehicle.label ?? 'Unnamed'}</h3>
-              <Badge tone={status.tone} size="sm">
-                {status.label}
-              </Badge>
-            </div>
-
-            <div className="flex flex-col gap-0.5">
-              <p className="flex items-center gap-1.5 text-sm text-fg">
-                <span className="font-semibold tabular-nums">{vehicle.capacity}</span>
-                <span className="text-muted">with luggage</span>
-                {vehicle.seatLabel && (
-                  <span className="text-subtle text-xs">({vehicle.seatLabel})</span>
-                )}
-              </p>
-
-              {vehicle.driverName && (
-                <p className="text-sm text-muted">
-                  Driver: {vehicle.driverName}
-                  {vehicle.driverMobile ? ` · ${vehicle.driverMobile}` : ''}
-                </p>
-              )}
-
-              {vehicle.vendorName && (
-                <p className="text-sm text-muted">
-                  Vendor: {vehicle.vendorName}
-                  {vehicle.rateNote ? ` · ${vehicle.rateNote}` : ''}
-                </p>
-              )}
-
-              {vehicle.registrationNo && (
-                <p className="text-xs text-subtle">{vehicle.registrationNo}</p>
-              )}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            disabled={removing}
-            onClick={onRemove}
-            className="tap shrink-0 rounded-lg px-2 py-1 text-xs text-muted hover:text-danger disabled:opacity-55"
-          >
-            Remove
-          </button>
+    <div
+      style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+      className="list-fade rounded-xl border border-rule bg-surface p-3.5"
+    >
+      <div className="flex items-start justify-between gap-2.5">
+        <div className="min-w-0">
+          <h3 className="text-base leading-snug font-medium text-ink">
+            {vehicle.label ?? 'Unnamed'}
+          </h3>
+          {vehicle.registrationNo ? (
+            <p className="mt-1 font-mono text-sm tracking-[0.08em] text-brand">
+              {vehicle.registrationNo}
+            </p>
+          ) : null}
         </div>
-      </CardBody>
-    </Card>
+        <StatusPill tone={status.tone}>
+          {status.label}
+        </StatusPill>
+      </div>
+
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className="figure text-2xl leading-none font-medium text-ink">
+          {vehicle.capacity}
+        </span>
+        <span className="text-sm text-muted">
+          carried <span className="text-brand">with luggage</span>
+        </span>
+        {vehicle.seatLabel ? (
+          <span className="figure ml-auto text-xs text-muted line-through decoration-muted/60">
+            {vehicle.seatLabel}
+          </span>
+        ) : null}
+      </div>
+
+      {vehicle.driverName || vehicle.vendorName ? (
+        <dl className="mt-3 flex flex-col gap-1.5 border-t border-rule pt-3 text-sm">
+          {vehicle.driverName ? (
+            <div className="flex gap-2">
+              <dt className="eyebrow w-16 shrink-0 pt-0.5">Driver</dt>
+              <dd className="min-w-0 text-ink">
+                {vehicle.driverName}
+                {vehicle.driverMobile ? (
+                  <a
+                    href={`tel:${vehicle.driverMobile}`}
+                    className="tap ml-2 font-mono text-brand active:opacity-70"
+                  >
+                    {vehicle.driverMobile}
+                  </a>
+                ) : null}
+              </dd>
+            </div>
+          ) : null}
+          {vehicle.vendorName ? (
+            <div className="flex gap-2">
+              <dt className="eyebrow w-16 shrink-0 pt-0.5">Vendor</dt>
+              <dd className="min-w-0 text-ink">
+                {vehicle.vendorName}
+                {vehicle.rateNote ? (
+                  <span className="text-muted"> · {vehicle.rateNote}</span>
+                ) : null}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+
+      <button
+        type="button"
+        disabled={removing}
+        onClick={onRemove}
+        className="tap mt-3 flex min-h-11 w-full items-center justify-center rounded-lg border border-rule-strong font-mono text-xs tracking-eyebrow text-muted uppercase active:bg-surface-2 active:text-ledger-red disabled:opacity-55"
+      >
+        Remove
+      </button>
+    </div>
   )
 }
 

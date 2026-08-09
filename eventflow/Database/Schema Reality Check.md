@@ -62,7 +62,7 @@ needs an RPC change.
 
 ## The live database is Postgres 17, not 16
 
-Docs say Postgres 16. The EventFlow Supabase project runs **17.6.1.155**. The migrations
+Docs say Postgres 16. The Nuvent Supabase project runs **17.6.1.155**. The migrations
 were verified on a separate PG16 instance and have **not been applied to the live project**.
 See [[Supabase Project]].
 

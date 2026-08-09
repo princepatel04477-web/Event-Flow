@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 
 import { BackRow } from './BackRow'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Badge } from '@/components/ui/Badge'
 import { ShieldAlertIcon, ClockIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
-import { getViewer, requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
+import { getSessionClaims } from '@/lib/auth/server'
+import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import { claimGroupForCall } from '@/lib/actions/call'
 import { formatMobile } from '@/lib/phone'
 import { formatDateTime } from '@/lib/utils'
@@ -25,10 +26,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function CallGroupPage({ params }: PageProps) {
   const { eventCode, groupId } = await params
 
-  const viewer = await getViewer()
-  if (!viewer) {
-    redirect(`/login?next=${encodeURIComponent(`/${eventCode}/call/${groupId}`)}`)
-  }
+  // No getViewer() pre-check: it only understands GoTrue (admin) sessions and
+  // returns null for a code-auth team session, which would bounce staff to
+  // /login. requireStaff() below resolves both session types via the claims.
 
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
@@ -93,6 +93,13 @@ export default async function CallGroupPage({ params }: PageProps) {
 
   const group = claim.group
 
+  // The caller's identity: code sessions use the selected staff member
+  // (locked_by_staff / caller_id_staff); admins use their auth uid
+  // (locked_by / caller_id). The attribution split keeps exactly one of
+  // each pair — resolve whichever is present.
+  const claims = await getSessionClaims()
+  const callerId = claims?.staffMemberId ?? group.locked_by ?? group.locked_by_staff ?? null
+
   const supabase = await createClient()
   const [{ data: attempts }, { data: travelLegs }] = await Promise.all([
     supabase
@@ -109,14 +116,20 @@ export default async function CallGroupPage({ params }: PageProps) {
       .order('travel_date', { ascending: true, nullsFirst: false }),
   ])
 
+  // An in-flight attempt is one this caller left open. The caller id may be
+  // in caller_id (admin) or caller_id_staff (team) — match either.
   const inFlightAttempt =
-    (attempts ?? []).find((a) => a.outcome === null && a.caller_id === viewer.userId) ?? null
+    (attempts ?? []).find(
+      (a) =>
+        a.outcome === null &&
+        (a.caller_id === callerId || a.caller_id_staff === callerId),
+    ) ?? null
 
   return (
     <CallScreen
       eventId={event.id}
       eventCode={event.code}
-      viewerId={viewer.userId}
+      viewerId={callerId ?? ''}
       group={group}
       attempts={attempts ?? []}
       travelLegs={travelLegs ?? []}

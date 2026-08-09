@@ -23,6 +23,7 @@ import { rsvpStatusLabel, rsvpStatusTone } from '@/lib/rsvp'
 import { BackRow } from './BackRow'
 import { claimGroupForCall, releaseGroupAfterCall, startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
 import { dialTarget, formatMobile, type DialTarget } from '@/lib/phone'
+import { placeCall } from '@/lib/native-call'
 import { drainOutbox, listQueuedCompletions, queueCompletion } from '@/lib/call/outbox'
 import { clearStoredAttempt, getStoredAttempt, setStoredAttempt, type StoredCallAttempt } from '@/lib/call/session'
 import {
@@ -249,24 +250,9 @@ export function CallScreen({
     setSubmitError(null)
     setPhase('awaiting_outcome')
 
-    // The row is written and stashed BEFORE we navigate — this is the one
-    // thing that must never be reordered. See the module doc in
-    // lib/call/session.ts.
-    //
-    // M6: on native, dial through the CallPlugin for direct dial + automatic
-    // call-state events; on web (or plugin failure) fall back to tel:.
-    const isNative = typeof window !== 'undefined' && Boolean((window as any).Capacitor)
-    if (isNative) {
-      try {
-        const { Call } = await import('@/lib/call/plugin')
-        await Call.dial({ phoneNumber: target.dialedNumber })
-        void Call.startListening()
-      } catch {
-        window.location.href = target.href
-      }
-    } else {
-      window.location.href = target.href
-    }
+    // The row is written and stashed BEFORE we dial — this is the one thing
+    // that must never be reordered. See the module doc in lib/call/session.ts.
+    await placeCall(target)
   }
 
   /**
@@ -284,7 +270,9 @@ export function CallScreen({
       setStoredAttempt(next)
       return next
     })
-    window.location.href = target.href
+    // Same path as the first dial — a redial used to skip the native plugin
+    // entirely and go straight to the system handoff.
+    void placeCall(target)
   }
 
   async function handleExtendLock() {
@@ -666,7 +654,9 @@ export function CallScreen({
                       {attempt.duration_sec !== null
                         ? ` · ${formatDuration(attempt.duration_sec)}`
                         : ''}
-                      {attempt.caller_id === viewerId ? ' · you' : ''}
+                      {(attempt.caller_id === viewerId || attempt.caller_id_staff === viewerId)
+                        ? ' · you'
+                        : ''}
                     </p>
                     {attempt.notes ? <p className="text-sm text-fg">{attempt.notes}</p> : null}
                     {attempt.callback_at ? (

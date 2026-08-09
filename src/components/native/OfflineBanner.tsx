@@ -17,6 +17,16 @@ export function OfflineBanner() {
   const online = useOnline()
   const [queued, setQueued] = useState(0)
 
+  // Persistent storage (M8/offline): without it Android can evict IndexedDB
+  // under storage pressure and take the proof queue with it. Best-effort —
+  // some browsers/WebViews only grant it after a user gesture, and that is
+  // fine: the request is a nudge, not a hard requirement.
+  useEffect(() => {
+    if (navigator.storage?.persist) {
+      void navigator.storage.persist()
+    }
+  }, [])
+
   useEffect(() => {
     void queuedProofCount().then(setQueued)
   }, [])

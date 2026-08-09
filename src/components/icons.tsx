@@ -38,6 +38,14 @@ export function ChevronDownIcon(props: IconProps) {
   )
 }
 
+export function ChevronRightIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  )
+}
+
 export function PhoneIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
@@ -135,6 +143,15 @@ export function ArrowUpCircleIcon(props: IconProps) {
   )
 }
 
+export function CameraIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2a1.5 1.5 0 0 0 1.25-.67l.85-1.28A1.5 1.5 0 0 1 10.05 4h3.9a1.5 1.5 0 0 1 1.25.67l.85 1.28A1.5 1.5 0 0 0 17.3 7h2.2A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5Z" />
+      <circle cx="12" cy="13" r="3.25" />
+    </svg>
+  )
+}
+
 export function GiftIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
@@ -183,6 +200,16 @@ export function ShieldAlertIcon(props: IconProps) {
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
       <path d="M12 8v4" />
       <path d="M12 16h.01" />
+    </svg>
+  )
+}
+
+export function AlertTriangleIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
     </svg>
   )
 }
@@ -316,6 +343,14 @@ export function PlusIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
       <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  )
+}
+
+export function MinusIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
       <path d="M5 12h14" />
     </svg>
   )

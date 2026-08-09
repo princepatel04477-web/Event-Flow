@@ -6,6 +6,7 @@ import { AdminLink } from '@/components/nav/AdminLink'
 import { BottomTabs } from '@/components/nav/BottomTabs'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { StickyHeader } from '@/components/ui/StickyHeader'
+import { getSessionClaims } from '@/lib/auth/server'
 import { getEventAccess, getViewer, resolveEventByCode } from '@/lib/supabase/queries'
 import { cn, formatDateRange } from '@/lib/utils'
 
@@ -18,12 +19,28 @@ type LayoutProps = {
 export default async function EventLayout({ children, params }: LayoutProps) {
   const { eventCode } = await params
 
-  const [viewer, event] = await Promise.all([
+  const [viewer, event, codeClaims] = await Promise.all([
     getViewer(),
     resolveEventByCode(eventCode),
+    getSessionClaims(),
   ])
 
-  if (!viewer) {
+  // A code-auth (team/client) session has no GoTrue viewer — getViewer()
+  // returns null for it because the code cookie is not visible in this render
+  // scope. The claims ARE the identity: build the nav data from them so staff
+  // are not bounced to /login. An admin has no claims and uses getViewer().
+  const isCodeSession = codeClaims !== null
+  const effectiveViewer = viewer ?? (isCodeSession ? {
+    userId: codeClaims.accessCodeId,
+    email: null,
+    fullName: codeClaims.staffMemberId ?? null,
+    isAdmin: false,
+    memberships: event
+      ? [{ eventId: codeClaims.eventId, eventName: event.name, eventCode: event.code, role: (codeClaims.appRole === 'team' ? 'event_team' : 'client') as 'event_team' | 'client' }]
+      : [],
+  } : null)
+
+  if (!effectiveViewer) {
     redirect(`/login?next=${encodeURIComponent(`/${eventCode}`)}`)
   }
 
@@ -50,23 +67,32 @@ export default async function EventLayout({ children, params }: LayoutProps) {
     formatDateRange(event.starts_on, event.ends_on) ?? event.venue_city ?? event.code
 
   return (
-    <>
+    // The skin is a property of WHO IS LOOKING, not of an OS setting.
+    // Staff get the night-teal ground they work on in corridors and car
+    // parks; a client — reading this in a hotel lobby in daylight, and
+    // often the oldest user of the app — gets warm paper. `data-theme`
+    // re-points the same token names (see globals.css), so nothing below
+    // this line branches on the role to get its colours right.
+    <div
+      data-theme={access === 'client' ? 'client' : undefined}
+      className="flex min-h-dvh flex-col bg-paper text-ink"
+    >
       <StickyHeader
         title={event.name}
         subtitle={subtitle}
         right={
           <>
-            {viewer.memberships.length > 1 ? (
+            {effectiveViewer.memberships.length > 1 ? (
               // Full memberships, not a projection: the switcher needs each
               // event's role so it can send a client to their guests page
               // rather than to a dashboard they will be bounced off.
               <EventSwitcher
-                events={viewer.memberships}
+                events={effectiveViewer.memberships}
                 currentCode={event.code}
-                isAdmin={viewer.isAdmin}
+                isAdmin={effectiveViewer.isAdmin}
               />
             ) : null}
-            <AdminLink show={viewer.isAdmin} />
+            <AdminLink show={effectiveViewer.isAdmin} />
             <SignOutButton compact />
           </>
         }
@@ -88,6 +114,6 @@ export default async function EventLayout({ children, params }: LayoutProps) {
       </main>
 
       <BottomTabs eventCode={event.code} access={access} />
-    </>
+    </div>
   )
 }

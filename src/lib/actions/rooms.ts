@@ -2,12 +2,30 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { friendlyDbError } from '@/lib/errors'
+import { suggestRooms } from '@/lib/allocate/suggest'
+
+/** Per-phase timing for server actions (instrument-first). */
+function phaseTiming(label: string) {
+  const marks: Record<string, number> = {}
+  let last = performance.now()
+  return {
+    mark(name: string) {
+      const now = performance.now()
+      marks[name] = Math.round(now - last)
+      last = now
+    },
+    report() {
+      const parts = Object.entries(marks).map(([k, v]) => `${k}:${v}ms`)
+      console.log(`[perf] ${label} phases :: ${parts.join(' · ')}`)
+    },
+  }
+}
 
 type GroupRow = {
   id: string; head_name: string; group_type: string; side: string | null
   expected_pax: number; confirmed_pax: number | null; priority: number
 }
-type RoomRow = { id: string; hotel_id: string; room_number: string; capacity: number }
+type RoomRow = { id: string; hotel_id: string; room_number: string; capacity: number; max_capacity: number | null; floor: string | null }
 type GuestRow = { id: string; group_id: string; age_band: string; is_head: boolean }
 type HotelRow = { id: string; name: string }
 type AssignmentRow = { room_id: string; group_id: string; guest_id: string }
@@ -40,6 +58,9 @@ export interface AllocationRoom {
   hotelName: string
   roomNumber: string
   capacity: number
+  /** Extra-bed ceiling; falls back to capacity when null (pre-migration). */
+  maxCapacity: number
+  floor: string | null
   occupiedBeds: number
   freeBeds: number
 }
@@ -63,7 +84,7 @@ export async function readAllocationData(eventId: string): Promise<AllocationDat
       .order('priority', { ascending: false }),
     supabase
       .from('rooms')
-      .select('id, hotel_id, room_number, capacity')
+      .select('id, hotel_id, room_number, capacity, max_capacity, floor')
       .eq('event_id', eventId)
       .eq('is_blocked', false)
       .order('room_number', { ascending: true }),
@@ -112,6 +133,8 @@ export async function readAllocationData(eventId: string): Promise<AllocationDat
     hotelName: hotels.get(r.hotel_id) ?? 'Unknown hotel',
     roomNumber: r.room_number,
     capacity: r.capacity,
+    maxCapacity: r.max_capacity ?? r.capacity,
+    floor: r.floor,
     occupiedBeds: occupancy.get(r.id) ?? 0,
     freeBeds: r.capacity - (occupancy.get(r.id) ?? 0),
   }))
@@ -136,6 +159,90 @@ export async function readAllocationData(eventId: string): Promise<AllocationDat
       isHead: g.is_head,
     })),
   }
+}
+
+// ---------------------------------------------------------------------------
+// R2: suggest top-3 rooms per unallocated family
+// ---------------------------------------------------------------------------
+
+export interface RoomSuggestionRow {
+  groupId: string
+  headName: string
+  occupancy: number
+  tooLarge: boolean
+  tooLargeReason: string | null
+  options: {
+    roomId: string
+    hotelName: string
+    roomNumber: string
+    floor: string | null
+    fitsBase: boolean
+    reason: string
+  }[]
+}
+
+export interface SuggestRoomsResult {
+  ok: boolean
+  error: string | null
+  suggestions: RoomSuggestionRow[]
+}
+
+/**
+ * Run the suggest engine over every unallocated family and return top-3
+ * candidates with plain-language reasons. Suggest-only: nothing is written.
+ */
+export async function suggestRoomAssignments(eventId: string): Promise<SuggestRoomsResult> {
+  const data = await readAllocationData(eventId)
+
+  // SuggestRoom shape the engine wants.
+  const rooms = data.rooms.map((r) => ({
+    id: r.id,
+    hotelId: r.hotelId,
+    hotelName: r.hotelName,
+    roomNumber: r.roomNumber,
+    floor: r.floor,
+    baseCapacity: r.capacity,
+    maxCapacity: r.maxCapacity,
+    occupied: r.occupiedBeds,
+  }))
+
+  const rows: RoomSuggestionRow[] = []
+
+  for (const group of data.groups) {
+    // Skip families already holding a room.
+    if (group.existingRoomIds.length > 0) continue
+
+    const occupancy = group.confirmedPax ?? group.expectedPax
+    const guests = data.guests
+      .filter((g) => g.groupId === group.id)
+      .map((g) => ({ fullName: g.isHead ? group.headName : '', ageBand: g.ageBand as 'adult' | 'child' | 'infant' }))
+
+    const result = suggestRooms({
+      id: group.id,
+      headName: group.headName,
+      side: group.side as 'bride' | 'groom' | 'both' | 'other' | null,
+      occupancy,
+      guests,
+    }, rooms)
+
+    rows.push({
+      groupId: group.id,
+      headName: group.headName,
+      occupancy,
+      tooLarge: result.tooLarge,
+      tooLargeReason: result.tooLargeReason,
+      options: result.suggestions.map((s) => ({
+        roomId: s.room.id,
+        hotelName: s.room.hotelName,
+        roomNumber: s.room.roomNumber,
+        floor: s.room.floor,
+        fitsBase: s.fitsBase,
+        reason: s.reason,
+      })),
+    })
+  }
+
+  return { ok: true, error: null, suggestions: rows }
 }
 
 // ---------------------------------------------------------------------------
@@ -171,42 +278,62 @@ export interface RoomsGridData {
 }
 
 export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
+  const timing = phaseTiming('rooms :: readRoomsGrid')
   const supabase = await createClient()
+  timing.mark('client-create')
 
-  const [roomsRes, assignmentsRes, hotelsRes, guestsRes] = await Promise.all([
-    supabase
-      .from('rooms')
-      .select('id, hotel_id, room_number, capacity, is_blocked')
-      .eq('event_id', eventId)
-      .order('room_number', { ascending: true }),
-    supabase
-      .from('room_assignments')
-      .select('id, room_id, guest_id, group_id, is_override')
-      .eq('event_id', eventId)
-      .is('released_at', null),
-    supabase
-      .from('hotels')
-      .select('id, name')
-      .eq('event_id', eventId),
-    supabase
-      .from('guests')
-      .select('id, group_id, age_band, is_head')
-      .eq('event_id', eventId),
-  ])
+  // Sequential reads — deliberately NOT a Promise.all batch. The rooms grid
+  // was flaky at 543-guest scale when five requests fired concurrently to
+  // the Supabase region; sequential keeps each request individually short
+  // and deterministic. The group read was merged (was: groups + confirmed
+  // groups = 6 requests; now: 5) by selecting rsvp_status once.
+  const roomsRes = await supabase
+    .from('rooms')
+    .select('id, hotel_id, room_number, capacity, is_blocked')
+    .eq('event_id', eventId)
+    .order('room_number', { ascending: true })
+  const assignmentsRes = await supabase
+    .from('room_assignments')
+    .select('id, room_id, guest_id, group_id, is_override')
+    .eq('event_id', eventId)
+    .is('released_at', null)
+  const hotelsRes = await supabase
+    .from('hotels')
+    .select('id, name')
+    .eq('event_id', eventId)
+  const guestsRes = await supabase
+    .from('guests')
+    .select('id, group_id, age_band, is_head')
+    .eq('event_id', eventId)
+  const groupsRes = await supabase
+    .from('guest_groups')
+    .select('id, head_name, rsvp_status')
+    .eq('event_id', eventId)
+  timing.mark('reads')
 
   const roomsRaw = roomsRes.data ?? []
   const assignments = assignmentsRes.data ?? []
   const hotelRows = hotelsRes.data ?? []
   const guestsAll = guestsRes.data ?? []
+  const groupRows = groupsRes.data ?? []
 
   const hotelNames = new Map(hotelRows.map((h) => [h.id, h.name]))
+  const groupNames = new Map(groupRows.map((g) => [g.id, g.head_name]))
+  const confirmedGroupIds = new Set(
+    groupRows.filter((g) => g.rsvp_status === 'confirmed').map((g) => g.id),
+  )
 
-  // Resolve guest names from groups
-  const { data: groups } = await supabase
-    .from('guest_groups')
-    .select('id, head_name')
-    .eq('event_id', eventId)
-  const groupNames = new Map((groups ?? []).map((g) => [g.id, g.head_name]))
+  // Precompute lookup maps once, so the per-room assembly below is O(rooms +
+  // assignments + guests) instead of O(rooms × assignments × guests). With
+  // 238 groups and a room per family the nested form was a full re-scan on
+  // every room card.
+  const guestById = new Map(guestsAll.map((g) => [g.id, g]))
+  const assignmentsByRoom = new Map<string, { id: string; room_id: string; guest_id: string; group_id: string; is_override: boolean }[]>()
+  for (const a of assignments) {
+    const list = assignmentsByRoom.get(a.room_id) ?? []
+    list.push(a)
+    assignmentsByRoom.set(a.room_id, list)
+  }
 
   // Build guest name map: if is_head, use head_name from group
   const guestNames = new Map<string, string>()
@@ -219,17 +346,18 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
   const assignedGuestIds = new Set(assignments.map((a) => a.guest_id))
 
   const rooms = roomsRaw.map((r) => {
-    const occupants: RoomGridGuest[] = assignments
-      .filter((a) => a.room_id === r.id)
-      .map((a) => ({
+    const occupants: RoomGridGuest[] = (assignmentsByRoom.get(r.id) ?? []).map((a) => {
+      const guest = guestById.get(a.guest_id)
+      return {
         guestId: a.guest_id,
         guestName: guestNames.get(a.guest_id) ?? 'Guest',
         groupId: a.group_id,
         headName: groupNames.get(a.group_id) ?? 'Unknown',
-        ageBand: guestsAll.find((g) => g.id === a.guest_id)?.age_band ?? 'adult',
-        isHead: guestsAll.find((g) => g.id === a.guest_id)?.is_head ?? false,
+        ageBand: guest?.age_band ?? 'adult',
+        isHead: guest?.is_head ?? false,
         assignmentId: a.id,
-      }))
+      }
+    })
 
     const occupied = occupants.length
     return {
@@ -245,15 +373,8 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
     }
   })
 
-  // Unplaced: confirmed guests NOT in any active assignment
-  const { data: confirmedGroups } = await supabase
-    .from('guest_groups')
-    .select('id')
-    .eq('event_id', eventId)
-    .eq('rsvp_status', 'confirmed')
-
-  const confirmedGroupIds = new Set((confirmedGroups ?? []).map((g) => g.id))
-
+  // Unplaced: confirmed guests NOT in any active assignment. The confirmed
+  // group ids come from the single group read in the batch above.
   const unplaced = guestsAll
     .filter((g) => !assignedGuestIds.has(g.id) && confirmedGroupIds.has(g.group_id))
     .map((g) => ({
@@ -263,6 +384,8 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
       headName: groupNames.get(g.group_id) ?? 'Unknown',
     }))
 
+  timing.mark('assemble')
+  timing.report()
   return { rooms, unplaced }
 }
 
@@ -466,4 +589,65 @@ export async function assignGuestToRoom(
   }
 
   return { ok: true }
+}
+
+// ---------------------------------------------------------------------------
+// R2: assign every unplaced guest of a family to one room (suggest confirm)
+// ---------------------------------------------------------------------------
+
+export type AssignGroupResult =
+  | { ok: true; assigned: number }
+  | { ok: false; error: string; code?: string; roomId?: string; roomNumber?: string }
+
+/**
+ * Assign all unplaced guests of a family to the chosen room — the confirm
+ * path for the top-3 suggestion panel. The DB still enforces max_capacity
+ * and date-range overlap; this action just submits the family as one unit so
+ * a family is never split across rooms by the suggestion flow.
+ */
+export async function assignGroupToRoom(
+  eventId: string,
+  groupId: string,
+  roomId: string,
+): Promise<AssignGroupResult> {
+  const supabase = await createClient()
+
+  const { data: guests } = await supabase
+    .from('guests')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('group_id', groupId)
+
+  const list = (guests ?? []) as unknown as { id: string }[]
+  if (list.length === 0) {
+    return { ok: false, error: 'This family has no guests to assign.', code: 'other' }
+  }
+
+  // Assign head first so the room shows the family name, then the rest.
+  const { data: head } = await supabase
+    .from('guests')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('group_id', groupId)
+    .eq('is_head', true)
+    .maybeSingle()
+
+  const ordered = head
+    ? [head.id, ...list.filter((g) => g.id !== head.id).map((g) => g.id)]
+    : list.map((g) => g.id)
+
+  let assigned = 0
+  for (const guestId of ordered) {
+    const res = await assignGuestToRoom(eventId, guestId, roomId, null)
+    if (!res.ok) {
+      // Surface the first failure (capacity/overlap) — the family stays whole.
+      const extra = res.code === 'capacity' && 'roomId' in res
+        ? { code: res.code as 'capacity', roomId: res.roomId, roomNumber: res.roomNumber }
+        : { code: res.code }
+      return { ok: false, error: res.error, ...extra }
+    }
+    assigned++
+  }
+
+  return { ok: true, assigned }
 }

@@ -13,6 +13,7 @@ import {
 } from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
 import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
+import { traceFetch } from '@/lib/perf'
 import { RSVP_STATUS_LABELS, parseExtractionPayload } from '@/lib/review/payload'
 import { summarizeConfidence } from '@/lib/review/confidence'
 import { formatCount, formatDateTime } from '@/lib/utils'
@@ -41,12 +42,14 @@ export default async function ReviewListPage({ params, searchParams }: PageProps
 
   const supabase = await createClient()
 
-  const { data: extractions, error } = await supabase
-    .from('rsvp_extractions')
-    .select('id, created_at, confidence, parsed, group_id, guest_groups(head_name, primary_mobile)')
-    .eq('event_id', event.id)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
+  const { data: extractions, error } = await traceFetch('review :: rsvp_extractions', () =>
+    supabase
+      .from('rsvp_extractions')
+      .select('id, created_at, confidence, parsed, group_id, guest_groups(head_name, primary_mobile)')
+      .eq('event_id', event.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false }),
+  )
 
   // `extractions ?? []` alone collapses a failed read and an empty queue into
   // one screen. Say which happened — "nothing to review" is a claim about the

@@ -5,7 +5,7 @@ updated: 2026-07-31
 
 # Schema Overview
 
-Back to [[EventFlow]]. Eight migrations, applied in filename order.
+Back to [[Nuvent]]. Eight migrations, applied in filename order.
 
 | Migration | Contents |
 |---|---|

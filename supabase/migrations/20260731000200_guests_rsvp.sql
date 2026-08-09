@@ -4,7 +4,7 @@
 -- You dial one number and the head answers for everybody.
 -- =====================================================================
 
-create table public.guest_groups (
+create table if not exists public.guest_groups (
   id              uuid primary key default gen_random_uuid(),
   event_id        uuid not null references public.events (id) on delete cascade,
 
@@ -35,13 +35,13 @@ create table public.guest_groups (
   unique (id, event_id)                        -- target for composite child FKs
 );
 
-create unique index guest_groups_event_row_hash_uq
+create unique index if not exists guest_groups_event_row_hash_uq
   on public.guest_groups (event_id, source_row_hash)
   where source_row_hash is not null;
 
-create index on public.guest_groups (event_id, rsvp_status);
-create index on public.guest_groups (event_id, primary_mobile);
-create index on public.guest_groups (event_id, priority desc);
+create index if not exists guest_groups_event_status_idx on public.guest_groups (event_id, rsvp_status);
+create index if not exists guest_groups_event_mobile_idx on public.guest_groups (event_id, primary_mobile);
+create index if not exists guest_groups_event_priority_idx on public.guest_groups (event_id, priority desc);
 
 comment on column public.guest_groups.source_row_hash is
   'Hash of the identifying Excel cells. Makes re-importing the same sheet a no-op '
@@ -49,7 +49,7 @@ comment on column public.guest_groups.source_row_hash is
 
 -- ---------------------------------------------------------------------
 
-create table public.guests (
+create table if not exists public.guests (
   id          uuid primary key default gen_random_uuid(),
   event_id    uuid not null references public.events (id) on delete cascade,
   group_id    uuid not null,
@@ -66,8 +66,8 @@ create table public.guests (
     references public.guest_groups (id, event_id) on delete cascade
 );
 
-create index on public.guests (event_id, group_id);
-create unique index guests_single_head_per_group
+create index if not exists guests_event_group_idx on public.guests (event_id, group_id);
+create unique index if not exists guests_single_head_per_group
   on public.guests (group_id) where is_head;
 
 -- ---------------------------------------------------------------------
@@ -75,7 +75,7 @@ create unique index guests_single_head_per_group
 -- "LHS = RHS" is a single query: every arrival leg needs a departure leg.
 -- ---------------------------------------------------------------------
 
-create table public.travel_legs (
+create table if not exists public.travel_legs (
   id              uuid primary key default gen_random_uuid(),
   event_id        uuid not null references public.events (id) on delete cascade,
   group_id        uuid not null,
@@ -100,15 +100,15 @@ create table public.travel_legs (
     references public.guest_groups (id, event_id) on delete cascade
 );
 
-create index on public.travel_legs (event_id, direction, travel_date, travel_time);
-create index on public.travel_legs (event_id, group_id, direction);
+create index if not exists travel_legs_event_direction_idx on public.travel_legs (event_id, direction, travel_date, travel_time);
+create index if not exists travel_legs_event_group_direction_idx on public.travel_legs (event_id, group_id, direction);
 
 -- ---------------------------------------------------------------------
 -- CALL ATTEMPTS — append-only. Attempt count is count(*), never a stored
 -- counter (stored counters drift the moment two devices are offline).
 -- ---------------------------------------------------------------------
 
-create table public.call_attempts (
+create table if not exists public.call_attempts (
   id             uuid primary key default gen_random_uuid(),
   event_id       uuid not null references public.events (id) on delete cascade,
   group_id       uuid not null,
@@ -131,9 +131,9 @@ create table public.call_attempts (
     references public.guest_groups (id, event_id) on delete cascade
 );
 
-create index on public.call_attempts (event_id, group_id, started_at desc);
-create index on public.call_attempts (event_id, caller_id, started_at desc);
-create index on public.call_attempts (event_id, outcome);
+create index if not exists call_attempts_event_group_idx on public.call_attempts (event_id, group_id, started_at desc);
+create index if not exists call_attempts_event_caller_idx on public.call_attempts (event_id, caller_id, started_at desc);
+create index if not exists call_attempts_event_outcome_idx on public.call_attempts (event_id, outcome);
 
 -- Rows may be completed once (ended_at / outcome), then they freeze.
 -- Identity columns can never be changed. Deletes are never allowed.
@@ -167,10 +167,12 @@ begin
 end;
 $$;
 
+drop trigger if exists call_attempts_guard_update on public.call_attempts;
 create trigger call_attempts_guard_update
   before update on public.call_attempts
   for each row execute function app.guard_call_attempt();
 
+drop trigger if exists call_attempts_guard_delete on public.call_attempts;
 create trigger call_attempts_guard_delete
   before delete on public.call_attempts
   for each row execute function app.guard_call_attempt();
@@ -187,6 +189,7 @@ begin
 end;
 $$;
 
+drop trigger if exists call_attempts_server_clock on public.call_attempts;
 create trigger call_attempts_server_clock
   before insert on public.call_attempts
   for each row execute function app.force_server_started_at();
@@ -197,7 +200,7 @@ create trigger call_attempts_server_clock
 -- reviewed, accepted extraction becomes data (see 0600 apply_rsvp_extraction).
 -- ---------------------------------------------------------------------
 
-create table public.call_recordings (
+create table if not exists public.call_recordings (
   id                 uuid primary key default gen_random_uuid(),
   event_id           uuid not null references public.events (id) on delete cascade,
   call_attempt_id    uuid references public.call_attempts (id) on delete cascade,
@@ -218,13 +221,14 @@ create table public.call_recordings (
     references public.guest_groups (id, event_id) on delete set null
 );
 
-create index on public.call_recordings (event_id, recorded_at desc);
+create index if not exists call_recordings_event_idx on public.call_recordings (event_id, recorded_at desc);
 
+drop trigger if exists call_recordings_server_clock on public.call_recordings;
 create trigger call_recordings_server_clock
   before insert on public.call_recordings
   for each row execute function app.force_server_recorded_at();
 
-create table public.transcripts (
+create table if not exists public.transcripts (
   id            uuid primary key default gen_random_uuid(),
   event_id      uuid not null references public.events (id) on delete cascade,
   recording_id  uuid not null references public.call_recordings (id) on delete cascade,
@@ -236,9 +240,9 @@ create table public.transcripts (
   created_at    timestamptz not null default now()
 );
 
-create index on public.transcripts (event_id, recording_id);
+create index if not exists transcripts_event_recording_idx on public.transcripts (event_id, recording_id);
 
-create table public.rsvp_extractions (
+create table if not exists public.rsvp_extractions (
   id               uuid primary key default gen_random_uuid(),
   event_id         uuid not null references public.events (id) on delete cascade,
   group_id         uuid not null,
@@ -260,8 +264,8 @@ create table public.rsvp_extractions (
     references public.guest_groups (id, event_id) on delete cascade
 );
 
-create index on public.rsvp_extractions (event_id, status, created_at desc);
-create index on public.rsvp_extractions (event_id, group_id);
+create index if not exists rsvp_extractions_event_status_idx on public.rsvp_extractions (event_id, status, created_at desc);
+create index if not exists rsvp_extractions_event_group_idx on public.rsvp_extractions (event_id, group_id);
 
 comment on table public.rsvp_extractions is
   'AI output is EVIDENCE, not data. A row here changes nothing until a human '

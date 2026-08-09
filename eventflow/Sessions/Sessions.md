@@ -5,7 +5,7 @@ updated: 2026-07-31
 
 # Sessions
 
-Back to [[EventFlow]]. Auto-captured raw history. One note per Claude Code session.
+Back to [[Nuvent]]. Auto-captured raw history. One note per Claude Code session.
 
 ## How this works
 
