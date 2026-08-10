@@ -140,32 +140,32 @@
                 {
                   "workerIndex": 0,
                   "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 2,
+                  "status": "timedOut",
+                  "duration": 1,
                   "error": {
-                    "message": "Error: reset trip_passengers failed: TypeError: fetch failed",
-                    "stack": "Error: reset trip_passengers failed: TypeError: fetch failed\n    at resetTestData (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts:175:23)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts:20:3",
+                    "message": "\u001b[31m\"beforeAll\" hook timeout of 60000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31m\"beforeAll\" hook timeout of 60000ms exceeded.\u001b[39m\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts:19:6",
                     "location": {
-                      "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
-                      "column": 23,
-                      "line": 175
+                      "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts",
+                      "column": 6,
+                      "line": 19
                     },
-                    "snippet": "\u001b[90m   at \u001b[39mhelpers\\db.ts:175\n\n\u001b[0m \u001b[90m 173 |\u001b[39m \u001b[36mexport\u001b[39m \u001b[36masync\u001b[39m \u001b[36mfunction\u001b[39m resetTestData()\u001b[33m:\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m<\u001b[39m\u001b[36mvoid\u001b[39m\u001b[33m>\u001b[39m {\n \u001b[90m 174 |\u001b[39m   \u001b[36mconst\u001b[39m { error\u001b[33m:\u001b[39m tripsErr } \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m db\u001b[33m.\u001b[39m\u001b[36mfrom\u001b[39m(\u001b[32m'trip_passengers'\u001b[39m)\u001b[33m.\u001b[39m\u001b[36mdelete\u001b[39m()\u001b[33m.\u001b[39meq(\u001b[32m'event_id'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mEVENT_ID\u001b[39m)\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 175 |\u001b[39m   \u001b[36mif\u001b[39m (tripsErr) \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`reset trip_passengers failed: ${tripsErr.message}`\u001b[39m)\n \u001b[90m     |\u001b[39m                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 176 |\u001b[39m\n \u001b[90m 177 |\u001b[39m   \u001b[36mconst\u001b[39m { error\u001b[33m:\u001b[39m trips2Err } \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m db\u001b[33m.\u001b[39m\u001b[36mfrom\u001b[39m(\u001b[32m'trips'\u001b[39m)\u001b[33m.\u001b[39m\u001b[36mdelete\u001b[39m()\u001b[33m.\u001b[39meq(\u001b[32m'event_id'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mEVENT_ID\u001b[39m)\n \u001b[90m 178 |\u001b[39m   \u001b[36mif\u001b[39m (trips2Err) \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`reset trips failed: ${trips2Err.message}`\u001b[39m)\u001b[0m"
+                    "snippet": "\u001b[0m \u001b[90m 17 |\u001b[39m \u001b[36mlet\u001b[39m stateA\u001b[33m:\u001b[39m string\n \u001b[90m 18 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 19 |\u001b[39m test\u001b[33m.\u001b[39mbeforeAll(\u001b[36masync\u001b[39m ({ browser }) \u001b[33m=>\u001b[39m {\n \u001b[90m    |\u001b[39m      \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 20 |\u001b[39m   \u001b[36mawait\u001b[39m resetTestData()\n \u001b[90m 21 |\u001b[39m   stateA \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m login(browser\u001b[33m,\u001b[39m \u001b[33mUSERS\u001b[39m\u001b[33m.\u001b[39ma)\n \u001b[90m 22 |\u001b[39m })\u001b[0m"
                   },
                   "errors": [
                     {
                       "location": {
-                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
-                        "column": 23,
-                        "line": 175
+                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts",
+                        "column": 6,
+                        "line": 19
                       },
-                      "message": "Error: reset trip_passengers failed: TypeError: fetch failed\n\n   at helpers\\db.ts:175\n\n  173 | export async function resetTestData(): Promise<void> {\n  174 |   const { error: tripsErr } = await db.from('trip_passengers').delete().eq('event_id', EVENT_ID)\n> 175 |   if (tripsErr) throw new Error(`reset trip_passengers failed: ${tripsErr.message}`)\n      |                       ^\n  176 |\n  177 |   const { error: trips2Err } = await db.from('trips').delete().eq('event_id', EVENT_ID)\n  178 |   if (trips2Err) throw new Error(`reset trips failed: ${trips2Err.message}`)\n    at resetTestData (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts:175:23)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts:20:3"
+                      "message": "\u001b[31m\"beforeAll\" hook timeout of 60000ms exceeded.\u001b[39m\n\n  17 | let stateA: string\n  18 |\n> 19 | test.beforeAll(async ({ browser }) => {\n     |      ^\n  20 |   await resetTestData()\n  21 |   stateA = await login(browser, USERS.a)\n  22 | })\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts:19:6"
                     }
                   ],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:18:46.468Z",
+                  "startTime": "2026-08-10T11:59:15.724Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -180,9 +180,9 @@
                     }
                   ],
                   "errorLocation": {
-                    "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
-                    "column": 23,
-                    "line": 175
+                    "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts",
+                    "column": 6,
+                    "line": 19
                   }
                 }
               ],
@@ -215,7 +215,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:18:57.580Z",
+                  "startTime": "2026-08-10T12:00:15.983Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -249,7 +249,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:18:57.581Z",
+                  "startTime": "2026-08-10T12:00:15.983Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -286,12 +286,12 @@
                   "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 12437,
+                  "duration": 17273,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:18:58.684Z",
+                  "startTime": "2026-08-10T12:00:16.824Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -320,12 +320,12 @@
                   "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 10003,
+                  "duration": 7219,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:19:38.423Z",
+                  "startTime": "2026-08-10T12:00:51.681Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -354,12 +354,12 @@
                   "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 11540,
+                  "duration": 21696,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:19:48.457Z",
+                  "startTime": "2026-08-10T12:00:58.916Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -374,7 +374,7 @@
         },
         {
           "title": "T0.4 guest list loads fast, windowed, and search finds any guest",
-          "ok": true,
+          "ok": false,
           "tags": [],
           "tests": [
             {
@@ -387,18 +387,58 @@
                 {
                   "workerIndex": 1,
                   "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 10329,
-                  "errors": [],
+                  "status": "failed",
+                  "duration": 34622,
+                  "error": {
+                    "message": "Error: guest list first paint (real count) took 27704ms\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m5000\u001b[39m\nReceived:   \u001b[31m27704\u001b[39m",
+                    "stack": "Error: guest list first paint (real count) took 27704ms\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m5000\u001b[39m\nReceived:   \u001b[31m27704\u001b[39m\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier0.spec.ts:153:76",
+                    "location": {
+                      "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier0.spec.ts",
+                      "column": 76,
+                      "line": 153
+                    },
+                    "snippet": "\u001b[0m \u001b[90m 151 |\u001b[39m   \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[36mnew\u001b[39m \u001b[33mRegExp\u001b[39m(\u001b[32m`${expectedDisplayCount} guest`\u001b[39m)))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m15\u001b[39m_000 })\n \u001b[90m 152 |\u001b[39m   \u001b[36mconst\u001b[39m elapsed \u001b[33m=\u001b[39m \u001b[33mDate\u001b[39m\u001b[33m.\u001b[39mnow() \u001b[33m-\u001b[39m started\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 153 |\u001b[39m   expect(elapsed\u001b[33m,\u001b[39m \u001b[32m`guest list first paint (real count) took ${elapsed}ms`\u001b[39m)\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m5000\u001b[39m)\n \u001b[90m     |\u001b[39m                                                                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 154 |\u001b[39m\n \u001b[90m 155 |\u001b[39m   \u001b[90m// The list is WINDOWED: only a fraction of the rows are mounted, but the\u001b[39m\n \u001b[90m 156 |\u001b[39m   \u001b[90m// scroll container is the full list height — every row is reachable by\u001b[39m\u001b[0m"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier0.spec.ts",
+                        "column": 76,
+                        "line": 153
+                      },
+                      "message": "Error: guest list first paint (real count) took 27704ms\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m5000\u001b[39m\nReceived:   \u001b[31m27704\u001b[39m\n\n  151 |   await expect(page.getByText(new RegExp(`${expectedDisplayCount} guest`))).toBeVisible({ timeout: 15_000 })\n  152 |   const elapsed = Date.now() - started\n> 153 |   expect(elapsed, `guest list first paint (real count) took ${elapsed}ms`).toBeLessThan(5000)\n      |                                                                            ^\n  154 |\n  155 |   // The list is WINDOWED: only a fraction of the rows are mounted, but the\n  156 |   // scroll container is the full list height — every row is reachable by\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier0.spec.ts:153:76"
+                    }
+                  ],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:20:00.028Z",
+                  "startTime": "2026-08-10T12:01:20.628Z",
                   "annotations": [],
-                  "attachments": []
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier0-T0-4-guest-list-load-ba2b0--and-search-finds-any-guest-phone\\test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier0-T0-4-guest-list-load-ba2b0--and-search-finds-any-guest-phone\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier0-T0-4-guest-list-load-ba2b0--and-search-finds-any-guest-phone\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier0.spec.ts",
+                    "column": 76,
+                    "line": 153
+                  }
                 }
               ],
-              "status": "expected"
+              "status": "unexpected"
             }
           ],
           "id": "1528017bade7b92b1fe1-b380c6df26655a7fdf9b",
@@ -419,20 +459,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 12821,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:20:10.386Z",
+                  "startTime": "2026-08-10T12:01:55.596Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "1528017bade7b92b1fe1-3382d477724fc974b6af",
@@ -453,20 +493,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 14169,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:20:23.245Z",
+                  "startTime": "2026-08-10T12:01:55.596Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "1528017bade7b92b1fe1-8ddb2de62321b9cc5148",
@@ -487,20 +527,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 8308,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:20:37.445Z",
+                  "startTime": "2026-08-10T12:01:55.596Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "1528017bade7b92b1fe1-147ece4e73ed4fc89fb3",
@@ -521,20 +561,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 644,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:20:45.774Z",
+                  "startTime": "2026-08-10T12:01:55.596Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "1528017bade7b92b1fe1-ebaa30be14606d8ff71d",
@@ -555,20 +595,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 1385,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:20:46.443Z",
+                  "startTime": "2026-08-10T12:01:55.596Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "1528017bade7b92b1fe1-f037fe4b554069d912eb",
@@ -589,20 +629,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 6784,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:20:47.846Z",
+                  "startTime": "2026-08-10T12:01:55.597Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "1528017bade7b92b1fe1-82bb7e57b526468bc611",
@@ -620,7 +660,7 @@
       "specs": [
         {
           "title": "T1.1 multi-user, no corruption — the caller lock is exclusive",
-          "ok": true,
+          "ok": false,
           "tags": [],
           "tests": [
             {
@@ -631,20 +671,52 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 1,
+                  "workerIndex": 2,
                   "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 6388,
-                  "errors": [],
+                  "status": "timedOut",
+                  "duration": 65020,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier1.spec.ts",
+                        "column": 15,
+                        "line": 71
+                      },
+                      "message": "Error: page.goto: Test ended.\nCall log:\n\u001b[2m  - navigating to \"https://nuvent-ppzhi25o0-rebelmaker1258-2015s-projects.vercel.app/SAMPLE2026/rsvp/1d3d858b-4347-4693-a0b3-6dbf3cc6adf0\", waiting until \"load\"\u001b[22m\n\n\n  69 |   // locked state — proving two callers cannot both edit one family.\n  70 |   const { context: ctxB, page: pageB } = await loggedInContext(browser, stateB)\n> 71 |   await pageB.goto(`/${code}/rsvp/${groupId}`)\n     |               ^\n  72 |   await expect(pageB.getByText(/Someone else is already logging this family/i)).toBeVisible({ timeout: 15_000 })\n  73 |\n  74 |   // A can still edit — its own lock is intact (re-entrant claim).\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier1.spec.ts:71:15"
+                    }
+                  ],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:20:54.676Z",
+                  "startTime": "2026-08-10T12:01:56.379Z",
                   "annotations": [],
-                  "attachments": []
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-1-multi-user-no-c-848a2-he-caller-lock-is-exclusive-phone\\test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-1-multi-user-no-c-848a2-he-caller-lock-is-exclusive-phone\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-1-multi-user-no-c-848a2-he-caller-lock-is-exclusive-phone\\trace.zip"
+                    }
+                  ]
                 }
               ],
-              "status": "expected"
+              "status": "unexpected"
             }
           ],
           "id": "2b11f1eba0624d9847f6-8ebe9fefe810a52a365a",
@@ -665,20 +737,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 8928,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:21:09.479Z",
+                  "startTime": "2026-08-10T12:03:45.627Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "2b11f1eba0624d9847f6-96bd21890f288286b740",
@@ -699,20 +771,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 12906,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:21:18.433Z",
+                  "startTime": "2026-08-10T12:03:45.627Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "2b11f1eba0624d9847f6-6e342b2694560129a833",
@@ -722,7 +794,7 @@
         },
         {
           "title": "T1.4 calling — dial goes to the system, session survives a remount",
-          "ok": false,
+          "ok": true,
           "tags": [],
           "tests": [
             {
@@ -733,65 +805,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 39010,
-                  "error": {
-                    "message": "TimeoutError: page.waitForURL: Timeout 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
-                    "stack": "TimeoutError: page.waitForURL: Timeout 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n    at loginTeamAs (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\auth.ts:60:14)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier1.spec.ts:308:21",
-                    "location": {
-                      "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\auth.ts",
-                      "column": 14,
-                      "line": 60
-                    },
-                    "snippet": "\u001b[90m   at \u001b[39mhelpers\\auth.ts:60\n\n\u001b[0m \u001b[90m 58 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m'Access code'\u001b[39m)\u001b[33m.\u001b[39mfill(env\u001b[33m.\u001b[39m\u001b[33mE2E_TEAM_CODE\u001b[39m)\n \u001b[90m 59 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m'button'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[35m/enter event|checking/i\u001b[39m })\u001b[33m.\u001b[39mclick()\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 60 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[35m/\\/pick-staff/\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m30\u001b[39m_000 })\n \u001b[90m    |\u001b[39m              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 61 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m'button'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m staffName\u001b[33m,\u001b[39m exact\u001b[33m:\u001b[39m \u001b[36mfalse\u001b[39m })\u001b[33m.\u001b[39mfirst()\u001b[33m.\u001b[39mclick()\n \u001b[90m 62 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL((url) \u001b[33m=>\u001b[39m \u001b[33m!\u001b[39murl\u001b[33m.\u001b[39mpathname\u001b[33m.\u001b[39mstartsWith(\u001b[32m'/pick-staff'\u001b[39m)\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m30\u001b[39m_000 })\n \u001b[90m 63 |\u001b[39m   \u001b[36mconst\u001b[39m state \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m context\u001b[33m.\u001b[39mstorageState()\u001b[0m"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\auth.ts",
-                        "column": 14,
-                        "line": 60
-                      },
-                      "message": "TimeoutError: page.waitForURL: Timeout 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n\n   at helpers\\auth.ts:60\n\n  58 |   await page.getByLabel('Access code').fill(env.E2E_TEAM_CODE)\n  59 |   await page.getByRole('button', { name: /enter event|checking/i }).click()\n> 60 |   await page.waitForURL(/\\/pick-staff/, { timeout: 30_000 })\n     |              ^\n  61 |   await page.getByRole('button', { name: staffName, exact: false }).first().click()\n  62 |   await page.waitForURL((url) => !url.pathname.startsWith('/pick-staff'), { timeout: 30_000 })\n  63 |   const state = await context.storageState()\n    at loginTeamAs (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\auth.ts:60:14)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier1.spec.ts:308:21"
-                    }
-                  ],
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:21:31.363Z",
+                  "startTime": "2026-08-10T12:03:45.627Z",
                   "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-4-calling-—-dial--6d40b--session-survives-a-remount-phone\\test-failed-1.png"
-                    },
-                    {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-4-calling-—-dial--6d40b--session-survives-a-remount-phone\\test-failed-2.png"
-                    },
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-4-calling-—-dial--6d40b--session-survives-a-remount-phone\\error-context.md"
-                    },
-                    {
-                      "name": "trace",
-                      "contentType": "application/zip",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-4-calling-—-dial--6d40b--session-survives-a-remount-phone\\trace.zip"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\auth.ts",
-                    "column": 14,
-                    "line": 60
-                  }
+                  "attachments": []
                 }
               ],
-              "status": "unexpected"
+              "status": "skipped"
             }
           ],
           "id": "2b11f1eba0624d9847f6-140b0cfb0e2a0f6ff8ee",
@@ -820,7 +847,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:22:11.636Z",
+                  "startTime": "2026-08-10T12:03:45.627Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -854,7 +881,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:22:11.637Z",
+                  "startTime": "2026-08-10T12:03:45.627Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -888,7 +915,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:22:11.637Z",
+                  "startTime": "2026-08-10T12:03:45.627Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -911,7 +938,7 @@
       "specs": [
         {
           "title": "T2.1 vehicle allocation — no split, luggage-adjusted capacity",
-          "ok": false,
+          "ok": true,
           "tags": [],
           "tests": [
             {
@@ -922,55 +949,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 3,
                   "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 1,
-                  "error": {
-                    "message": "Error: reset trip_passengers failed: TypeError: fetch failed",
-                    "stack": "Error: reset trip_passengers failed: TypeError: fetch failed\n    at resetTestData (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts:175:23)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier2.spec.ts:15:3",
-                    "location": {
-                      "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
-                      "column": 23,
-                      "line": 175
-                    },
-                    "snippet": "\u001b[90m   at \u001b[39mhelpers\\db.ts:175\n\n\u001b[0m \u001b[90m 173 |\u001b[39m \u001b[36mexport\u001b[39m \u001b[36masync\u001b[39m \u001b[36mfunction\u001b[39m resetTestData()\u001b[33m:\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m<\u001b[39m\u001b[36mvoid\u001b[39m\u001b[33m>\u001b[39m {\n \u001b[90m 174 |\u001b[39m   \u001b[36mconst\u001b[39m { error\u001b[33m:\u001b[39m tripsErr } \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m db\u001b[33m.\u001b[39m\u001b[36mfrom\u001b[39m(\u001b[32m'trip_passengers'\u001b[39m)\u001b[33m.\u001b[39m\u001b[36mdelete\u001b[39m()\u001b[33m.\u001b[39meq(\u001b[32m'event_id'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mEVENT_ID\u001b[39m)\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 175 |\u001b[39m   \u001b[36mif\u001b[39m (tripsErr) \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`reset trip_passengers failed: ${tripsErr.message}`\u001b[39m)\n \u001b[90m     |\u001b[39m                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 176 |\u001b[39m\n \u001b[90m 177 |\u001b[39m   \u001b[36mconst\u001b[39m { error\u001b[33m:\u001b[39m trips2Err } \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m db\u001b[33m.\u001b[39m\u001b[36mfrom\u001b[39m(\u001b[32m'trips'\u001b[39m)\u001b[33m.\u001b[39m\u001b[36mdelete\u001b[39m()\u001b[33m.\u001b[39meq(\u001b[32m'event_id'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mEVENT_ID\u001b[39m)\n \u001b[90m 178 |\u001b[39m   \u001b[36mif\u001b[39m (trips2Err) \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`reset trips failed: ${trips2Err.message}`\u001b[39m)\u001b[0m"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
-                        "column": 23,
-                        "line": 175
-                      },
-                      "message": "Error: reset trip_passengers failed: TypeError: fetch failed\n\n   at helpers\\db.ts:175\n\n  173 | export async function resetTestData(): Promise<void> {\n  174 |   const { error: tripsErr } = await db.from('trip_passengers').delete().eq('event_id', EVENT_ID)\n> 175 |   if (tripsErr) throw new Error(`reset trip_passengers failed: ${tripsErr.message}`)\n      |                       ^\n  176 |\n  177 |   const { error: trips2Err } = await db.from('trips').delete().eq('event_id', EVENT_ID)\n  178 |   if (trips2Err) throw new Error(`reset trips failed: ${trips2Err.message}`)\n    at resetTestData (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts:175:23)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier2.spec.ts:15:3"
-                    }
-                  ],
+                  "status": "passed",
+                  "duration": 9720,
+                  "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:22:13.064Z",
+                  "startTime": "2026-08-10T12:03:46.507Z",
                   "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier2-T2-1-vehicle-allocat-daaf9-t-luggage-adjusted-capacity-phone\\error-context.md"
-                    },
-                    {
-                      "name": "trace",
-                      "contentType": "application/zip",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier2-T2-1-vehicle-allocat-daaf9-t-luggage-adjusted-capacity-phone\\trace.zip"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
-                    "column": 23,
-                    "line": 175
-                  }
+                  "attachments": []
                 }
               ],
-              "status": "unexpected"
+              "status": "expected"
             }
           ],
           "id": "eaa73614df34142dcf75-db63d943a73d8e53d068",
@@ -991,20 +983,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11846,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T09:22:24.159Z",
+                  "startTime": "2026-08-10T12:04:24.495Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "skipped"
+              "status": "expected"
             }
           ],
           "id": "eaa73614df34142dcf75-c02977fb82c0b9d2a7cf",
@@ -1017,10 +1009,10 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-08-10T09:18:45.184Z",
-    "duration": 219009.047,
-    "expected": 13,
-    "skipped": 6,
+    "startTime": "2026-08-10T11:59:14.714Z",
+    "duration": 321781.367,
+    "expected": 5,
+    "skipped": 14,
     "unexpected": 3,
     "flaky": 0
   }

@@ -78,5 +78,17 @@ export default defineConfig({
       },
       testMatch: /identity\.spec\.ts/,
     },
+    {
+      // The client's single screen. Its own project rather than a fifth
+      // scored spec: the tier suites are a serial chain that mutates shared
+      // rows, and this one only ever reads. Run it with
+      // `npx playwright test --project=client`.
+      name: 'client',
+      use: {
+        ...devices['Pixel 5'],
+        viewport: { width: 360, height: 800 },
+      },
+      testMatch: /client-view\.spec\.ts/,
+    },
   ],
 })

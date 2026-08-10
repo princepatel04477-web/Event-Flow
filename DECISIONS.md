@@ -5,6 +5,56 @@ made, so the next session does not re-litigate it.
 
 ---
 
+## 10 August 2026 — The client view, and the app icon
+
+### `/[eventCode]/guests` serves two screens off one URL
+
+The 7 August rewrite below turned this route into the staff list and put
+`requireStaff` on it. `requireStaff` sends a client to `/{eventCode}/guests` —
+which *is* this page. The client's only permitted screen bounced them at
+itself, and the loop surfaced through the event error boundary as "This screen
+did not load". The client view was not broken so much as deleted: the commit
+kept `GuestCard`, `FamilySection` and `format.ts` and dropped the page that
+used them.
+
+The page now branches on `getEventAccess` (memoised per request, so resolving
+it after the layout already did is free) instead of gating. Staff get the
+windowed list; a client gets `ClientGuestList`.
+
+**The two data sources are not interchangeable.** `search_guest_profiles` is
+`language sql stable` with no `security definer`, so it runs as the invoker and
+`guest_groups` RLS applies — a client reads **zero rows** through it. Pointing
+the client screen at the staff source does not error; it renders a confident
+"No guest details yet" on a wedding with 238 families. The client reads
+`client_guest_profiles`, never joined (`security_invoker = false`; a join
+against any base table reintroduces that table's RLS and empties the result).
+
+### The client list pages instead of virtualising
+
+Same 26-second lesson as below, different fix. Virtualising needs a fixed row
+height, and a `GuestCard`'s height depends on how much of that family's travel
+is known. So the list renders 15 families and grows on demand, with in-memory
+search over the one cached read. First card visible in ~3.6s against a
+765-guest event; every guest still reachable.
+
+Cards carry no links. The RSVP record they would link to is a staff screen
+that would bounce a client straight back here.
+
+Guarded by `e2e/client-view.spec.ts` (its own Playwright project — the tier
+suites are a serial chain that mutates shared rows, and this one only reads).
+Both routing tests fail against the previous page, which is the point.
+
+### App icon comes from `nuvent_logo.png`
+
+Legacy mipmaps take the full tile. The adaptive foreground draws it at 68 of
+the 108dp canvas rather than full-bleed: at full-bleed the "EVENT OPERATIONS"
+line and the outer arcs of the N fall outside the 66dp guaranteed-visible
+circle and a round launcher slices them off. `ic_launcher_background` is
+`#0E2523`, sampled from the tile's own edge, so the corners the mask does eat
+blend rather than show a seam.
+
+---
+
 ## 7 August 2026 — Guest list: windowed rendering + server-side search
 
 ### `/guests` is now a windowed client list, not a server-rendered card wall
