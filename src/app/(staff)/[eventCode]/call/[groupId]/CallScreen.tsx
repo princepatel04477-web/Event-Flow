@@ -36,6 +36,7 @@ import {
   type GuestGroupRow,
   type TravelLegRow,
 } from '@/lib/call/types'
+import { VoiceNoteRecorder } from '@/components/voice-note/VoiceNoteRecorder'
 
 export interface CallScreenProps {
   eventId: string
@@ -571,44 +572,53 @@ export function CallScreen({
         ) : null}
 
         {phase === 'submitted' ? (
-          <Card>
-            <CardBody className="flex flex-col items-center gap-2 py-6 text-center">
-              {savedOffline ? (
-                <>
-                  <ClockIcon className="h-8 w-8 text-warning" />
-                  <p className="text-base font-semibold text-fg">Saved on this phone</p>
-                  <p className="max-w-xs text-sm text-muted">
-                    No signal right now — this outcome will sync automatically the moment you are
-                    back online. It is not lost.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <CheckCircleIcon className="h-8 w-8 text-success" />
-                  <p className="text-base font-semibold text-fg">Outcome saved</p>
-                  <p className="text-sm text-muted">This record cannot be edited from here on.</p>
-                </>
-              )}
-            </CardBody>
-            <CardFooter className="flex flex-col gap-2">
-              <Button fullWidth variant="primary" onClick={handleRelease} loading={releasing}>
-                Release family &amp; back to queue
-              </Button>
-              <div className="flex w-full gap-2">
-                <Button
-                  variant="secondary"
-                  fullWidth
-                  onClick={handleCallAgain}
-                  disabled={!primaryTarget && !altTarget}
-                >
-                  Call again
+          <>
+            {!savedOffline && activeAttempt ? (
+              <VoiceNoteRecorder
+                eventId={eventId}
+                groupId={group.id}
+                callAttemptId={activeAttempt.attemptId}
+              />
+            ) : null}
+            <Card>
+              <CardBody className="flex flex-col items-center gap-2 py-6 text-center">
+                {savedOffline ? (
+                  <>
+                    <ClockIcon className="h-8 w-8 text-warning" />
+                    <p className="text-base font-semibold text-fg">Saved on this phone</p>
+                    <p className="max-w-xs text-sm text-muted">
+                      No signal right now — this outcome will sync automatically the moment you are
+                      back online. It is not lost.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircleIcon className="h-8 w-8 text-success" />
+                    <p className="text-base font-semibold text-fg">Outcome saved</p>
+                    <p className="text-sm text-muted">This record cannot be edited from here on.</p>
+                  </>
+                )}
+              </CardBody>
+              <CardFooter className="flex flex-col gap-2">
+                <Button fullWidth variant="primary" onClick={handleRelease} loading={releasing}>
+                  Release family &amp; back to queue
                 </Button>
-                <Button variant="ghost" fullWidth onClick={() => router.push(`/${eventCode}/queue`)}>
-                  Back without releasing
-                </Button>
-              </div>
-            </CardFooter>
-          </Card>
+                <div className="flex w-full gap-2">
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    onClick={handleCallAgain}
+                    disabled={!primaryTarget && !altTarget}
+                  >
+                    Call again
+                  </Button>
+                  <Button variant="ghost" fullWidth onClick={() => router.push(`/${eventCode}/queue`)}>
+                    Back without releasing
+                  </Button>
+                </div>
+              </CardFooter>
+            </Card>
+          </>
         ) : null}
 
         {queuedCount > 0 ? (

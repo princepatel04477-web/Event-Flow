@@ -6,6 +6,12 @@ import { createClient } from '@/lib/supabase/server'
 import { friendlyDbError, isFrozenRowError } from '@/lib/errors'
 import type { CallCompletionPayload, CallAttemptRow, GuestGroupRow } from '@/lib/call/types'
 
+function extractConstraintName(error: { message?: string | null } | null | undefined): string | null {
+  if (!error?.message) return null
+  const match = /constraint\s+"(\w+)"/i.exec(error.message)
+  return match?.[1] ?? null
+}
+
 /**
  * Server actions for the call screen (p1f).
  *
@@ -149,6 +155,20 @@ export async function startCallAttempt(input: {
     .single()
 
   if (error || !data) {
+    // Log constraint violations to the server console so the SQLSTATE and
+    // constraint name are in the Vercel log — 23514 with no constraint name
+    // is how this bug was diagnosed, and a generic user message would have
+    // sent the developer on a wild goose chase without this.
+    if (error?.code === '23514') {
+      const constraint = extractConstraintName(error)
+      console.error('[startCallAttempt] CHECK violation', {
+        sqlstate: error.code,
+        constraint,
+        eventId: input.eventId,
+        groupId: input.groupId,
+        message: error.message?.slice(0, 200),
+      })
+    }
     return { ok: false, message: friendlyDbError(error) }
   }
 

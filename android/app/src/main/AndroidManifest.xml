@@ -68,4 +68,9 @@
     <!-- M6: direct dial (ACTION_CALL) + automatic call-state tracking. -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- H1: call-recording harvest. MANAGE_EXTERNAL_STORAGE would be rejected
+         by Play Store review. We sideload the APK, so this is acceptable. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <!-- H5: voice-note recorder. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 </manifest>

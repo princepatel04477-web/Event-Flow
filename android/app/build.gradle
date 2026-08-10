@@ -14,6 +14,11 @@ if (hasKeystore) {
 }
 
 android {
+    // Build output goes outside OneDrive — its NTFS redirector holds locks
+    // on intermediate build files even when sync is paused, and Gradle's
+    // mergeResources task fails with AccessDeniedException on deletion.
+    buildDir = "C:/android-builds/nuvent/debug"
+    
     namespace = "com.nuvent.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {

@@ -25,7 +25,10 @@ export async function getSessionClaims(): Promise<CodeAuthClaims | null> {
 
   if (!(await isAccessCodeLive(token))) return null
 
-  const staffMemberId = cookieStore.get(STAFF_MEMBER_COOKIE)?.value ?? null
+  const staffMemberId =
+    claims.staffMemberId ??
+    cookieStore.get(STAFF_MEMBER_COOKIE)?.value ??
+    null
   return { ...claims, staffMemberId }
 }
 
