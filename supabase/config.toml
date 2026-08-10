@@ -418,3 +418,12 @@ enabled = true
 # its own hash lookup + rate limiting and mints the session JWT.
 [functions.verify-access-code]
 verify_jwt = false
+
+# Called by the call_recordings AFTER INSERT trigger through pg_net, which
+# sends only `x-webhook-secret` — there is no Authorization header and no
+# session behind it. With verify_jwt on, the platform gateway returns 401
+# before the function runs; the trigger swallows that by design, so the
+# symptom is transcripts silently never appearing. The function does its own
+# shared-secret check instead.
+[functions.transcribe-recording]
+verify_jwt = false

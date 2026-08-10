@@ -246,12 +246,21 @@ Enforced at the **database level**, not in application code. Do not weaken them.
    `auth.uid()`; its identity is the selected `staff_members.id`. Every attribution column
    (`locked_by`, `caller_id`, `created_by`, `uploaded_by`, `assigned_by`, `imported_by`)
    therefore has a nullable `_staff` sibling (`locked_by_staff`, `caller_id_staff`, ...) with
-   `ON DELETE RESTRICT` to `staff_members(id)`. `delivery_proofs` set the precedent
-   (`captured_by` + `captured_by_staff`). Rules:
+   `ON DELETE RESTRICT` to `staff_members(id)`. Rules:
    - A `CHECK` (`num_nonnulls(pair) <= 1`, or `= 1` where the column was NOT NULL) makes
      double-attribution impossible — "who did this" is always answerable.
    - A `BEFORE INSERT` trigger (`app.route_attribution`) writes the staff column for a
      team session (`jwt_staff_member_id` present) and the auth column for an admin.
+   - **`delivery_proofs` was the exception, not the precedent.** Until
+     `20260809130000` it had *neither* the CHECK nor the trigger, while this section
+     claimed it set the pattern. L1 found a team session could write a proof carrying
+     **both** `captured_by` and `captured_by_staff` — and proofs are insert-only, so the
+     row could never be corrected. That migration adds the `delivery_proofs` branch to
+     `route_attribution`, drops the stale `app.current_identity()` defaults, and requires
+     `captured_by is null` in the insert policy. **The pair CHECK is still missing**: two
+     live rows have neither column set and cannot be repaired or deleted. See `TEST-LOG.md`.
+   - `app.route_attribution` dispatches on `TG_TABLE_NAME`. Attaching it to a new table
+     without adding a branch silently does nothing — it falls through to `return NEW`.
    - `claim_group` / `release_group` write/clear the lock pair.
    - Read paths (the call/RSVP "in-flight" checks, "you" labels, the export's `deliveredBy`)
      resolve whichever column is populated — never assume one.
@@ -379,28 +388,93 @@ Feed the group's **existing record** into the prompt as context — that is what
 Instruct the model to emit `null` rather than guess, especially on flight numbers.
 A hallucinated PNR is worse than a blank.
 
+### The STT step — `transcribe-recording` Edge Function
+
+Sarvam Saaras v3, batch, with diarization (~₹45/hour). Key is in Edge Function secrets
+only (`SARVAM_API_KEY`) — the APK is a zip file and anyone can read its strings.
+
+**Trigger: a Database Webhook, not a direct invoke from the app.** Migration
+`20260810120000_transcribe_webhook.sql` puts an `after insert` trigger on
+`call_recordings` that calls the function through `pg_net`. Chosen because the phone is
+the least reliable component here: a client-driven invoke fires from the same handset
+that just lost signal mid-upload, so "recording committed" and "transcription attempted"
+would routinely diverge with nothing recording that a transcript was ever expected.
+There is also no app-side producer today — the M7 upload path is unwired, so a direct
+invoke has no call site. **The trigger swallows every error**: a failure to enqueue must
+never block the insert, because a recording with no transcript is recoverable and lost
+audio is not.
+
+Setup is two Vault secrets (`transcribe_webhook_url`, `transcribe_webhook_secret`) plus
+the matching `TRANSCRIBE_WEBHOOK_SECRET` Edge Function secret — see the migration header.
+Until those exist the trigger warns and does nothing; recordings still save.
+
+Things that are not what you'd assume:
+
+- **`transcripts.text` is `NOT NULL`** — a legacy column from `0200` that predates
+  `full_text`. The pending row is inserted with `text = ''` before Sarvam is called, and
+  both `text` and `full_text` are set on completion. Do not "fix" this by nulling `text`
+  without a migration.
+- **`transcripts` has no `group_id`.** It carries `event_id` and `recording_id` only; the
+  group is reached via `recording_id → call_recordings.group_id`.
+- **The cost counter is derived, never stored** — cumulative hours are summed from
+  `call_recordings.duration_sec` over completed transcripts. Same reasoning as §5.4:
+  a stored counter drifts, and one that drifts upward silences the alert exactly when a
+  retry loop is burning money. Alert threshold 50h against a ~40h expected ceiling.
+- **`raw_response` keeps the entire Sarvam payload, untrimmed.** Re-running extraction is
+  ~₹0.03; re-running STT is ~₹0.75. Never discard a field and force the expensive path.
+- **4xx is never retried**, 5xx and timeouts are retried 3× with exponential backoff. A
+  4xx fails identically every time and each attempt is billable.
+- **Recordings under 10s are skipped** with `status='failed'`, `error_text='too_short'`,
+  and no API call — a misdial is not worth ₹0.75.
+- `v_transcription_backlog` is the retry work list: recordings with no transcript, or one
+  stuck `pending`/`processing`/`failed`.
+- **The function runs on the service role, so RLS cannot constrain what it writes.** Its
+  restraint (transcripts only) is enforced by review, not by the grant system — see the
+  header of `tests/l2_transcribe.sql`. Making that a hard guarantee means moving it to a
+  dedicated database role with explicit grants.
+
 ---
 
 ## 10. Where the schema differs from what you'd assume
 
 Verified against the migrations. Do not go looking for things in this list — they aren't there.
 
-- **Room double-booking is *not* prevented by an `EXCLUDE` constraint.** There is no
-  `btree_gist`, no `stay_range` column, no exclusion constraint anywhere. What exists is
-  `app.guard_room_capacity()`, a `before insert or update` trigger that counts active
-  assignments and raises `23514` if occupancy would exceed `rooms.capacity`, bypassable with
-  `is_override = true` plus a non-null `override_reason`. Plus a partial unique index
-  `room_assignments_one_active_per_guest on (guest_id) where released_at is null`, so one
-  guest cannot hold two active rooms. **Date ranges are not considered at all** —
-  `check_in_date` / `check_out_date` are informational. Two guests in the same room on
-  non-overlapping dates still both count against capacity. If true date-range exclusion is
-  wanted, it is new work.
+- **Room double-booking IS prevented — by a trigger, not an `EXCLUDE` constraint.**
+  There is no `btree_gist` and no exclusion constraint, but since `20260805140000`
+  there *is* a date-range overlap guard: `app.guard_room_overlap()`, a
+  `before insert or update` trigger raising `23514` when two **active** (unreleased)
+  stays overlap on the same room, using `daterange(..., '[)')` so a checkout day and the
+  next checkin day do not collide. A trigger was chosen deliberately over `EXCLUDE`
+  because `room_assignments` uses soft-release and an `EXCLUDE` cannot be partial —
+  released history would wrongly block new bookings. Verified by L1
+  (`L1.4-room-overlap`, `L1.4-room-adjacent`).
+  Alongside it: `app.guard_room_capacity()` counts active assignments and raises `23514`
+  if occupancy would exceed `rooms.max_capacity` (the extra-bed ceiling; `capacity` is the
+  base), bypassable with `is_override = true` plus a non-null `override_reason`. Plus a
+  partial unique index `room_assignments_one_active_per_guest on (guest_id) where
+  released_at is null`, so one guest cannot hold two active rooms.
+  *(An earlier version of this section claimed no overlap guard existed at all and that
+  date ranges were ignored. Both were wrong.)*
 - **There is no "disputed proof" mechanism.** `delivery_proofs` has no `disputed` column and
   no admin flow to mark one. The row is genuinely immutable. Building this means a new
   sibling table — do not add a column to `delivery_proofs`.
 - **There are no `desk` or `hamper` roles.** `app.event_role` is exactly
   `('event_team', 'client')`. A finer field-staff split needs an enum value plus new RLS, and
   every existing `app.is_staff()` call would need revisiting.
+- **There is no `admin_users` table.** Admin identity is `profiles.global_role = 'admin'`.
+  The admin-related tables that *do* exist are `admin_devices`, `event_access_codes`,
+  `code_reveal_log` and `login_attempt_log`. Likewise the extraction table is
+  `rsvp_extractions`, not `extractions`.
+- **Revoking or rotating an access code now ends live sessions** (`20260809140000`).
+  Before it, `verifyCodeAuthToken` checked signature and expiry only and RLS read claims
+  straight from the JWT, so a revoked code left a phone with full read *and write* access
+  until the token expired — confirmed against the live project, 30-day tokens. Enforcement
+  is `app.code_is_live()`, folded into `app.is_staff()` / `app.is_member()` so PostgREST is
+  covered too, plus `public.session_code_live()` for the app layer. `app.rotate_access_code`
+  now retires the old row and inserts a replacement (it used to stamp `rotated_at` and then
+  null it on the same row, marking nothing). Session lifetime is **7 days**, not 30.
+  Uniqueness is a partial index over live codes only, so retired rows persist —
+  they must, or a retired session could not be recognised.
 - **Audit trigger coverage is not universal.** Attached to: `events`, `profiles`,
   `event_members`, `guest_groups`, `guests`, `travel_legs`, `call_attempts`,
   `call_recordings`, `rsvp_extractions`, `hotels`, `rooms`, `room_assignments`,
