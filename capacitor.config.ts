@@ -91,8 +91,27 @@ const config: CapacitorConfig = {
       style: 'DARK',
       backgroundColor: '#071a1d',
     },
+    // The splash is dismissed PROGRAMMATICALLY, by WelcomeOverlay, one painted
+    // frame after React mounts — not on a fixed timer. A timer is always
+    // either too short (the app is not ready, so it flashes an empty screen)
+    // or too long (the app has been ready for 900ms and staff are waiting on
+    // an animation). Hiding it when the first frame actually exists is the
+    // only version that is right on both a fast handset and a slow one.
+    //
+    // `launchAutoHide` stays TRUE, with a deliberately generous duration, and
+    // that is not a contradiction — it is the failsafe. In remote-shell mode
+    // an unreachable server renders `errorPath: offline.html`, a static file
+    // with no React in it, so nothing would ever call `SplashScreen.hide()`.
+    // With autoHide false, the one failure mode this app is most likely to hit
+    // at a venue — bad Wi-Fi — would park every handset on the splash forever.
+    // So: the programmatic hide is the mechanism (and fires in ~1 frame), and
+    // the 3s native timer exists purely so a dead network cannot strand anyone.
+    // Do not lower it to make the splash feel faster; it is never what you are
+    // waiting for on a healthy launch.
     SplashScreen: {
-      launchShowDuration: 1500,
+      launchAutoHide: true,
+      launchShowDuration: 3000,
+      launchFadeOutDuration: 200,
       backgroundColor: '#071a1d',
       showSpinner: false,
     },

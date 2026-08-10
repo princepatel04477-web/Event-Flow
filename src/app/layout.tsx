@@ -7,6 +7,8 @@ import {
 } from 'next/font/google'
 import type { ReactNode } from 'react'
 
+import { MotionProvider } from '@/components/motion/MotionProvider'
+import { WelcomeOverlay } from '@/components/motion/WelcomeOverlay'
 import { NativeBridge } from '@/components/native/NativeBridge'
 import { SessionBridge } from '@/components/native/SessionBridge'
 import { OfflineBanner } from '@/components/native/OfflineBanner'
@@ -124,7 +126,16 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
               which throws in Capacitor 8 and blanks the WebView. Restore once
               the core/capgo versions align. */}
           <OfflineBanner />
-          {children}
+          {/* MotionProvider renders no DOM — it supplies the LazyMotion and
+              MotionConfig context (OS reduced-motion, the house easing) and
+              code-splits the feature bundle off the initial route. It wraps
+              WelcomeOverlay because the overlay uses `m` components, and
+              wraps `children` so screens can animate without each one
+              re-establishing the context. */}
+          <MotionProvider>
+            <WelcomeOverlay />
+            {children}
+          </MotionProvider>
         </SentryErrorBoundary>
       </body>
     </html>
