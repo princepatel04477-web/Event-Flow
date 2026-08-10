@@ -43,11 +43,47 @@ const NAMES = {
   'T2.2': 'Offline capture and sync',
 }
 
+/**
+ * Read Playwright's JSON report, retrying transient Windows file locks.
+ *
+ * Observed 2026-08-10: `UNKNOWN: unknown error, open 'e2e/results.json'`
+ * immediately after a run that had in fact written the file correctly. This
+ * repo lives under OneDrive, whose sync engine grabs a just-written file; the
+ * same shows up as EBUSY/EPERM. Because report.mjs is the last link of an
+ * `&&` chain, one such blip left ACCEPTANCE-REPORT.md silently a day stale
+ * while the suite itself was fine — a stale report is worse than no report,
+ * because it looks current.
+ *
+ * Retries, then fails LOUDLY rather than leaving the old file in place.
+ */
 function load() {
-  if (!existsSync(RESULTS)) {
-    throw new Error('e2e/results.json not found — run the suite first.')
+  const RETRIES = 8
+  let lastErr = null
+
+  for (let attempt = 1; attempt <= RETRIES; attempt++) {
+    if (!existsSync(RESULTS)) {
+      lastErr = new Error('e2e/results.json not found — run the suite first.')
+    } else {
+      try {
+        const raw = readFileSync(RESULTS, 'utf8')
+        // A partially-flushed file parses as invalid JSON; treat that as
+        // retryable too rather than reporting a corrupt run.
+        return JSON.parse(raw)
+      } catch (err) {
+        lastErr = err
+      }
+    }
+    // Busy-wait briefly; this runs once at the end of a 4-minute suite.
+    const until = Date.now() + 400
+    while (Date.now() < until) {
+      /* spin */
+    }
   }
-  return JSON.parse(readFileSync(RESULTS, 'utf8'))
+
+  throw new Error(
+    `Could not read e2e/results.json after ${RETRIES} attempts: ${lastErr?.message}. ` +
+      'ACCEPTANCE-REPORT.md has NOT been updated and is now stale — do not trust it.',
+  )
 }
 
 function flatten(report) {
