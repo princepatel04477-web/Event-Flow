@@ -159,6 +159,20 @@ export function DashboardClient({ eventId, eventCode }: Props) {
         </div>
       </section>
 
+      {/* ---- Access ---- */}
+      <section>
+        <h2 className="eyebrow mb-3">Access</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <Link
+            href={`/admin/events/${eventCode}/codes`}
+            className="tap flex flex-col gap-1 rounded-2xl border border-border bg-surface p-4"
+          >
+            <span className="text-sm font-semibold text-fg">Access codes</span>
+            <span className="text-xs text-muted">Issue a team or client code</span>
+          </Link>
+        </div>
+      </section>
+
       {/* ---- Today detail ---- */}
       <TodayPanel arrivals={today.arrivals} departures={today.departures} date={todayDate} eventCode={eventCode} />
 
