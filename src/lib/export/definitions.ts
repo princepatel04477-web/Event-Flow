@@ -5,16 +5,22 @@
  */
 import type { AnySheetDefinition } from './workbook'
 import {
+  buildCallLogRows,
   buildDeliverableRows,
   buildExceptionRows,
   buildFamilyHeadRows,
   buildGuestMasterRows,
   buildRoomAllocationRows,
+  buildArrivalManifestRows,
+  buildDepartureManifestRows,
+  type CallLogRow,
   type DeliverableRowExport,
   type ExceptionRow,
   type ExportData,
   type FamilyHeadRow,
   type GuestMasterRow,
+  type ArrivalManifestRow,
+  type DepartureManifestRow,
   type RoomAllocationRow,
 } from './sheets'
 
@@ -34,6 +40,9 @@ export function buildSheetDefinitions(data: ExportData): ExportSheetDefinition[]
   const roomRows = buildRoomAllocationRows(data)
   const deliverableRows = buildDeliverableRows(data)
   const exceptionRows = buildExceptionRows(data)
+  const callLogRows = buildCallLogRows(data)
+  const arrivalRows = buildArrivalManifestRows(data)
+  const departureRows = buildDepartureManifestRows(data)
 
   return [
     guestMasterSheet(guestMasterRows),
@@ -41,6 +50,9 @@ export function buildSheetDefinitions(data: ExportData): ExportSheetDefinition[]
     roomAllocationSheet(roomRows),
     deliverablesSheet(deliverableRows),
     exceptionsSheet(exceptionRows),
+    callLogSheet(callLogRows),
+    arrivalManifestSheet(arrivalRows),
+    departureManifestSheet(departureRows),
   ]
 }
 
@@ -160,5 +172,72 @@ function exceptionsSheet(rows: ExceptionRow[]): AnySheetDefinition {
     ],
     // Every row in this sheet is an exception — amber all of them.
     isException: () => true,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sheet 6 — RSVP Call Log
+// ---------------------------------------------------------------------------
+
+function callLogSheet(rows: CallLogRow[]): AnySheetDefinition {
+  return {
+    name: 'RSVP Call Log',
+    rows,
+    columns: [
+      { key: 'callIndex', header: '#', type: 'number', width: 5 },
+      { key: 'headName', header: 'Family head', type: 'string', width: 28 },
+      { key: 'phone', header: 'Phone', type: 'string', width: 16 },
+      { key: 'startedAt', header: 'Started', type: 'string', width: 18 },
+      { key: 'endedAt', header: 'Ended', type: 'string', width: 18 },
+      { key: 'durationSec', header: 'Duration (s)', type: 'number', width: 12 },
+      { key: 'outcome', header: 'Outcome', type: 'string', width: 14 },
+    ],
+    headerNote: 'All times IST',
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sheet 7 — Arrivals Manifest (the sheet the transport team works from)
+// ---------------------------------------------------------------------------
+
+function arrivalManifestSheet(rows: ArrivalManifestRow[]): AnySheetDefinition {
+  return {
+    name: 'Arrivals',
+    rows,
+    columns: [
+      { key: 'headName', header: 'Family head', type: 'string', width: 28 },
+      { key: 'phone', header: 'Phone', type: 'string', width: 16 },
+      { key: 'pax', header: 'Pax', type: 'number', width: 6 },
+      { key: 'arrivalDate', header: 'Arrival date', type: 'string', width: 14 },
+      { key: 'arrivalTime', header: 'Time', type: 'time', width: 8 },
+      { key: 'arrivalMode', header: 'Mode', type: 'string', width: 10 },
+      { key: 'arrivalPoint', header: 'Point', type: 'text', width: 22 },
+      { key: 'arrivalReference', header: 'Reference', type: 'text', width: 18 },
+      { key: 'rsvpStatus', header: 'RSVP', type: 'string', width: 14 },
+    ],
+    headerNote: 'All times IST · Sorted by arrival',
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sheet 8 — Departures Manifest
+// ---------------------------------------------------------------------------
+
+function departureManifestSheet(rows: DepartureManifestRow[]): AnySheetDefinition {
+  return {
+    name: 'Departures',
+    rows,
+    columns: [
+      { key: 'headName', header: 'Family head', type: 'string', width: 28 },
+      { key: 'phone', header: 'Phone', type: 'string', width: 16 },
+      { key: 'pax', header: 'Pax', type: 'number', width: 6 },
+      { key: 'departureDate', header: 'Departure date', type: 'string', width: 14 },
+      { key: 'departureTime', header: 'Time', type: 'time', width: 8 },
+      { key: 'departureMode', header: 'Mode', type: 'string', width: 10 },
+      { key: 'departurePoint', header: 'Point', type: 'text', width: 22 },
+      { key: 'departureReference', header: 'Reference', type: 'text', width: 18 },
+      { key: 'rsvpStatus', header: 'RSVP', type: 'string', width: 14 },
+    ],
+    headerNote: 'All times IST · Sorted by departure',
   }
 }

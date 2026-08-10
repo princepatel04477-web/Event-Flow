@@ -106,6 +106,8 @@ function makeData(): ExportData {
     hotels: [],
     profileNames: {},
     staffNames: {},
+    callAttempts: [],
+    extractions: [],
   }
 }
 
@@ -309,7 +311,7 @@ describe('format traps', () => {
   it('freezes the header row and applies an autofilter on every sheet', () => {
     const data = makeData()
     const wb = buildWorkbook(buildSheetDefinitions(data))
-    for (const sheetName of ['Guest Master', 'Family Heads', 'Room Allocation', 'Deliverables', 'Exceptions']) {
+    for (const sheetName of ['Guest Master', 'Family Heads', 'Room Allocation', 'Deliverables', 'Exceptions', 'RSVP Call Log', 'Arrivals', 'Departures']) {
       const ws = wb.Sheets[sheetName]
       expect(ws).toBeDefined()
       expect(ws['!freeze']).toEqual({ xSplit: 0, ySplit: 1, topLeftCell: 'A2' })

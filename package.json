@@ -11,6 +11,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:fixture": "node scripts/build-test-fixture.mts",
+    "eval:extraction": "vitest run tests/extraction-eval.test.ts",
     "test:acceptance": "node e2e/fixtures/generate.mjs && node scripts/seed-543.mjs && npx playwright test --project=phone && node e2e/report.mjs",
     "types:gen": "npx supabase gen types typescript --linked --schema public,app > src/lib/supabase/database.types.ts",
     "mobile": "next build && npx cap sync android",

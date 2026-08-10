@@ -21,6 +21,8 @@ export type DeliveryProofRow = Database['public']['Tables']['delivery_proofs']['
 export type RoomAssignmentRow = Database['public']['Tables']['room_assignments']['Row']
 export type RoomRow = Database['public']['Tables']['rooms']['Row']
 export type HotelRow = Database['public']['Tables']['hotels']['Row']
+export type CallAttemptRow = Database['public']['Tables']['call_attempts']['Row']
+export type RsvpExtractionRow = Database['public']['Tables']['rsvp_extractions']['Row']
 
 // ---------------------------------------------------------------------------
 // Sheet row shapes
@@ -93,6 +95,40 @@ export interface ExceptionRow {
   detail: string
 }
 
+export interface CallLogRow {
+  headName: string
+  phone: string
+  startedAt: string
+  endedAt: string | null
+  durationSec: number | null
+  outcome: string
+  callIndex: number
+}
+
+export interface ArrivalManifestRow {
+  headName: string
+  phone: string
+  pax: number
+  arrivalDate: string
+  arrivalTime: string
+  arrivalMode: string
+  arrivalPoint: string
+  arrivalReference: string
+  rsvpStatus: string
+}
+
+export interface DepartureManifestRow {
+  headName: string
+  phone: string
+  pax: number
+  departureDate: string
+  departureTime: string
+  departureMode: string
+  departurePoint: string
+  departureReference: string
+  rsvpStatus: string
+}
+
 // ---------------------------------------------------------------------------
 // Fetching
 // ---------------------------------------------------------------------------
@@ -105,6 +141,8 @@ export interface ExportData {
   assignments: RoomAssignmentRow[]
   rooms: RoomRow[]
   hotels: HotelRow[]
+  callAttempts: CallAttemptRow[]
+  extractions: RsvpExtractionRow[]
   /** profiles keyed by user id -> display name, for "delivered by". */
   profileNames: Record<string, string>
   /** staff members keyed by id -> name, for code-auth proof attribution. */
@@ -346,6 +384,123 @@ export function buildExceptionRows(data: ExportData): ExceptionRow[] {
   }
 
   return exceptions
+}
+
+// ---------------------------------------------------------------------------
+// Sheet 6 — RSVP Call Log (every call attempt, ordered by time)
+// ---------------------------------------------------------------------------
+
+const CALL_OUTCOME_LABELS: Record<string, string> = {
+  confirmed: 'Confirmed',
+  declined: 'Declined',
+  tentative: 'Tentative',
+  callback: 'Callback',
+  unreachable: 'Unreachable',
+  wrong_number: 'Wrong number',
+  no_answer: 'No answer',
+}
+
+export function buildCallLogRows(data: ExportData): CallLogRow[] {
+  const groupById = new Map(data.groups.map((g) => [g.id, g]))
+
+  // Include failed transcriptions as call rows too — they're real calls, and
+  // the transport team needs to know which families are still unknown.
+  const recordingGroupIds = new Set<string>()
+  for (const ca of data.callAttempts) {
+    recordingGroupIds.add(ca.group_id)
+  }
+
+  const rows: CallLogRow[] = data.callAttempts
+    .slice()
+    .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime())
+    .map((ca, i) => {
+      const g = groupById.get(ca.group_id)
+      return {
+        headName: g?.head_name ?? 'Unknown',
+        phone: ca.dialed_number,
+        startedAt: ca.started_at,
+        endedAt: ca.ended_at,
+        durationSec: ca.duration_sec,
+        outcome: ca.outcome ? (CALL_OUTCOME_LABELS[ca.outcome] ?? ca.outcome) : '—',
+        callIndex: i + 1,
+      }
+    })
+
+  return rows
+}
+
+// ---------------------------------------------------------------------------
+// Sheet 7 — Arrivals Manifest (sorted by arrival datetime; transport works from this)
+// ---------------------------------------------------------------------------
+
+export function buildArrivalManifestRows(data: ExportData): ArrivalManifestRow[] {
+  const groupById = new Map(data.groups.map((g) => [g.id, g]))
+
+  const rows = data.legs
+    .filter((l) => l.direction === 'arrival')
+    .map((l) => {
+      const g = groupById.get(l.group_id)
+      return {
+        headName: g?.head_name ?? 'Unknown',
+        phone: g?.primary_mobile ?? '',
+        pax: g ? (g.confirmed_pax ?? g.expected_pax) : 0,
+        arrivalDate: l.travel_date ?? '',
+        arrivalTime: l.travel_time ? l.travel_time.slice(0, 5) : '',
+        arrivalMode: l.mode ? TRAVEL_MODE_LABELS[l.mode] ?? l.mode : '',
+        arrivalPoint: l.point ?? '',
+        arrivalReference: l.reference ?? '',
+        rsvpStatus: g ? RSVP_STATUS_LABELS[g.rsvp_status] ?? g.rsvp_status : '',
+        dateValue: l.travel_date
+          ? new Date(`${l.travel_date}T${l.travel_time ?? '00:00'}:00`)
+          : null,
+      } as ArrivalManifestRow & { dateValue: Date | null }
+    })
+    .sort((a, b) => {
+      if (!a.dateValue && !b.dateValue) return 0
+      if (!a.dateValue) return 1
+      if (!b.dateValue) return -1
+      return a.dateValue.getTime() - b.dateValue.getTime()
+    })
+    .map(({ dateValue: _, ...rest }) => rest)
+
+  return rows
+}
+
+// ---------------------------------------------------------------------------
+// Sheet 8 — Departures Manifest (same, for departure)
+// ---------------------------------------------------------------------------
+
+export function buildDepartureManifestRows(data: ExportData): DepartureManifestRow[] {
+  const groupById = new Map(data.groups.map((g) => [g.id, g]))
+
+  const rows = data.legs
+    .filter((l) => l.direction === 'departure')
+    .map((l) => {
+      const g = groupById.get(l.group_id)
+      return {
+        headName: g?.head_name ?? 'Unknown',
+        phone: g?.primary_mobile ?? '',
+        pax: g ? (g.confirmed_pax ?? g.expected_pax) : 0,
+        departureDate: l.travel_date ?? '',
+        departureTime: l.travel_time ? l.travel_time.slice(0, 5) : '',
+        departureMode: l.mode ? TRAVEL_MODE_LABELS[l.mode] ?? l.mode : '',
+        departurePoint: l.point ?? '',
+        departureReference: l.reference ?? '',
+        rsvpStatus: g ? RSVP_STATUS_LABELS[g.rsvp_status] ?? g.rsvp_status : '',
+        dateValue: l.travel_date
+          ? new Date(`${l.travel_date}T${l.travel_time ?? '00:00'}:00`)
+          : null,
+      } as DepartureManifestRow & { dateValue: Date | null }
+    })
+    .sort((a, b) => {
+      if (!a.dateValue && !b.dateValue) return 0
+      if (!a.dateValue) return 1
+      if (!b.dateValue) return -1
+      return a.dateValue.getTime() - b.dateValue.getTime()
+    })
+    .map(({ dateValue: _, ...rest }) => rest)
+
+  return rows
 }
 
 // ---------------------------------------------------------------------------

@@ -42,6 +42,9 @@ export async function readExportData(eventId: string): Promise<ExportDataResult>
     supabase.from('profiles').select('id, full_name').limit(1000),
     // staff_members resolves captured_by_staff on code-auth proofs.
     supabase.from('staff_members').select('id, full_name').eq('event_id', eventId),
+    // Call log + extraction audit (N6 export sheets 6-8)
+    supabase.from('call_attempts').select('*').eq('event_id', eventId),
+    supabase.from('rsvp_extractions').select('*').eq('event_id', eventId),
   ])
 
   const failure = rest.find((r) => r.error)
@@ -49,7 +52,7 @@ export async function readExportData(eventId: string): Promise<ExportDataResult>
     return { ok: false, message: `Could not read export data: ${failure.error.message}` }
   }
 
-  const [groups, legs, deliverables, proofs, assignments, rooms, hotels, profiles, staffMembers] = rest
+  const [groups, legs, deliverables, proofs, assignments, rooms, hotels, profiles, staffMembers, callAttempts, extractions] = rest
 
   const profileNames: Record<string, string> = {}
   for (const p of profiles.data ?? []) {
@@ -74,6 +77,8 @@ export async function readExportData(eventId: string): Promise<ExportDataResult>
       assignments: assignments.data ?? [],
       rooms: rooms.data ?? [],
       hotels: hotels.data ?? [],
+      callAttempts: callAttempts.data ?? [],
+      extractions: extractions.data ?? [],
       profileNames,
       staffNames,
     },
