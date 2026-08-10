@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nuvent",
+  "main": ".open-next/worker.js",
+
+  // nodejs_compat is required: the app imports node:crypto (createHash, in
+  // src/lib/actions/access-codes.ts) and Next's server runtime pulls in more.
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  // SMART PLACEMENT.
+  //
+  // Supabase is in ap-northeast-2 (Seoul). Staff and the client are in India,
+  // so a request lands in a Mumbai/Chennai colo and every server-side DB call
+  // crosses ~6,000km. The admin dashboard makes roughly ten of them per load,
+  // and they are sequential enough that the round trips dominate the page.
+  //
+  // Smart Placement lets Cloudflare relocate the Worker to a colo nearer the
+  // origin it talks to, so those ten trips become short and only the single
+  // user->Worker leg is long. It is a HINT, not a guarantee: Cloudflare only
+  // relocates once it has observed enough traffic and decided it helps, and a
+  // freshly deployed Worker always starts unplaced. Verify with the
+  // cf-placement response header rather than assuming.
+  "placement": { "mode": "smart" },
+
+  "observability": { "enabled": true }
+}

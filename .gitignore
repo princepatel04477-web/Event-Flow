@@ -98,3 +98,13 @@ testsprite_tests\tmp\config.json
 /fleet.png
 /queue.png
 /rooms.png
+
+# Cloudflare / OpenNext build output
+.open-next/
+.wrangler/
+
+# Release signing — the keystore and its passwords live OUTSIDE the repo.
+# Losing the keystore means every phone must uninstall and reinstall.
+*.jks
+*.keystore
+android/keystore.properties

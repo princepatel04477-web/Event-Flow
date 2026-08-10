@@ -97,11 +97,27 @@ export async function readImportContext(eventId: string): Promise<ImportContext>
     return emptyContext(`Could not read what this event already holds: ${failure.message}`)
   }
 
+  // A null count on either query means the response came back without a count
+  // header — the DB accepted the query but the transport layer dropped the
+  // number. Treating that as 0 is how you silently duplicate every family.
+  // This is the call-intelligence seed-543 pattern: a failed count returned 0,
+  // the script inserted 543 against an event that already had 543. Import is a
+  // higher-consequence write — 238 families, not 543 seed rows — so it fails
+  // loudly rather than returning a number it cannot verify.
+  if (groups.count === null || guests.count === null) {
+    return emptyContext(
+      'The count queries returned, but without numbers. The database accepted ' +
+        'the query; the transport layer dropped the count headers — this is a ' +
+        'network blip, not an empty event. Wait a moment and retry, or check ' +
+        'the connection. (Refusing to treat a lost count as zero.)',
+    )
+  }
+
   return {
     ok: true,
     error: null,
-    existingFamilies: groups.count ?? 0,
-    existingGuests: guests.count ?? 0,
+    existingFamilies: groups.count,
+    existingGuests: guests.count,
   }
 }
 

@@ -204,7 +204,8 @@ async function revocationProbe() {
   record('2a-bind', true, `bound to ${staffName}`)
 
   // Auth client with the bound token
-  const authSf = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrdHhua3V6cGxoenhrZXZ3cmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5NzY4MDAsImV4cCI6MjA1NzU1MjgwMH0.dummy', {
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrdHhua3V6cGxoenhrZXZ3cmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MjM3MDIsImV4cCI6MjEwMDk5OTcwMn0.K5Pqh_VXD2Q1ocgc5cLDdkcusn2rmk2VlEHA9DoJDNk'
+  const authSf = createClient(env.SUPABASE_URL, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
   // Set the custom JWT directly
@@ -212,39 +213,45 @@ async function revocationProbe() {
 
   // Helper: make a read and write probe with these headers
   async function probe(label, headers) {
-    const readUrl = `${env.SUPABASE_URL}/rest/v1/guest_groups?event_id=eq.${EVENT_ID}&limit=1`
+    const readUrl = `${env.SUPABASE_URL}/rest/v1/guest_groups?select=head_name&event_id=eq.${EVENT_ID}&limit=1`
     const { res: rRes, text: rText } = await fetchRetry(readUrl, { headers })
-    const readOk = rRes.status === 200 && !rText.includes('JWT expired') && !rText.includes('permission denied')
+    const readOk = rRes.status === 200 && rText.length > 2 && !rText.includes('JWT expired') && !rText.includes('permission denied')
 
     // Write: update a known group's remarks (reversible)
     const { data: group } = await sf.from('guest_groups').select('id').eq('event_id', EVENT_ID).limit(1).maybeSingle()
-    const writeUrl = `${env.SUPABASE_URL}/rest/v1/guest_groups?id=eq.${group?.id}`
-    const { res: wRes } = await fetchRetry(writeUrl, {
+    if (!group) {
+      console.log(`    write probe: no group found in event ${EVENT_ID}`)
+      return { readOk, readRaw: `status=${rRes.status} body=${rText.slice(0, 80)}`, writeChanged: false, writeRaw: 'no group' }
+    }
+    const writeUrl = `${env.SUPABASE_URL}/rest/v1/guest_groups?id=eq.${group.id}`
+    const { res: wRes, text: wText } = await fetchRetry(writeUrl, {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=representation' },
       body: JSON.stringify({ remarks: `_l1-revoke-probe-${Date.now()}` }),
     })
-    const writeChanged = wRes.status === 200 && wRes.headers.get('content-range')?.includes('/1')
-    return { readOk, writeChanged }
+    const writeChanged = wRes.status === 200 && wText.length > 2 && !wText.trim().startsWith('[]')
+    return { readOk, readRaw: `status=${rRes.status} body=${rText.slice(0, 80)}`, writeChanged, writeRaw: `status=${wRes.status} body=${wText.slice(0, 80)}` }
   }
 
   // Before revocation
   const before = await probe('before', authHeaders)
-  record('2b-before-read', before.readOk, before.readOk ? '200' : 'denied/unexpected')
-  record('2b-before-write', before.writeChanged, before.writeChanged ? '200 patched' : 'denied/unexpected')
+  record('2b-before-read', before.readOk, before.readOk ? '200 rows' : `denied: ${before.readRaw}`)
+  record('2b-before-write', before.writeChanged, before.writeChanged ? '200 patched' : `denied: ${before.writeRaw}`)
 
-  // Find the access code row
-  const { data: codeRow } = await sf.from('event_access_codes')
-    .select('id').eq('event_id', EVENT_ID).eq('code', TEAM_CODE).maybeSingle()
-  if (!codeRow) {
-    record('2b-revoke-read', false, 'Could not find access code row to revoke')
+  // Find the access code row — the JWT carries access_code_id as a claim.
+  // The code column in event_access_codes is code_hash (sha256), not the
+  // plaintext code, so we decode the JWT payload rather than querying by code.
+  const jwtPayload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'))
+  const accessCodeId = jwtPayload.access_code_id
+  if (!accessCodeId) {
+    record('2b-revoke-read', false, 'JWT carries no access_code_id claim — cannot locate the code row to revoke')
     record('2b-revoke-write', false, 'skipped')
     return
   }
 
   // Revoke it
-  await sf.from('event_access_codes').update({ revoked_at: new Date().toISOString() }).eq('id', codeRow.id)
-  console.log('  code revoked')
+  await sf.from('event_access_codes').update({ revoked_at: new Date().toISOString() }).eq('id', accessCodeId)
+  console.log(`  code revoked (access_code_id=${accessCodeId})`)
 
   // After revocation
   const after = await probe('after', authHeaders)
@@ -260,7 +267,7 @@ async function revocationProbe() {
   record('2d-relogin', reloginRes.status !== 200, reloginRes.status !== 200 ? `new login denied (${reloginRes.status})` : 'LEAK — new login with revoked code succeeded')
 
   // Clean up: restore revoked_at = null
-  await sf.from('event_access_codes').update({ revoked_at: null }).eq('id', codeRow.id)
+  await sf.from('event_access_codes').update({ revoked_at: null }).eq('id', accessCodeId)
   console.log('  revoked_at restored')
 }
 

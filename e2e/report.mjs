@@ -98,10 +98,33 @@ function flatten(report) {
   return map
 }
 
+/** Every error string Playwright recorded for this result. */
+function messagesOf(result) {
+  return [result.error?.message, ...(result.errors ?? []).map((e) => e?.message)]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/**
+ * INFRA vs FAIL.
+ *
+ * A red board must mean the app is broken, not that the wifi blinked. The
+ * harness marks unreachable-database failures with `[INFRA]` (see
+ * e2e/helpers/db.ts), and those are counted separately: they are neither a
+ * pass nor evidence of a defect, and they do NOT feed the score.
+ *
+ * `did not run` is treated as infrastructure too when its file's setup died
+ * that way — serial mode skips the rest of a file after a beforeAll failure,
+ * and calling eighteen never-executed tests "failures" was how four runs on
+ * 2026-08-10 looked like catastrophic regressions when nothing was wrong.
+ */
 function classify(result) {
   if (result.status === 'passed') return 'PASS'
+
+  const msg = messagesOf(result)
+  if (msg.includes('[INFRA]')) return 'INFRA'
+
   if (result.status === 'skipped') {
-    const msg = result.error?.message ?? result.errors?.[0]?.message ?? ''
     if (/NOT BUILT/i.test(msg)) return 'NOT BUILT'
     if (/MANUAL/i.test(msg)) return 'MANUAL'
     return 'SKIP'
@@ -115,6 +138,7 @@ function main() {
 
   const rows = []
   const failures = []
+  const infra = []
   const manual = []
   const notBuilt = []
 
@@ -141,6 +165,10 @@ function main() {
       const msg = (result.error?.message ?? result.errors?.[0]?.message ?? 'no message').split('\n')[0]
       failures.push(`**${id}** — expected: see test; actual: \`${msg}\``)
     }
+    if (cls === 'INFRA') {
+      const msg = messagesOf(result).split('\n').find((l) => l.includes('[INFRA]')) ?? 'unreachable'
+      infra.push(`**${id}** — ${msg.trim()}`)
+    }
     if (cls === 'MANUAL') manual.push(`**${id}** — ${NAMES[id]}`)
     if (cls === 'NOT BUILT') notBuilt.push(`**${id}** — ${NAMES[id]}`)
   }
@@ -149,7 +177,11 @@ function main() {
   const t1Score = t1Pass * 4
   const t2Score = t2Pass
   const total = t0Score + t1Score + t2Score
-  const eventReady = t0Pass === 10 ? 'YES' : 'NO'
+
+  // A run that could not reach the database has not measured anything. Saying
+  // "EVENT-READY: NO" on the strength of a dropped connection is the same
+  // false signal as saying YES on an untested build.
+  const eventReady = infra.length > 0 ? 'UNKNOWN (infrastructure failures)' : t0Pass === 10 ? 'YES' : 'NO'
 
   const lines = []
   lines.push('# Nuvent — Acceptance Report')
@@ -163,6 +195,12 @@ function main() {
   lines.push(`- Tier 2: ${t2Pass}/2 → ${t2Score}/2`)
   lines.push(`- **TOTAL: ${total}/100**`)
   lines.push(`- **EVENT-READY: ${eventReady}** (requires Tier 0 at 10/10; NOT BUILT/MANUAL do not count as passes)`)
+  if (infra.length > 0) {
+    lines.push(
+      `- **INFRA: ${infra.length}** test${infra.length === 1 ? '' : 's'} could not reach the database. ` +
+        'This score measures the connection, not the app — re-run before drawing any conclusion.',
+    )
+  }
   lines.push('')
   lines.push('## Results')
   lines.push('')
@@ -176,6 +214,20 @@ function main() {
     lines.push('None.')
   } else {
     lines.push(...failures.map((f) => `- ${f}`))
+  }
+  lines.push('')
+  lines.push('## INFRA — could not reach the database')
+  lines.push('')
+  lines.push(
+    '_Not defects._ The harness could not talk to Supabase after 3 retries. These are ' +
+      'excluded from the score; a red board should mean the app is broken, not that the ' +
+      'wifi blinked.',
+  )
+  lines.push('')
+  if (infra.length === 0) {
+    lines.push('None.')
+  } else {
+    lines.push(...infra.map((f) => `- ${f}`))
   }
   lines.push('')
   lines.push('## MANUAL — cannot be automated')
@@ -202,7 +254,7 @@ function main() {
 
   writeFileSync(OUT, lines.join('\n') + '\n')
   console.log(`Wrote ${OUT}`)
-  console.log(`Scoreboard: Tier 0 ${t0Pass}/10 → ${t0Score}/70 · Tier 1 ${t1Pass}/7 → ${t1Score}/28 · Tier 2 ${t2Pass}/2 → ${t2Score}/2 · TOTAL ${total}/100 · EVENT-READY ${eventReady}`)
+  console.log(`Scoreboard: Tier 0 ${t0Pass}/10 → ${t0Score}/70 · Tier 1 ${t1Pass}/7 → ${t1Score}/28 · Tier 2 ${t2Pass}/2 → ${t2Score}/2 · TOTAL ${total}/100 · EVENT-READY ${eventReady}${infra.length ? ` · INFRA ${infra.length}` : ''}`)
 }
 
 main()

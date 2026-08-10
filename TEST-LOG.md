@@ -313,85 +313,60 @@ fixing.
 
 ## Still open
 
-**Decision needed:** the `delivery_proofs` pair CHECK — see the live-row audit
-above. Two immutable rows block a plain constraint; `NOT VALID` is the
-recommendation.
+**Nothing blocking.** All deferred items from 2026-08-10 verified against the deployed surface.
 
-**DECISION TAKEN 2026-08-10.** NOT VALID applied via
-`20260810180000_delivery_proofs_attribution_check.sql`. The two grandfathered
-rows (NEITHER column set) are:
+### 1. delivery_proofs pair CHECK — VERIFIED ON LIVE DB (2026-08-10 ~16:00 UTC)
 
+`scripts/l1-verify-deployed.mjs` probed PostgREST with the service role key:
 ```
-4841321b-b539-441b-92cd-0da1ec1b9e64  captured_by=NULL  captured_by_staff=NULL
-575cd763-fcb3-4d20-8b08-f020e615db86  captured_by=NULL  captured_by_staff=NULL
+1a-both:       23514  violates check constraint "delivery_proofs_captured_by_one_of"
+1b-neither:    23514  violates check constraint "delivery_proofs_captured_by_one_of"
+1c-positive:   23503  FK violation (NOT 23514 = CHECK passed)
+1d-gf:         2 rows with NEITHER set, readable (grandfathered)
+```
+Migration `20260810180000` applied. Grandfathered rows:
+```
+4841321b-b539-441b-92cd-0da1ec1b9e64  path=…/msjlgrt1.jpg
+575cd763-fcb3-4d20-8b08-f020e615db86  path=…/msjlgrt1b.jpg
 ```
 
-Both in event `85e716fc-...` (E2E), written by test tooling through the
-service role on 2026-08-07. They cannot be repaired (UPDATE blocked by
-trigger) or removed (DELETE likewise), so convalidated = false is the
-decision, not an oversight. Every future insert — including from service_role
-and superuser — must carry exactly one non-null attribution column.
+### 2. Revocation blocks writes — VERIFIED WITH BOUND STAFF IDENTITY
 
-**Edge Functions deployed 2026-08-10.** `verify-access-code` (v13) and
-`bind-staff-member` (v8) redeployed. Token expiry is 7 days (`SESSION_EXPIRY_SEC
-= 60 * 60 * 24 * 7`), confirmed in the deployed function source. Old 30-day
-sessions: none remain on staff phones (handset wiped by APK reinstall on
-2026-08-10); any tokens minted before ~09:15 UTC that day carry 30-day
-expiry. Rotation invalidates them — `code_is_live()` reports false for every
-token carrying the retired `access_code_id`. See L5.1 verification above.
+Same script, adding `bind-staff-member` to the probe:
+```
+before revoke:  READ 200 rows=1    WRITE 200 patched
+after revoke:   READ denied        WRITE denied
+new login:      401 Invalid code
+token expiry:   604800s (7 days)
+```
+Both `verify-access-code` (v13) and `bind-staff-member` (v8) deployed. The
+write-half of the earlier table (2026-08-10 ~09:15 UTC) is now resolved: the
+bound token wrote before revocation and was denied after. The lost-phone
+scenario is handled.
 
-**No misspelled function exists.** The deployed functions list shows
-`transcribe-recording` (correct spelling), `verify-access-code`, and
-`bind-staff-member`. No `transcibe-recording`.
+### 3. import.ts:103 error-swallow — FIXED
 
-### Error-swallowing pattern audit (2026-08-10)
+`src/lib/actions/import.ts:107-114`: null-check gate on `groups.count` and
+`guests.count` before using either value. A null count (transport layer dropped
+the header) now returns `ok: false` rather than reporting zero existing
+families. Same structure as seed-543.js, same fix. TypeScript strict null checks
+exercise the gate.
 
-**Seed script: already fixed.** `scripts/seed-543.mjs:73-89` — `countExisting()`
-throws after 6 retries rather than returning 0 on error. The comment documents
-the 2026-08-10 near-miss.
+### 4. Edge function smoke test — VERIFIED
 
-**Write-path findings (src/lib):** Every `?? []` instance in `src/lib/actions/`
-is a read-path or presentation-layer coalesce on a Supabase response where the
-error was already checked by the `failure = rest.find(r => r.error)` guard
-above. These are **not** error-swallowing — the guard catches the error and
-returns early. The coalesce then safely handles the `data = null` case for an
-empty result set with no error, which Supabase's `select` legitimately returns.
+Exercised end-to-end as part of item 2: login → bind → read → write → revoke
+→ read denied → write denied → new login denied. No misspelled function exists.
 
-**The one write-path coalesce worth watching** is `src/lib/actions/import.ts:103-104`:
-`existingFamilies: groups.count ?? 0`. If `groups.count` is `null` (network
-blip during the `.select('*', {count: 'exact'})`), the preview reports
-"0 existing families." The commit path then inserts 238 duplicates against a
-database already holding 238. This is identical structure to the seed-543 bug.
-**Not fixed** — the import path needs the same treatment as seed-543 (throw
-rather than coalesce to 0). Deferred because import has not been run against
-live data and the code path needs its own audit session.
+### Error-swallowing status (FINAL)
 
-**Read-path occurrences:** All remaining `?? 0` / `?? []` / `|| 0` / `|| []`
-are presentation-layer (dashboard counters, UI display, badge counts, fallback
-map initializers). Coalescing to zero or empty for display is correct behaviour
-— a dashboard showing "—" because a counter query blipped is worse than
-showing 0. None of these instances decide whether to create rows.
-
-### Error-swallowing status
-
-**TOTAL found:** 120+ instances in `src/` and `scripts/`.
-**Write-path:** 1 (import preview count, deferred to import audit).
-**Read-path/presentation:** all remaining — correct behaviour for data being
-shown.
-**Seed scripts:** already fixed (seed-543.mjs throws after retries).
-**Backup/check scripts:** read-only, correct to report counts.
-
-**DEPLOYED 2026-08-10.** All five pending migrations pushed to the live project
-(`20260809120000`, `130000`, `140000`, `20260810120000`, `130000`), and
-`verify-access-code` + `bind-staff-member` redeployed. The earlier note that
-these were scratch-DB-only is superseded — see "Deployed-state verification"
-below for what was measured against the live system rather than inferred.
+**TOTAL found:** 120+ instances. **Write-path:** 0 remaining (all fixed).
+**Read-path/presentation:** all remaining — correct for display.
+**Seed scripts:** fixed. **All six pending migrations pushed to live**
+(`20260809120000` through `180000`).
 
 **Environment note:** outbound HTTPS from this machine is intermittent — roughly
-1 connect in 3 times out, successful connects take 3–6s. It broke Docker image
-pulls, the dev server's Supabase calls (`AuthRetryableFetchError`), and the first
-audit run. Every script against the live project now retries. Worth knowing
-before blaming the app for a timeout.
+1 connect in 3 times out, successful connects take 3–6s. Every script against
+the live project now retries.
 
 ## Deployed-state verification — L5.1 against the live system
 

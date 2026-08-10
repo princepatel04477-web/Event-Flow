@@ -41,7 +41,13 @@ const config: CapacitorConfig = {
     // Set by `npm run mobile:dev`, which auto-detects the LAN IP. Override with
     // CAP_SERVER_URL (e.g. http://<LAN_IP>:3000) for a manual `cap sync`.
     url: serverUrl,
-    cleartext: true,
+    // Derived from the URL, never hardcoded. The release build points at
+    // https://…vercel.app and must NOT permit cleartext — but `npm run
+    // mobile:dev` points at http://<LAN_IP>:3000 and cannot work without it.
+    // Hardcoding `false` would silently break the dev loop; hardcoding `true`
+    // would ship a release that allows plaintext HTTP. Deriving it means the
+    // release is secure by construction and the dev loop keeps working.
+    cleartext: !serverUrl.startsWith('https://'),
     androidScheme: 'https',
     // Served from the local assets (webDir) when the WebView cannot reach
     // server.url. Without it an unreachable server shows Chromium's own

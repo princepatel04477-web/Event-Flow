@@ -152,7 +152,97 @@ Native code (M6 dialer, M7 recorder, M8 camera proof) lives in
 Any change there, to `AndroidManifest.xml`, or to the plugin list requires a full APK rebuild —
 OTA (M11) ships JS/HTML/CSS only.
 
+### Deployment — Vercel (live since 2026-08-10)
+
+| | |
+|---|---|
+| URL | `https://nuvent-ppzhi25o0-rebelmaker1258-2015s-projects.vercel.app` |
+| Project | `nuvent`, scope `rebelmaker1258-2015s-projects`, id `prj_MOyao678WL7786GHPQh5XH9JLm98` |
+| Region | **`icn1` (Seoul)** — set in `vercel.json` |
+| Verified by | `X-Vercel-Id: bom1::icn1::…` — request enters the Mumbai edge, the function runs in Seoul |
+
+Seoul was chosen to sit beside Supabase (`ap-northeast-2`): the admin dashboard makes
+~10 sequential DB calls per load, and from Mumbai each crossed ~6,000km. **This trade-off
+is unproven for the guest list**, which makes few DB calls and is dominated by the
+user↔server leg instead — deployed S1 timings were 7.4s and 9.9s against a 5s budget.
+Those were measured from a laptop whose own link varies wildly (TTFB 0.58s–6.5s on the
+same URL), so they do not settle it. Measure from a phone on mobile data before changing
+the region; `bom1` is the alternative if the guest list is the page that matters most.
+
+**Env vars live in Vercel, never in the repo.** Only three exist:
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (both public by design) and
+`APP_JWT_SECRET` (server-only, verifies code-auth JWTs). The service-role key and
+`SARVAM_API_KEY` are **not** here and must never be — the app never uses them; they live
+in Supabase Edge Function secrets. Client bundle verified clean against all of them.
+
+**Deployment Protection must stay OFF.** It was on by default
+(`ssoProtection: all_except_custom_domains`) and every request 302'd to `vercel.com/sso-api`
+— staff would have hit a Vercel login wall. Disabled via the API; re-check after any
+project settings change.
+
+**Rollback:** `npx vercel ls` to list deployments, then
+`npx vercel rollback <deployment-url>` — or promote an older one from the dashboard's
+Deployments tab. Each deployment keeps its own immutable URL, so the previous build is
+always reachable even before promoting it.
+
+**`.vercelignore` matters.** Without it the upload was 90MB (mostly `android/` and
+`.next/`) and never finished on this connection. It is a few MB now.
+
+#### Cloudflare Pages — BLOCKED, revisit later
+
+Not a configuration problem, a hard incompatibility:
+
+- Next 16 renamed middleware to `proxy.ts` and made it **Node-runtime only** — setting
+  `runtime: 'edge'` fails the Next build with "Proxy does not support Edge runtime".
+- `@opennextjs/cloudflare` **refuses Node middleware** — hard-coded in
+  `dist/cli/build/build.js:67`, no flag, no opt-out.
+
+The only route through is deleting `src/proxy.ts` and relocating `updateSession()`, i.e.
+rewriting session refresh. `wrangler.jsonc` and `open-next.config.ts` are committed and
+inert, with Smart Placement already declared, ready for when the adapter supports Node
+middleware.
+
 ### Release build (M10) — run on a machine with Android Studio + JDK
+
+**DONE 2026-08-10 — the release pipeline is wired and a signed APK exists.**
+
+```
+APK      android/app/build/outputs/apk/release/app-release.apk   6,142,584 bytes
+Download https://xktxnkuzplhzxkevwrcj.supabase.co/storage/v1/object/public/app-releases/nuvent-1.0.apk
+sha256   b274872035226ccbbef322a9899a114b9648914528eeca264fa19b0a032fbf84
+Signer   CN=Nuvent, O=Varunya Technologies, L=Surat   SHA-256 e865d4c1b3865da6…
+```
+
+**⚠ LOSING THE KEYSTORE MEANS EVERY PHONE MUST UNINSTALL AND REINSTALL.** Android
+identifies an app by its signature; a differently-signed build cannot upgrade an installed
+one. Mid-event that means every staff member stops, uninstalls, reinstalls and logs in
+again. Backed up in two places, checksums verified identical:
+
+```
+C:\Users\rebel\NuventKeys\                 local, not synced
+C:\Users\rebel\OneDrive\NuventKeys-backup\ syncs off-machine
+```
+
+Both hold `nuvent-release.jks` + `keystore.properties`. `*.jks`, `*.keystore` and
+`android/keystore.properties` are gitignored; only `keystore.properties.example` is
+tracked. **A third copy on separate physical media is still worth making.**
+
+Things that are already true and should not be re-derived:
+
+- `cleartext` is **derived**, not hardcoded: `!serverUrl.startsWith('https://')` in
+  `capacitor.config.ts`. A release on https gets `false`; `npm run mobile:dev` on a
+  `http://<LAN_IP>:3000` still gets `true` and keeps working. Hardcoding either value
+  breaks one of the two.
+- The release build **throws** if `android/keystore.properties` is missing rather than
+  falling back to debug signing — see the warning above for why that fallback is a trap.
+- `minifyEnabled true` + `shrinkResources true`, with Capacitor keep rules in
+  `proguard-rules.pro`. Capacitor registers plugins by reflection, so without them R8
+  strips the classes and the plugin silently does not exist — no crash, no log, the JS
+  call just never resolves.
+- Verified on the **merged** manifest (`merged_manifest/release/…`), not the source:
+  `usesCleartextTraffic` ABSENT, `debuggable` ABSENT, `<queries>` + `tel:` PRESENT.
+
+Original steps, kept for reference:
 
 1. `keytool` the keystore, store it OUTSIDE the repo in two places.
    Copy `android/keystore.properties.example` → `android/keystore.properties`.
