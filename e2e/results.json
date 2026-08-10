@@ -53,6 +53,38 @@
           "/tier1\\.spec\\.ts/"
         ],
         "timeout": 60000
+      },
+      {
+        "outputDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "perf",
+        "name": "perf",
+        "testDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/perf\\.spec\\.ts/"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "identity",
+        "name": "identity",
+        "testDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/identity\\.spec\\.ts/"
+        ],
+        "timeout": 60000
       }
     ],
     "quiet": false,
@@ -95,7 +127,7 @@
       "specs": [
         {
           "title": "S1 full load — guest list interactive time",
-          "ok": true,
+          "ok": false,
           "tags": [],
           "tests": [
             {
@@ -108,22 +140,53 @@
                 {
                   "workerIndex": 0,
                   "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 3165,
-                  "errors": [],
-                  "stdout": [
+                  "status": "failed",
+                  "duration": 2,
+                  "error": {
+                    "message": "Error: reset trip_passengers failed: TypeError: fetch failed",
+                    "stack": "Error: reset trip_passengers failed: TypeError: fetch failed\n    at resetTestData (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts:175:23)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts:20:3",
+                    "location": {
+                      "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
+                      "column": 23,
+                      "line": 175
+                    },
+                    "snippet": "\u001b[90m   at \u001b[39mhelpers\\db.ts:175\n\n\u001b[0m \u001b[90m 173 |\u001b[39m \u001b[36mexport\u001b[39m \u001b[36masync\u001b[39m \u001b[36mfunction\u001b[39m resetTestData()\u001b[33m:\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m<\u001b[39m\u001b[36mvoid\u001b[39m\u001b[33m>\u001b[39m {\n \u001b[90m 174 |\u001b[39m   \u001b[36mconst\u001b[39m { error\u001b[33m:\u001b[39m tripsErr } \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m db\u001b[33m.\u001b[39m\u001b[36mfrom\u001b[39m(\u001b[32m'trip_passengers'\u001b[39m)\u001b[33m.\u001b[39m\u001b[36mdelete\u001b[39m()\u001b[33m.\u001b[39meq(\u001b[32m'event_id'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mEVENT_ID\u001b[39m)\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 175 |\u001b[39m   \u001b[36mif\u001b[39m (tripsErr) \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`reset trip_passengers failed: ${tripsErr.message}`\u001b[39m)\n \u001b[90m     |\u001b[39m                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 176 |\u001b[39m\n \u001b[90m 177 |\u001b[39m   \u001b[36mconst\u001b[39m { error\u001b[33m:\u001b[39m trips2Err } \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m db\u001b[33m.\u001b[39m\u001b[36mfrom\u001b[39m(\u001b[32m'trips'\u001b[39m)\u001b[33m.\u001b[39m\u001b[36mdelete\u001b[39m()\u001b[33m.\u001b[39meq(\u001b[32m'event_id'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mEVENT_ID\u001b[39m)\n \u001b[90m 178 |\u001b[39m   \u001b[36mif\u001b[39m (trips2Err) \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`reset trips failed: ${trips2Err.message}`\u001b[39m)\u001b[0m"
+                  },
+                  "errors": [
                     {
-                      "text": "S1: guest list interactive (729 guests) in 2529ms\n"
+                      "location": {
+                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
+                        "column": 23,
+                        "line": 175
+                      },
+                      "message": "Error: reset trip_passengers failed: TypeError: fetch failed\n\n   at helpers\\db.ts:175\n\n  173 | export async function resetTestData(): Promise<void> {\n  174 |   const { error: tripsErr } = await db.from('trip_passengers').delete().eq('event_id', EVENT_ID)\n> 175 |   if (tripsErr) throw new Error(`reset trip_passengers failed: ${tripsErr.message}`)\n      |                       ^\n  176 |\n  177 |   const { error: trips2Err } = await db.from('trips').delete().eq('event_id', EVENT_ID)\n  178 |   if (trips2Err) throw new Error(`reset trips failed: ${trips2Err.message}`)\n    at resetTestData (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts:175:23)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts:20:3"
                     }
                   ],
+                  "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:47:39.887Z",
+                  "startTime": "2026-08-10T09:18:46.468Z",
                   "annotations": [],
-                  "attachments": []
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\stress-S1-full-load-—-guest-list-interactive-time-phone\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\stress-S1-full-load-—-guest-list-interactive-time-phone\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
+                    "column": 23,
+                    "line": 175
+                  }
                 }
               ],
-              "status": "expected"
+              "status": "unexpected"
             }
           ],
           "id": "496454548f4205703e07-484f88490a2e7e757aaa",
@@ -138,42 +201,22 @@
           "tests": [
             {
               "timeout": 60000,
-              "annotations": [
-                {
-                  "type": "skip",
-                  "description": "CDP network throttling needs a persistent CDP session; the headless runner does not expose one portably. Reported MANUAL (run in Chrome DevTools Slow 3G).",
-                  "location": {
-                    "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts",
-                    "line": 56,
-                    "column": 8
-                  }
-                }
-              ],
-              "expectedStatus": "skipped",
+              "annotations": [],
+              "expectedStatus": "passed",
               "projectId": "phone",
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
-                  "parallelIndex": 0,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
                   "status": "skipped",
-                  "duration": 2,
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:47:47.342Z",
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "CDP network throttling needs a persistent CDP session; the headless runner does not expose one portably. Reported MANUAL (run in Chrome DevTools Slow 3G).",
-                      "location": {
-                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts",
-                        "line": 56,
-                        "column": 8
-                      }
-                    }
-                  ],
+                  "startTime": "2026-08-10T09:18:57.580Z",
+                  "annotations": [],
                   "attachments": []
                 }
               ],
@@ -198,27 +241,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 8829,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
-                  "stdout": [
-                    {
-                      "text": "S3: loop took 8.1s\n"
-                    },
-                    {
-                      "text": "S3: at 238 families that is 0.5 hours of staff work\n"
-                    }
-                  ],
+                  "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:47:47.361Z",
+                  "startTime": "2026-08-10T09:18:57.581Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "496454548f4205703e07-30f7c941f87fc1ef708b",
@@ -247,15 +283,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3220,
+                  "duration": 12437,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:47:56.352Z",
+                  "startTime": "2026-08-10T09:18:58.684Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -281,15 +317,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 4254,
+                  "duration": 10003,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:48:01.635Z",
+                  "startTime": "2026-08-10T09:19:38.423Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -315,15 +351,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 7341,
+                  "duration": 11540,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:48:05.905Z",
+                  "startTime": "2026-08-10T09:19:48.457Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -349,15 +385,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 7224,
+                  "duration": 10329,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:48:13.260Z",
+                  "startTime": "2026-08-10T09:20:00.028Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -383,15 +419,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 7852,
+                  "duration": 12821,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:48:20.500Z",
+                  "startTime": "2026-08-10T09:20:10.386Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -417,15 +453,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 10083,
+                  "duration": 14169,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:48:28.370Z",
+                  "startTime": "2026-08-10T09:20:23.245Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -451,15 +487,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 5922,
+                  "duration": 8308,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:48:38.475Z",
+                  "startTime": "2026-08-10T09:20:37.445Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -485,15 +521,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 512,
+                  "duration": 644,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:48:44.407Z",
+                  "startTime": "2026-08-10T09:20:45.774Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -519,15 +555,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1056,
+                  "duration": 1385,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:48:44.927Z",
+                  "startTime": "2026-08-10T09:20:46.443Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -553,15 +589,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3888,
+                  "duration": 6784,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:48:45.990Z",
+                  "startTime": "2026-08-10T09:20:47.846Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -595,15 +631,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 4062,
+                  "duration": 6388,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:48:49.906Z",
+                  "startTime": "2026-08-10T09:20:54.676Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -613,7 +649,7 @@
           ],
           "id": "2b11f1eba0624d9847f6-8ebe9fefe810a52a365a",
           "file": "tier1.spec.ts",
-          "line": 57,
+          "line": 58,
           "column": 5
         },
         {
@@ -629,15 +665,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 5540,
+                  "duration": 8928,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:48:59.309Z",
+                  "startTime": "2026-08-10T09:21:09.479Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -647,7 +683,7 @@
           ],
           "id": "2b11f1eba0624d9847f6-96bd21890f288286b740",
           "file": "tier1.spec.ts",
-          "line": 80,
+          "line": 81,
           "column": 5
         },
         {
@@ -663,15 +699,15 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 9060,
+                  "duration": 12906,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:49:04.864Z",
+                  "startTime": "2026-08-10T09:21:18.433Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -681,12 +717,12 @@
           ],
           "id": "2b11f1eba0624d9847f6-6e342b2694560129a833",
           "file": "tier1.spec.ts",
-          "line": 117,
+          "line": 118,
           "column": 5
         },
         {
-          "title": "T1.4 calling — tel: dial target is correct",
-          "ok": true,
+          "title": "T1.4 calling — dial goes to the system, session survives a remount",
+          "ok": false,
           "tags": [],
           "tests": [
             {
@@ -697,25 +733,70 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 1,
                   "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 2271,
-                  "errors": [],
+                  "status": "failed",
+                  "duration": 39010,
+                  "error": {
+                    "message": "TimeoutError: page.waitForURL: Timeout 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+                    "stack": "TimeoutError: page.waitForURL: Timeout 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n    at loginTeamAs (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\auth.ts:60:14)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier1.spec.ts:308:21",
+                    "location": {
+                      "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\auth.ts",
+                      "column": 14,
+                      "line": 60
+                    },
+                    "snippet": "\u001b[90m   at \u001b[39mhelpers\\auth.ts:60\n\n\u001b[0m \u001b[90m 58 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByLabel(\u001b[32m'Access code'\u001b[39m)\u001b[33m.\u001b[39mfill(env\u001b[33m.\u001b[39m\u001b[33mE2E_TEAM_CODE\u001b[39m)\n \u001b[90m 59 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m'button'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[35m/enter event|checking/i\u001b[39m })\u001b[33m.\u001b[39mclick()\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 60 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[35m/\\/pick-staff/\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m30\u001b[39m_000 })\n \u001b[90m    |\u001b[39m              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 61 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m'button'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m staffName\u001b[33m,\u001b[39m exact\u001b[33m:\u001b[39m \u001b[36mfalse\u001b[39m })\u001b[33m.\u001b[39mfirst()\u001b[33m.\u001b[39mclick()\n \u001b[90m 62 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL((url) \u001b[33m=>\u001b[39m \u001b[33m!\u001b[39murl\u001b[33m.\u001b[39mpathname\u001b[33m.\u001b[39mstartsWith(\u001b[32m'/pick-staff'\u001b[39m)\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m30\u001b[39m_000 })\n \u001b[90m 63 |\u001b[39m   \u001b[36mconst\u001b[39m state \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m context\u001b[33m.\u001b[39mstorageState()\u001b[0m"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\auth.ts",
+                        "column": 14,
+                        "line": 60
+                      },
+                      "message": "TimeoutError: page.waitForURL: Timeout 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n\n   at helpers\\auth.ts:60\n\n  58 |   await page.getByLabel('Access code').fill(env.E2E_TEAM_CODE)\n  59 |   await page.getByRole('button', { name: /enter event|checking/i }).click()\n> 60 |   await page.waitForURL(/\\/pick-staff/, { timeout: 30_000 })\n     |              ^\n  61 |   await page.getByRole('button', { name: staffName, exact: false }).first().click()\n  62 |   await page.waitForURL((url) => !url.pathname.startsWith('/pick-staff'), { timeout: 30_000 })\n  63 |   const state = await context.storageState()\n    at loginTeamAs (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\auth.ts:60:14)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier1.spec.ts:308:21"
+                    }
+                  ],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:49:13.937Z",
+                  "startTime": "2026-08-10T09:21:31.363Z",
                   "annotations": [],
-                  "attachments": []
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-4-calling-—-dial--6d40b--session-survives-a-remount-phone\\test-failed-1.png"
+                    },
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-4-calling-—-dial--6d40b--session-survives-a-remount-phone\\test-failed-2.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-4-calling-—-dial--6d40b--session-survives-a-remount-phone\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-4-calling-—-dial--6d40b--session-survives-a-remount-phone\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\auth.ts",
+                    "column": 14,
+                    "line": 60
+                  }
                 }
               ],
-              "status": "expected"
+              "status": "unexpected"
             }
           ],
-          "id": "2b11f1eba0624d9847f6-35ce8c975879612b86ec",
+          "id": "2b11f1eba0624d9847f6-140b0cfb0e2a0f6ff8ee",
           "file": "tier1.spec.ts",
-          "line": 205,
+          "line": 206,
           "column": 5
         },
         {
@@ -731,25 +812,25 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 5095,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:49:16.223Z",
+                  "startTime": "2026-08-10T09:22:11.636Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "2b11f1eba0624d9847f6-96141ac28e78d6112021",
           "file": "tier1.spec.ts",
-          "line": 239,
+          "line": 332,
           "column": 5
         },
         {
@@ -765,25 +846,25 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 2946,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:49:21.333Z",
+                  "startTime": "2026-08-10T09:22:11.637Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "2b11f1eba0624d9847f6-3b0931d008a8c2910e58",
           "file": "tier1.spec.ts",
-          "line": 284,
+          "line": 377,
           "column": 5
         },
         {
@@ -792,32 +873,32 @@
           "tags": [],
           "tests": [
             {
-              "timeout": 120000,
+              "timeout": 60000,
               "annotations": [],
               "expectedStatus": "passed",
               "projectId": "phone",
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 40619,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:49:24.290Z",
+                  "startTime": "2026-08-10T09:22:11.637Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "2b11f1eba0624d9847f6-34b4703af4785798b784",
           "file": "tier1.spec.ts",
-          "line": 323,
+          "line": 416,
           "column": 5
         }
       ]
@@ -830,7 +911,7 @@
       "specs": [
         {
           "title": "T2.1 vehicle allocation — no split, luggage-adjusted capacity",
-          "ok": true,
+          "ok": false,
           "tags": [],
           "tests": [
             {
@@ -841,20 +922,55 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 2,
                   "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 1824,
-                  "errors": [],
+                  "status": "failed",
+                  "duration": 1,
+                  "error": {
+                    "message": "Error: reset trip_passengers failed: TypeError: fetch failed",
+                    "stack": "Error: reset trip_passengers failed: TypeError: fetch failed\n    at resetTestData (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts:175:23)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier2.spec.ts:15:3",
+                    "location": {
+                      "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
+                      "column": 23,
+                      "line": 175
+                    },
+                    "snippet": "\u001b[90m   at \u001b[39mhelpers\\db.ts:175\n\n\u001b[0m \u001b[90m 173 |\u001b[39m \u001b[36mexport\u001b[39m \u001b[36masync\u001b[39m \u001b[36mfunction\u001b[39m resetTestData()\u001b[33m:\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m<\u001b[39m\u001b[36mvoid\u001b[39m\u001b[33m>\u001b[39m {\n \u001b[90m 174 |\u001b[39m   \u001b[36mconst\u001b[39m { error\u001b[33m:\u001b[39m tripsErr } \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m db\u001b[33m.\u001b[39m\u001b[36mfrom\u001b[39m(\u001b[32m'trip_passengers'\u001b[39m)\u001b[33m.\u001b[39m\u001b[36mdelete\u001b[39m()\u001b[33m.\u001b[39meq(\u001b[32m'event_id'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mEVENT_ID\u001b[39m)\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 175 |\u001b[39m   \u001b[36mif\u001b[39m (tripsErr) \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`reset trip_passengers failed: ${tripsErr.message}`\u001b[39m)\n \u001b[90m     |\u001b[39m                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 176 |\u001b[39m\n \u001b[90m 177 |\u001b[39m   \u001b[36mconst\u001b[39m { error\u001b[33m:\u001b[39m trips2Err } \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m db\u001b[33m.\u001b[39m\u001b[36mfrom\u001b[39m(\u001b[32m'trips'\u001b[39m)\u001b[33m.\u001b[39m\u001b[36mdelete\u001b[39m()\u001b[33m.\u001b[39meq(\u001b[32m'event_id'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mEVENT_ID\u001b[39m)\n \u001b[90m 178 |\u001b[39m   \u001b[36mif\u001b[39m (trips2Err) \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`reset trips failed: ${trips2Err.message}`\u001b[39m)\u001b[0m"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
+                        "column": 23,
+                        "line": 175
+                      },
+                      "message": "Error: reset trip_passengers failed: TypeError: fetch failed\n\n   at helpers\\db.ts:175\n\n  173 | export async function resetTestData(): Promise<void> {\n  174 |   const { error: tripsErr } = await db.from('trip_passengers').delete().eq('event_id', EVENT_ID)\n> 175 |   if (tripsErr) throw new Error(`reset trip_passengers failed: ${tripsErr.message}`)\n      |                       ^\n  176 |\n  177 |   const { error: trips2Err } = await db.from('trips').delete().eq('event_id', EVENT_ID)\n  178 |   if (trips2Err) throw new Error(`reset trips failed: ${trips2Err.message}`)\n    at resetTestData (C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts:175:23)\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier2.spec.ts:15:3"
+                    }
+                  ],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:50:04.933Z",
+                  "startTime": "2026-08-10T09:22:13.064Z",
                   "annotations": [],
-                  "attachments": []
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier2-T2-1-vehicle-allocat-daaf9-t-luggage-adjusted-capacity-phone\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier2-T2-1-vehicle-allocat-daaf9-t-luggage-adjusted-capacity-phone\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\helpers\\db.ts",
+                    "column": 23,
+                    "line": 175
+                  }
                 }
               ],
-              "status": "expected"
+              "status": "unexpected"
             }
           ],
           "id": "eaa73614df34142dcf75-db63d943a73d8e53d068",
@@ -875,20 +991,20 @@
               "projectName": "phone",
               "results": [
                 {
-                  "workerIndex": 0,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 4261,
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-07T23:50:10.486Z",
+                  "startTime": "2026-08-10T09:22:24.159Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "eaa73614df34142dcf75-c02977fb82c0b9d2a7cf",
@@ -901,11 +1017,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-08-07T23:47:38.968Z",
-    "duration": 156237.68600000002,
-    "expected": 21,
-    "skipped": 1,
-    "unexpected": 0,
+    "startTime": "2026-08-10T09:18:45.184Z",
+    "duration": 219009.047,
+    "expected": 13,
+    "skipped": 6,
+    "unexpected": 3,
     "flaky": 0
   }
 }
