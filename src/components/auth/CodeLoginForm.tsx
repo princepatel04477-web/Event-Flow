@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import { setCodeAuthSession } from '@/lib/auth/session'
@@ -27,6 +27,35 @@ export function CodeLoginForm({ next }: { next: string }) {
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+
+  // Has React taken over the form yet?
+  //
+  // Before hydration, a tap on the submit button is handled by the BROWSER,
+  // not by handleSubmit — so `e.preventDefault()` never runs and the form does
+  // a default GET. Observed on 2026-08-10: the page reloaded to
+  // `/login?access-code=E-8DRCJR`, no request ever reached verify-access-code,
+  // and the access code was written into the URL — i.e. into browser history,
+  // the server access log, and any Referer header. On a cheap handset on venue
+  // Wi-Fi, hydration is slow and an impatient staff member reproduces this
+  // easily. The button stays disabled until this flips.
+  const [hydrated, setHydrated] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    // ADOPT whatever the browser already has in the field.
+    //
+    // Anything typed before hydration went into the DOM but never reached
+    // React state — onChange was not attached yet. This is a controlled
+    // input, so the first render after hydration would otherwise write
+    // `value={code}` (empty) straight over the user's typing and silently
+    // erase it. On a cheap handset that is exactly what happens: staff type
+    // their code into a page that has not finished booting and watch it
+    // vanish. Confirmed 2026-08-10 — the submit then failed with "Enter your
+    // access code." against a field that visibly had one.
+    const typed = inputRef.current?.value ?? ''
+    if (typed) setCode(typed.toUpperCase())
+    setHydrated(true)
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -90,7 +119,10 @@ export function CodeLoginForm({ next }: { next: string }) {
       </label>
       <input
         id="access-code"
-        name="access-code"
+        ref={inputRef}
+        // Deliberately UNNAMED. A nameless field is omitted from a native form
+        // submission, so even if one somehow fires the access code cannot end
+        // up in the URL. Belt and braces alongside the `hydrated` gate above.
         value={code}
         onChange={(e) => {
           setCode(e.target.value.toUpperCase())
@@ -112,7 +144,14 @@ export function CodeLoginForm({ next }: { next: string }) {
         not have one.
       </p>
 
-      <Button type="submit" size="lg" fullWidth loading={pending} className="mt-2">
+      <Button
+        type="submit"
+        size="lg"
+        fullWidth
+        loading={pending || !hydrated}
+        disabled={!hydrated}
+        className="mt-2"
+      >
         {pending ? 'Checking…' : 'Enter event'}
       </Button>
     </form>
