@@ -57,13 +57,36 @@ function nameFor(i) {
   return `${SEED_PREFIX} ${first} ${surname} ${i}`
 }
 
+/**
+ * How many SEED-543 guests already exist.
+ *
+ * MUST throw rather than return 0 on failure. The comment below calls this
+ * "the source of truth" for how many rows to add, and a dropped connection
+ * used to surface as `count = null` -> 0 -> "adding 543" against a database
+ * that already had 543. The inserts happened to fail too on 2026-08-10, so
+ * nothing was duplicated, but a blip that hits the count and spares the
+ * inserts doubles the live acceptance event's guest list.
+ *
+ * Retries because outbound HTTPS from this machine is intermittent
+ * (TEST-LOG.md, "Environment note").
+ */
 async function countExisting() {
-  const { count } = await db
-    .from('guests')
-    .select('*', { count: 'exact', head: true })
-    .eq('event_id', EVENT_ID)
-    .ilike('full_name', `${SEED_PREFIX}%`)
-  return count ?? 0
+  let lastErr = null
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    const { count, error } = await db
+      .from('guests')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', EVENT_ID)
+      .ilike('full_name', `${SEED_PREFIX}%`)
+
+    if (!error && typeof count === 'number') return count
+    lastErr = error
+    await new Promise((r) => setTimeout(r, 1500))
+  }
+  throw new Error(
+    `Could not count existing SEED-543 guests after 6 attempts: ${lastErr?.message ?? 'count was null'}. ` +
+      'Refusing to continue — treating this as 0 would insert a duplicate 543.',
+  )
 }
 
 async function main() {
