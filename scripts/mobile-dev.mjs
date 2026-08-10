@@ -29,7 +29,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { networkInterfaces } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -40,8 +40,13 @@ const MAIN_ACTIVITY = `${APP_ID}/.MainActivity`
 const PORT = process.env.PORT ?? '3000'
 const IS_WINDOWS = process.platform === 'win32'
 
-/** The config that is actually baked into the installed APK. */
-const BAKED_CONFIG = path.join(ROOT, 'android/app/src/main/assets/capacitor.config.json')
+/**
+ * What we last actually INSTALLED, written only after `adb install` succeeds.
+ * This is the real staleness marker: without it, one failed build convinces
+ * every later run that there is nothing to do, and the app silently keeps
+ * pointing at a dead IP.
+ */
+const INSTALLED_MARKER = path.join(ROOT, 'android/.last-installed-url')
 
 function log(msg) {
   console.log(`\x1b[36m[mobile:dev]\x1b[0m ${msg}`)
@@ -146,16 +151,6 @@ function findLocalJdk() {
   return null
 }
 
-/** The server.url currently compiled into the APK's assets, or null. */
-function bakedServerUrl() {
-  if (!existsSync(BAKED_CONFIG)) return null
-  try {
-    return JSON.parse(readFileSync(BAKED_CONFIG, 'utf8'))?.server?.url ?? null
-  } catch {
-    return null
-  }
-}
-
 function run(cmd, args, opts = {}) {
   const res = spawnSync(cmd, args, {
     stdio: 'inherit',
@@ -237,7 +232,12 @@ async function main() {
   // 2. Rebuild only when the URL baked into the APK is stale. A Gradle build is
   //    ~1-2 minutes; skipping it when the IP has not moved is the difference
   //    between a usable loop and one nobody runs.
-  const baked = bakedServerUrl()
+  // Only the marker counts. No marker means we cannot prove what is on the
+  // phone, so we rebuild — deliberately NOT falling back to the synced config,
+  // which is what made a failed build look like a successful one.
+  const baked = existsSync(INSTALLED_MARKER)
+    ? readFileSync(INSTALLED_MARKER, 'utf8')
+    : null
   const needsRebuild = baked?.trim() !== serverUrl
 
   if (needsRebuild) {
@@ -260,7 +260,14 @@ async function main() {
     }
 
     log('building debug APK (this is the slow step)...')
-    run(IS_WINDOWS ? 'gradlew.bat' : './gradlew', ['assembleDebug'], {
+    // Absolute path, not a bare `gradlew.bat`. run() uses shell:true on Windows,
+    // and Git Bash exports NoDefaultCurrentDirectoryInExePath=1, which tells the
+    // child cmd.exe NOT to search the current directory — so the bare name fails
+    // with "not recognized" even though cwd is android/. Quoted for spaces.
+    const gradlew = IS_WINDOWS
+      ? `"${path.join(ROOT, 'android', 'gradlew.bat')}"`
+      : './gradlew'
+    run(gradlew, ['assembleDebug'], {
       cwd: path.join(ROOT, 'android'),
     })
 
@@ -269,6 +276,7 @@ async function main() {
 
     log('installing...')
     run(adb.cmd, ['install', '-r', apk], { shell: adb.useShell })
+    writeFileSync(INSTALLED_MARKER, serverUrl)
   } else {
     log(`baked URL already matches ${serverUrl} — skipping rebuild`)
   }
