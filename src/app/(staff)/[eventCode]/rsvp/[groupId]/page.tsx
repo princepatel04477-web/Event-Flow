@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
 import { BackRow } from './BackRow'
+import { Card, CardBody } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ShieldAlertIcon, ClockIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
@@ -14,8 +15,13 @@ import { RsvpLogForm } from './RsvpLogForm'
 import { buildInitialFormValues } from '@/lib/rsvp-log'
 
 type PageProps = {
-  // Next 15+ hands params over as a Promise.
+  // Next 15+ hands params and searchParams over as Promises.
   params: Promise<{ eventCode: string; groupId: string }>
+  // ?recording=<id> arrives from the review queue when a transcription failed:
+  // there is no AI draft, so the caller listens to the audio and types the
+  // outcome into this same form. The form itself is unchanged — the manual
+  // path is the manual path.
+  searchParams: Promise<{ recording?: string; from?: string }>
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -23,8 +29,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return { title: `RSVP — ${groupId.slice(0, 8)}` }
 }
 
-export default async function RsvpLogPage({ params }: PageProps) {
+export default async function RsvpLogPage({ params, searchParams }: PageProps) {
   const { eventCode, groupId } = await params
+  const { recording: recordingId } = await searchParams
 
   // No getViewer() pre-check: it only understands GoTrue (admin) sessions and
   // returns null for a code-auth team/client session (the cookie store is
@@ -133,7 +140,28 @@ export default async function RsvpLogPage({ params }: PageProps) {
     .map((r) => r.group_id as string)
   const nextGroupId = queueOrder[0] ?? null
 
-  return (
+  // Manual-entry mode: the transcription failed, so play her the call.
+  // Scoped by event_id AND group_id so a crafted ?recording= cannot pull audio
+  // from another family or another event.
+  let manualAudioUrl: string | null = null
+  if (recordingId) {
+    const { data: rec } = await supabase
+      .from('call_recordings')
+      .select('storage_path, storage_bucket')
+      .eq('id', recordingId)
+      .eq('event_id', event.id)
+      .eq('group_id', groupId)
+      .maybeSingle()
+
+    if (rec?.storage_path) {
+      const { data: signed } = await supabase.storage
+        .from(rec.storage_bucket ?? 'call-recordings')
+        .createSignedUrl(rec.storage_path, 3600)
+      manualAudioUrl = signed?.signedUrl ?? null
+    }
+  }
+
+  const form = (
     <RsvpLogForm
       eventId={event.id}
       eventCode={event.code}
@@ -144,5 +172,34 @@ export default async function RsvpLogPage({ params }: PageProps) {
       inFlightAttempt={inFlightAttempt}
       hasQueueNext={nextGroupId !== null}
     />
+  )
+
+  if (!recordingId) return form
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="border-warning/50 bg-tint-warning">
+        <CardBody className="flex flex-col gap-2 py-3">
+          <p className="text-sm font-semibold text-warning">
+            Transcription failed — enter manually
+          </p>
+          {manualAudioUrl ? (
+            <>
+              <p className="text-sm text-muted">
+                Listen to the call and type the outcome below. Nothing was transcribed, so
+                the form starts from this family&apos;s existing record.
+              </p>
+              <audio controls src={manualAudioUrl} className="w-full" preload="metadata" />
+            </>
+          ) : (
+            <p className="text-sm text-muted">
+              The recording could not be loaded. Log the outcome from memory or call the
+              family back — do not leave this call unlogged.
+            </p>
+          )}
+        </CardBody>
+      </Card>
+      {form}
+    </div>
   )
 }
