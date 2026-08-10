@@ -118,7 +118,19 @@ export async function claimGroupForCall(
 
 export type StartCallAttemptResult =
   | { ok: true; attempt: CallAttemptRow }
-  | { ok: false; message: string }
+  | { ok: false; message: string; /** One-line diagnostic: step + SQLSTATE-or-status + constraint + timestamp. */ diagnostic?: string }
+
+function buildDiagnostic(
+  step: string,
+  error: { message?: string | null; code?: string | null; details?: string | null } | null,
+  eventId: string,
+  groupId: string,
+): string {
+  const constraint = extractConstraintName(error)
+  const sqlstate = error?.code ?? 'unknown'
+  const now = new Date().toISOString()
+  return `step=${step} code=${sqlstate}${constraint ? ` constraint=${constraint}` : ''} event=${eventId.slice(0, 8)} group=${groupId.slice(0, 8)} at=${now}`
+}
 
 /**
  * Creates the `call_attempts` row. Must complete BEFORE the `tel:` link
@@ -155,6 +167,7 @@ export async function startCallAttempt(input: {
     .single()
 
   if (error || !data) {
+    const diag = buildDiagnostic('startCallAttempt', error, input.eventId, input.groupId)
     // Log constraint violations to the server console so the SQLSTATE and
     // constraint name are in the Vercel log — 23514 with no constraint name
     // is how this bug was diagnosed, and a generic user message would have
@@ -169,7 +182,7 @@ export async function startCallAttempt(input: {
         message: error.message?.slice(0, 200),
       })
     }
-    return { ok: false, message: friendlyDbError(error) }
+    return { ok: false, message: friendlyDbError(error), diagnostic: diag }
   }
 
   return { ok: true, attempt: data }

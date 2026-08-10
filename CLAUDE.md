@@ -364,11 +364,19 @@ Enforced at the **database level**, not in application code. Do not weaken them.
 - **The calling unit is the group, not the guest.** You dial one number and the family head
   answers for six people. PAX lives on `guest_groups` (`expected_pax` / `confirmed_pax`),
   not scattered across individual guests. The SRS contradicts itself here; the group wins.
+- **The caller lock is dormant (2026-08-12).** `claim_group()`, `release_group()`, and
+  `locked_by`/`locked_until` columns still exist in the database but are NOT called from
+  any client code path. Two handsets can open the same family simultaneously. Presence is
+  now non-blocking: `last_opened_by_staff` / `last_opened_at` on `guest_groups` are
+  fire-and-forget and surfaced as quiet text on the queue row. The attribution CHECK on
+  `call_attempts` (`num_nonnulls(caller_id, caller_id_staff) = 1`) is NOT the lock and
+  is NOT negotiable — it must never be softened.
 - **Individual member names are collected later**, at room allocation — not over the phone.
 - **Hampers and return gifts are the same shape.** One `deliverables` table with a `kind`
   enum, one insert-only `delivery_proofs` table. Do not build it twice.
 - **Groups are locked to a caller for 15 minutes** on open (`claim_group()` defaults to
   `p_minutes => 15`). With a 10-person calling team, two people *will* dial the same uncle.
+  **DORMANT as of 2026-08-12** — the call path no longer uses this. See above.
 - **`travel_legs` holds arrival and departure in one table**, so arrivals-vs-departures
   reconciliation is one query (`v_travel_ledger`).
 - **Fleet is live inventory and capacities are luggage-adjusted.** The sticker number lies:

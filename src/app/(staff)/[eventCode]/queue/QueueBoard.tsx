@@ -53,6 +53,18 @@ type LoadState =
  * subscriptions report SUBSCRIBED and then deliver nothing, forever. The
  * board still works — it just will not self-update.
  */
+const QUEUE_OFFSET_KEY = 'eventflow:queue:offset'
+
+/** Deterministic offset so simultaneous callers do not all begin at row 1. */
+function getOrCreateOffset(): number {
+  if (typeof window === 'undefined') return 0
+  const stored = sessionStorage.getItem(QUEUE_OFFSET_KEY)
+  if (stored !== null) return parseInt(stored, 10) || 0
+  const offset = Math.floor(Math.random() * 12) // 0-11, just enough to spread 10 callers
+  sessionStorage.setItem(QUEUE_OFFSET_KEY, String(offset))
+  return offset
+}
+
 export function QueueBoard({ eventId, eventCode, canImport }: QueueBoardProps) {
   const router = useRouter()
   const pathname = usePathname()

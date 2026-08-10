@@ -7,10 +7,9 @@ import { PhoneIcon } from '@/components/icons'
 import { Badge } from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Spinner'
 import { StatusPill } from '@/components/ui/StatusPill'
-import { claimGroupAction } from '@/lib/actions/queue'
 import { rsvpStatusLabel } from '@/lib/rsvp'
 import { statusTone, type StatusTone } from '@/lib/status'
-import { cn, formatDateTime } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/database.types'
 
 export type QueueGroupRow = Database['public']['Views']['v_rsvp_queue']['Row']
@@ -35,21 +34,14 @@ const EDGE_TONES: Record<string, StatusTone> = {
 /**
  * One family in the calling queue.
  *
- * The whole card is the tap target — always tappable, locked or not,
- * because `claim_group()` is re-entrant for its current holder. The server
- * decides whether the tap wins; this component just relays the answer.
- *
- * The call button inside it is deliberately a second, smaller target on the
- * same destination rather than a `tel:` shortcut: the row must write a
- * `call_attempts` row BEFORE the dialer backgrounds the WebView (see the
- * call screen), so there is no path from this list straight to the phone
- * app. What it buys is a thumb-sized affordance that says "this row is a
- * phone call" without the caller having to know the whole card is live.
+ * Always tappable — the caller lock is dormant as of 2026-08-12.
+ * Tapping navigates directly to the call screen with no RPC, no
+ * await, and no lock gate. Two handsets can open the same family
+ * simultaneously.
  */
 export function QueueRow({ row, eventCode }: QueueRowProps) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
-  const [conflict, setConflict] = useState<string | null>(null)
 
   const groupId = row.group_id
   const headName = row.head_name?.trim() || 'Unnamed family'
@@ -58,27 +50,26 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
   const pax = row.confirmed_pax ?? row.expected_pax ?? 0
   const status = row.rsvp_status ?? 'not_started'
   const attemptCount = row.attempt_count ?? 0
-  const isLocked = row.is_locked ?? false
   const nextCallbackAt = row.next_callback_at
 
   const edge = EDGE_TONES[status] ?? 'neutral'
   const disabled = !groupId || pending
 
-  async function handleTap() {
+  // Presence signal: when staff opened this group within the last 15 min.
+  // guest_groups columns added by migration 20260812000000_presence_columns.
+  const lastOpenedBy = (row as Record<string, unknown>).last_opened_by_staff as string | null
+  const lastOpenedAt = (row as Record<string, unknown>).last_opened_at as string | null
+  const openedRecently =
+    lastOpenedAt != null &&
+    new Date(lastOpenedAt).getTime() > Date.now() - 15 * 60_000
+
+  // Resolve the staff name from the view's own joined column
+  const lastOpenedByName = (row as Record<string, unknown>).last_opened_by_name as string | undefined
+
+  function handleTap() {
     if (!groupId || pending) return
-
-    setConflict(null)
     setPending(true)
-
-    const result = await claimGroupAction(groupId)
-
-    if (result.ok) {
-      router.push(`/${eventCode}/call/${groupId}`)
-      return
-    }
-
-    setPending(false)
-    setConflict(result.message)
+    router.push(`/${eventCode}/call/${groupId}`)
   }
 
   return (
@@ -100,8 +91,6 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
       >
         <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0">
-            {/* Sans, not the display serif — these names arrive in
-                Devanagari off the sheet and Cormorant has no Devanagari. */}
             <span className="block text-lg leading-snug font-medium text-ink">
               {headName}
             </span>
@@ -131,28 +120,45 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
           </StatusPill>
         </div>
 
-        {/* Secondary facts get their own ruled line so the chip row above
-            keeps the same height on every card in the register. */}
-        {isLocked || nextCallbackAt ? (
-          <div className="mt-2.5 flex flex-wrap gap-x-3 border-t border-rule pt-2.5 font-mono text-xs text-brand">
-            {isLocked ? <span>Locked by another caller</span> : null}
+        {/* Secondary facts */}
+        {openedRecently || nextCallbackAt ? (
+          <div className="mt-2.5 flex flex-wrap gap-x-3 border-t border-rule pt-2.5 font-mono text-xs">
+            {openedRecently && lastOpenedByName ? (
+              <span className="text-muted">
+                {lastOpenedByName}, {relativeTimeLabel(lastOpenedAt!)}
+              </span>
+            ) : null}
             {nextCallbackAt ? (
-              <span>Callback {formatDateTime(nextCallbackAt)}</span>
+              <span className="text-brand">
+                Callback {formatRelativeDateTime(nextCallbackAt)}
+              </span>
             ) : null}
           </div>
         ) : null}
       </button>
-
-      {conflict ? (
-        <p
-          role="alert"
-          className="border-t border-ledger-red/25 bg-red-tint px-3.5 py-2.5 text-sm font-medium text-ledger-red"
-        >
-          {conflict}
-        </p>
-      ) : null}
     </div>
   )
+}
+
+function formatRelativeDateTime(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const diffMs = d.getTime() - now.getTime()
+  const diffMin = Math.round(diffMs / 60_000)
+  if (diffMin <= 0) return 'now'
+  if (diffMin < 60) return `${diffMin}m`
+  const diffHr = Math.round(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h`
+  return `${Math.round(diffHr / 24)}d`
+}
+
+function relativeTimeLabel(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const diffSec = Math.round(diffMs / 1000)
+  if (diffSec < 60) return 'just now'
+  const diffMin = Math.round(diffSec / 60)
+  if (diffMin < 60) return `${diffMin} min ago`
+  return 'earlier'
 }
 
 export default QueueRow

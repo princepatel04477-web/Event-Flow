@@ -21,7 +21,7 @@ import { cn, formatDateTime, formatDuration } from '@/lib/utils'
 import { rsvpStatusLabel, rsvpStatusTone } from '@/lib/rsvp'
 
 import { BackRow } from './BackRow'
-import { claimGroupForCall, releaseGroupAfterCall, startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
+import { startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
 import { dialTarget, formatMobile, type DialTarget } from '@/lib/phone'
 import { placeCall } from '@/lib/native-call'
 import { drainOutbox, listQueuedCompletions, queueCompletion } from '@/lib/call/outbox'
@@ -77,15 +77,7 @@ export function CallScreen({
   const [saving, setSaving] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [savedOffline, setSavedOffline] = useState(false)
-
-  const [lockedUntil, setLockedUntil] = useState(group.locked_until)
-  const [extending, setExtending] = useState(false)
-
-  const [releasing, setReleasing] = useState(false)
-  const [releaseWarning, setReleaseWarning] = useState<string | null>(null)
   const [queuedCount, setQueuedCount] = useState(0)
-
-  const [now, setNow] = useState(() => Date.now())
 
   // ---------------------------------------------------------------------
   // Resume-first: rehydrate an in-flight attempt on mount. sessionStorage
@@ -140,12 +132,6 @@ export function CallScreen({
   }, [group.id])
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Lock countdown ticks every second purely for display.
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(id)
-  }, [])
-
   // Record the moment the caller comes back from the dialer. That instant —
   // not "when we finish typing notes", and certainly not "when the row was
   // inserted" — is the end of the call for duration purposes.
@@ -185,11 +171,6 @@ export function CallScreen({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const remainingMs = lockedUntil ? new Date(lockedUntil).getTime() - now : null
-  const lockLabel = formatCountdown(remainingMs)
-  const lockExpiringSoon = remainingMs !== null && remainingMs > 0 && remainingMs < 60_000
-  const lockExpired = remainingMs !== null && remainingMs <= 0
 
   const primaryTarget = dialTarget(group.primary_mobile)
   const altTarget = dialTarget(group.alt_mobile)
@@ -274,13 +255,6 @@ export function CallScreen({
     // Same path as the first dial — a redial used to skip the native plugin
     // entirely and go straight to the system handoff.
     void placeCall(target)
-  }
-
-  async function handleExtendLock() {
-    setExtending(true)
-    const result = await claimGroupForCall(eventId, group.id)
-    setExtending(false)
-    if (result.ok) setLockedUntil(result.group.locked_until)
   }
 
   function buildPayload(
@@ -404,25 +378,6 @@ export function CallScreen({
     await sendCompletion({ ...payload, durationSec: null })
   }
 
-  async function handleRelease() {
-    setReleasing(true)
-    setReleaseWarning(null)
-    const result = await releaseGroupAfterCall(eventId, group.id, eventCode)
-    if (!result.ok) {
-      // Do not navigate away telling them it worked when it did not.
-      setReleasing(false)
-      setReleaseWarning(result.message ?? 'This family could not be released.')
-      return
-    }
-    router.push(`/${eventCode}/queue`)
-  }
-
-  /** Leave without calling. Only reachable while idle — there is no open attempt to strand. */
-  async function handleReleaseIdle() {
-    clearStoredAttempt(group.id)
-    await handleRelease()
-  }
-
   function handleCallAgain() {
     if (!activeAttempt) return
     setPhase('idle')
@@ -435,44 +390,10 @@ export function CallScreen({
         href={`/${eventCode}/queue`}
         title={group.head_name}
         subtitle={[formatMobile(group.primary_mobile), group.city].filter(Boolean).join(' · ')}
-        right={
-          lockedUntil ? (
-            <Badge tone={lockExpired ? 'danger' : lockExpiringSoon ? 'warning' : 'neutral'} size="sm">
-              <ClockIcon className="h-3.5 w-3.5" />
-              {lockExpired ? 'Lock expired' : lockLabel}
-            </Badge>
-          ) : null
-        }
       />
 
       <>
-        {lockExpiringSoon || lockExpired ? (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-warning/40 bg-tint-warning px-3.5 py-2.5 text-sm text-warning">
-            <span>
-              {lockExpired
-                ? 'Your 15-minute claim on this family has run out.'
-                : `Your claim runs out in ${lockLabel}.`}
-            </span>
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={handleExtendLock}
-              loading={extending}
-              className="shrink-0"
-            >
-              Extend 15m
-            </Button>
-          </div>
-        ) : null}
-
-        {releaseWarning ? (
-          <p
-            role="alert"
-            className="rounded-xl border border-warning bg-tint-warning px-4 py-3 text-sm font-medium text-warning"
-          >
-            {releaseWarning}
-          </p>
-        ) : null}
+        {/* Lock state removed 2026-08-12 — caller lock is dormant. */}
 
         {/* Group context */}
         <Card>
@@ -600,8 +521,8 @@ export function CallScreen({
                 )}
               </CardBody>
               <CardFooter className="flex flex-col gap-2">
-                <Button fullWidth variant="primary" onClick={handleRelease} loading={releasing}>
-                  Release family &amp; back to queue
+                <Button fullWidth variant="primary" onClick={() => router.push(`/${eventCode}/queue`)}>
+                  Back to queue
                 </Button>
                 <div className="flex w-full gap-2">
                   <Button
@@ -611,9 +532,6 @@ export function CallScreen({
                     disabled={!primaryTarget && !altTarget}
                   >
                     Call again
-                  </Button>
-                  <Button variant="ghost" fullWidth onClick={() => router.push(`/${eventCode}/queue`)}>
-                    Back without releasing
                   </Button>
                 </div>
               </CardFooter>
@@ -696,11 +614,10 @@ export function CallScreen({
         {phase === 'idle' ? (
           <Button
             variant="ghost"
-            onClick={handleReleaseIdle}
-            loading={releasing}
+            onClick={() => { clearStoredAttempt(group.id); router.push(`/${eventCode}/queue`) }}
             className="self-center"
           >
-            Not calling right now — release this family
+            Back to queue
           </Button>
         ) : null}
       </>
