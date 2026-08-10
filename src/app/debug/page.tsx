@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { SectionHead } from '@/components/ui/SectionHead'
+import { resetWelcomeClaim } from '@/lib/motion/cold-start'
 import { isNativePlatform } from '@/lib/native/platform'
 import { queuedProofCount, stuckProofs, type QueuedProof } from '@/lib/proof-queue'
 import { supabase } from '@/lib/supabase/client'
@@ -161,6 +162,19 @@ export default function DebugPage() {
         </Button>
         <Button variant="secondary" onClick={copy}>
           {copied ? 'Copied!' : 'Copy diagnostics'}
+        </Button>
+        {/* The welcome animation plays once per app launch and is then
+            suppressed for the rest of the WebView session. Without this,
+            checking a change to it means force-stopping the app between
+            every attempt. Clears the claim, then reloads to replay it. */}
+        <Button
+          variant="secondary"
+          onClick={() => {
+            resetWelcomeClaim()
+            window.location.reload()
+          }}
+        >
+          Replay welcome animation
         </Button>
       </div>
     </main>
