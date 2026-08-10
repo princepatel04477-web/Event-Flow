@@ -34,6 +34,13 @@ const jwtSecret = Deno.env.get('APP_JWT_SECRET')!
 const CODE_ALPHABET = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]+$/
 const RATE_DEVICE_MAX = 5
 const RATE_DEVICE_WINDOW_MS = 15 * 60 * 1000
+// Session lifetime. Was 30 days, which meant a revoked code left a lost
+// phone working for a month. app.code_is_live() now ends such a session
+// on its next request, so this is the fallback ceiling, not the control:
+// 7 days is generous for a 4-day event and keeps a stolen token from
+// outliving the wedding.
+const SESSION_EXPIRY_SEC = 60 * 60 * 24 * 7
+
 const RATE_DEVICE_LOCK_MS = 60 * 60 * 1000
 const RATE_IP_MAX = 20
 const RATE_IP_WINDOW_MS = 60 * 60 * 1000
@@ -214,14 +221,14 @@ Deno.serve(async (req) => {
     eventId,
     appRole,
     accessCodeId: match.id as string,
-    expirySec: 60 * 60 * 24 * 30,
+    expirySec: SESSION_EXPIRY_SEC,
   })
 
   return Response.json(
     {
       access_token: token,
       token_type: 'bearer',
-      expires_in: 60 * 60 * 24 * 30,
+      expires_in: SESSION_EXPIRY_SEC,
       app_role: appRole,
       event_id: eventId,
     },

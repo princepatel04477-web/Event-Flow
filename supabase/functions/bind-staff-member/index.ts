@@ -143,9 +143,11 @@ Deno.serve(async (req) => {
   }
 
   // 3. Re-mint with the staff claim, preserving the original expiry window.
+  // Preserve the original window; the fallback matches
+  // SESSION_EXPIRY_SEC in verify-access-code (7 days, was 30).
   const expirySec = claims.exp
     ? Math.max(60, claims.exp - Math.floor(Date.now() / 1000))
-    : 60 * 60 * 24 * 30
+    : 60 * 60 * 24 * 7
 
   const newToken = await mintJwt({
     eventId,
