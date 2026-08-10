@@ -23,6 +23,15 @@ import { persistClaims } from '@/lib/native/session-keeper'
  * The Edge Function never reveals whether the prefix was valid or which
  * part was wrong — a failure always reads "Invalid code".
  */
+/**
+ * How long to wait for verify-access-code before giving up.
+ *
+ * Generous — venue Wi-Fi is slow, and a staff member would rather wait than
+ * be told to retry a request that was about to succeed. But bounded: an
+ * unbounded spinner is indistinguishable from a frozen app.
+ */
+const LOGIN_TIMEOUT_MS = 20_000
+
 export function CodeLoginForm({ next }: { next: string }) {
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -68,6 +77,14 @@ export function CodeLoginForm({ next }: { next: string }) {
     setPending(true)
     setError(null)
 
+    // Bound the wait. Without a timeout this fetch can hang indefinitely on
+    // venue Wi-Fi — observed 2026-08-10: the POST was sent and no response
+    // ever arrived, past 18 seconds, with no error event. The staff member
+    // sees a spinner forever, with nothing to tap and no idea whether it is
+    // working. A bounded failure they can retry beats an unbounded wait.
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), LOGIN_TIMEOUT_MS)
+
     try {
       const deviceId = await getDeviceId()
       const res = await fetch(
@@ -76,6 +93,7 @@ export function CodeLoginForm({ next }: { next: string }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: code.trim(), device_id: deviceId }),
+          signal: controller.signal,
         },
       )
 
@@ -97,9 +115,21 @@ export function CodeLoginForm({ next }: { next: string }) {
       const target = body.app_role === 'team' ? '/pick-staff' : '/'
       await persistClaims({ token: body.access_token, staffMemberId: null, eventCode: null })
       await setCodeAuthSession(body.access_token, target)
-    } catch {
-      setError('Could not reach the server. Check your connection and try again.')
+    } catch (err) {
+      // Distinguish "we gave up waiting" from "the network refused us".
+      // setCodeAuthSession ends in redirect(), which Next signals by
+      // throwing — that must pass through, not be reported as a failure.
+      if (err && typeof err === 'object' && 'digest' in err) throw err
+
+      const timedOut = err instanceof DOMException && err.name === 'AbortError'
+      setError(
+        timedOut
+          ? `The server did not answer within ${Math.round(LOGIN_TIMEOUT_MS / 1000)} seconds. Check your signal and tap Enter event again.`
+          : 'Could not reach the server. Check your connection and try again.',
+      )
       setPending(false)
+    } finally {
+      clearTimeout(timer)
     }
   }
 
