@@ -16,9 +16,9 @@ export interface BottomTabsProps {
 }
 
 /**
- * Five-section bottom bar. Each section is a tab with its icon + label.
- * Active state highlights the current section by path segment. Sub-navigation
- * lives inside each section's own layout, never at the top level.
+ * Section bottom bar — icon + short label per section. Equal-width flex
+ * tabs, evenly distributed. Active state matches the current section by
+ * path segment. Feature-flagged sections are hidden without a placeholder.
  *
  * Icons are from the section config — one source of truth shared with the
  * sidebar, breadcrumbs, and section headers.
@@ -29,11 +29,12 @@ export function BottomTabs({ eventCode, access }: BottomTabsProps) {
   // segments = [eventCode, section, ...children]
   const currentSection = segments.length >= 2 ? segments[1] : ''
 
-  // Five operational sections that staff and admin can reach
+  // Operational sections that staff and admin can reach, with feature flags respected.
   const visibleSections = Object.values(SECTIONS).filter(
-    (s) => (access === 'admin' && s.roles.includes('admin'))
+    (s) => s.featureFlag === undefined &&
+      ((access === 'admin' && s.roles.includes('admin'))
         || (access === 'event_team' && s.roles.includes('event_team'))
-        || (access === 'client' && s.roles.includes('client'))
+        || (access === 'client' && s.roles.includes('client')))
   )
 
   if (visibleSections.length === 0) return null
@@ -57,8 +58,8 @@ export function BottomTabs({ eventCode, access }: BottomTabsProps) {
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'tap relative flex min-h-16 flex-col items-center justify-center gap-1 px-0.5 py-2',
-                  'font-mono text-[0.625rem] leading-none font-medium tracking-[0.08em] uppercase',
+                  'tap relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 py-2',
+                  'text-[0.6875rem] leading-tight font-medium',
                   'transition-colors duration-press ease-ledger',
                   active ? 'text-brand' : 'text-muted active:text-ink',
                 )}

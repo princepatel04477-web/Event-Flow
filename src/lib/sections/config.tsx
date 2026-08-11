@@ -5,9 +5,10 @@ import {
   CarIcon,
   BuildingIcon,
   GridIcon,
+  ClipboardCheckIcon,
 } from '@/components/icons'
 
-export type SectionId = 'dashboard' | 'guests' | 'rsvp' | 'logistics' | 'hospitality'
+export type SectionId = 'dashboard' | 'guests' | 'rsvp' | 'logistics' | 'hospitality' | 'production'
 
 export type TabAccess = 'admin' | 'event_team' | 'client'
 
@@ -25,6 +26,9 @@ export interface SectionDef {
   icon: ReactNode
   roles: TabAccess[]
   children: SectionChild[]
+  /** Set when the section is defined but gated behind this feature flag. Flag-off means
+   *  the section renders nowhere — no tab, no sidebar entry, no placeholder route. */
+  featureFlag?: 'production'
 }
 
 export const SECTIONS: Record<SectionId, SectionDef> = {
@@ -56,7 +60,7 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     ],
   },
   logistics: {
-    id: 'logistics', label: 'Logistics', tabLabel: 'Logistics',
+    id: 'logistics', label: 'Logistics', tabLabel: 'Travel',
     icon: <CarIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
     children: [
@@ -67,7 +71,7 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     ],
   },
   hospitality: {
-    id: 'hospitality', label: 'Hospitality', tabLabel: 'Hospitality',
+    id: 'hospitality', label: 'Hospitality', tabLabel: 'Stay',
     icon: <BuildingIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
     children: [
@@ -75,6 +79,13 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
       { segment: 'checkin', label: 'Check-in', roles: ['admin','event_team'] },
       { segment: 'deliveries', label: 'Deliveries', roles: ['admin','event_team'] },
     ],
+  },
+  production: {
+    id: 'production', label: 'Production', tabLabel: 'Prep',
+    icon: <ClipboardCheckIcon className="h-6 w-6" />,
+    roles: ['admin', 'event_team'],
+    children: [],
+    featureFlag: 'production',
   },
 } as const
 

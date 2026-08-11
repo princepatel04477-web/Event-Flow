@@ -81,7 +81,7 @@ export default async function EventLayout({ children, params }: LayoutProps) {
         title={event.name}
         subtitle={subtitle}
         right={
-          <>
+          <nav className="flex items-center gap-2" aria-label="Header actions">
             {effectiveViewer.memberships.length > 1 ? (
               // Full memberships, not a projection: the switcher needs each
               // event's role so it can send a client to their guests page
@@ -93,8 +93,10 @@ export default async function EventLayout({ children, params }: LayoutProps) {
               />
             ) : null}
             <AdminLink show={effectiveViewer.isAdmin} />
-            <SignOutButton compact />
-          </>
+            <span className="ml-0.5 border-l border-rule-strong pl-2.5">
+              <SignOutButton compact />
+            </span>
+          </nav>
         }
       />
 
@@ -102,10 +104,10 @@ export default async function EventLayout({ children, params }: LayoutProps) {
           are both horizontal padding, so they cannot share a box. The bottom
           inset lives on <main> for the same reason — pb-safe and pb-8 are the
           same property and would fight on one element. */}
-      <main className={cn('flex-1 px-safe', !showTabs && 'pb-safe')}>
+      <main className={cn('flex flex-1 flex-col px-safe', !showTabs && 'pb-safe')}>
         <div
           className={cn(
-            'mx-auto w-full max-w-[480px] px-4 pt-4',
+            'mx-auto flex w-full max-w-[480px] flex-1 flex-col px-4 pt-4',
             showTabs ? 'pb-nav' : 'pb-8',
           )}
         >

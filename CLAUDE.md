@@ -423,7 +423,11 @@ only an admin can change `global_role`.
 
 **Hampers / return gifts** — `deliverables`, `delivery_proofs`
 
+**(Production)** — reserved, not built yet. See §8a.
+
 **Logistics** — `vehicle_types`, `vehicles`, `trips`, `trip_passengers`
+
+**Messaging / import** — `message_templates`, `messages`, `import_batches`, `import_rows`
 
 **Messaging / import** — `message_templates`, `messages`, `import_batches`, `import_rows`
 
