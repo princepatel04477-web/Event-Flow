@@ -1,22 +1,17 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 
 import { createClient } from '@/lib/supabase/server'
 import { resolveEventByCode } from '@/lib/supabase/queries'
 import { DashboardClient } from './DashboardClient'
-import { HotelImporter } from './HotelImporter'
 import { readHotelImportContext } from '@/lib/actions/import-hotels'
 import { Button } from '@/components/ui/Button'
-import { Card, CardBody } from '@/components/ui/Card'
-import { BuildingIcon, UploadIcon } from '@/components/icons'
+import { BuildingIcon } from '@/components/icons'
 
-export const metadata: Metadata = {
-  title: 'Dashboard',
-}
+export const metadata: Metadata = { title: 'Dashboard' }
 
-type PageProps = {
-  params: Promise<{ eventCode: string }>
-}
+type PageProps = { params: Promise<{ eventCode: string }> }
 
 export default async function AdminEventDashboardPage({ params }: PageProps) {
   const { eventCode } = await params
@@ -29,7 +24,7 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
       .from('staff_members')
       .select('id', { count: 'exact', head: true })
       .eq('event_id', event.id)
-      .then((r) => r.count),
+      .then(r => r.count),
     readHotelImportContext(event.id),
   ])
 
@@ -43,23 +38,23 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
 
       <DashboardClient eventId={event.id} eventCode={event.code} />
 
-      <div className="flex flex-col gap-4 rounded-2xl border border-rule bg-surface-2 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold text-fg">Import hotels</h3>
-            <p className="text-sm text-muted">
-              Upload a CSV or Excel file to bulk-add hotels and rooms for this event.
-            </p>
-            {hotelContext.ok ? (
-              <p className="mt-1 text-xs text-subtle">
-                {hotelContext.existingHotels} hotel{hotelContext.existingHotels === 1 ? '' : 's'},{' '}
-                {hotelContext.existingRooms} room{hotelContext.existingRooms === 1 ? '' : 's'} already on file.
-              </p>
-            ) : null}
-          </div>
+      <Link
+        href={`/admin/events/${event.code}/hotels`}
+        className="tap flex items-center gap-4 rounded-2xl border border-rule bg-surface p-4 transition-colors hover:bg-surface-2 active:bg-surface-2"
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-tint text-brand">
+          <BuildingIcon className="h-5 w-5" />
         </div>
-        <HotelImporter eventId={event.id} eventCode={event.code} context={hotelContext} />
-      </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-fg">Hotels &amp; Rooms</p>
+          {hotelContext.ok ? (
+            <p className="text-sm text-muted">
+              {hotelContext.existingHotels} hotel{hotelContext.existingHotels === 1 ? '' : 's'},{' '}
+              {hotelContext.existingRooms} room{hotelContext.existingRooms === 1 ? '' : 's'}
+            </p>
+          ) : null}
+        </div>
+      </Link>
     </div>
   )
 }
