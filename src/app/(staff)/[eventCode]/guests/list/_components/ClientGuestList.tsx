@@ -5,12 +5,21 @@ import { useMemo, useState } from 'react'
 import { SearchIcon, UsersIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { listClientGuests, type ClientGuestRow } from '@/lib/actions/client-guests'
+import { listClientGuests, type ClientGuestRow, type ClientDashboardStats } from '@/lib/actions/client-guests'
 import { traceFetch } from '@/lib/perf'
 import { useStableData } from '@/lib/use-stable-data'
 
 import { FamilySection } from './FamilySection'
-import { groupByFamilyHead } from './format'
+import { groupByFamilyHead, groupBySide, rsvpLabel } from './format'
+
+function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'green' | 'red' }) {
+  return (
+    <div className="rounded-xl border border-rule bg-surface p-3">
+      <div className={`text-xl font-semibold leading-none ${tone === 'green' ? 'text-ledger-green' : tone === 'red' ? 'text-ledger-red' : 'text-ink'}`}>{value}</div>
+      <div className="mt-1 text-xs text-muted">{label}</div>
+    </div>
+  )
+}
 
 /**
  * The client's guest list — the only screen a `client` login can use.
@@ -61,6 +70,27 @@ export function ClientGuestList({ eventId }: ClientGuestListProps) {
   const searchActive = q.length >= MIN_SEARCH
 
   const allFamilies = useMemo(() => groupByFamilyHead(rows ?? []), [rows])
+
+  const sideSections = useMemo(() => groupBySide(allFamilies), [allFamilies])
+
+  const stats = useMemo((): ClientDashboardStats | null => {
+    if (!rows || rows.length === 0) return null
+    const confirmed = allFamilies.filter(f => f.guests.some(g => g.rsvp_status === 'confirmed')).length
+    const declined = allFamilies.filter(f => f.guests.some(g => g.rsvp_status === 'declined')).length
+    const withRoom = new Set(rows.filter(r => r.room_number).map(r => r.family_head?.trim()?.toLowerCase())).size
+    const hamper = rows.filter(r => r.hamper_delivered === true).length
+    return {
+      totalGuests: rows.length,
+      totalFamilies: allFamilies.length,
+      confirmedFamilies: confirmed,
+      declinedFamilies: declined,
+      pendingFamilies: allFamilies.length - confirmed - declined,
+      familiesWithHotel: new Set(rows.filter(r => r.hotel_name).map(r => r.family_head?.trim()?.toLowerCase())).size,
+      familiesWithRoom: withRoom,
+      hamperDelivered: hamper,
+      returnGiftDelivered: rows.filter(r => r.return_gift_delivered === true).length,
+    }
+  }, [rows, allFamilies])
 
   const families = useMemo(() => {
     if (!searchActive) return allFamilies
@@ -115,7 +145,7 @@ export function ClientGuestList({ eventId }: ClientGuestListProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div>
         <h2 className="font-display text-2xl leading-tight font-medium text-ink">Guest list</h2>
         <p className="mt-1 text-sm text-muted">
@@ -125,6 +155,15 @@ export function ClientGuestList({ eventId }: ClientGuestListProps) {
         </p>
       </div>
 
+      {stats ? (
+        <div className="grid grid-cols-2 gap-2">
+          <StatCard label="Families" value={String(stats.totalFamilies)} />
+          <StatCard label="Confirmed" value={String(stats.confirmedFamilies)} tone="green" />
+          <StatCard label="Roomed" value={String(stats.familiesWithRoom)} />
+          <StatCard label="Declined" value={String(stats.declinedFamilies)} tone="red" />
+        </div>
+      ) : null}
+
       <div className="flex items-center gap-2 rounded-xl border border-rule-strong bg-surface px-3">
         <SearchIcon className="h-5 w-5 shrink-0 text-muted" />
         <input
@@ -132,10 +171,6 @@ export function ClientGuestList({ eventId }: ClientGuestListProps) {
           value={search}
           onChange={(e) => {
             setSearch(e.target.value)
-            // Reset paging here, in the event handler, not in an effect:
-            // narrowing the search must not leave the reader on page 4 of a
-            // result set that no longer has one, and a synchronous setState
-            // inside an effect cascades renders.
             setPage(1)
           }}
           placeholder="Search by name"
@@ -158,10 +193,23 @@ export function ClientGuestList({ eventId }: ClientGuestListProps) {
           title="Nothing matches"
           description="No guest matches that search. Try a different spelling, or part of the family head's name."
         />
-      ) : (
+      ) : searchActive ? (
         <div className="flex flex-col gap-4">
           {shown.map((family, index) => (
             <FamilySection key={family.key} family={family} index={index} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {sideSections.map(section => (
+            <div key={section.label}>
+              <h3 className="mb-3 text-sm font-semibold text-muted uppercase tracking-wider">{section.label}</h3>
+              <div className="flex flex-col gap-3">
+                {section.families.slice(0, page * FAMILIES_PER_PAGE).map((family, index) => (
+                  <FamilySection key={family.key} family={family} index={index} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}

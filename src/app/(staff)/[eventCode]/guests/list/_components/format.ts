@@ -30,6 +30,31 @@ const GROUP_TYPE_LABELS: Record<GroupType, string> = {
   single: 'Single',
 }
 
+const RSVP_LABELS: Record<string, string> = {
+  confirmed: 'Confirmed',
+  declined: 'Declined',
+  tentative: 'Tentative',
+  callback: 'Awaiting callback',
+  unreachable: 'Unreachable',
+  not_started: 'Not yet called',
+  attempted: 'Attempted',
+}
+
+export function rsvpLabel(status: string | null): string | null {
+  if (!status || !(status in RSVP_LABELS)) return null
+  return RSVP_LABELS[status]
+}
+
+export function rsvpTone(status: string | null): string {
+  switch (status) {
+    case 'confirmed': return 'text-ledger-green'
+    case 'declined': return 'text-ledger-red'
+    case 'tentative': case 'callback': return 'text-warning'
+    case 'unreachable': return 'text-danger'
+    default: return 'text-muted'
+  }
+}
+
 export function groupTypeLabel(value: GroupType | null): string | null {
   return value ? GROUP_TYPE_LABELS[value] : null
 }
@@ -119,7 +144,7 @@ export function describeLeg(input: LegInput): LegView {
  * Rooms are Phase 2, so null is the ordinary case today — the copy says
  * "not allocated yet", never anything that reads like a failure.
  */
-export function describeRoom(row: GuestRow): string {
+export function describeRoom(row: { hotel_name: string | null; room_number: string | null }): string {
   const hotel = row.hotel_name?.trim() || null
   const room = row.room_number?.trim() || null
 
@@ -145,28 +170,62 @@ export type GuestFamily = {
  * ("Kirit Patel" vs "kirit patel " are one family).
  */
 export function groupByFamilyHead(rows: GuestRow[]): GuestFamily[] {
-  const families = new Map<string, GuestFamily>()
+  return groupRows(rows, (row) => row.family_head?.trim()?.toLocaleLowerCase() ?? null, 'solo', 'head')
+}
+
+export type SideSection = {
+  label: string
+  families: GuestFamily[]
+}
+
+export function groupBySide(families: GuestFamily[]): SideSection[] {
+  const map: Record<string, GuestFamily[]> = {}
+  for (const f of families) {
+    const side = f.guests[0]?.side ?? 'other'
+    const key = side
+    if (!map[key]) map[key] = []
+    map[key].push(f)
+  }
+  const order = ['groom', 'bride', 'both', 'other']
+  const sections: SideSection[] = []
+  for (const key of order) {
+    if (map[key]?.length) {
+      const label = key === 'groom' ? "Groom's side"
+        : key === 'bride' ? "Bride's side"
+        : key === 'both' ? 'Both sides'
+        : 'Other guests'
+      sections.push({ label, families: map[key] })
+    }
+  }
+  return sections
+}
+
+function groupRows(
+  rows: GuestRow[],
+  keyFn: (row: GuestRow) => string | null,
+  soloKey: string,
+  keyPrefix: string,
+): GuestFamily[] {
+  const familiesMap = new Map<string, GuestFamily>()
 
   rows.forEach((row, index) => {
-    const head = row.family_head?.trim() || null
-    const key = head ? `head:${head.toLocaleLowerCase()}` : `solo:${row.guest_id ?? index}`
-
-    const existing = families.get(key)
+    const k = keyFn(row)
+    const key = k ? `${keyPrefix}:${k}` : `${soloKey}:${row.guest_id ?? index}`
+    const existing = familiesMap.get(key)
     if (existing) {
       existing.guests.push(row)
       return
     }
-
-    families.set(key, { key, head, guests: [row] })
+    familiesMap.set(key, { key, head: k ? row.family_head?.trim() ?? null : null, guests: [row] })
   })
 
-  for (const family of families.values()) {
+  for (const family of familiesMap.values()) {
     family.guests.sort((a, b) =>
       (a.guest_name ?? '').localeCompare(b.guest_name ?? '', 'en-IN'),
     )
   }
 
-  return [...families.values()].sort((a, b) =>
+  return [...familiesMap.values()].sort((a, b) =>
     (a.head ?? '').localeCompare(b.head ?? '', 'en-IN'),
   )
 }

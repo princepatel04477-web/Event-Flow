@@ -29,6 +29,22 @@ export type ClientGuestResult =
   | { ok: false; message: string }
 
 /**
+ * Dashboard stats for the client — light, computed from the guest list.
+ * Zero additional queries: derive from what client_guest_profiles already returns.
+ */
+export interface ClientDashboardStats {
+  totalGuests: number
+  totalFamilies: number
+  confirmedFamilies: number
+  declinedFamilies: number
+  pendingFamilies: number
+  familiesWithHotel: number
+  familiesWithRoom: number
+  hamperDelivered: number
+  returnGiftDelivered: number
+}
+
+/**
  * Every guest profile shared on this event, ordered family-then-name.
  *
  * Returns the whole set in one read (543 rows answered in ~5ms) and lets the

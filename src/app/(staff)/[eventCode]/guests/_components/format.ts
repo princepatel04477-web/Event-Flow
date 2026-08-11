@@ -119,7 +119,7 @@ export function describeLeg(input: LegInput): LegView {
  * Rooms are Phase 2, so null is the ordinary case today — the copy says
  * "not allocated yet", never anything that reads like a failure.
  */
-export function describeRoom(row: GuestRow): string {
+export function describeRoom(row: { hotel_name: string | null; room_number: string | null }): string {
   const hotel = row.hotel_name?.trim() || null
   const room = row.room_number?.trim() || null
 

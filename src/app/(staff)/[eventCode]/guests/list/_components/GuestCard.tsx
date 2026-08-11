@@ -5,6 +5,8 @@ import {
   describeRoom,
   groupTypeLabel,
   sideLabel,
+  rsvpLabel,
+  rsvpTone,
   type GuestRow,
 } from './format'
 
@@ -44,6 +46,8 @@ export function GuestCard({ row, headingLevel, showFamilyHead = false }: GuestCa
 
   const side = sideLabel(row.side)
   const groupType = groupTypeLabel(row.group_type)
+  const status = rsvpLabel(row.rsvp_status)
+  const statusTone = rsvpTone(row.rsvp_status)
   const pax = typeof row.pax === 'number' ? row.pax : null
 
   const arrival = describeLeg({
@@ -79,9 +83,9 @@ export function GuestCard({ row, headingLevel, showFamilyHead = false }: GuestCa
           {showFamilyHead && head && head !== name ? (
             <p className="mt-1 text-sm text-muted">Family of {head}</p>
           ) : null}
-          {side || groupType ? (
+          {side || groupType || status ? (
             <p className="mt-1 text-sm text-muted">
-              {[groupType, side].filter(Boolean).join(' · ')}
+              {[status, groupType, side].filter(Boolean).join(' · ')}
             </p>
           ) : null}
         </div>
