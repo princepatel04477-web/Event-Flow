@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { type Membership } from '@/lib/events/paths'
 import {
   GridIcon,
+  BuildingIcon,
   LockIcon,
   FileTextIcon,
   ListIcon,
@@ -46,6 +47,12 @@ const EVENT_NAV: NavItem[] = [
     label: 'Dashboard',
     icon: <GridIcon className="h-5 w-5" />,
     matchSegments: ['dashboard'],
+  },
+  {
+    href: 'hotels',
+    label: 'Hotels',
+    icon: <BuildingIcon className="h-5 w-5" />,
+    matchSegments: ['hotels'],
   },
   {
     href: 'codes',

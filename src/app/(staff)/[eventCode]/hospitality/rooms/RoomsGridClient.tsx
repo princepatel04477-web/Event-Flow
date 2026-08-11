@@ -6,11 +6,12 @@ import { Badge } from '@/components/ui/Badge'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { PageTitle } from '@/components/ui/PageTitle'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { Textarea } from '@/components/ui/Textarea'
-import { BuildingIcon, ShieldAlertIcon } from '@/components/icons'
+import { BuildingIcon, PlusIcon, UploadIcon, ShieldAlertIcon } from '@/components/icons'
 import {
   readRoomsGrid,
   moveGuestToRoom,
@@ -23,9 +24,12 @@ import {
 import { traceFetch } from '@/lib/perf'
 import { ROOM_STATUS_LABELS, ROOM_STATUS_TONES, type RoomStatus } from '@/lib/status'
 import { cn } from '@/lib/utils'
+import type { TabAccess } from '@/components/nav/BottomTabs'
 
 interface Props {
   eventId: string
+  eventCode: string
+  access: TabAccess
 }
 
 type LoadState =
@@ -87,7 +91,7 @@ function occupancyDots(room: RoomGridRow): string {
   return out
 }
 
-export function RoomsGridClient({ eventId }: Props) {
+export function RoomsGridClient({ eventId, eventCode, access }: Props) {
   const [state, setState] = useState<LoadState>({ phase: 'loading' })
   const [hotelIdx, setHotelIdx] = useState(0)
   const [openRoomId, setOpenRoomId] = useState<string | null>(null)
@@ -273,11 +277,40 @@ export function RoomsGridClient({ eventId }: Props) {
   const { data } = state
 
   if (data.rooms.length === 0) {
+    const isAdmin = access === 'admin'
     return (
       <EmptyState
         icon={<BuildingIcon className="h-7 w-7" />}
         title="No rooms set up"
-        description="Add hotels and rooms first from the admin area. Without rooms there is nothing to allocate."
+        description={
+          isAdmin
+            ? 'Create a hotel first, then import rooms from an Excel sheet or add them manually.'
+            : 'No hotels or rooms have been added yet. An admin needs to set them up first — ask them to add hotels and rooms.'
+        }
+        action={
+          <div className="flex flex-col gap-2 w-full max-w-xs">
+            <LinkButton
+              href={`/admin/events/${eventCode}/hotels/new`}
+              variant="primary"
+              leadingIcon={<PlusIcon className="h-5 w-5" />}
+              size="md"
+              fullWidth
+            >
+              Add hotel
+            </LinkButton>
+            {isAdmin ? (
+              <LinkButton
+                href={`/admin/events/${eventCode}/import-hotels`}
+                variant="secondary"
+                leadingIcon={<UploadIcon className="h-5 w-5" />}
+                size="md"
+                fullWidth
+              >
+                Import from Excel
+              </LinkButton>
+            ) : null}
+          </div>
+        }
       />
     )
   }
