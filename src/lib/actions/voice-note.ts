@@ -1,31 +1,53 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
+
 import { createClient } from '@/lib/supabase/server'
 import { getSessionClaims } from '@/lib/auth/server'
 
-export type UploadVoiceNoteResult =
+export type RegisterVoiceNoteResult =
   | { ok: true; recordingId: string }
-  | { ok: false; error: string }
+  | { ok: false; error: string; /** `step=… code=… at=…`, for Sentry. Never shown to staff. */ diagnostic?: string }
 
 /**
- * Upload a voice note recording to Supabase Storage and insert a
- * call_recordings row, triggering the existing STT pipeline.
+ * Insert the `call_recordings` row for an already-uploaded voice note.
  *
- * Follows the delivery_proofs pattern: storage upload, then insert,
- * attribution from the session. The source column marks this as
- * 'voice_note' so the extraction prompt weights it differently.
+ * WHY THE AUDIO DOES NOT COME THROUGH HERE
  *
- * Called from the browser. The audio is base64-encoded AAC.
+ * The previous version took the whole file as base64 in the server-action
+ * body. Two hard ceilings made that unshippable:
+ *
+ *   - Next's `serverActions.bodySizeLimit` defaults to 1 MB.
+ *   - Vercel caps a serverless request body at 4.5 MB, which no config can
+ *     raise.
+ *
+ * base64 inflates by a third, so a three-minute AAC note crossed both. The
+ * client now uploads the blob straight to Storage with the browser Supabase
+ * client — the code-auth JWT carries `role: 'authenticated'`, so the
+ * `staff upload call recordings` policy (`app.is_staff(<first path segment>)`)
+ * applies exactly as it does server-side — and this action only records that
+ * it happened.
+ *
+ * ORDERING IS LOAD-BEARING: upload first, insert second. A row pointing at
+ * audio that does not exist is unrecoverable — the transcribe webhook fires,
+ * fails to sign a URL, and the call looks transcribed-and-empty forever. An
+ * uploaded object with no row is merely an orphan in a private bucket.
+ *
+ * Attribution stays server-side and follows the §5.9 paired-column rule: a
+ * team session writes `uploaded_by_staff`, an admin writes `uploaded_by`.
+ * Never both — that is what the CHECK constraints exist to prevent.
  */
-export async function uploadVoiceNote(input: {
+export async function registerVoiceNote(input: {
   eventId: string
+  eventCode: string
   groupId: string
   callAttemptId: string
-  /** base64-encoded AAC audio */
-  audioBase64: string
-  /** Duration in seconds */
+  /** Storage path the client already uploaded to, inside the call-recordings bucket. */
+  storagePath: string
+  /** The real content type of the uploaded object. */
+  mimeType: string
   durationSec: number
-}): Promise<UploadVoiceNoteResult> {
+}): Promise<RegisterVoiceNoteResult> {
   const supabase = await createClient()
   const claims = await getSessionClaims()
 
@@ -36,17 +58,11 @@ export async function uploadVoiceNote(input: {
     return { ok: false, error: 'No staff identity is selected. Pick who you are, then try again.' }
   }
 
-  const fileId = crypto.randomUUID()
-  const storagePath = `${input.eventId}/${input.groupId}/${fileId}.m4a`
-
-  const binary = Uint8Array.from(atob(input.audioBase64), (c) => c.charCodeAt(0))
-
-  const { error: uploadError } = await supabase.storage
-    .from('call-recordings')
-    .upload(storagePath, binary, { contentType: 'audio/mp4', upsert: false })
-
-  if (uploadError) {
-    return { ok: false, error: `Could not upload the recording: ${uploadError.message}` }
+  // The bucket policy fences on the first path segment being an event the
+  // caller is staff on. Re-assert it here so a crafted path cannot file a
+  // recording under one event while claiming another.
+  if (!input.storagePath.startsWith(`${input.eventId}/`)) {
+    return { ok: false, error: 'That recording was stored under the wrong event and was not filed.' }
   }
 
   const { data: inserted, error: insertError } = await supabase
@@ -56,9 +72,9 @@ export async function uploadVoiceNote(input: {
       group_id: input.groupId,
       call_attempt_id: input.callAttemptId,
       storage_bucket: 'call-recordings',
-      storage_path: storagePath,
+      storage_path: input.storagePath,
       duration_sec: input.durationSec,
-      mime_type: 'audio/mp4',
+      mime_type: input.mimeType,
       source: 'voice_note',
       consent_given: true,
       ...(staffMemberId
@@ -69,14 +85,23 @@ export async function uploadVoiceNote(input: {
     .single()
 
   if (insertError) {
-    console.error('[uploadVoiceNote] insert failed', {
+    const diagnostic =
+      `step=registerVoiceNote code=${insertError.code ?? 'unknown'} ` +
+      `event=${input.eventId.slice(0, 8)} group=${input.groupId.slice(0, 8)} at=${new Date().toISOString()}`
+    console.error('[registerVoiceNote] insert failed', {
       sqlstate: insertError.code,
       message: insertError.message?.slice(0, 200),
       eventId: input.eventId,
       groupId: input.groupId,
+      storagePath: input.storagePath,
     })
-    return { ok: false, error: `Could not save recording: ${insertError.message}` }
+    return { ok: false, error: `Could not save recording: ${insertError.message}`, diagnostic }
   }
+
+  // The review queue is fed by this row's downstream transcript/extraction, and
+  // the call screen lists recordings for the family.
+  revalidatePath(`/${input.eventCode}/rsvp/review`)
+  revalidatePath(`/${input.eventCode}/rsvp/call/${input.groupId}`)
 
   return { ok: true, recordingId: inserted.id }
 }

@@ -71,6 +71,20 @@
     <!-- H1: call-recording harvest. MANAGE_EXTERNAL_STORAGE would be rejected
          by Play Store review. We sideload the APK, so this is acceptable. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <!-- H5: voice-note recorder. -->
+    <!-- H5: voice-note recorder.
+
+         MODIFY_AUDIO_SETTINGS is NOT optional and its absence is not harmless.
+         Capacitor's BridgeWebChromeClient.onPermissionRequest() asks for BOTH
+         RECORD_AUDIO and MODIFY_AUDIO_SETTINGS whenever the WebView requests
+         AUDIO_CAPTURE, and its result callback ANDs every entry in the result
+         map. An undeclared permission comes back denied, so `granted` was
+         always false and the bridge called request.deny() — getUserMedia
+         rejected with NotAllowedError no matter what the staff member tapped,
+         and the microphone looked broken rather than un-permitted.
+
+         The native recorder (capacitor-voice-recorder) does not go through
+         that path, but the web fallback in a desktop/mobile browser does, and
+         the two must not disagree about whether recording is possible. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>

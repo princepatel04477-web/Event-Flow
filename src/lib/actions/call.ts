@@ -194,7 +194,13 @@ export async function startCallAttempt(input: {
 
 export type SubmitCallOutcomeResult =
   | { ok: true }
-  | { ok: false; alreadyFinalized: boolean; message: string }
+  | {
+      ok: false
+      alreadyFinalized: boolean
+      message: string
+      /** `step=… code=… constraint=… at=…`. For Sentry, never shown to staff. */
+      diagnostic?: string
+    }
 
 /**
  * The single freezing update. `app.guard_call_attempt()` stamps
@@ -240,26 +246,56 @@ export async function submitCallOutcome(
 
   if (error) {
     const alreadyFinalized = isFrozenRowError(error)
+    if (!alreadyFinalized) {
+      console.error('[submitCallOutcome] update failed', {
+        sqlstate: error.code,
+        constraint: extractConstraintName(error),
+        attemptId: payload.attemptId,
+        eventId: payload.eventId,
+        message: error.message?.slice(0, 200),
+      })
+    }
     return {
       ok: false,
       alreadyFinalized,
       message: alreadyFinalized
         ? 'This call was already completed — nothing more to save.'
         : friendlyDbError(error),
+      diagnostic: alreadyFinalized
+        ? undefined
+        : buildDiagnostic('submitCallOutcome', error, payload.eventId, payload.groupId),
     }
   }
 
   if (!data || data.length === 0) {
+    // Zero rows matched. There is no Postgres error to log — this is the
+    // silent case the `.select()` exists to expose, and it is the one worth
+    // knowing about, so it gets its own synthetic code rather than 'unknown'.
+    console.error('[submitCallOutcome] zero rows matched', {
+      attemptId: payload.attemptId,
+      eventId: payload.eventId,
+    })
     return {
       ok: false,
       alreadyFinalized: false,
       message:
         'The outcome was not saved — the database matched no such call for your account. ' +
         'Your session may have expired. Sign in again; this outcome is still held on this phone.',
+      diagnostic: buildDiagnostic(
+        'submitCallOutcome',
+        { code: 'zero_rows' },
+        payload.eventId,
+        payload.groupId,
+      ),
     }
   }
 
+  // Both route trees are live: the five-section IA added `/[eventCode]/rsvp/queue`
+  // while `/[eventCode]/queue` still resolves. Revalidating only one leaves
+  // whichever the staff member is actually on showing a stale attempt count.
   revalidatePath(`/${payload.eventCode}/rsvp/queue`)
+  revalidatePath(`/${payload.eventCode}/queue`)
+  revalidatePath(`/${payload.eventCode}/rsvp/status/${payload.groupId}`)
   revalidatePath(`/${payload.eventCode}/dashboard`)
 
   return { ok: true }

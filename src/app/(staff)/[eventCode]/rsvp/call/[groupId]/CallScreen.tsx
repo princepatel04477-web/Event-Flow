@@ -25,6 +25,7 @@ import { startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
 import { dialTarget, formatMobile, type DialTarget } from '@/lib/phone'
 import { placeCall } from '@/lib/native-call'
 import { drainOutbox, listQueuedCompletions, queueCompletion } from '@/lib/call/outbox'
+import { drainVoiceNotes } from '@/lib/voice-note/upload'
 import { clearStoredAttempt, getStoredAttempt, setStoredAttempt, type StoredCallAttempt } from '@/lib/call/session'
 import {
   CALL_OUTCOMES,
@@ -37,6 +38,7 @@ import {
   type TravelLegRow,
 } from '@/lib/call/types'
 import { VoiceNoteRecorder } from '@/components/voice-note/VoiceNoteRecorder'
+import { captureDiagnostic } from '@/lib/sentry'
 
 export interface CallScreenProps {
   eventId: string
@@ -161,6 +163,13 @@ export function CallScreen({
       if (synced.length > 0) router.refresh()
       const remaining = await listQueuedCompletions()
       if (!cancelled) setQueuedCount(remaining.length)
+
+      // Voice notes queue separately (audio, not JSON) and the recorder only
+      // mounts after an outcome is saved — so a note held from yesterday would
+      // otherwise wait for this caller to complete another call before it got
+      // a chance to send. Draining here means opening any call screen with
+      // signal clears the backlog.
+      await drainVoiceNotes()
     }
 
     void drain()
@@ -212,6 +221,7 @@ export function CallScreen({
 
     if (!result.ok) {
       setStartError(result.message)
+      captureDiagnostic('startCallAttempt', result.diagnostic, { eventId, groupId: group.id })
       return
     }
 
@@ -331,6 +341,16 @@ export function CallScreen({
       setSaving(false)
       setConfirming(false)
       setSubmitError(result.message)
+      // The outcome is safe on the phone, so the staff member carries on — but
+      // the SQLSTATE would otherwise die here. A queued completion that never
+      // drains produces no server log at all, because the request never
+      // arrived; this is the only record that the write was refused.
+      captureDiagnostic('submitCallOutcome', result.diagnostic, {
+        eventId,
+        groupId: group.id,
+        attemptId: payload.attemptId,
+        outcome: payload.outcome,
+      })
       await refreshQueuedCount()
     } catch {
       // Could not even reach the server — queue it rather than lose the outcome.
@@ -494,9 +514,15 @@ export function CallScreen({
 
         {phase === 'submitted' ? (
           <>
-            {!savedOffline && activeAttempt ? (
+            {/* The recorder runs offline too — it has its own IndexedDB queue —
+                so a caller with no signal can still capture the summary while
+                it is fresh. Gating this on `!savedOffline` meant the basement
+                case, the one that most needs a spoken note, was the one case
+                that could not make one. */}
+            {activeAttempt ? (
               <VoiceNoteRecorder
                 eventId={eventId}
+                eventCode={eventCode}
                 groupId={group.id}
                 callAttemptId={activeAttempt.attemptId}
               />
@@ -519,12 +545,34 @@ export function CallScreen({
                     <p className="text-sm text-muted">This record cannot be edited from here on.</p>
                   </>
                 )}
+                {/* The outcome is a record of the CALL. It does not touch the
+                    family's rsvp_status, confirmed_pax or travel — those live
+                    on guest_groups and only `save_rsvp_log` writes them. Until
+                    this link existed, a caller could log "Confirmed" and walk
+                    away with the family still showing Pending, because the
+                    screen that updates it was not reachable from here. */}
+                <p className="mt-2 max-w-xs text-sm text-muted">
+                  {outcome === 'connected' || outcome === 'declined'
+                    ? 'The family record still says what it said before. Update the RSVP to record pax and travel.'
+                    : 'Update the RSVP if anything about the family changed on this call.'}
+                </p>
               </CardBody>
               <CardFooter className="flex flex-col gap-2">
-                <Button fullWidth variant="primary" onClick={() => router.push(`/${eventCode}/rsvp/queue`)}>
-                  Back to queue
+                <Button
+                  fullWidth
+                  variant="primary"
+                  onClick={() => router.push(`/${eventCode}/rsvp/status/${group.id}`)}
+                >
+                  Update RSVP
                 </Button>
                 <div className="flex w-full gap-2">
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    onClick={() => router.push(`/${eventCode}/rsvp/queue`)}
+                  >
+                    Back to queue
+                  </Button>
                   <Button
                     variant="secondary"
                     fullWidth
@@ -599,17 +647,11 @@ export function CallScreen({
           </CardBody>
         </Card>
 
-        {/* Recording placeholder — audio capture/transcription/extraction ships in p1g/p1h. */}
-        <Card flat className="border border-dashed border-border bg-transparent">
-          <CardBody className="flex flex-col items-center gap-1 py-6 text-center">
-            <PhoneIcon className="h-6 w-6 text-subtle" />
-            <p className="text-sm font-medium text-muted">Call recording not available yet</p>
-            <p className="max-w-xs text-xs text-subtle">
-              The native recorder (p1g) and transcription/extraction (p1h) mount here once built.
-              For now, capture what was said in the notes field above.
-            </p>
-          </CardBody>
-        </Card>
+        {/* The "recorder mounts here once built" placeholder used to live here.
+            It outlived the recorder it was waiting for and rendered in every
+            phase — including alongside the working recorder — so the screen
+            told staff recording was unavailable while offering it. The
+            recorder now mounts in the submitted phase above. */}
 
         {phase === 'idle' ? (
           <Button
@@ -904,15 +946,6 @@ function formatPax(group: GuestGroupRow): string {
   const confirmed = group.confirmed_pax
   if (confirmed !== null) return `${confirmed} confirmed pax`
   return `${group.expected_pax} expected pax`
-}
-
-function formatCountdown(ms: number | null): string {
-  if (ms === null) return ''
-  const clamped = Math.max(0, ms)
-  const totalSec = Math.floor(clamped / 1000)
-  const m = Math.floor(totalSec / 60)
-  const s = totalSec % 60
-  return `${m}:${String(s).padStart(2, '0')}`
 }
 
 export default CallScreen

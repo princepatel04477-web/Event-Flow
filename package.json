@@ -37,6 +37,7 @@
     "@sentry/react": "10.60.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.111.0",
+    "capacitor-voice-recorder": "^7.0.6",
     "date-fns": "^4.4.0",
     "dexie": "^4.4.4",
     "idb": "^8.0.3",

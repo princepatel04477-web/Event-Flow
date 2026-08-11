@@ -40,6 +40,14 @@
 # Our own native code, including the M6 dialer. Same reflection path.
 -keep class com.nuvent.app.** { *; }
 
+# capacitor-voice-recorder (H5 voice notes). The generic rules above already
+# keep the @CapacitorPlugin class itself; this keeps its helper types
+# (CustomMediaRecorder, RecordData) explicitly. They are only ever reached
+# from the plugin class, so R8 should retain them anyway — but the failure
+# mode if it does not is the silent one described above, discovered by a
+# staff member mid-call rather than by a build error.
+-keep class com.tchvu3.capacitorvoicerecorder.** { *; }
+
 # Cordova plugins bridged through Capacitor.
 -keep class org.apache.cordova.** { *; }
 
