@@ -62,8 +62,8 @@ export async function markArrived(
     return { ok: false, message: eventDayError(error) }
   }
 
-  revalidatePath(`/${eventCode}/arrivals`)
-  revalidatePath(`/${eventCode}/departures`)
+  revalidatePath(`/${eventCode}/logistics/arrivals`)
+  revalidatePath(`/${eventCode}/logistics/departures`)
   return { ok: true, leg: data as TravelLegRow }
 }
 
@@ -82,7 +82,7 @@ export async function markDeparted(
     return { ok: false, message: eventDayError(error) }
   }
 
-  revalidatePath(`/${eventCode}/departures`)
+  revalidatePath(`/${eventCode}/logistics/departures`)
   return { ok: true, leg: data as TravelLegRow }
 }
 
@@ -101,8 +101,8 @@ export async function checkInRoom(
     return { ok: false, message: eventDayError(error) }
   }
 
-  revalidatePath(`/${eventCode}/rooms`)
-  revalidatePath(`/${eventCode}/arrivals`)
+  revalidatePath(`/${eventCode}/hospitality/rooms`)
+  revalidatePath(`/${eventCode}/logistics/arrivals`)
   return { ok: true, assignment: data as RoomAssignmentRow }
 }
 
@@ -121,7 +121,7 @@ export async function checkOutRoom(
     return { ok: false, message: eventDayError(error) }
   }
 
-  revalidatePath(`/${eventCode}/rooms`)
-  revalidatePath(`/${eventCode}/departures`)
+  revalidatePath(`/${eventCode}/hospitality/rooms`)
+  revalidatePath(`/${eventCode}/logistics/departures`)
   return { ok: true, assignment: data as RoomAssignmentRow }
 }

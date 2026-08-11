@@ -147,7 +147,7 @@ export function LedgerClient({ eventId, eventCode, eventName }: Props) {
             return (
               <LinkButton
                 key={r.groupId}
-                href={`/${eventCode}/departures`}
+                href={`/${eventCode}/logistics/departures`}
                 variant="secondary"
                 fullWidth
                 className="justify-between"

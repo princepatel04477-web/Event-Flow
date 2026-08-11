@@ -131,10 +131,10 @@ export async function acceptExtractionWithAudit(
     }
   }
 
-  revalidatePath(`/${eventCode}/review`)
-  revalidatePath(`/${eventCode}/review/${extractionId}`)
+  revalidatePath(`/${eventCode}/rsvp/review`)
+  revalidatePath(`/${eventCode}/rsvp/review/${extractionId}`)
   revalidatePath(`/${eventCode}`)
-  revalidatePath(`/${eventCode}/queue`)
+  revalidatePath(`/${eventCode}/rsvp/queue`)
 
   return { ok: true }
 }

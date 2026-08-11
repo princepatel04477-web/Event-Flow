@@ -109,8 +109,8 @@ export async function saveRsvpLog(input: {
     }
   }
 
-  revalidatePath(`/${input.eventCode}/queue`)
-  revalidatePath(`/${input.eventCode}/rsvp/${input.groupId}`)
+  revalidatePath(`/${input.eventCode}/rsvp/queue`)
+  revalidatePath(`/${input.eventCode}/rsvp/status/${input.groupId}`)
 
   return { ok: true, group: data }
 }

@@ -259,8 +259,8 @@ export async function submitCallOutcome(
     }
   }
 
-  revalidatePath(`/${payload.eventCode}/queue`)
-  revalidatePath(`/${payload.eventCode}`)
+  revalidatePath(`/${payload.eventCode}/rsvp/queue`)
+  revalidatePath(`/${payload.eventCode}/dashboard`)
 
   return { ok: true }
 }
@@ -296,7 +296,7 @@ export async function releaseGroupAfterCall(
     .eq('event_id', eventId)
     .maybeSingle()
 
-  revalidatePath(`/${eventCode}/queue`)
+  revalidatePath(`/${eventCode}/rsvp/queue`)
 
   const stillLocked = Boolean(
     (data?.locked_by || data?.locked_by_staff) &&

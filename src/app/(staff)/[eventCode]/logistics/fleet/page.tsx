@@ -1,0 +1,23 @@
+import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
+
+import { resolveEventByCode, requireStaff } from '@/lib/supabase/queries'
+import { FleetClient } from './FleetClient'
+
+export const metadata: Metadata = {
+  title: 'Fleet',
+}
+
+type PageProps = {
+  params: Promise<{ eventCode: string }>
+}
+
+export default async function FleetPage({ params }: PageProps) {
+  const { eventCode } = await params
+  const event = await resolveEventByCode(eventCode)
+  if (!event) notFound()
+
+  await requireStaff(event.id, event.code)
+
+  return <FleetClient eventId={event.id} />
+}

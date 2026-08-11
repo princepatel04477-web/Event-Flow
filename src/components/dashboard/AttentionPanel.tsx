@@ -30,22 +30,22 @@ export function AttentionPanel({ attn, eventCode }: AttentionPanelProps) {
     {
       label: 'Confirmed, no room',
       count: attn.confirmedNoRoom,
-      href: `/${eventCode}/rooms`,
+      href: `/${eventCode}/hospitality/rooms`,
     },
     {
       label: 'Arriving today, no vehicle',
       count: attn.arrivalsNoVehicle,
-      href: `/${eventCode}/fleet`,
+      href: `/${eventCode}/logistics/fleet`,
     },
     {
       label: 'Arrived, no departure logged',
       count: attn.noDeparture,
-      href: `/${eventCode}/departures`,
+      href: `/${eventCode}/logistics/departures`,
     },
     {
       label: 'Hampers with no proof',
       count: attn.hampersPending,
-      href: `/${eventCode}/deliveries`,
+      href: `/${eventCode}/hospitality/deliveries`,
     },
   ].filter((i) => i.count > 0)
 

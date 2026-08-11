@@ -187,7 +187,7 @@ export function DeliveryDetail({ eventId, eventCode, deliverableId }: DeliveryDe
           replaced.
         </p>
         <LinkButton
-          href={`/${eventCode}/deliveries`}
+          href={`/${eventCode}/hospitality/deliveries`}
           variant="secondary"
           size="lg"
           fullWidth
@@ -269,7 +269,7 @@ export function DeliveryDetail({ eventId, eventCode, deliverableId }: DeliveryDe
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link href={`/${eventCode}/deliveries`} className="text-sm font-semibold text-ink underline">
+        <Link href={`/${eventCode}/hospitality/deliveries`} className="text-sm font-semibold text-ink underline">
           ← Deliveries
         </Link>
       </div>
@@ -359,7 +359,7 @@ export function DeliveryDetail({ eventId, eventCode, deliverableId }: DeliveryDe
               the network returns. This is NOT marked delivered yet.
             </p>
             <p className="text-xs text-subtle">{queuedCount} proof{queuedCount === 1 ? '' : 's'} waiting to sync</p>
-            <Link href={`/${eventCode}/deliveries`} className="text-sm font-semibold text-ink underline">
+            <Link href={`/${eventCode}/hospitality/deliveries`} className="text-sm font-semibold text-ink underline">
               Back to deliveries
             </Link>
           </CardBody>
@@ -427,7 +427,7 @@ export function DeliveryDetail({ eventId, eventCode, deliverableId }: DeliveryDe
           </div>
 
           <LinkButton
-            href={`/${eventCode}/deliveries`}
+            href={`/${eventCode}/hospitality/deliveries`}
             size="lg"
             fullWidth
             className="mt-5"

@@ -220,7 +220,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
             {loadError}
           </p>
           {/no allocated room/i.test(loadError) ? (
-            <LinkButton fullWidth variant="secondary" href={`/${eventCode}/rooms/allocate`}>
+            <LinkButton fullWidth variant="secondary" href={`/${eventCode}/hospitality/rooms/allocate`}>
               Go to room allocation
             </LinkButton>
           ) : null}
@@ -232,7 +232,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
           title="No room assignments"
           description="No families are allocated to rooms yet — allocate rooms before check-in."
           action={
-            <LinkButton fullWidth href={`/${eventCode}/rooms/allocate`}>
+            <LinkButton fullWidth href={`/${eventCode}/hospitality/rooms/allocate`}>
               Go to room allocation
             </LinkButton>
           }

@@ -282,7 +282,7 @@ function DeliveryRunCard({ row, eventCode }: { row: DeliveryRunRow; eventCode: s
 
   return (
     <Link
-      href={`/${eventCode}/deliveries/${row.id}`}
+      href={`/${eventCode}/hospitality/deliveries/${row.id}`}
       className={`list-fade tap block rounded-xl p-3.5 transition-colors duration-press ease-ledger ${
         sealed
           ? 'border border-ledger-green/35 border-l-4 border-l-ledger-green bg-green-tint active:bg-green-tint/70'

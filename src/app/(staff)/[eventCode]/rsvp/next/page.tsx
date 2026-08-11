@@ -40,7 +40,7 @@ export default async function RsvpNextPage({ params }: PageProps) {
     .maybeSingle()
 
   if (!rows?.group_id) {
-    redirect(`/${eventCode}/rsvp`)
+    redirect(`/${eventCode}/rsvp/status`)
   }
 
   redirect(`/${eventCode}/rsvp/${rows.group_id}`)
