@@ -39,14 +39,17 @@ export default async function CallGroupPage({ params }: PageProps) {
 
   // Fire-and-forget presence: stamp who opened this and when. Never awaited,
   // never surfaced as an error — this is a best-effort signal, not a lock.
-  // Sentry captures failures so we know the feature is degrading silently.
   if (callerId) {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     supabase
       .from('guest_groups')
       .update({ last_opened_by_staff: callerId } as Record<string, unknown> as never)
       .eq('id', groupId)
       .eq('event_id', event.id)
+      .then(({ error }) => {
+        if (error) {
+          console.error('[presence] last_opened_by_staff update failed:', { groupId, eventId: event.id, code: (error as any)?.code, message: error.message })
+        }
+      })
   }
 
   const [{ data: attempts }, { data: travelLegs }] = await Promise.all([

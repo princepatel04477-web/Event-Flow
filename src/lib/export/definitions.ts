@@ -107,6 +107,9 @@ function familyHeadsSheet(rows: FamilyHeadRow[]): AnySheetDefinition {
       { key: 'expectedPax', header: 'Expected pax', type: 'number', width: 10 },
       { key: 'rsvpStatus', header: 'RSVP', type: 'string', width: 14 },
       { key: 'priority', header: 'Priority', type: 'number', width: 8 },
+      { key: 'attemptCount', header: 'Calls', type: 'number', width: 6 },
+      { key: 'lastOutcome', header: 'Last outcome', type: 'string', width: 14 },
+      { key: 'callbackAt', header: 'Callback', type: 'string', width: 18 },
       { key: 'room', header: 'Room', type: 'string', width: 20 },
       { key: 'arrival', header: 'Arrival', type: 'text', width: 28 },
       { key: 'departure', header: 'Departure', type: 'text', width: 28 },
@@ -191,6 +194,7 @@ function callLogSheet(rows: CallLogRow[]): AnySheetDefinition {
       { key: 'endedAt', header: 'Ended', type: 'string', width: 18 },
       { key: 'durationSec', header: 'Duration (s)', type: 'number', width: 12 },
       { key: 'outcome', header: 'Outcome', type: 'string', width: 14 },
+      { key: 'notes', header: 'Notes', type: 'text', width: 30 },
     ],
     headerNote: 'All times IST',
   }

@@ -23,8 +23,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
-    // Explicit imports from 'vitest' rather than ambient globals, so the suite
-    // typechecks under the app's own tsconfig without extra "types" entries.
     globals: false,
+    env: {
+      ...Object.fromEntries(
+        Object.entries(process.env).filter(([k]) => k.startsWith('SUPABASE_') || k.startsWith('E2E_'))
+      ),
+    },
   },
 })

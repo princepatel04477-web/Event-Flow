@@ -64,6 +64,9 @@ export interface FamilyHeadRow {
   room: string
   arrival: string
   departure: string
+  attemptCount: number
+  lastOutcome: string
+  callbackAt: string | null
 }
 
 export interface RoomAllocationRow {
@@ -102,6 +105,7 @@ export interface CallLogRow {
   endedAt: string | null
   durationSec: number | null
   outcome: string
+  notes: string
   callIndex: number
 }
 
@@ -236,9 +240,21 @@ export function buildFamilyHeadRows(data: ExportData): FamilyHeadRow[] {
     if (label) roomByGroup.set(a.group_id, label)
   }
 
+  // Per-family call stats: attempt count, last outcome, callback_at
+  const callByGroup = new Map<string, { count: number; lastOutcome: string | null; callbackAt: string | null }>()
+  for (const ca of data.callAttempts) {
+    const entry = callByGroup.get(ca.group_id)
+    callByGroup.set(ca.group_id, {
+      count: (entry?.count ?? 0) + 1,
+      lastOutcome: ca.outcome ?? entry?.lastOutcome ?? null,
+      callbackAt: ca.callback_at ?? entry?.callbackAt ?? null,
+    })
+  }
+
   return data.groups.map((g) => {
     const arrival = data.legs.find((l) => l.group_id === g.id && l.direction === 'arrival')
     const departure = data.legs.find((l) => l.group_id === g.id && l.direction === 'departure')
+    const calls = callByGroup.get(g.id)
     return {
       _id: g.id,
       headName: g.head_name,
@@ -254,6 +270,9 @@ export function buildFamilyHeadRows(data: ExportData): FamilyHeadRow[] {
       room: roomByGroup.get(g.id) ?? '',
       arrival: legCell(arrival),
       departure: legCell(departure),
+      attemptCount: calls?.count ?? 0,
+      lastOutcome: calls?.lastOutcome ? (CALL_OUTCOME_LABELS[calls.lastOutcome] ?? calls.lastOutcome) : '—',
+      callbackAt: calls?.callbackAt ?? null,
     }
   })
 }
@@ -422,6 +441,7 @@ export function buildCallLogRows(data: ExportData): CallLogRow[] {
         endedAt: ca.ended_at,
         durationSec: ca.duration_sec,
         outcome: ca.outcome ? (CALL_OUTCOME_LABELS[ca.outcome] ?? ca.outcome) : '—',
+        notes: ca.notes ?? '',
         callIndex: i + 1,
       }
     })
