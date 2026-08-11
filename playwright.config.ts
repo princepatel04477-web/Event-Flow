@@ -79,6 +79,20 @@ export default defineConfig({
       testMatch: /identity\.spec\.ts/,
     },
     {
+      // T3 pre-event smoke. Runs against the DEPLOYED build (SMOKE_BASE_URL),
+      // not the dev server every other project uses — that difference is the
+      // entire point of the suite, so the baseURL is overridden here rather
+      // than inherited. Driven by `npm run smoke`; excluded from every other
+      // project's testMatch so it never lands in the scored acceptance run.
+      name: 'smoke',
+      use: {
+        ...devices['Pixel 5'],
+        viewport: { width: 360, height: 800 },
+        baseURL: process.env.SMOKE_BASE_URL ?? baseURL,
+      },
+      testMatch: /smoke\.spec\.ts/,
+    },
+    {
       // The client's single screen. Its own project rather than a fifth
       // scored spec: the tier suites are a serial chain that mutates shared
       // rows, and this one only ever reads. Run it with

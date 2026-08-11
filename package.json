@@ -18,7 +18,9 @@
     "mobile:dev": "node scripts/mobile-dev.mjs",
     "mobile:launch": "adb shell am start -n com.nuvent.app/.MainActivity",
     "mobile:local": "next build && npx cap sync android",
-    "mobile:prod": "npx cap sync android"
+    "mobile:prod": "npx cap sync android",
+    "smoke": "node scripts/smoke.mjs",
+    "test:t1": "vitest run tests/t1_isolation.test.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
