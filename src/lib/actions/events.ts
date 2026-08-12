@@ -1,9 +1,7 @@
-'use server'
-
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { friendlyDbError } from '@/lib/errors'
 import {
   MAX_EVENT_CODE_LENGTH,
@@ -160,9 +158,7 @@ export async function createEvent(
 
   if (Object.keys(fieldErrors).length > 0) {
     return { error: null, fieldErrors, values }
-  }
-
-  const supabase = await createClient()
+  }
 
   const {
     data: { user },
@@ -244,8 +240,6 @@ export async function createEvent(
 
   // Every layout above reads the viewer's event list — the front door, the
   // event switcher, this page. Drop the lot rather than guess which.
-  revalidatePath('/', 'layout')
-
   // Return the codes to the form so the admin can share them ONCE. They
   // are never persisted in plaintext; this is the single reveal.
   return {

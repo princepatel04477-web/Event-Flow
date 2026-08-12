@@ -1,78 +1,99 @@
-import { notFound, redirect } from 'next/navigation'
-import type { ReactNode } from 'react'
+'use client'
+
+import { useMemo, type ReactNode } from 'react'
 
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { AdminLink } from '@/components/nav/AdminLink'
 import { BottomTabs } from '@/components/nav/BottomTabs'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { StickyHeader } from '@/components/ui/StickyHeader'
-import { getSessionClaims } from '@/lib/auth/server'
-import { getEventAccess, getViewer, resolveEventByCode } from '@/lib/supabase/queries'
+import { SessionProvider, useSession, useRequireSession } from '@/lib/client/session-context'
+import { EventProvider, useEvent } from '@/lib/client/event-context'
 import { cn, formatDateRange } from '@/lib/utils'
 
 type LayoutProps = {
   children: ReactNode
-  // Next 15+ hands params over as a Promise.
   params: Promise<{ eventCode: string }>
 }
 
-export default async function EventLayout({ children, params }: LayoutProps) {
-  const { eventCode } = await params
+/**
+ * M2 event layout — client-side wrapper with session + event providers.
+ *
+ * Replaces the server layout (awaiting cookies, redirect/notFound mid-render).
+ * The providers resolve viewer + event + access, and the useRequireSession /
+ * useRequireStaff hooks gate each sub-page from effects.
+ */
+export default function EventLayout({ children, params }: LayoutProps) {
+  return (
+    <SessionProvider>
+      <SessionGate children={children} params={params} />
+    </SessionProvider>
+  )
+}
 
-  const [viewer, event, codeClaims] = await Promise.all([
-    getViewer(),
-    resolveEventByCode(eventCode),
-    getSessionClaims(),
-  ])
+function SessionGate({ children, params: paramsPromise }: LayoutProps) {
+  const session = useRequireSession()
 
-  // A code-auth (team/client) session has no GoTrue viewer — getViewer()
-  // returns null for it because the code cookie is not visible in this render
-  // scope. The claims ARE the identity: build the nav data from them so staff
-  // are not bounced to /login. An admin has no claims and uses getViewer().
-  const isCodeSession = codeClaims !== null
-  const effectiveViewer = viewer ?? (isCodeSession ? {
-    userId: codeClaims.accessCodeId,
-    email: null,
-    fullName: codeClaims.staffMemberId ?? null,
-    isAdmin: false,
-    memberships: event
-      ? [{ eventId: codeClaims.eventId, eventName: event.name, eventCode: event.code, role: (codeClaims.appRole === 'team' ? 'event_team' : 'client') as 'event_team' | 'client' }]
-      : [],
-  } : null)
-
-  if (!effectiveViewer) {
-    redirect(`/login?next=${encodeURIComponent(`/${eventCode}`)}`)
+  if (session.status === 'loading') {
+    return <div className="flex min-h-dvh items-center justify-center bg-paper text-muted">Loading…</div>
   }
 
-  // getEventByCode runs under RLS. No row means "this code does not exist"
-  // OR "you are not a member of it" — indistinguishable on purpose, and a
-  // 404 is the right answer to both.
-  if (!event) notFound()
+  if (session.status === 'anonymous') {
+    // useRequireSession redirects to /login from an effect — this renders
+    // only for one frame while the redirect fires.
+    return null
+  }
 
-  // Resolved once here, for the nav. The per-page gate (requireStaff /
-  // requireAdmin) resolves it again inside each page, because a server layout
-  // cannot see the pathname and sniffing headers() to fake it would opt this
-  // whole subtree out of static rendering.
-  const access = await getEventAccess(event.id)
+  // params is a Promise in Next 15+; unwrap it synchronously via a sentinel
+  // that the static renderer resolves. For now, read the event code from the
+  // browser URL directly — the static export has no server to resolve params.
+  return <EventGate children={children} />
+}
 
-  // Belt and braces: getEventByCode already returned null for a non-member,
-  // so this cannot fire. It documents the invariant rather than assuming it.
-  if (access === 'none') notFound()
+function EventGate({ children }: { children: ReactNode }) {
+  // Read event code from the URL path in the browser
+  const eventCode = useMemo(() => {
+    if (typeof window === 'undefined') return ''
+    const seg = window.location.pathname.split('/').filter(Boolean)
+    return seg[0] ?? ''
+  }, [])
 
-  // A client gets no tab bar (see BottomTabs), so nothing needs clearing at
-  // the bottom of the page — just the gesture bar.
-  const showTabs = access !== 'client'
-
-  const subtitle =
-    formatDateRange(event.starts_on, event.ends_on) ?? event.venue_city ?? event.code
+  if (!eventCode) return null
 
   return (
-    // The skin is a property of WHO IS LOOKING, not of an OS setting.
-    // Staff get the night-teal ground they work on in corridors and car
-    // parks; a client — reading this in a hotel lobby in daylight, and
-    // often the oldest user of the app — gets warm paper. `data-theme`
-    // re-points the same token names (see globals.css), so nothing below
-    // this line branches on the role to get its colours right.
+    <EventProvider eventCode={eventCode}>
+      <EventLayoutInner eventCode={eventCode}>{children}</EventLayoutInner>
+    </EventProvider>
+  )
+}
+
+function EventLayoutInner({ children, eventCode }: { children: ReactNode; eventCode: string }) {
+  const eventCtx = useEvent()
+  const session = useSession()
+
+  if (eventCtx.status === 'loading') {
+    return <div className="flex min-h-dvh items-center justify-center bg-paper text-muted">Loading…</div>
+  }
+
+  if (eventCtx.status === 'not-found') {
+    // NotFound replacement — render a 404-like state
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-paper p-6 text-center">
+        <h1 className="font-display text-2xl font-medium text-ink">Event not found</h1>
+        <p className="mt-2 text-muted">This event doesn't exist or you don't have access to it.</p>
+      </div>
+    )
+  }
+
+  const { event, access } = eventCtx
+  if (!event) return null
+
+  const viewer = session.viewer
+  const showTabs = access !== 'client'
+
+  const subtitle = formatDateRange(event.starts_on, event.ends_on) ?? event.venue_city ?? event.code
+
+  return (
     <div
       data-theme={access === 'client' ? 'client' : undefined}
       className="flex min-h-dvh flex-col bg-paper text-ink"
@@ -82,17 +103,14 @@ export default async function EventLayout({ children, params }: LayoutProps) {
         subtitle={subtitle}
         right={
           <nav className="flex items-center gap-2" aria-label="Header actions">
-            {effectiveViewer.memberships.length > 1 ? (
-              // Full memberships, not a projection: the switcher needs each
-              // event's role so it can send a client to their guests page
-              // rather than to a dashboard they will be bounced off.
+            {viewer && viewer.memberships.length > 1 ? (
               <EventSwitcher
-                events={effectiveViewer.memberships}
+                events={viewer.memberships}
                 currentCode={event.code}
-                isAdmin={effectiveViewer.isAdmin}
+                isAdmin={viewer.isAdmin}
               />
             ) : null}
-            <AdminLink show={effectiveViewer.isAdmin} />
+            <AdminLink show={viewer?.isAdmin ?? false} />
             <span className="ml-0.5 border-l border-rule-strong pl-2.5">
               <SignOutButton compact />
             </span>
@@ -100,10 +118,6 @@ export default async function EventLayout({ children, params }: LayoutProps) {
         }
       />
 
-      {/* Two elements on purpose: the safe-area inset and the content gutter
-          are both horizontal padding, so they cannot share a box. The bottom
-          inset lives on <main> for the same reason — pb-safe and pb-8 are the
-          same property and would fight on one element. */}
       <main className={cn('flex flex-1 flex-col px-safe', !showTabs && 'pb-safe')}>
         <div
           className={cn(

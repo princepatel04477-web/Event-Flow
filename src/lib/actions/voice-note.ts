@@ -1,8 +1,6 @@
-'use server'
-
 import { revalidatePath } from 'next/cache'
 
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { getSessionClaims } from '@/lib/auth/server'
 
 export type RegisterVoiceNoteResult =
@@ -47,8 +45,7 @@ export async function registerVoiceNote(input: {
   /** The real content type of the uploaded object. */
   mimeType: string
   durationSec: number
-}): Promise<RegisterVoiceNoteResult> {
-  const supabase = await createClient()
+}): Promise<RegisterVoiceNoteResult> {
   const claims = await getSessionClaims()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -100,8 +97,5 @@ export async function registerVoiceNote(input: {
 
   // The review queue is fed by this row's downstream transcript/extraction, and
   // the call screen lists recordings for the family.
-  revalidatePath(`/${input.eventCode}/rsvp/review`)
-  revalidatePath(`/${input.eventCode}/rsvp/call/${input.groupId}`)
-
   return { ok: true, recordingId: inserted.id }
 }

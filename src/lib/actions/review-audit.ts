@@ -1,8 +1,6 @@
-'use server'
-
 import { revalidatePath } from 'next/cache'
 
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { getSessionClaims } from '@/lib/auth/server'
 import type { Json } from '@/lib/supabase/database.types'
 import { friendlyRpcError } from '@/lib/errors'
@@ -49,8 +47,7 @@ export async function acceptExtractionWithAudit(
   extractionId: string,
   payload: RpcPayload,
   fieldReviews: FieldReviewDecision[],
-): Promise<ReviewActionResult> {
-  const supabase = await createClient()
+): Promise<ReviewActionResult> {
 
   const claims = await getSessionClaims()
   const staffMemberId = claims?.staffMemberId ?? null
@@ -130,11 +127,5 @@ export async function acceptExtractionWithAudit(
       }
     }
   }
-
-  revalidatePath(`/${eventCode}/rsvp/review`)
-  revalidatePath(`/${eventCode}/rsvp/review/${extractionId}`)
-  revalidatePath(`/${eventCode}`)
-  revalidatePath(`/${eventCode}/rsvp/queue`)
-
   return { ok: true }
 }

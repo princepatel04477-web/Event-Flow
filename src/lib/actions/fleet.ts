@@ -1,6 +1,4 @@
-'use server'
-
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { friendlyDbError } from '@/lib/errors'
 import { z } from 'zod'
 
@@ -38,7 +36,6 @@ export interface FleetData {
 }
 
 export async function readFleet(eventId: string): Promise<FleetData> {
-  const supabase = await createClient()
 
   const [vehiclesRes, typesRes] = await Promise.all([
     supabase
@@ -114,7 +111,6 @@ export type VehicleResult =
   | { ok: false; error: string }
 
 export async function addVehicle(eventId: string, input: Omit<VehicleInput, 'eventId'>): Promise<VehicleResult> {
-  const supabase = await createClient()
 
   const parsed = vehicleSchema.safeParse({ ...input, eventId })
   if (!parsed.success) {
@@ -147,7 +143,6 @@ export async function updateVehicle(
   vehicleId: string,
   input: Omit<VehicleInput, 'eventId'>,
 ): Promise<VehicleResult> {
-  const supabase = await createClient()
 
   const parsed = vehicleSchema.safeParse({ ...input, eventId: '00000000-0000-0000-0000-000000000000' })
   if (!parsed.success) {
@@ -176,7 +171,6 @@ export async function updateVehicle(
 }
 
 export async function deleteVehicle(vehicleId: string): Promise<VehicleResult> {
-  const supabase = await createClient()
   const { error } = await supabase.from('vehicles').delete().eq('id', vehicleId)
   if (error) return { ok: false, error: friendlyDbError(error) }
   return { ok: true, id: vehicleId }
@@ -198,7 +192,6 @@ export async function quickAddVehicles(
   let defaultCap = 4
 
   if (vehicleTypeId) {
-    const supabase = await createClient()
     const { data: typeRow } = await supabase
       .from('vehicle_types')
       .select('name, seat_label, default_capacity')
@@ -212,7 +205,6 @@ export async function quickAddVehicles(
   }
 
   const capacity = capacityOverride ?? defaultCap
-  const supabase = await createClient()
 
   const rows = Array.from({ length: count }, (_, i) => ({
     event_id: eventId,

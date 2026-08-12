@@ -1,7 +1,5 @@
-'use server'
-
 import { friendlyDbError } from '@/lib/errors'
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/database.types'
 
 /**
@@ -51,8 +49,7 @@ export interface ClientDashboardStats {
  * screen filter and window it. The cost of this list was never the query —
  * see the note in ClientGuestList about what actually took 26 seconds.
  */
-export async function listClientGuests(eventId: string): Promise<ClientGuestResult> {
-  const supabase = await createClient()
+export async function listClientGuests(eventId: string): Promise<ClientGuestResult> {
 
   const { data, error } = await supabase
     .from('client_guest_profiles')

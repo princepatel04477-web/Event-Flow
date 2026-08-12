@@ -1,5 +1,3 @@
-'use server'
-
 /**
  * Deliverables — hamper / return-gift generation and the delivery-run list.
  *
@@ -19,7 +17,7 @@
  */
 
 import { getEventAccess } from '@/lib/supabase/queries'
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 
 /** Per-phase timing for server actions (instrument-first). */
 function phaseTiming(label: string) {
@@ -62,9 +60,7 @@ export async function generateDeliverables(eventId: string): Promise<GenerateRes
   const access = await getEventAccess(eventId)
   if (access !== 'admin' && access !== 'event_team') {
     return { ok: false, error: 'Not permitted. Only staff can manage deliveries.', summary: { hampersCreated: 0, returnGiftsCreated: 0, existingHampers: 0, existingReturnGifts: 0 } }
-  }
-
-  const supabase = await createClient()
+  }
 
   // Groups with an active (unreleased) room assignment.
   const { data: hampers, error: hamperErr } = await supabase
@@ -188,9 +184,7 @@ export async function readDeliveryRun(eventId: string): Promise<DeliveryRunResul
   timing.mark('guard')
   if (access !== 'admin' && access !== 'event_team') {
     return { ok: false, error: 'Not permitted.', rows: [] }
-  }
-
-  const supabase = await createClient()
+  }
   timing.mark('client-create')
 
   const { data, error } = await supabase

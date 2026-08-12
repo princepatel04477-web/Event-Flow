@@ -1,6 +1,4 @@
-'use server'
-
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { friendlyDbError } from '@/lib/errors'
 import {
   pack,
@@ -79,8 +77,7 @@ export interface LogisticsProposal {
 export async function readUnplacedTravelLegs(
   eventId: string,
   direction: 'arrival' | 'departure',
-): Promise<TravelLegForLogistics[]> {
-  const supabase = await createClient()
+): Promise<TravelLegForLogistics[]> {
 
   const { data } = await supabase
     .from('travel_legs')
@@ -126,8 +123,7 @@ export async function readUnplacedTravelLegs(
 // Read: available vehicles
 // ---------------------------------------------------------------------------
 
-export async function readAvailableVehicles(eventId: string): Promise<VehicleForPacking[]> {
-  const supabase = await createClient()
+export async function readAvailableVehicles(eventId: string): Promise<VehicleForPacking[]> {
   const { data } = await supabase
     .from('vehicles')
     .select('id, label, capacity, driver_name, driver_mobile')
@@ -283,8 +279,7 @@ function timeToMinutes(time: string): number | null {
 export async function commitTrips(
   eventId: string,
   proposal: LogisticsProposal,
-): Promise<{ ok: true; tripCount: number } | { ok: false; error: string }> {
-  const supabase = await createClient()
+): Promise<{ ok: true; tripCount: number } | { ok: false; error: string }> {
 
   // Allocate vehicles
   const vehicleIds = proposal.trips.map((t) => t.vehicleId)
@@ -395,8 +390,7 @@ export async function runPack(input: PackRequest): Promise<PackResult> {
 export async function commitPackProposal(
   eventId: string,
   proposal: PackProposal,
-): Promise<{ ok: true; tripCount: number } | { ok: false; error: string }> {
-  const supabase = await createClient()
+): Promise<{ ok: true; tripCount: number } | { ok: false; error: string }> {
 
   const vehicleIds = proposal.trips.map((t) => t.vehicleId)
   if (vehicleIds.length > 0) {

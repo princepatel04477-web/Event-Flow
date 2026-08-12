@@ -1,6 +1,4 @@
-'use server'
-
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { friendlyDbError } from '@/lib/errors'
 import { suggestRooms } from '@/lib/allocate/suggest'
 
@@ -72,8 +70,7 @@ export interface AllocationGuest {
   isHead: boolean
 }
 
-export async function readAllocationData(eventId: string): Promise<AllocationData> {
-  const supabase = await createClient()
+export async function readAllocationData(eventId: string): Promise<AllocationData> {
 
   const [groupsRes, roomsRes, guestsRes] = await Promise.all([
     supabase
@@ -278,8 +275,7 @@ export interface RoomsGridData {
 }
 
 export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
-  const timing = phaseTiming('rooms :: readRoomsGrid')
-  const supabase = await createClient()
+  const timing = phaseTiming('rooms :: readRoomsGrid')
   timing.mark('client-create')
 
   // Sequential reads — deliberately NOT a Promise.all batch. The rooms grid
@@ -407,8 +403,7 @@ export type CommitResult =
 export async function commitAllocations(
   eventId: string,
   plan: AllocationCommit,
-): Promise<CommitResult> {
-  const supabase = await createClient()
+): Promise<CommitResult> {
 
   // We need group_id for each guest — resolve from the database
   const guestIds = Object.keys(plan.assignments)
@@ -469,8 +464,7 @@ export async function moveGuestToRoom(
   assignmentId: string,
   targetRoomId: string,
   overrideReason: string | null,
-): Promise<MoveGuestResult> {
-  const supabase = await createClient()
+): Promise<MoveGuestResult> {
 
   const { error } = await supabase
     .from('room_assignments')
@@ -515,8 +509,7 @@ export type ReleaseGuestResult =
 export async function releaseGuestFromRoom(
   assignmentId: string,
   reason: string,
-): Promise<ReleaseGuestResult> {
-  const supabase = await createClient()
+): Promise<ReleaseGuestResult> {
 
   const { error } = await supabase
     .from('room_assignments')
@@ -544,8 +537,7 @@ export async function assignGuestToRoom(
   guestId: string,
   roomId: string,
   overrideReason: string | null,
-): Promise<AssignGuestResult> {
-  const supabase = await createClient()
+): Promise<AssignGuestResult> {
 
   // Resolve group_id from the guest
   const { data: guest } = await supabase
@@ -609,8 +601,7 @@ export async function assignGroupToRoom(
   eventId: string,
   groupId: string,
   roomId: string,
-): Promise<AssignGroupResult> {
-  const supabase = await createClient()
+): Promise<AssignGroupResult> {
 
   const { data: guests } = await supabase
     .from('guests')

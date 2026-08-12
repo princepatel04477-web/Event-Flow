@@ -1,6 +1,4 @@
-'use server'
-
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { friendlyDbError } from '@/lib/errors'
 import { z } from 'zod'
 
@@ -36,7 +34,6 @@ export async function searchDepartureGroups(
   eventId: string,
   query: string,
 ): Promise<DepartureGroup[]> {
-  const supabase = await createClient()
   const term = `%${query}%`
 
   // Search by head name or room number
@@ -150,7 +147,6 @@ export type DepartureResult =
 export async function saveDeparture(
   input: Omit<DepartureInput, 'eventId'> & { eventId: string; existingLegId: string | null },
 ): Promise<DepartureResult> {
-  const supabase = await createClient()
 
   const parsed = departureSchema.safeParse(input)
   if (!parsed.success) {
@@ -249,7 +245,6 @@ export interface TripExpense {
 }
 
 export async function readTripExpenses(eventId: string): Promise<TripExpense[]> {
-  const supabase = await createClient()
 
   const { data } = await supabase
     .from('trips')
@@ -319,7 +314,6 @@ export async function readLedger(
   eventId: string,
   filter: LedgerFilter = 'all',
 ): Promise<{ rows: LedgerRow[]; summary: { total: number; balanced: number; unbalanced: number } }> {
-  const supabase = await createClient()
 
   let query = supabase
     .from('v_travel_ledger')
@@ -391,7 +385,6 @@ export interface DriverSheetTrip {
 }
 
 export async function readDriverSheets(eventId: string): Promise<DriverSheetTrip[]> {
-  const supabase = await createClient()
 
   const { data } = await supabase
     .from('trips')

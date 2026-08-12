@@ -1,8 +1,6 @@
-'use server'
-
 import { revalidatePath } from 'next/cache'
 
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { friendlyDbError } from '@/lib/errors'
 import { rsvpLogSchema, type GuestGroupRow } from '@/lib/rsvp-log'
 import type { Database } from '@/lib/supabase/database.types'
@@ -49,9 +47,7 @@ export async function saveRsvpLog(input: {
       reason: 'error',
       message: `${first?.message ?? 'The form has a problem.'}${where}`,
     }
-  }
-
-  const supabase = await createClient()
+  }
 
   // Scope check BEFORE the RPC, mirroring claimGroupForCall: the RPC fences
   // on the GROUP's own event, so an admin calling with a foreign group id
@@ -108,10 +104,6 @@ export async function saveRsvpLog(input: {
         'Your session may have expired. Sign in again; your entry is still on this phone.',
     }
   }
-
-  revalidatePath(`/${input.eventCode}/rsvp/queue`)
-  revalidatePath(`/${input.eventCode}/rsvp/status/${input.groupId}`)
-
   return { ok: true, group: data }
 }
 

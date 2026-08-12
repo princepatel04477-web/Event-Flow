@@ -1,6 +1,4 @@
-'use server'
-
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { friendlyDbError } from '@/lib/errors'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -34,8 +32,7 @@ export type GuestSearchResult =
 
 /** One staff-facing guest read, used for both the full list and search. */
 async function readGuestRows(eventId: string, term: string, limit: number): Promise<GuestSearchResult> {
-  const timing = phaseTiming('guests :: readGuestRows')
-  const supabase = await createClient()
+  const timing = phaseTiming('guests :: readGuestRows')
   timing.mark('client-create')
   const { data, error } = await supabase.rpc('search_guest_profiles', {
     p_event_id: eventId,

@@ -1,6 +1,4 @@
-'use server'
-
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { getEventAccess } from '@/lib/supabase/queries'
 
 export interface HotelListItem {
@@ -13,9 +11,7 @@ export interface HotelListItem {
 
 export async function readHotelList(eventId: string): Promise<HotelListItem[]> {
   const access = await getEventAccess(eventId)
-  if (access !== 'admin' && access !== 'event_team') return []
-
-  const supabase = await createClient()
+  if (access !== 'admin' && access !== 'event_team') return []
 
   const { data: hotels } = await supabase
     .from('hotels')

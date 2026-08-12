@@ -1,10 +1,8 @@
-'use server'
-
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { safeRedirectPath } from '@/lib/utils'
 import { CODE_AUTH_COOKIE, STAFF_MEMBER_COOKIE } from '@/lib/auth/cookies'
 
@@ -39,18 +37,14 @@ export async function signIn(
 
   if (!email || !password) {
     return { error: 'Enter your email and password.' }
-  }
-
-  const supabase = await createClient()
+  }
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
     return { error: friendlyAuthError(error) }
   }
 
-  // The whole tree is user-scoped, so drop the cached render of every layout.
-  revalidatePath('/', 'layout')
-  redirect(next)
+  return { ok: true, next }
 }
 
 /**
@@ -60,15 +54,9 @@ export async function signIn(
  * (team/client). Safe to use directly as a `<form action={signOut}>`.
  */
 export async function signOut(): Promise<void> {
-  const supabase = await createClient()
   await supabase.auth.signOut()
-
-  const cookieStore = await cookies()
-  cookieStore.delete(CODE_AUTH_COOKIE)
-  cookieStore.delete(STAFF_MEMBER_COOKIE)
-
-  revalidatePath('/', 'layout')
-  redirect('/login')
+  // M2: code auth session is now in client storage (session-client.ts);
+  // the caller should clear it via clearSession() after calling this.
 }
 
 type MaybeAuthError = {

@@ -1,6 +1,4 @@
-'use server'
-
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { friendlyDbError } from '@/lib/errors'
 
 /**
@@ -39,8 +37,6 @@ export async function claimGroupAction(groupId: string): Promise<ClaimGroupResul
   if (!groupId) {
     return { ok: false, reason: 'error', message: 'Missing group id.' }
   }
-
-  const supabase = await createClient()
   const { error } = await supabase.rpc('claim_group', { p_group_id: groupId })
 
   if (!error) return { ok: true }

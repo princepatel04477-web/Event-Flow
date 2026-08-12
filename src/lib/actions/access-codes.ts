@@ -1,9 +1,7 @@
-'use server'
-
 import { createHash } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { generateAccessCode } from '@/lib/auth/codes'
 
 /**
@@ -74,9 +72,7 @@ export async function issueAccessCode(
 ): Promise<IssueCodeResult> {
   if (role !== 'team' && role !== 'client') {
     return { ok: false, error: 'Unknown role.' }
-  }
-
-  const supabase = await createClient()
+  }
 
   const plain = generateAccessCode(role)
   const hash = hashCode(plain)
@@ -134,8 +130,5 @@ export async function issueAccessCode(
   if (!newCodeId) {
     return { ok: false, error: 'The code was not created. Nothing was changed.' }
   }
-
-  revalidatePath('/', 'layout')
-
   return { ok: true, issued: { code: plain, role, lastFour, rotated } }
 }

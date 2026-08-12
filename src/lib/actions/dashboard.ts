@@ -1,6 +1,4 @@
-'use server'
-
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { perRequest } from '@/lib/request-cache'
 import { PERF_BASELINE } from '@/lib/supabase/queries'
 import { ttlCache } from '@/lib/ttl-cache'
@@ -112,9 +110,7 @@ export async function readBoard(eventId: string): Promise<BoardRow | null> {
   // Per-request first: one render must never read this twice.
   return perRequest(key, async () => {
     const hit = PERF_BASELINE ? undefined : (cache30.get(key) as BoardRow | null | undefined)
-    if (hit !== undefined) return hit
-
-    const supabase = await createClient()
+    if (hit !== undefined) return hit
     const timing = phaseTiming('dashboard :: v_event_board')
 
     if (!boardViewMissing) {
@@ -219,8 +215,7 @@ export interface TodayLeg {
 export async function readTodayLegs(
   eventId: string,
   date: string,
-): Promise<{ arrivals: TodayLeg[]; departures: TodayLeg[] }> {
-  const supabase = await createClient()
+): Promise<{ arrivals: TodayLeg[]; departures: TodayLeg[] }> {
 
   const { data: legs } = await supabase
     .from('travel_legs')

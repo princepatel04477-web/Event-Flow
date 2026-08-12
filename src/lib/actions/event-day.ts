@@ -1,8 +1,6 @@
-'use server'
-
 import { revalidatePath } from 'next/cache'
 
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { friendlyDbError } from '@/lib/errors'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -51,8 +49,7 @@ export async function markArrived(
   eventId: string,
   eventCode: string,
   groupId: string,
-): Promise<EventDayResult> {
-  const supabase = await createClient()
+): Promise<EventDayResult> {
   const { data, error } = await supabase.rpc('mark_arrived', {
     p_event_id: eventId,
     p_group_id: groupId,
@@ -61,9 +58,6 @@ export async function markArrived(
   if (error) {
     return { ok: false, message: eventDayError(error) }
   }
-
-  revalidatePath(`/${eventCode}/logistics/arrivals`)
-  revalidatePath(`/${eventCode}/logistics/departures`)
   return { ok: true, leg: data as TravelLegRow }
 }
 
@@ -71,8 +65,7 @@ export async function markDeparted(
   eventId: string,
   eventCode: string,
   groupId: string,
-): Promise<EventDayResult> {
-  const supabase = await createClient()
+): Promise<EventDayResult> {
   const { data, error } = await supabase.rpc('mark_departed', {
     p_event_id: eventId,
     p_group_id: groupId,
@@ -81,8 +74,6 @@ export async function markDeparted(
   if (error) {
     return { ok: false, message: eventDayError(error) }
   }
-
-  revalidatePath(`/${eventCode}/logistics/departures`)
   return { ok: true, leg: data as TravelLegRow }
 }
 
@@ -90,8 +81,7 @@ export async function checkInRoom(
   eventId: string,
   eventCode: string,
   groupId: string,
-): Promise<EventDayResult> {
-  const supabase = await createClient()
+): Promise<EventDayResult> {
   const { data, error } = await supabase.rpc('check_in_room', {
     p_event_id: eventId,
     p_group_id: groupId,
@@ -100,9 +90,6 @@ export async function checkInRoom(
   if (error) {
     return { ok: false, message: eventDayError(error) }
   }
-
-  revalidatePath(`/${eventCode}/hospitality/rooms`)
-  revalidatePath(`/${eventCode}/logistics/arrivals`)
   return { ok: true, assignment: data as RoomAssignmentRow }
 }
 
@@ -110,8 +97,7 @@ export async function checkOutRoom(
   eventId: string,
   eventCode: string,
   groupId: string,
-): Promise<EventDayResult> {
-  const supabase = await createClient()
+): Promise<EventDayResult> {
   const { data, error } = await supabase.rpc('check_out_room', {
     p_event_id: eventId,
     p_group_id: groupId,
@@ -120,8 +106,5 @@ export async function checkOutRoom(
   if (error) {
     return { ok: false, message: eventDayError(error) }
   }
-
-  revalidatePath(`/${eventCode}/hospitality/rooms`)
-  revalidatePath(`/${eventCode}/logistics/departures`)
   return { ok: true, assignment: data as RoomAssignmentRow }
 }

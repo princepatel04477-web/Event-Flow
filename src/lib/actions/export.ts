@@ -1,6 +1,4 @@
-'use server'
-
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { getEventAccess } from '@/lib/supabase/queries'
 import type { ExportData } from '@/lib/export/sheets'
 
@@ -25,9 +23,7 @@ export async function readExportData(eventId: string): Promise<ExportDataResult>
   const access = await getEventAccess(eventId)
   if (access !== 'admin' && access !== 'event_team') {
     return { ok: false, message: NOT_STAFF_MESSAGE }
-  }
-
-  const supabase = await createClient()
+  }
 
   const [{ data: event }, ...rest] = await Promise.all([
     supabase.from('events').select('name').eq('id', eventId).maybeSingle(),

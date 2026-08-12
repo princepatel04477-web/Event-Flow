@@ -1,6 +1,4 @@
-'use server'
-
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { friendlyDbError } from '@/lib/errors'
 import { provider } from '@/lib/messaging/provider'
 
@@ -19,7 +17,6 @@ export interface MessageTemplate {
 }
 
 export async function readTemplates(eventId: string): Promise<MessageTemplate[]> {
-  const supabase = await createClient()
 
   // Global plus event-level overrides
   const { data } = await supabase
@@ -61,7 +58,6 @@ export async function saveTemplate(
     language?: string
   },
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const supabase = await createClient()
 
   // Upsert: event-level override
   const { data, error } = await supabase
@@ -97,7 +93,6 @@ export async function previewTemplate(
   templateKey: string,
   groupId: string,
 ): Promise<TemplatePreview | { error: string }> {
-  const supabase = await createClient()
 
   const { data: template } = await supabase
     .from('message_templates')
@@ -168,7 +163,6 @@ export async function resolveRecipients(
   eventId: string,
   filter: RecipientFilter,
 ): Promise<RecipientGroup[]> {
-  const supabase = await createClient()
 
   let query = supabase
     .from('guest_groups')
@@ -245,7 +239,6 @@ export async function sendMessages(
   testNumber?: string,
   overwriteExisting = false,
 ): Promise<SendResult> {
-  const supabase = await createClient()
 
   // Resolve template
   const { data: template } = await supabase
@@ -468,7 +461,6 @@ export async function generateMessages(
   templateKey: string,
   filter: RecipientFilter,
 ): Promise<GeneratedMessage[]> {
-  const supabase = await createClient()
 
   const { data: template } = await supabase
     .from('message_templates')
@@ -573,7 +565,6 @@ export async function readMessageLog(
   eventId: string,
   filter: MessageLogFilter = 'all',
 ): Promise<MessageLogRow[]> {
-  const supabase = await createClient()
 
   let query = supabase
     .from('messages')
@@ -610,7 +601,6 @@ export async function readMessageLog(
 }
 
 export async function retryMessage(messageId: string): Promise<{ ok: boolean; error?: string }> {
-  const supabase = await createClient()
 
   const { data: msg } = await supabase
     .from('messages')
@@ -658,8 +648,6 @@ export async function retryMessage(messageId: string): Promise<{ ok: boolean; er
 export async function handleWebhook(body: unknown): Promise<{ status: number }> {
   const status = provider.parseWebhook(body)
   if (!status) return { status: 200 } // Health check or irrelevant
-
-  const supabase = await createClient()
   const { error } = await supabase
     .from('messages')
     .update({

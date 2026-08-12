@@ -1,8 +1,6 @@
-'use server'
-
 import { z } from 'zod'
 
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { getEventAccess } from '@/lib/supabase/queries'
 import type { Json } from '@/lib/supabase/database.types'
 
@@ -25,9 +23,7 @@ export async function readHotelImportContext(eventId: string): Promise<HotelImpo
   const access = await getEventAccess(eventId)
   if (access !== 'admin' && access !== 'event_team') {
     return { ok: false, error: NOT_STAFF_MESSAGE, existingHotels: 0, existingRooms: 0 }
-  }
-
-  const supabase = await createClient()
+  }
   const [hotels, rooms] = await Promise.all([
     supabase.from('hotels').select('id', { count: 'exact', head: true }).eq('event_id', eventId),
     supabase.from('rooms').select('id', { count: 'exact', head: true }).eq('event_id', eventId),
@@ -110,9 +106,7 @@ export async function commitHotelImport(
   const parsed = hotelCommitRowSchema.array().safeParse(rows)
   if (!parsed.success) {
     return { ok: false, error: 'The hotel data was not valid — re-upload the sheet.', summary: null, failures: [] }
-  }
-
-  const supabase = await createClient()
+  }
   const failures: { rowNumber: number; reason: string }[] = []
 
   // Hotel dedupe map: hotel name → id

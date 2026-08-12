@@ -1,8 +1,6 @@
-'use server'
-
 import { revalidatePath } from 'next/cache'
 
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import type { Json } from '@/lib/supabase/database.types'
 import { friendlyRpcError } from '@/lib/errors'
 import type { RpcPayload } from '@/lib/review/payload'
@@ -18,8 +16,7 @@ export async function acceptExtraction(
   eventCode: string,
   extractionId: string,
   payload: RpcPayload,
-): Promise<ReviewActionResult> {
-  const supabase = await createClient()
+): Promise<ReviewActionResult> {
 
   const { error } = await supabase.rpc('apply_rsvp_extraction', {
     p_extraction_id: extractionId,
@@ -31,12 +28,6 @@ export async function acceptExtraction(
   if (error) {
     return { ok: false, error: friendlyRpcError(error) }
   }
-
-  revalidatePath(`/${eventCode}/rsvp/review`)
-  revalidatePath(`/${eventCode}/rsvp/review/${extractionId}`)
-  revalidatePath(`/${eventCode}`)
-  revalidatePath(`/${eventCode}/rsvp/queue`)
-
   return { ok: true }
 }
 
@@ -53,9 +44,7 @@ export async function rejectExtraction(
   const notes = reviewNotes.trim()
   if (!notes) {
     return { ok: false, error: 'Add a short note explaining why this is being rejected.' }
-  }
-
-  const supabase = await createClient()
+  }
 
   const {
     data: { user },
@@ -112,9 +101,5 @@ export async function rejectExtraction(
       error: 'Nothing was updated — you may not have permission to review this extraction.',
     }
   }
-
-  revalidatePath(`/${eventCode}/rsvp/review`)
-  revalidatePath(`/${eventCode}/rsvp/review/${extractionId}`)
-
   return { ok: true }
 }

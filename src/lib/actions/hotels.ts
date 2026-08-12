@@ -1,8 +1,6 @@
-'use server'
-
 import { z } from 'zod'
 
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { getEventAccess } from '@/lib/supabase/queries'
 
 // ---------------------------------------------------------------------------
@@ -38,9 +36,7 @@ export async function createHotel(eventId: string, raw: CreateHotelInput) {
   const parsed = createHotelSchema.safeParse(raw)
   if (!parsed.success) {
     return { ok: false as const, error: parsed.error.issues[0]?.message ?? 'Invalid data' }
-  }
-
-  const supabase = await createClient()
+  }
   const { data, error } = await supabase
     .from('hotels')
     .insert({
@@ -71,9 +67,7 @@ export async function updateHotel(
 ) {
   const access = await getEventAccess(eventId)
   const block = staffGate(access)
-  if (block) return { ok: false as const, error: block }
-
-  const supabase = await createClient()
+  if (block) return { ok: false as const, error: block }
   const db: Record<string, string | null> = {}
   if (patch.name !== undefined) db.name = patch.name
   if (patch.address !== undefined) db.address = patch.address ?? null
@@ -98,9 +92,7 @@ export async function updateHotel(
 
 export async function deleteHotel(hotelId: string, eventId: string) {
   const access = await getEventAccess(eventId)
-  if (access !== 'admin') return { ok: false as const, error: 'Only admins can delete hotels.' }
-
-  const supabase = await createClient()
+  if (access !== 'admin') return { ok: false as const, error: 'Only admins can delete hotels.' }
 
   // Check for active room allocations
   const { data: occupants } = await supabase
@@ -197,9 +189,7 @@ export async function createRooms(
         max_capacity: capacity + 1,
         notes: notes ?? null,
       })
-    }
-
-    const supabase = await createClient()
+    }
     let created = 0
     let skipped = 0
     for (const row of rows) {
@@ -223,9 +213,7 @@ export async function createRooms(
     return { ok: false, error: parsed.error.issues[0]?.message, created: 0, skipped: 0 }
   }
 
-  const { roomNumber, roomType, floor, capacity, notes } = parsed.data
-
-  const supabase = await createClient()
+  const { roomNumber, roomType, floor, capacity, notes } = parsed.data
   const { error } = await supabase.from('rooms').insert({
     event_id: eventId,
     hotel_id: hotelId,
@@ -261,9 +249,7 @@ export async function updateRoom(
 ) {
   const access = await getEventAccess(eventId)
   const block = staffGate(access)
-  if (block) return { ok: false as const, error: block }
-
-  const supabase = await createClient()
+  if (block) return { ok: false as const, error: block }
   const db: Record<string, boolean | string | number | null> = {}
   if (patch.roomNumber !== undefined) db.room_number = patch.roomNumber
   if (patch.roomType !== undefined) db.room_type = patch.roomType ?? null
@@ -295,9 +281,7 @@ export async function updateRoom(
 
 export async function deleteRoom(roomId: string, eventId: string) {
   const access = await getEventAccess(eventId)
-  if (access !== 'admin') return { ok: false as const, error: 'Only admins can delete rooms.' }
-
-  const supabase = await createClient()
+  if (access !== 'admin') return { ok: false as const, error: 'Only admins can delete rooms.' }
 
   // Check for active allocations
   const { data: occupants, error: checkErr } = await supabase

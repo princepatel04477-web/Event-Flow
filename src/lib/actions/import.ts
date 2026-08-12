@@ -1,5 +1,3 @@
-'use server'
-
 /**
  * Read-only support for the Excel import PREVIEW.
  *
@@ -41,7 +39,7 @@
 import { z } from 'zod'
 
 import { getEventAccess } from '@/lib/supabase/queries'
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import type { Json } from '@/lib/supabase/database.types'
 
 /**
@@ -80,9 +78,7 @@ export async function readImportContext(eventId: string): Promise<ImportContext>
   const access = await getEventAccess(eventId)
   if (access !== 'admin' && access !== 'event_team') {
     return emptyContext(NOT_STAFF_MESSAGE)
-  }
-
-  const supabase = await createClient()
+  }
 
   const [groups, guests] = await Promise.all([
     supabase
@@ -219,9 +215,7 @@ export async function commitImport(
       headName: f.headName ?? '',
       primaryMobile: f.primaryMobile,
     }),
-  }))
-
-  const supabase = await createClient()
+  }))
   const { data, error } = await supabase.rpc('commit_guest_import', {
     p_event_id: eventId,
     p_kind: 'guests',

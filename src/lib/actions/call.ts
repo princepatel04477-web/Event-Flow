@@ -1,8 +1,6 @@
-'use server'
-
 import { revalidatePath } from 'next/cache'
 
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import { friendlyDbError, isFrozenRowError } from '@/lib/errors'
 import type { CallCompletionPayload, CallAttemptRow, GuestGroupRow } from '@/lib/call/types'
 
@@ -63,8 +61,7 @@ export async function claimGroupForCall(
   eventId: string,
   groupId: string,
   minutes = 15,
-): Promise<ClaimGroupResult> {
-  const supabase = await createClient()
+): Promise<ClaimGroupResult> {
 
   const { data: scoped, error: scopeError } = await supabase
     .from('guest_groups')
@@ -152,8 +149,7 @@ export async function startCallAttempt(input: {
   dialedNumber: string
   /** ISO timestamp from the phone. Untrusted by design — the server overrides `started_at`. */
   deviceStartedAt?: string
-}): Promise<StartCallAttemptResult> {
-  const supabase = await createClient()
+}): Promise<StartCallAttemptResult> {
 
   const { data, error } = await supabase
     .from('call_attempts')
@@ -228,8 +224,7 @@ export type SubmitCallOutcomeResult =
  */
 export async function submitCallOutcome(
   payload: CallCompletionPayload,
-): Promise<SubmitCallOutcomeResult> {
-  const supabase = await createClient()
+): Promise<SubmitCallOutcomeResult> {
 
   const { data, error } = await supabase
     .from('call_attempts')
@@ -293,11 +288,6 @@ export async function submitCallOutcome(
   // Both route trees are live: the five-section IA added `/[eventCode]/rsvp/queue`
   // while `/[eventCode]/queue` still resolves. Revalidating only one leaves
   // whichever the staff member is actually on showing a stale attempt count.
-  revalidatePath(`/${payload.eventCode}/rsvp/queue`)
-  revalidatePath(`/${payload.eventCode}/queue`)
-  revalidatePath(`/${payload.eventCode}/rsvp/status/${payload.groupId}`)
-  revalidatePath(`/${payload.eventCode}/dashboard`)
-
   return { ok: true }
 }
 
@@ -320,8 +310,7 @@ export async function releaseGroupAfterCall(
   eventId: string,
   groupId: string,
   eventCode: string,
-): Promise<ReleaseGroupResult> {
-  const supabase = await createClient()
+): Promise<ReleaseGroupResult> {
 
   await supabase.rpc('release_group', { p_group_id: groupId })
 
@@ -331,9 +320,6 @@ export async function releaseGroupAfterCall(
     .eq('id', groupId)
     .eq('event_id', eventId)
     .maybeSingle()
-
-  revalidatePath(`/${eventCode}/rsvp/queue`)
-
   const stillLocked = Boolean(
     (data?.locked_by || data?.locked_by_staff) &&
       data.locked_until &&
