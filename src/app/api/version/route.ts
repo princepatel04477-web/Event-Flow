@@ -19,6 +19,14 @@ import { NextResponse } from 'next/server'
  * name and a build timestamp are not secrets, and requiring a session would
  * make the check impossible to run before a session can be established. No
  * env values, no config, nothing that is not already public in the repo.
+ *
+ * DELIBERATELY ONLY TWO FIELDS. This endpoint is unauthenticated, so it
+ * returns the commit SHA and the time this instance came up, and nothing
+ * else. `branch`, `message`, `environment` and `region` were dropped: a
+ * branch name and a commit subject describe unreleased work to anonymous
+ * callers, and none of the four are needed to answer "what is deployed".
+ * scripts/smoke.mjs depends only on `commit`; it prints branch and region
+ * when present and falls back to '?' when they are not.
  */
 
 export const dynamic = 'force-dynamic'
@@ -26,16 +34,12 @@ export const dynamic = 'force-dynamic'
 export function GET() {
   return NextResponse.json(
     {
-      // Vercel injects these at build time. Locally they are undefined, which
-      // is the honest answer for `next dev` — the smoke suite treats a missing
+      // Vercel injects this at build time. Locally it is undefined, which is
+      // the honest answer for `next dev` — the smoke suite treats a missing
       // SHA as "not a real deployment" rather than as a match.
       commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
-      branch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
-      message: process.env.VERCEL_GIT_COMMIT_MESSAGE ?? null,
-      environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null,
-      region: process.env.VERCEL_REGION ?? null,
-      // Evaluated when the serverless function cold-starts, not at build. Close
-      // enough to "when did this instance come up" to be worth having.
+      // Evaluated when the serverless function cold-starts, not at build.
+      // Close enough to "when did this instance come up" to be worth having.
       servedAt: new Date().toISOString(),
     },
     { headers: { 'cache-control': 'no-store' } },

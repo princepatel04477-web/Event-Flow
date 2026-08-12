@@ -9,6 +9,20 @@ import { verifyCodeAuthToken } from '@/lib/auth/claims'
 const PUBLIC_PATHS = ['/login', '/admin/login', '/auth', '/pick-staff']
 
 /**
+ * Routes reachable without a session, matched EXACTLY — no sub-paths.
+ *
+ * `/api/version` is the deployment-truth probe. It has to answer before a
+ * session can exist, or it cannot tell you what is deployed when login itself
+ * is the thing that is broken.
+ *
+ * It is kept OUT of PUBLIC_PATHS deliberately: that list also matches
+ * `${p}/`, which would open every future `/api/version/*` route to anonymous
+ * callers as a side effect. Exact-only means exposing a sub-route later has to
+ * be a deliberate act rather than an inherited default.
+ */
+const PUBLIC_PATHS_EXACT = ['/api/version']
+
+/**
  * Refreshes the auth session on every request and bounces anonymous users to
  * /login.
  *
@@ -39,9 +53,9 @@ export async function updateSession(request: NextRequest) {
   const codeClaims = codeToken ? await verifyCodeAuthToken(codeToken) : null
 
   const { pathname } = request.nextUrl
-  const isPublic = PUBLIC_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  )
+  const isPublic =
+    PUBLIC_PATHS_EXACT.includes(pathname) ||
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   if (codeClaims) return response
 
