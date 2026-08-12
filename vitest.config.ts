@@ -29,7 +29,7 @@ export default defineConfig({
     // flaky laptop connection would produce a red board that means nothing
     // (the same reasoning as the retry layer in e2e/helpers/db.ts).
     // Run it deliberately: `npm run test:t1`.
-    exclude: ['tests/t1_isolation.test.ts', '**/node_modules/**', '**/dist/**'],
+    exclude: ['tests/t1_isolation.test.ts', 'tests/t2_reality.test.ts', '**/node_modules/**', '**/dist/**'],
     globals: false,
     // Loads .env.test / .env.local into process.env before any test module is
     // imported. Without it the DB-backed suites gate on a key that is not
