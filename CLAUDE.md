@@ -19,31 +19,25 @@ sheets, Google Forms, manual calling records, and manual room/hamper/logistics t
 
 ## 2. Repository state
 
-**This repo currently contains SQL only. The application has not been scaffolded yet.**
+**Next.js 16 application with Supabase backend.** Full TypeScript codebase with 70+ routes,
+30+ server actions, 44 database migrations, and Capacitor-based Android APK.
 
 ```
-CLAUDE.md
-SCHEMA_GUIDE.md
-20260731000100_foundation.sql          extensions, enums, tenancy, helpers, audit
-20260731000200_guests_rsvp.sql         guest_groups, guests, travel_legs, call chain
-20260731000300_rooms_deliverables.sql  hotels, rooms, assignments, deliverables, proofs
-20260731000400_logistics_messaging.sql vehicles, trips, messages, import batches
-20260731000500_rls.sql                 all RLS policies + storage buckets
-20260731000600_views_rpc.sql           4 views + 3 RPCs
-20260731000700_seed.sql                vehicle types + message templates
-test_security.sql                      8 security tests
+src/              Next.js app (App Router, route groups: (staff), (admin))
+supabase/         migrations (44 files), Edge Functions (3 deployed, 1 pending)
+android/          Capacitor Android project (APK built via npm run mobile:dev)
+tests/            11 test files, 129 unit tests (Vitest)
+scripts/          Build, deployment, and diagnostic scripts
 ```
 
-Facts a new session needs before touching anything:
+Current branch: `feat/m2-static-export-bundle` (M2 static-export conversion in progress).
+Feature branch: `feat/app-consolidation-2026-08-09` (merged — 5-section IA, bottom bar, hotel CRUD).
 
-- **No `package.json`, no `supabase/` directory, no Next.js app.** The next code written
-  here is the first application code in the project.
-- **Not a git repository.** `git init` is still pending, despite §14 saying to commit each session.
-- **Migrations live at the repo root, not in `supabase/migrations/`.** They must be moved
-  there (or copied) before `supabase db push` will see them.
-- **`CALLING_MASTER_LIST.xlsx` is not in the repo.** `p1c` needs it; ask for it before starting.
-- **The migrations have not been applied to the live Supabase project.** They were applied
-  and tested against a separate Postgres instance. See §3.
+**Deployed** at `https://nuvent-five.vercel.app` (aliased). The APK is a WebView shell
+over the deployed site (M2-ALT mode — static export audit returned HEAVY, see §3 mobile
+section). M2 conversion to true static export is in progress on the current branch.
+
+**Live Supabase project:** `xktxnkuzplhzxkevwrcj`, Postgres 17.6.1.155, region ap-northeast-2.
 
 ---
 
@@ -601,30 +595,29 @@ Verified against the migrations. Do not go looking for things in this list — t
 
 ---
 
-## 11. Current status (as of 31 July 2026)
+## 11. Current status (as of 12 August 2026)
 
 **Done**
-- `p1a` — Database schema, RLS, audit triggers. 7 migrations, ~1,663 lines, applied clean on
-  Postgres 16. Schema covers **all 19 SRS sections**, not just Phase 1 — `event_id` was put
-  everywhere up front deliberately, because retrofitting tenancy in week three kills deadlines.
-- `p1b` — `test_security.sql`, 8 tests passing: cross-event insert blocked, client sees
-  nothing in base tables, phone claiming 2020 gets stamped with real server time, room
-  capacity guard fires, two callers can't lock the same group.
+- Full Next.js 16 application with 5-section navigation (Dashboard, Guests, RSVP, Travel, Stay).
+- Admin hotel/room CRUD, Excel import of hotels/rooms, manual room creation with range entry.
+- Guest Excel import with preview, idempotent by row hash.
+- Calling queue, call screen (start/outcome/notes), offline outbox via IndexedDB.
+- RSVP status form (confirmed/declined/tentative + PAX counts + travel legs).
+- Room allocation grid with drag-and-drop, capacity + overlap guards at DB level.
+- Client view with RSVP status, stat cards, side-section grouping.
+- 8-sheet Excel export with round-trip Guest Master, family heads, call log, arrivals, departures, rooms, deliverables, exceptions.
+- Capacitor Android APK (WebView shell over Vercel deploy — M2-ALT mode).
+- 129 unit tests (Vitest), typecheck clean.
+- 44 database migrations applied to live Supabase (Postgres 17).
 
-Both were verified against a Postgres 16 instance. **Neither has been applied to the live
-Nuvent project**, which runs Postgres 17 — re-run `test_security.sql` there after the
-first `db push`.
+**In progress**
+- `feat/m2-static-export-bundle` — converting to true static export so APK contains the app instead of shelling Vercel. Client session context, event context, paths already in place (commits 17764a0, 51bbbbf). ~79 server actions + 22 pages remaining.
+- `extract-rsvp` Edge Function — source exists, NOT deployed. Pipeline unverified.
 
 **Next up**
-- `p1c` — **Excel import from `CALLING_MASTER_LIST.xlsx`.** Column mapper, mobile
-  normalisation (+91 → last 10), idempotent by row hash. This is the line that turns an
-  empty database into 238 real families.
-- Then: `p1d` auth/event switching/role routing → `p1e` calling queue → `p1f` call screen →
-  `p1g` native call-recording module → `p1h` upload/transcribe/extract → `p1i` review screen →
-  `p1j` Excel export.
-
-**Later phases:** 2 Rooms · 3 Hampers & return gifts · 4 Logistics & departure ·
-5 Ship (WhatsApp, admin dashboard, APK, dry run, training).
+- P1: Seed staff for SHARMA26, import real guest list, deploy extract-rsvp, populate smoke codes.
+- P3: Finish M2 static-export conversion (server actions → client calls, dynamic routes → query params, proxy.ts removal, `output: 'export'`).
+- P1G/P1H: Native voice recorder (Capacitor plugin) + pipeline wiring.
 
 ---
 
