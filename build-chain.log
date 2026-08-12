@@ -1,0 +1,764 @@
+﻿=== npm ci ===
+node.exe : npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn deprec...ception instead:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For 
+CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@9.3.5: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, 
+which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by 
+contacting i@izs.me
+
+added 790 packages, and audited 791 packages in 1m
+
+220 packages are looking for funding
+  run `npm fund` for details
+
+9 vulnerabilities (6 moderate, 3 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+npm warn allow-scripts 6 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   esbuild@0.25.4 (postinstall: node install.js)
+npm warn allow-scripts   @sentry/capacitor@4.2.0 (postinstall: node scripts/check-siblings.js)
+npm warn allow-scripts   sharp@0.34.5 (install: node install/check.js || npm run build)
+npm warn allow-scripts   unrs-resolver@1.12.2 (postinstall: node postinstall.js)
+npm warn allow-scripts   workerd@1.20260801.1 (postinstall: node install.js)
+npm warn allow-scripts   esbuild@0.28.1 (postinstall: node install.js)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+npm_ci_exit=0
+=== cap sync ===
+[32m√[39m Copying web assets from [1mpublic[22m to android\app\src\main\assets\public [2min 20.25ms[22m
+[32m√[39m Creating [1mcapacitor.config.json[22m in android\app\src\main\assets [2min 1.96ms[22m
+[32m√[39m [32m[1mcopy android[22m[39m [2min 109.33ms[22m
+[32m√[39m Updating Android plugins [2min 18.02ms[22m
+[36m[info][39m Found 11 Capacitor plugins for [1mandroid[22m:
+       @capacitor/app[2m@8.1.1[22m
+       @capacitor/app-launcher[2m@8.0.1[22m
+       @capacitor/camera[2m@8.2.2[22m
+       @capacitor/device[2m@8.0.3[22m
+       @capacitor/filesystem[2m@8.1.2[22m
+       @capacitor/network[2m@8.0.1[22m
+       @capacitor/preferences[2m@8.0.1[22m
+       @capacitor/splash-screen[2m@8.0.2[22m
+       @capacitor/status-bar[2m@8.0.3[22m
+       @sentry/capacitor[2m@4.2.0[22m
+       capacitor-voice-recorder[2m@7.0.6[22m
+[32m√[39m [32m[1mupdate android[22m[39m [2min 225.44ms[22m
+[36m[info][39m Sync finished in 1.226s
+sync_exit=0
+=== gradle ===
+
+> Configure project :app
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Configure project :capacitor-cordova-android-plugins
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Configure project :sentry-capacitor
+Sentry Capacitor: Applying defaults for Capacitor 8 or higher
+Sentry Capacitor: Applying defaults for Capacitor 8 or higher
+
+> Task :clean UP-TO-DATE
+> Task :app:clean
+> Task :capacitor-android:clean UP-TO-DATE
+> Task :capacitor-app:clean UP-TO-DATE
+> Task :capacitor-app-launcher:clean UP-TO-DATE
+> Task :capacitor-camera:clean UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:clean UP-TO-DATE
+> Task :capacitor-device:clean UP-TO-DATE
+> Task :capacitor-filesystem:clean UP-TO-DATE
+> Task :capacitor-network:clean UP-TO-DATE
+> Task :capacitor-preferences:clean UP-TO-DATE
+> Task :capacitor-splash-screen:clean UP-TO-DATE
+> Task :capacitor-status-bar:clean UP-TO-DATE
+> Task :capacitor-voice-recorder:clean UP-TO-DATE
+> Task :sentry-capacitor:clean UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders
+> Task :capacitor-android:preBuild UP-TO-DATE
+> Task :capacitor-android:preReleaseBuild UP-TO-DATE
+> Task :capacitor-android:mergeReleaseJniLibFolders
+> Task :capacitor-android:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-app:preBuild UP-TO-DATE
+> Task :capacitor-app:preReleaseBuild UP-TO-DATE
+> Task :capacitor-android:copyReleaseJniLibsProjectOnly
+> Task :capacitor-app:mergeReleaseJniLibFolders
+> Task :capacitor-app:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-app-launcher:preBuild UP-TO-DATE
+> Task :capacitor-app-launcher:preReleaseBuild UP-TO-DATE
+> Task :capacitor-app:copyReleaseJniLibsProjectOnly
+> Task :capacitor-app-launcher:mergeReleaseJniLibFolders
+> Task :capacitor-app-launcher:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-camera:preBuild UP-TO-DATE
+> Task :capacitor-camera:preReleaseBuild UP-TO-DATE
+> Task :capacitor-app-launcher:copyReleaseJniLibsProjectOnly
+> Task :capacitor-camera:mergeReleaseJniLibFolders
+> Task :capacitor-camera:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-cordova-android-plugins:preBuild UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:preReleaseBuild UP-TO-DATE
+> Task :capacitor-camera:copyReleaseJniLibsProjectOnly
+> Task :capacitor-cordova-android-plugins:mergeReleaseJniLibFolders
+> Task :capacitor-cordova-android-plugins:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-device:preBuild UP-TO-DATE
+> Task :capacitor-device:preReleaseBuild UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:copyReleaseJniLibsProjectOnly
+> Task :capacitor-device:mergeReleaseJniLibFolders
+> Task :capacitor-device:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-filesystem:preBuild UP-TO-DATE
+> Task :capacitor-filesystem:preReleaseBuild UP-TO-DATE
+> Task :capacitor-device:copyReleaseJniLibsProjectOnly
+> Task :capacitor-filesystem:mergeReleaseJniLibFolders
+> Task :capacitor-filesystem:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-network:preBuild UP-TO-DATE
+> Task :capacitor-network:preReleaseBuild UP-TO-DATE
+> Task :capacitor-filesystem:copyReleaseJniLibsProjectOnly
+> Task :capacitor-network:mergeReleaseJniLibFolders
+> Task :capacitor-network:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-preferences:preBuild UP-TO-DATE
+> Task :capacitor-preferences:preReleaseBuild UP-TO-DATE
+> Task :capacitor-network:copyReleaseJniLibsProjectOnly
+> Task :capacitor-preferences:mergeReleaseJniLibFolders
+> Task :capacitor-preferences:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-splash-screen:preBuild UP-TO-DATE
+> Task :capacitor-splash-screen:preReleaseBuild UP-TO-DATE
+> Task :capacitor-preferences:copyReleaseJniLibsProjectOnly
+> Task :capacitor-splash-screen:mergeReleaseJniLibFolders
+> Task :capacitor-splash-screen:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-status-bar:preBuild UP-TO-DATE
+> Task :capacitor-status-bar:preReleaseBuild UP-TO-DATE
+> Task :capacitor-splash-screen:copyReleaseJniLibsProjectOnly
+> Task :capacitor-status-bar:mergeReleaseJniLibFolders
+> Task :capacitor-status-bar:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-voice-recorder:preBuild UP-TO-DATE
+> Task :capacitor-voice-recorder:preReleaseBuild UP-TO-DATE
+> Task :capacitor-status-bar:copyReleaseJniLibsProjectOnly
+> Task :capacitor-voice-recorder:mergeReleaseJniLibFolders
+> Task :capacitor-voice-recorder:mergeReleaseNativeLibs NO-SOURCE
+> Task :sentry-capacitor:preBuild UP-TO-DATE
+> Task :capacitor-voice-recorder:copyReleaseJniLibsProjectOnly
+> Task :sentry-capacitor:preReleaseBuild UP-TO-DATE
+> Task :sentry-capacitor:mergeReleaseJniLibFolders
+> Task :sentry-capacitor:mergeReleaseNativeLibs NO-SOURCE
+> Task :sentry-capacitor:copyReleaseJniLibsProjectOnly
+> Task :capacitor-android:generateReleaseResValues
+> Task :capacitor-android:generateReleaseResources
+> Task :capacitor-android:packageReleaseResources
+> Task :capacitor-android:processReleaseNavigationResources
+> Task :app:mergeReleaseNativeLibs
+> Task :capacitor-app:generateReleaseResValues
+> Task :capacitor-android:javaPreCompileRelease
+> Task :capacitor-app:generateReleaseResources
+> Task :capacitor-android:parseReleaseLocalResources
+> Task :capacitor-app:packageReleaseResources
+> Task :capacitor-app:processReleaseNavigationResources
+> Task :capacitor-android:generateReleaseRFile
+> Task :capacitor-app:javaPreCompileRelease
+> Task :capacitor-app:parseReleaseLocalResources
+
+> Task :app:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libimage_processing_util_jni.so, libsentry-android.so, libsentry.so, libsurface_util_jni.so. Run with --info option to learn more.
+.\gradlew.bat : Note: Some input files use unchecked or unsafe operations.
+At line:1 char:922
++ ... t-File $log -Append; .\gradlew.bat clean assembleRelease 2>&1 | Out-F ...
++                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Note: Some inpu...afe operations.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :capacitor-android:compileReleaseJavaWithJavac
+
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :capacitor-app-launcher:generateReleaseResValues
+> Task :capacitor-app-launcher:generateReleaseResources
+> Task :capacitor-android:bundleLibCompileToJarRelease
+> Task :capacitor-app:generateReleaseRFile
+> Task :capacitor-app-launcher:packageReleaseResources
+> Task :capacitor-app:compileReleaseJavaWithJavac
+> Task :capacitor-app:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-app:exportReleaseConsumerProguardFiles
+> Task :capacitor-app-launcher:processReleaseNavigationResources
+> Task :capacitor-camera:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :capacitor-app-launcher:javaPreCompileRelease
+> Task :capacitor-app-launcher:parseReleaseLocalResources
+> Task :capacitor-camera:generateReleaseResValues
+> Task :capacitor-camera:generateReleaseResources
+> Task :capacitor-app-launcher:generateReleaseRFile
+> Task :capacitor-camera:packageReleaseResources
+> Task :capacitor-app-launcher:compileReleaseJavaWithJavac
+> Task :capacitor-app-launcher:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-app-launcher:exportReleaseConsumerProguardFiles
+> Task :capacitor-camera:processReleaseNavigationResources
+> Task :capacitor-camera:javaPreCompileRelease
+> Task :capacitor-camera:parseReleaseLocalResources
+> Task :capacitor-device:generateReleaseResValues
+> Task :capacitor-device:generateReleaseResources
+> Task :capacitor-camera:generateReleaseRFile
+> Task :capacitor-device:packageReleaseResources
+> Task :capacitor-device:processReleaseNavigationResources
+> Task :capacitor-filesystem:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :capacitor-device:javaPreCompileRelease
+> Task :capacitor-device:parseReleaseLocalResources
+> Task :capacitor-filesystem:generateReleaseResValues
+> Task :capacitor-filesystem:generateReleaseResources
+> Task :capacitor-device:generateReleaseRFile
+> Task :capacitor-filesystem:packageReleaseResources
+> Task :capacitor-device:compileReleaseJavaWithJavac
+> Task :capacitor-device:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-device:exportReleaseConsumerProguardFiles
+> Task :capacitor-filesystem:processReleaseNavigationResources
+> Task :capacitor-filesystem:javaPreCompileRelease
+> Task :capacitor-filesystem:parseReleaseLocalResources
+> Task :capacitor-network:generateReleaseResValues
+> Task :capacitor-network:generateReleaseResources
+> Task :capacitor-filesystem:generateReleaseRFile
+> Task :capacitor-network:packageReleaseResources
+> Task :capacitor-network:processReleaseNavigationResources
+> Task :capacitor-network:javaPreCompileRelease
+> Task :capacitor-network:parseReleaseLocalResources
+> Task :capacitor-preferences:generateReleaseResValues
+> Task :capacitor-preferences:generateReleaseResources
+> Task :capacitor-network:generateReleaseRFile
+> Task :capacitor-preferences:packageReleaseResources
+> Task :capacitor-network:compileReleaseJavaWithJavac
+> Task :capacitor-network:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-network:exportReleaseConsumerProguardFiles
+> Task :capacitor-preferences:processReleaseNavigationResources
+> Task :capacitor-preferences:javaPreCompileRelease
+> Task :capacitor-preferences:parseReleaseLocalResources
+> Task :capacitor-splash-screen:generateReleaseResValues
+> Task :capacitor-splash-screen:generateReleaseResources
+> Task :capacitor-preferences:generateReleaseRFile
+> Task :capacitor-splash-screen:packageReleaseResources
+> Task :capacitor-preferences:compileReleaseJavaWithJavac
+> Task :capacitor-preferences:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-preferences:exportReleaseConsumerProguardFiles
+> Task :capacitor-splash-screen:processReleaseNavigationResources
+> Task :capacitor-splash-screen:javaPreCompileRelease
+> Task :capacitor-status-bar:generateReleaseResValues
+> Task :capacitor-splash-screen:parseReleaseLocalResources
+> Task :capacitor-status-bar:generateReleaseResources
+> Task :capacitor-splash-screen:generateReleaseRFile
+> Task :capacitor-status-bar:packageReleaseResources
+> Task :capacitor-splash-screen:compileReleaseJavaWithJavac
+> Task :capacitor-splash-screen:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-splash-screen:exportReleaseConsumerProguardFiles
+> Task :capacitor-status-bar:processReleaseNavigationResources
+> Task :capacitor-status-bar:parseReleaseLocalResources
+> Task :capacitor-status-bar:javaPreCompileRelease
+> Task :sentry-capacitor:generateReleaseResValues
+> Task :sentry-capacitor:generateReleaseResources
+> Task :capacitor-status-bar:generateReleaseRFile
+> Task :sentry-capacitor:packageReleaseResources
+> Task :capacitor-status-bar:compileReleaseJavaWithJavac
+> Task :capacitor-status-bar:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-status-bar:exportReleaseConsumerProguardFiles
+> Task :sentry-capacitor:processReleaseNavigationResources
+> Task :sentry-capacitor:javaPreCompileRelease
+> Task :sentry-capacitor:parseReleaseLocalResources
+> Task :capacitor-voice-recorder:generateReleaseResValues
+> Task :capacitor-voice-recorder:generateReleaseResources
+> Task :sentry-capacitor:generateReleaseRFile
+> Task :capacitor-voice-recorder:packageReleaseResources
+
+> Task :sentry-capacitor:compileReleaseJavaWithJavac
+Note: C:\dev\EventFlow\node_modules\@sentry\capacitor\android\src\main\java\io\sentry\capacitor\SentryCapacitor.java uses or 
+overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :sentry-capacitor:mergeReleaseGeneratedProguardFiles
+> Task :sentry-capacitor:exportReleaseConsumerProguardFiles
+> Task :capacitor-voice-recorder:processReleaseNavigationResources
+> Task :capacitor-voice-recorder:javaPreCompileRelease
+> Task :capacitor-voice-recorder:parseReleaseLocalResources
+> Task :capacitor-android:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-cordova-android-plugins:generateReleaseResValues
+> Task :capacitor-android:exportReleaseConsumerProguardFiles
+> Task :capacitor-voice-recorder:generateReleaseRFile
+> Task :capacitor-cordova-android-plugins:generateReleaseResources
+
+> Task :capacitor-camera:compileReleaseKotlin
+w: file:///C:/dev/EventFlow/node_modules/@capacitor/camera/android/src/main/java/com/capacitorjs/plugins/camera/IonCameraFlow.kt:864:13 Condition is always 'false'.
+
+> Task :capacitor-voice-recorder:compileReleaseJavaWithJavac
+Note: C:\dev\EventFlow\node_modules\capacitor-voice-recorder\android\src\main\java\com\tchvu3\capacitorvoicerecorder\CustomMediaRe
+corder.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :capacitor-voice-recorder:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-voice-recorder:exportReleaseConsumerProguardFiles
+
+> Task :capacitor-filesystem:compileReleaseKotlin
+w: file:///C:/dev/EventFlow/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/FilesystemPlugin.kt:335:31 'fun downloadFile(call: PluginCall): Unit' is deprecated. Use @capacitor/file-transfer plugin instead.
+w: file:///C:/dev/EventFlow/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/LegacyFilesystemImplementation.kt:66:29 Java type mismatch: inferred type is 'String?', but 'String' was expected.
+
+> Task :capacitor-cordova-android-plugins:packageReleaseResources
+
+> Task :capacitor-camera:compileReleaseJavaWithJavac
+Note: C:\dev\EventFlow\node_modules\@capacitor\camera\android\src\main\java\com\capacitorjs\plugins\camera\CameraBottomSheetDialog
+Fragment.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :capacitor-camera:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-camera:exportReleaseConsumerProguardFiles
+> Task :capacitor-filesystem:compileReleaseJavaWithJavac NO-SOURCE
+> Task :capacitor-filesystem:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-filesystem:exportReleaseConsumerProguardFiles
+> Task :capacitor-cordova-android-plugins:processReleaseNavigationResources
+> Task :capacitor-cordova-android-plugins:javaPreCompileRelease
+> Task :capacitor-cordova-android-plugins:parseReleaseLocalResources
+> Task :app:javaPreCompileRelease
+> Task :capacitor-android:writeReleaseAarMetadata
+> Task :capacitor-app:writeReleaseAarMetadata
+> Task :capacitor-app-launcher:writeReleaseAarMetadata
+> Task :capacitor-cordova-android-plugins:writeReleaseAarMetadata
+> Task :capacitor-device:writeReleaseAarMetadata
+> Task :capacitor-camera:writeReleaseAarMetadata
+> Task :capacitor-cordova-android-plugins:generateReleaseRFile
+> Task :capacitor-filesystem:writeReleaseAarMetadata
+> Task :capacitor-cordova-android-plugins:compileReleaseJavaWithJavac NO-SOURCE
+> Task :capacitor-cordova-android-plugins:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-cordova-android-plugins:exportReleaseConsumerProguardFiles
+> Task :capacitor-network:writeReleaseAarMetadata
+> Task :capacitor-preferences:writeReleaseAarMetadata
+> Task :capacitor-splash-screen:writeReleaseAarMetadata
+> Task :capacitor-status-bar:writeReleaseAarMetadata
+> Task :capacitor-voice-recorder:writeReleaseAarMetadata
+> Task :sentry-capacitor:writeReleaseAarMetadata
+> Task :app:processReleaseNavigationResources
+> Task :app:compileReleaseNavigationResources
+> Task :app:generateReleaseResValues
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:checkReleaseAarMetadata
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:packageReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :capacitor-android:extractDeepLinksRelease
+> Task :capacitor-app:extractDeepLinksRelease
+> Task :capacitor-app-launcher:extractDeepLinksRelease
+> Task :app:parseReleaseLocalResources
+> Task :capacitor-camera:extractDeepLinksRelease
+> Task :capacitor-app-launcher:processReleaseManifest
+> Task :capacitor-android:processReleaseManifest
+> Task :capacitor-cordova-android-plugins:extractDeepLinksRelease
+> Task :capacitor-app:processReleaseManifest
+> Task :capacitor-device:extractDeepLinksRelease
+> Task :capacitor-camera:processReleaseManifest
+> Task :capacitor-cordova-android-plugins:processReleaseManifest
+> Task :capacitor-filesystem:extractDeepLinksRelease
+> Task :capacitor-network:extractDeepLinksRelease
+> Task :capacitor-device:processReleaseManifest
+> Task :capacitor-preferences:extractDeepLinksRelease
+> Task :capacitor-filesystem:processReleaseManifest
+> Task :capacitor-splash-screen:extractDeepLinksRelease
+> Task :capacitor-network:processReleaseManifest
+> Task :capacitor-status-bar:extractDeepLinksRelease
+> Task :capacitor-voice-recorder:extractDeepLinksRelease
+> Task :capacitor-preferences:processReleaseManifest
+> Task :capacitor-splash-screen:processReleaseManifest
+> Task :sentry-capacitor:extractDeepLinksRelease
+> Task :capacitor-status-bar:processReleaseManifest
+> Task :capacitor-voice-recorder:processReleaseManifest
+> Task :capacitor-app:bundleLibCompileToJarRelease
+> Task :capacitor-cordova-android-plugins:bundleLibCompileToJarRelease
+> Task :capacitor-app-launcher:bundleLibCompileToJarRelease
+> Task :capacitor-device:bundleLibCompileToJarRelease
+> Task :capacitor-camera:bundleLibCompileToJarRelease
+> Task :sentry-capacitor:processReleaseManifest
+> Task :capacitor-network:bundleLibCompileToJarRelease
+> Task :capacitor-filesystem:bundleLibCompileToJarRelease
+> Task :capacitor-preferences:bundleLibCompileToJarRelease
+> Task :capacitor-splash-screen:bundleLibCompileToJarRelease
+> Task :capacitor-status-bar:bundleLibCompileToJarRelease
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :capacitor-android:prepareReleaseArtProfile
+> Task :capacitor-app:prepareReleaseArtProfile
+> Task :capacitor-voice-recorder:bundleLibCompileToJarRelease
+> Task :capacitor-app-launcher:prepareReleaseArtProfile
+> Task :sentry-capacitor:bundleLibCompileToJarRelease
+> Task :capacitor-camera:prepareReleaseArtProfile
+> Task :capacitor-cordova-android-plugins:prepareReleaseArtProfile
+> Task :capacitor-device:prepareReleaseArtProfile
+> Task :capacitor-filesystem:prepareReleaseArtProfile
+> Task :capacitor-network:prepareReleaseArtProfile
+> Task :capacitor-preferences:prepareReleaseArtProfile
+> Task :capacitor-splash-screen:prepareReleaseArtProfile
+> Task :capacitor-status-bar:prepareReleaseArtProfile
+> Task :capacitor-voice-recorder:prepareReleaseArtProfile
+> Task :sentry-capacitor:prepareReleaseArtProfile
+> Task :capacitor-app:bundleLibRuntimeToJarRelease
+> Task :capacitor-app-launcher:bundleLibRuntimeToJarRelease
+> Task :capacitor-cordova-android-plugins:bundleLibRuntimeToJarRelease
+> Task :capacitor-device:bundleLibRuntimeToJarRelease
+> Task :capacitor-camera:bundleLibRuntimeToJarRelease
+> Task :capacitor-android:bundleLibRuntimeToJarRelease
+> Task :capacitor-network:bundleLibRuntimeToJarRelease
+> Task :capacitor-preferences:bundleLibRuntimeToJarRelease
+> Task :capacitor-filesystem:bundleLibRuntimeToJarRelease
+> Task :capacitor-splash-screen:bundleLibRuntimeToJarRelease
+> Task :capacitor-status-bar:bundleLibRuntimeToJarRelease
+> Task :capacitor-voice-recorder:bundleLibRuntimeToJarRelease
+> Task :sentry-capacitor:bundleLibRuntimeToJarRelease
+> Task :app:extractProguardFiles
+> Task :app:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-android:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-app:processReleaseJavaRes NO-SOURCE
+> Task :app:mergeReleaseArtProfile
+> Task :capacitor-app-launcher:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-camera:processReleaseJavaRes
+> Task :capacitor-cordova-android-plugins:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-device:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-filesystem:processReleaseJavaRes
+> Task :capacitor-network:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-preferences:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-splash-screen:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-status-bar:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-voice-recorder:processReleaseJavaRes NO-SOURCE
+> Task :sentry-capacitor:processReleaseJavaRes NO-SOURCE
+> Task :app:mergeReleaseStartupProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-android:mergeReleaseShaders
+> Task :capacitor-android:compileReleaseShaders NO-SOURCE
+> Task :capacitor-android:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-android:mergeReleaseAssets
+> Task :capacitor-app:mergeReleaseShaders
+> Task :capacitor-app:compileReleaseShaders NO-SOURCE
+> Task :capacitor-app:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-app:mergeReleaseAssets
+> Task :capacitor-app-launcher:mergeReleaseShaders
+> Task :capacitor-app-launcher:compileReleaseShaders NO-SOURCE
+> Task :capacitor-app-launcher:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-app-launcher:mergeReleaseAssets
+> Task :capacitor-camera:mergeReleaseShaders
+> Task :capacitor-camera:compileReleaseShaders NO-SOURCE
+> Task :capacitor-camera:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-camera:mergeReleaseAssets
+> Task :capacitor-cordova-android-plugins:mergeReleaseShaders
+> Task :capacitor-cordova-android-plugins:compileReleaseShaders NO-SOURCE
+> Task :capacitor-cordova-android-plugins:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:mergeReleaseAssets
+> Task :capacitor-device:mergeReleaseShaders
+> Task :capacitor-device:compileReleaseShaders NO-SOURCE
+> Task :capacitor-device:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-device:mergeReleaseAssets
+> Task :capacitor-filesystem:mergeReleaseShaders
+> Task :capacitor-filesystem:compileReleaseShaders NO-SOURCE
+> Task :capacitor-filesystem:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-filesystem:mergeReleaseAssets
+> Task :capacitor-network:mergeReleaseShaders
+> Task :capacitor-network:compileReleaseShaders NO-SOURCE
+> Task :capacitor-network:generateReleaseAssets UP-TO-DATE
+> Task :app:processReleaseManifestForPackage
+> Task :capacitor-network:mergeReleaseAssets
+> Task :capacitor-preferences:mergeReleaseShaders
+> Task :capacitor-preferences:compileReleaseShaders NO-SOURCE
+> Task :capacitor-preferences:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-preferences:mergeReleaseAssets
+> Task :capacitor-splash-screen:mergeReleaseShaders
+> Task :capacitor-splash-screen:compileReleaseShaders NO-SOURCE
+> Task :capacitor-splash-screen:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-splash-screen:mergeReleaseAssets
+> Task :capacitor-status-bar:mergeReleaseShaders
+> Task :capacitor-status-bar:compileReleaseShaders NO-SOURCE
+> Task :capacitor-status-bar:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-status-bar:mergeReleaseAssets
+> Task :capacitor-voice-recorder:mergeReleaseShaders
+> Task :capacitor-voice-recorder:compileReleaseShaders NO-SOURCE
+> Task :capacitor-voice-recorder:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-voice-recorder:mergeReleaseAssets
+> Task :sentry-capacitor:mergeReleaseShaders
+> Task :sentry-capacitor:compileReleaseShaders NO-SOURCE
+> Task :sentry-capacitor:generateReleaseAssets UP-TO-DATE
+> Task :sentry-capacitor:mergeReleaseAssets
+> Task :app:mergeReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :capacitor-android:createFullJarRelease
+> Task :capacitor-android:extractProguardFiles
+> Task :app:compressReleaseAssets
+> Task :capacitor-android:generateReleaseLintModel
+> Task :capacitor-android:prepareLintJarForPublish
+> Task :capacitor-app:createFullJarRelease
+> Task :capacitor-app:extractProguardFiles
+> Task :capacitor-app:generateReleaseLintModel
+> Task :capacitor-app:prepareLintJarForPublish
+> Task :capacitor-app-launcher:createFullJarRelease
+> Task :capacitor-app-launcher:extractProguardFiles
+> Task :capacitor-app-launcher:generateReleaseLintModel
+> Task :capacitor-app-launcher:prepareLintJarForPublish
+> Task :capacitor-camera:createFullJarRelease
+> Task :capacitor-camera:extractProguardFiles
+> Task :capacitor-camera:generateReleaseLintModel
+> Task :capacitor-camera:prepareLintJarForPublish
+> Task :capacitor-cordova-android-plugins:createFullJarRelease
+> Task :capacitor-cordova-android-plugins:extractProguardFiles
+> Task :capacitor-cordova-android-plugins:generateReleaseLintModel
+> Task :capacitor-cordova-android-plugins:prepareLintJarForPublish
+> Task :capacitor-device:createFullJarRelease
+> Task :capacitor-device:extractProguardFiles
+> Task :capacitor-device:generateReleaseLintModel
+> Task :capacitor-device:prepareLintJarForPublish
+> Task :capacitor-filesystem:createFullJarRelease
+> Task :capacitor-filesystem:extractProguardFiles
+> Task :capacitor-filesystem:generateReleaseLintModel
+> Task :capacitor-filesystem:prepareLintJarForPublish
+> Task :capacitor-network:createFullJarRelease
+> Task :capacitor-network:extractProguardFiles
+> Task :app:mergeReleaseJavaResource
+> Task :app:mergeReleaseResources
+> Task :capacitor-network:generateReleaseLintModel
+> Task :capacitor-network:prepareLintJarForPublish
+> Task :capacitor-preferences:createFullJarRelease
+> Task :capacitor-preferences:extractProguardFiles
+> Task :capacitor-preferences:generateReleaseLintModel
+> Task :capacitor-preferences:prepareLintJarForPublish
+> Task :capacitor-splash-screen:createFullJarRelease
+> Task :capacitor-splash-screen:extractProguardFiles
+> Task :capacitor-splash-screen:generateReleaseLintModel
+> Task :capacitor-splash-screen:prepareLintJarForPublish
+> Task :capacitor-status-bar:createFullJarRelease
+> Task :capacitor-status-bar:extractProguardFiles
+> Task :capacitor-status-bar:generateReleaseLintModel
+> Task :capacitor-status-bar:prepareLintJarForPublish
+> Task :capacitor-voice-recorder:createFullJarRelease
+> Task :capacitor-voice-recorder:extractProguardFiles
+> Task :capacitor-voice-recorder:generateReleaseLintModel
+> Task :capacitor-voice-recorder:prepareLintJarForPublish
+> Task :sentry-capacitor:createFullJarRelease
+> Task :sentry-capacitor:extractProguardFiles
+> Task :sentry-capacitor:generateReleaseLintModel
+> Task :sentry-capacitor:prepareLintJarForPublish
+> Task :capacitor-app:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-app:checkReleaseAarMetadata
+> Task :capacitor-app:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-app:extractDeepLinksForAarRelease
+> Task :capacitor-app:extractReleaseAnnotations
+> Task :capacitor-app:mergeReleaseConsumerProguardFiles
+> Task :capacitor-app:mergeReleaseJavaResource
+> Task :capacitor-app-launcher:checkReleaseAarMetadata
+> Task :capacitor-app:syncReleaseLibJars
+> Task :capacitor-app:bundleReleaseLocalLintAar
+> Task :capacitor-app-launcher:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-app-launcher:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-app-launcher:extractDeepLinksForAarRelease
+> Task :capacitor-app-launcher:extractReleaseAnnotations
+> Task :capacitor-app-launcher:mergeReleaseConsumerProguardFiles
+> Task :capacitor-app-launcher:mergeReleaseJavaResource
+> Task :capacitor-camera:checkReleaseAarMetadata
+> Task :capacitor-app-launcher:syncReleaseLibJars
+> Task :capacitor-app-launcher:bundleReleaseLocalLintAar
+> Task :capacitor-camera:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-camera:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-camera:extractDeepLinksForAarRelease
+> Task :capacitor-camera:extractReleaseAnnotations
+> Task :capacitor-camera:mergeReleaseConsumerProguardFiles
+> Task :capacitor-device:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-camera:mergeReleaseJavaResource
+> Task :capacitor-device:checkReleaseAarMetadata
+> Task :capacitor-device:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-camera:syncReleaseLibJars
+> Task :capacitor-camera:bundleReleaseLocalLintAar
+> Task :capacitor-device:extractDeepLinksForAarRelease
+> Task :capacitor-device:extractReleaseAnnotations
+> Task :capacitor-device:mergeReleaseConsumerProguardFiles
+> Task :capacitor-device:mergeReleaseJavaResource
+> Task :capacitor-filesystem:checkReleaseAarMetadata
+> Task :capacitor-device:syncReleaseLibJars
+> Task :capacitor-device:bundleReleaseLocalLintAar
+> Task :capacitor-filesystem:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-filesystem:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-filesystem:extractDeepLinksForAarRelease
+> Task :capacitor-filesystem:extractReleaseAnnotations
+> Task :capacitor-filesystem:mergeReleaseConsumerProguardFiles
+> Task :capacitor-network:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-network:checkReleaseAarMetadata
+> Task :capacitor-network:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-network:extractDeepLinksForAarRelease
+> Task :capacitor-filesystem:mergeReleaseJavaResource
+> Task :capacitor-network:extractReleaseAnnotations
+> Task :capacitor-filesystem:syncReleaseLibJars
+> Task :capacitor-filesystem:bundleReleaseLocalLintAar
+> Task :capacitor-network:mergeReleaseConsumerProguardFiles
+> Task :capacitor-network:mergeReleaseJavaResource
+> Task :capacitor-preferences:checkReleaseAarMetadata
+> Task :capacitor-network:syncReleaseLibJars
+> Task :capacitor-network:bundleReleaseLocalLintAar
+> Task :capacitor-preferences:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-preferences:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-preferences:extractDeepLinksForAarRelease
+> Task :capacitor-preferences:extractReleaseAnnotations
+> Task :capacitor-preferences:mergeReleaseConsumerProguardFiles
+> Task :capacitor-preferences:mergeReleaseJavaResource
+> Task :capacitor-splash-screen:checkReleaseAarMetadata
+> Task :capacitor-preferences:syncReleaseLibJars
+> Task :capacitor-preferences:bundleReleaseLocalLintAar
+> Task :capacitor-splash-screen:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-splash-screen:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-splash-screen:extractDeepLinksForAarRelease
+> Task :capacitor-splash-screen:extractReleaseAnnotations
+> Task :capacitor-splash-screen:mergeReleaseConsumerProguardFiles
+> Task :capacitor-splash-screen:mergeReleaseJavaResource
+> Task :capacitor-status-bar:checkReleaseAarMetadata
+> Task :capacitor-splash-screen:syncReleaseLibJars
+> Task :capacitor-splash-screen:bundleReleaseLocalLintAar
+> Task :capacitor-status-bar:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-status-bar:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-status-bar:extractDeepLinksForAarRelease
+> Task :capacitor-status-bar:extractReleaseAnnotations
+> Task :capacitor-status-bar:mergeReleaseConsumerProguardFiles
+> Task :capacitor-status-bar:mergeReleaseJavaResource
+> Task :sentry-capacitor:checkReleaseAarMetadata
+> Task :capacitor-status-bar:syncReleaseLibJars
+> Task :app:processReleaseResources
+> Task :capacitor-status-bar:bundleReleaseLocalLintAar
+
+> Task :app:compileReleaseJavaWithJavac
+Note: C:\dev\EventFlow\android\app\src\main\java\com\nuvent\app\CallPlugin.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :app:mergeReleaseGeneratedProguardFiles
+> Task :app:generateReleaseLintVitalReportModel
+> Task :sentry-capacitor:stripReleaseDebugSymbols NO-SOURCE
+> Task :sentry-capacitor:copyReleaseJniLibsProjectAndLocalJars
+> Task :sentry-capacitor:extractDeepLinksForAarRelease
+> Task :sentry-capacitor:extractReleaseAnnotations
+> Task :sentry-capacitor:mergeReleaseConsumerProguardFiles
+> Task :sentry-capacitor:mergeReleaseJavaResource
+> Task :capacitor-voice-recorder:checkReleaseAarMetadata
+> Task :sentry-capacitor:syncReleaseLibJars
+> Task :sentry-capacitor:bundleReleaseLocalLintAar
+> Task :capacitor-voice-recorder:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-voice-recorder:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-voice-recorder:extractDeepLinksForAarRelease
+> Task :capacitor-voice-recorder:extractReleaseAnnotations
+> Task :capacitor-voice-recorder:mergeReleaseConsumerProguardFiles
+> Task :capacitor-voice-recorder:mergeReleaseJavaResource
+> Task :capacitor-android:checkReleaseAarMetadata
+> Task :capacitor-voice-recorder:syncReleaseLibJars
+> Task :capacitor-voice-recorder:bundleReleaseLocalLintAar
+> Task :capacitor-android:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-android:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-android:extractDeepLinksForAarRelease
+> Task :capacitor-android:extractReleaseAnnotations
+> Task :capacitor-android:mergeReleaseConsumerProguardFiles
+> Task :capacitor-cordova-android-plugins:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-android:mergeReleaseJavaResource
+> Task :capacitor-cordova-android-plugins:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-cordova-android-plugins:checkReleaseAarMetadata
+> Task :capacitor-android:syncReleaseLibJars
+> Task :capacitor-android:bundleReleaseLocalLintAar
+> Task :capacitor-cordova-android-plugins:extractDeepLinksForAarRelease
+> Task :capacitor-cordova-android-plugins:extractReleaseAnnotations
+> Task :capacitor-cordova-android-plugins:mergeReleaseConsumerProguardFiles
+> Task :capacitor-cordova-android-plugins:mergeReleaseJavaResource
+> Task :capacitor-cordova-android-plugins:syncReleaseLibJars
+> Task :capacitor-cordova-android-plugins:bundleReleaseLocalLintAar
+> Task :capacitor-android:writeReleaseLintModelMetadata
+> Task :capacitor-app:writeReleaseLintModelMetadata
+> Task :capacitor-app-launcher:writeReleaseLintModelMetadata
+> Task :capacitor-camera:writeReleaseLintModelMetadata
+> Task :capacitor-cordova-android-plugins:writeReleaseLintModelMetadata
+> Task :capacitor-device:writeReleaseLintModelMetadata
+> Task :capacitor-filesystem:writeReleaseLintModelMetadata
+> Task :capacitor-network:writeReleaseLintModelMetadata
+> Task :capacitor-preferences:writeReleaseLintModelMetadata
+> Task :capacitor-splash-screen:writeReleaseLintModelMetadata
+> Task :capacitor-status-bar:writeReleaseLintModelMetadata
+> Task :capacitor-voice-recorder:writeReleaseLintModelMetadata
+> Task :sentry-capacitor:writeReleaseLintModelMetadata
+> Task :capacitor-android:generateReleaseLintVitalModel
+> Task :capacitor-app:generateReleaseLintVitalModel
+> Task :capacitor-app-launcher:generateReleaseLintVitalModel
+> Task :capacitor-camera:generateReleaseLintVitalModel
+> Task :capacitor-cordova-android-plugins:generateReleaseLintVitalModel
+> Task :capacitor-device:generateReleaseLintVitalModel
+> Task :capacitor-filesystem:generateReleaseLintVitalModel
+> Task :capacitor-network:generateReleaseLintVitalModel
+> Task :capacitor-preferences:generateReleaseLintVitalModel
+> Task :capacitor-splash-screen:generateReleaseLintVitalModel
+> Task :capacitor-status-bar:generateReleaseLintVitalModel
+> Task :capacitor-voice-recorder:generateReleaseLintVitalModel
+> Task :sentry-capacitor:generateReleaseLintVitalModel
+> Task :app:expandReleaseArtProfileWildcards
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :capacitor-android:bundleReleaseAar
+> Task :capacitor-android:mapReleaseSourceSetPaths
+> Task :capacitor-app:lintVitalAnalyzeRelease
+> Task :capacitor-android:lintVitalAnalyzeRelease
+> Task :capacitor-android:mergeReleaseResources
+> Task :capacitor-app:bundleReleaseAar
+> Task :capacitor-app:mapReleaseSourceSetPaths
+> Task :capacitor-android:compileReleaseLibraryResources
+> Task :capacitor-app-launcher:lintVitalAnalyzeRelease
+> Task :capacitor-app:mergeReleaseResources
+> Task :capacitor-app-launcher:bundleReleaseAar
+> Task :capacitor-app-launcher:mapReleaseSourceSetPaths
+> Task :capacitor-android:verifyReleaseResources
+> Task :app:minifyReleaseWithR8
+> Task :capacitor-cordova-android-plugins:lintVitalAnalyzeRelease
+> Task :capacitor-camera:lintVitalAnalyzeRelease
+> Task :capacitor-app-launcher:mergeReleaseResources
+> Task :capacitor-android:assembleRelease
+> Task :capacitor-camera:bundleReleaseAar
+> Task :capacitor-camera:mapReleaseSourceSetPaths
+> Task :capacitor-app:verifyReleaseResources
+> Task :capacitor-device:lintVitalAnalyzeRelease
+> Task :capacitor-filesystem:lintVitalAnalyzeRelease
+> Task :capacitor-app-launcher:verifyReleaseResources
+> Task :capacitor-camera:mergeReleaseResources
+> Task :capacitor-app:assembleRelease
+> Task :capacitor-app-launcher:assembleRelease
+> Task :capacitor-cordova-android-plugins:bundleReleaseAar
+> Task :app:compileReleaseArtProfile
+> Task :capacitor-cordova-android-plugins:mapReleaseSourceSetPaths
+> Task :capacitor-network:lintVitalAnalyzeRelease
+> Task :capacitor-preferences:lintVitalAnalyzeRelease
+> Task :capacitor-cordova-android-plugins:mergeReleaseResources
+> Task :capacitor-device:bundleReleaseAar
+> Task :capacitor-device:mapReleaseSourceSetPaths
+> Task :capacitor-status-bar:lintVitalAnalyzeRelease
+> Task :capacitor-splash-screen:lintVitalAnalyzeRelease
+> Task :capacitor-device:mergeReleaseResources
+> Task :capacitor-filesystem:bundleReleaseAar
+> Task :capacitor-filesystem:mapReleaseSourceSetPaths
+> Task :sentry-capacitor:lintVitalAnalyzeRelease
+> Task :capacitor-voice-recorder:lintVitalAnalyzeRelease
+> Task :capacitor-cordova-android-plugins:verifyReleaseResources
+> Task :capacitor-filesystem:mergeReleaseResources
+> Task :capacitor-cordova-android-plugins:assembleRelease
+> Task :capacitor-network:bundleReleaseAar
+> Task :capacitor-network:mapReleaseSourceSetPaths
+> Task :capacitor-camera:verifyReleaseResources
+> Task :app:lintVitalAnalyzeRelease
+> Task :capacitor-device:verifyReleaseResources
+> Task :app:convertShrunkResourcesToBinaryRelease
+> Task :capacitor-network:mergeReleaseResources
+> Task :capacitor-camera:assembleRelease
+> Task :capacitor-device:assembleRelease
+> Task :capacitor-preferences:bundleReleaseAar
+> Task :capacitor-preferences:mapReleaseSourceSetPaths
+> Task :app:lintVitalReportRelease
+> Task :capacitor-filesystem:verifyReleaseResources
+> Task :capacitor-preferences:mergeReleaseResources
+> Task :app:lintVitalRelease
+> Task :capacitor-filesystem:assembleRelease
+> Task :capacitor-splash-screen:bundleReleaseAar
+> Task :capacitor-splash-screen:mapReleaseSourceSetPaths
+> Task :capacitor-network:verifyReleaseResources
