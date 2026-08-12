@@ -44,6 +44,10 @@ type PageProps = {
   searchParams: Promise<{ denied?: string }>
 }
 
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function EventDashboardPage({ params, searchParams }: PageProps) {
   const { eventCode } = await params
   const { denied } = await searchParams

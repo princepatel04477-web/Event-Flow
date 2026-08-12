@@ -48,6 +48,10 @@ type ReviewQueueRow = {
   duration_sec: number | null
 }
 
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function ReviewListPage({ params, searchParams }: PageProps) {
   const { eventCode } = await params
   const { done } = await searchParams

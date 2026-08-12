@@ -25,6 +25,10 @@ type PageProps = {
  * therefore says "no codes issued", which for a team session would be a lie —
  * hence the admin layout guard above this route.
  */
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function AccessCodesPage({ params }: PageProps) {
   const { eventCode } = await params
   const event = await resolveEventByCode(eventCode)

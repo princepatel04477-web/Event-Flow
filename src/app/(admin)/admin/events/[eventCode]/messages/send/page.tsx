@@ -17,6 +17,10 @@ type PageProps = {
  * /messages (prepare → copy / download); this one hands the job to
  * sendMessages() and writes the messages table with provider status.
  */
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function SendPage({ params }: PageProps) {
   const { eventCode } = await params
   const event = await resolveEventByCode(eventCode)

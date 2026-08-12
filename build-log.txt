@@ -1,0 +1,16 @@
+
+> app-scaffold@0.1.0 build
+> next build
+
+▲ Next.js 16.2.12 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 10.8s
+  Running TypeScript ...
+  Finished TypeScript in 28.1s ...
+  Collecting page data using 15 workers ...
+
+> Build error occurred
+Error: Page "/admin/events/[eventCode]/codes" is missing "generateStaticParams()" so it cannot be used with "output: export" config.
+    at ignore-listed frames

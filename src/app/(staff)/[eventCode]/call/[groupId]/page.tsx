@@ -15,6 +15,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return { title: `Call — ${groupId.slice(0, 8)}` }
 }
 
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function CallGroupPage({ params }: PageProps) {
   const { eventCode, groupId } = await params
 

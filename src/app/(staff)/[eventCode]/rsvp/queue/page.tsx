@@ -15,6 +15,10 @@ type PageProps = {
   params: Promise<{ eventCode: string }>
 }
 
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function QueuePage({ params }: PageProps) {
   const { eventCode } = await params
 

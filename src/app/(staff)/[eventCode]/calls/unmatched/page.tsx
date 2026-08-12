@@ -20,6 +20,10 @@ type PageProps = {
  * attach each one to a guest group. This is a normal outcome, not an error —
  * the tray must not look like a failure state.
  */
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function UnmatchedTrayPage({ params }: PageProps) {
   const { eventCode } = await params
 

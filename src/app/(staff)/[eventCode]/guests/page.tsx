@@ -36,6 +36,10 @@ type PageProps = {
  * `getEventAccess` is memoised per request, so resolving it here after the
  * layout already did costs nothing.
  */
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function GuestsPage({ params }: PageProps) {
   const { eventCode } = await params
 

@@ -29,6 +29,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return { title: `RSVP — ${groupId.slice(0, 8)}` }
 }
 
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function RsvpLogPage({ params, searchParams }: PageProps) {
   const { eventCode, groupId } = await params
   const { recording: recordingId } = await searchParams

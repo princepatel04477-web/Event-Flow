@@ -27,6 +27,10 @@ type PageProps = {
  * is fenced by `event_id` (CLAUDE.md §5); an import screen with no event is
  * not a screen this schema can support.
  */
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function ImportPage({ params }: PageProps) {
   const { eventCode } = await params
 

@@ -21,6 +21,10 @@ type PageProps = {
  * the user reviews and presses Commit — the allocator is a pure function
  * run on the server, and committing is a separate action.
  */
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function AllocatePage({ params }: PageProps) {
   const { eventCode } = await params
   const event = await resolveEventByCode(eventCode)

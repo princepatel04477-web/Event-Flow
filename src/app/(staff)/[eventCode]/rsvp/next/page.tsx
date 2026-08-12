@@ -18,6 +18,10 @@ type PageProps = {
  * call. The sort is the same one the queue screen applies — never called
  * first, then fewest attempts, then oldest attempt.
  */
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function RsvpNextPage({ params }: PageProps) {
   const { eventCode } = await params
 

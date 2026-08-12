@@ -207,6 +207,10 @@ function buildFieldDefs(
   return defs
 }
 
+export function generateStaticParams(): Array<Record<string, string>> {
+  return [{}]
+}
+
 export default async function ReviewDetailPage({ params }: PageProps) {
   const { eventCode, extractionId } = await params
 
