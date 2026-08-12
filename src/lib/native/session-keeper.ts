@@ -4,20 +4,29 @@ import { capacitorStorageAdapter } from '@/lib/supabase/capacitor-storage'
 import { codeTokenCache } from '@/lib/supabase/code-token-cache'
 
 /**
- * Durable storage for the code-auth session (team/client).
+ * Durable storage for the code-auth session (team/client) — and, since M2, the
+ * ONLY session authority.
  *
- * A code-auth session is a JWT minted by verify-access-code, persisted in an
- * httpOnly cookie. When the WebView remounts — a tel: dial, a camera capture,
- * Android reclaiming memory — the cookie can be gone, and with it the only
- * thing the server guard reads. Nothing then rehydrates it, so staff are
- * bounced to /login.
+ * A code-auth session is a JWT minted by verify-access-code. It used to live in
+ * an httpOnly cookie, with this module holding a survival copy: when the
+ * WebView remounted (a tel: dial, a camera capture, Android reclaiming memory)
+ * the cookie could be gone, and with it the only thing the server guard read,
+ * so staff were bounced to /login. SessionBridge existed to rebuild the cookie
+ * from here before a guard ran.
  *
- * This module keeps the claims in a durable store (Capacitor Preferences →
- * Android SharedPreferences on native, localStorage on web for the e2e
- * remount simulation) and lets the SessionBridge restore the cookie before a
- * guard runs. Persisting a signed JWT client-side does not change the trust
- * model: the cookie already carried the same token, and the server's
- * verifyCodeAuthToken() remains the only acceptance path.
+ * The bundled build has no server and therefore no cookie, so this store is
+ * promoted from survival copy to authority. That deletes the remount bounce at
+ * the root instead of racing to patch it — there is no longer a second copy to
+ * fall out of sync with.
+ *
+ * Backing store: Capacitor Preferences → Android SharedPreferences on native
+ * (survives a WebView cache clear), localStorage on web.
+ *
+ * Persisting a signed JWT client-side does not change the trust model. The
+ * cookie always carried this same token, and acceptance was never the client's
+ * call: the token is signed with the project JWT secret, so PostgREST validates
+ * it on every REST/RPC call and app.code_is_live() gates revoked codes inside
+ * is_staff/is_member. See claims-client.ts.
  */
 export interface StoredCodeClaims {
   /** The code-auth JWT (same value as the nuvent_code_auth cookie). */
@@ -42,8 +51,12 @@ export async function persistClaims(claims: StoredCodeClaims): Promise<void> {
     if (claims.staffMemberId) await capacitorStorageAdapter.setItem(STAFF_KEY, claims.staffMemberId)
     if (claims.eventCode) await capacitorStorageAdapter.setItem(EVENT_KEY, claims.eventCode)
   } catch {
-    // A failed persist must not break the current session — the cookie is
-    // still the authority; this is only the survival copy.
+    // A failed persist must not break the CURRENT session: codeTokenCache is
+    // already set above, so this boot keeps working and RLS calls keep their
+    // bearer. What is lost is survival across a remount or restart — the user
+    // has to log in again. Since M2 there is no cookie standing behind this,
+    // so a silent failure here is the difference between one re-login and a
+    // working session; it must never also take down the live one.
   }
 }
 
@@ -75,6 +88,11 @@ export async function clearClaims(): Promise<void> {
       capacitorStorageAdapter.removeItem(EVENT_KEY),
     ])
   } catch {
-    // Nothing sane to do on failure — the cookie clear is the real sign-out.
+    // codeTokenCache is cleared above, so the live session is already dead for
+    // this boot. A failed durable clear means the token could come back on the
+    // next cold start, which is a real sign-out failure now that no cookie
+    // clear stands behind it — but there is nothing sane to retry with here.
+    // The backstop is server-side: revoking the code kills the session via
+    // app.code_is_live() no matter what this device kept.
   }
 }

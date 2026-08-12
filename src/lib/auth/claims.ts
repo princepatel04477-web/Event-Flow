@@ -2,6 +2,8 @@ import 'server-only'
 
 import { jwtVerify } from 'jose'
 
+import type { CodeAuthClaims } from '@/lib/auth/claims-types'
+
 /**
  * Code-auth session claims — the verified contents of the JWT minted by
  * the verify-access-code Edge Function.
@@ -13,17 +15,17 @@ import { jwtVerify } from 'jose'
  * signature against the project JWT secret (the same secret the Edge
  * Function signs with and PostgREST validates against) and returns the
  * claims the app needs to route and render.
+ *
+ * M2 NOTE: this file only runs while Next.js is still on the request path.
+ * The bundled build has no server and cannot hold the secret, so the client
+ * reads claims via decodeCodeAuthClaims() in claims-client.ts and treats
+ * PostgREST as the verifier. Delete this file once no server guard remains.
+ *
+ * `CodeAuthClaims` now lives in claims-types.ts so client code can import the
+ * type without pulling 'server-only' in behind it. Re-exported here so the
+ * existing `from '@/lib/auth/claims'` imports keep resolving.
  */
-export interface CodeAuthClaims {
-  /** 'team' | 'client' — from the app_role claim. */
-  appRole: 'team' | 'client'
-  /** The event this session may access. */
-  eventId: string
-  /** The access code row that minted this session. */
-  accessCodeId: string
-  /** The selected staff member, set after the "Who are you?" picker. */
-  staffMemberId: string | null
-}
+export type { CodeAuthClaims }
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? process.env.APP_JWT_SECRET ?? '')
 
