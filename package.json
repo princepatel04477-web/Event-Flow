@@ -21,7 +21,8 @@
     "mobile:prod": "npx cap sync android",
     "smoke": "node scripts/smoke.mjs",
     "test:t1": "vitest run --config vitest.integration.config.ts tests/t1_isolation.test.ts",
-    "test:t2": "vitest run --config vitest.integration.config.ts tests/t2_reality.test.ts"
+    "test:t2": "vitest run --config vitest.integration.config.ts tests/t2_reality.test.ts",
+    "test:t2:offline": "npx playwright test e2e/t2_offline.spec.ts --project=phone"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
