@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
-import { getEventAccess } from '@/lib/supabase/queries'
+// Client-reachable module: must not import queries.ts ('server-only').
+import { getEventAccessClient } from '@/lib/supabase/queries-client'
 import type { ExportData } from '@/lib/export/sheets'
 
 export type ExportDataResult =
@@ -20,7 +21,7 @@ const NOT_STAFF_MESSAGE =
  * — nothing here invents a timestamp.
  */
 export async function readExportData(eventId: string): Promise<ExportDataResult> {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   if (access !== 'admin' && access !== 'event_team') {
     return { ok: false, message: NOT_STAFF_MESSAGE }
   }

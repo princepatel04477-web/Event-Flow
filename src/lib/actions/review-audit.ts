@@ -1,7 +1,6 @@
-import { revalidatePath } from 'next/cache'
 
 import { supabase } from '@/lib/supabase/client'
-import { getSessionClaims } from '@/lib/auth/server'
+import { readSessionClaims } from '@/lib/auth/session-client'
 import type { Json } from '@/lib/supabase/database.types'
 import { friendlyRpcError } from '@/lib/errors'
 import type { RpcPayload } from '@/lib/review/payload'
@@ -47,9 +46,9 @@ export async function acceptExtractionWithAudit(
   extractionId: string,
   payload: RpcPayload,
   fieldReviews: FieldReviewDecision[],
-): Promise<ReviewActionResult> {
+): Promise<ReviewActionResult> {
 
-  const claims = await getSessionClaims()
+  const claims = await readSessionClaims()
   const staffMemberId = claims?.staffMemberId ?? null
 
   // The audit insert needs a reviewed_by / reviewed_by_staff value. A code

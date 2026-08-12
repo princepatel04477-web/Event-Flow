@@ -1,4 +1,3 @@
-import { revalidatePath } from 'next/cache'
 
 import { supabase } from '@/lib/supabase/client'
 import type { Json } from '@/lib/supabase/database.types'

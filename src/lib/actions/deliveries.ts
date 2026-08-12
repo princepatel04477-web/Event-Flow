@@ -16,7 +16,8 @@
  * (migration 0300). That is the whole point of the proof chain.
  */
 
-import { getEventAccess } from '@/lib/supabase/queries'
+// Client-reachable module: must not import queries.ts ('server-only').
+import { getEventAccessClient } from '@/lib/supabase/queries-client'
 import { supabase } from '@/lib/supabase/client'
 
 /** Per-phase timing for server actions (instrument-first). */
@@ -57,7 +58,7 @@ export interface GenerateResult {
  * (group_id, kind) WHERE guest_id IS NULL makes a re-run a no-op.
  */
 export async function generateDeliverables(eventId: string): Promise<GenerateResult> {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   if (access !== 'admin' && access !== 'event_team') {
     return { ok: false, error: 'Not permitted. Only staff can manage deliveries.', summary: { hampersCreated: 0, returnGiftsCreated: 0, existingHampers: 0, existingReturnGifts: 0 } }
   }
@@ -180,7 +181,7 @@ export interface DeliveryRunResult {
  */
 export async function readDeliveryRun(eventId: string): Promise<DeliveryRunResult> {
   const timing = phaseTiming('deliveries :: readDeliveryRun')
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   timing.mark('guard')
   if (access !== 'admin' && access !== 'event_team') {
     return { ok: false, error: 'Not permitted.', rows: [] }

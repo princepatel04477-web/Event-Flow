@@ -129,7 +129,7 @@ function EventLayoutInner({ children, eventCode }: { children: ReactNode; eventC
         </div>
       </main>
 
-      <BottomTabs eventCode={event.code} access={access} />
+      <BottomTabs eventCode={event.code} access={access === 'none' ? 'client' : access} />
     </div>
   )
 }

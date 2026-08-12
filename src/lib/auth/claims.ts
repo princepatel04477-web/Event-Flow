@@ -1,5 +1,3 @@
-import 'server-only'
-
 import { jwtVerify } from 'jose'
 
 import type { CodeAuthClaims } from '@/lib/auth/claims-types'

@@ -1,7 +1,6 @@
-import { revalidatePath } from 'next/cache'
 
 import { supabase } from '@/lib/supabase/client'
-import { getSessionClaims } from '@/lib/auth/server'
+import { readSessionClaims } from '@/lib/auth/session-client'
 
 export type RegisterVoiceNoteResult =
   | { ok: true; recordingId: string }
@@ -45,8 +44,8 @@ export async function registerVoiceNote(input: {
   /** The real content type of the uploaded object. */
   mimeType: string
   durationSec: number
-}): Promise<RegisterVoiceNoteResult> {
-  const claims = await getSessionClaims()
+}): Promise<RegisterVoiceNoteResult> {
+  const claims = await readSessionClaims()
 
   const { data: { user } } = await supabase.auth.getUser()
   const staffMemberId = claims?.staffMemberId ?? null

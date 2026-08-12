@@ -1,6 +1,3 @@
-import { cookies } from 'next/headers'
-import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 
 import { supabase } from '@/lib/supabase/client'
 import { safeRedirectPath } from '@/lib/utils'
@@ -13,7 +10,9 @@ import { CODE_AUTH_COOKIE, STAFF_MEMBER_COOKIE } from '@/lib/auth/cookies'
  * may not export values, so the form supplies its own initial state.
  */
 export type SignInState = {
-  error: string | null
+  error?: string | null
+  ok?: boolean
+  next?: string
 }
 
 /**
@@ -37,7 +36,7 @@ export async function signIn(
 
   if (!email || !password) {
     return { error: 'Enter your email and password.' }
-  }
+  }
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {

@@ -1,12 +1,30 @@
+// M2 IN PROGRESS — this is still the SERVER guard layer and still 'server-only'.
+//
+// A codemod rewrote this header to claim the server imports had been replaced
+// with client equivalents, and repointed `createClient` at ./client. That was
+// incoherent: `sessionScope()` below reads `cookies()`, and requireStaff /
+// requireAdmin call redirect()/notFound() — none of which a browser client can
+// do. It also left this file failing to compile (9 errors).
+//
+// It cannot become a re-export shim over queries-client.ts either, and the
+// reason is worth writing down so nobody tries again: the ~70 callers are
+// `async function Page()` SERVER components. In a static export a server
+// component renders ONCE at build time, with no session, so every guard would
+// resolve to "no event" and every page would bake a redirect to /login. The
+// pages have to become client components consuming EventProvider /
+// useRequireStaff — see src/lib/client/event-context.tsx. Until they do, this
+// file stays exactly as it was.
 import 'server-only'
 
+import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 
-import { cookies } from 'next/headers'
-
 import { createClient } from './server'
+export { createClient }
+
 import { getSessionClaims } from '@/lib/auth/server'
 import { CODE_AUTH_COOKIE } from '@/lib/auth/cookies'
+
 import { perRequest } from '@/lib/request-cache'
 import { ttlCache } from '@/lib/ttl-cache'
 

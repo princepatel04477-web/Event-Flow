@@ -1,5 +1,8 @@
 import { supabase } from '@/lib/supabase/client'
-import { getEventAccess } from '@/lib/supabase/queries'
+// Client module: reached from HotelListClient.tsx, so it must not pull in
+// queries.ts ('server-only' → cookies()/redirect()). Same semantics, browser
+// client — see queries-client.ts.
+import { getEventAccessClient } from '@/lib/supabase/queries-client'
 
 export interface HotelListItem {
   id: string
@@ -10,8 +13,8 @@ export interface HotelListItem {
 }
 
 export async function readHotelList(eventId: string): Promise<HotelListItem[]> {
-  const access = await getEventAccess(eventId)
-  if (access !== 'admin' && access !== 'event_team') return []
+  const access = await getEventAccessClient(eventId)
+  if (access !== 'admin' && access !== 'event_team') return []
 
   const { data: hotels } = await supabase
     .from('hotels')

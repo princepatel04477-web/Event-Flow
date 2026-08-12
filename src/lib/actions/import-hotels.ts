@@ -1,7 +1,8 @@
 import { z } from 'zod'
 
 import { supabase } from '@/lib/supabase/client'
-import { getEventAccess } from '@/lib/supabase/queries'
+// Client-reachable module: must not import queries.ts ('server-only').
+import { getEventAccessClient } from '@/lib/supabase/queries-client'
 import type { Json } from '@/lib/supabase/database.types'
 
 const NOT_STAFF_MESSAGE =
@@ -20,7 +21,7 @@ export interface HotelImportContext {
 }
 
 export async function readHotelImportContext(eventId: string): Promise<HotelImportContext> {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   if (access !== 'admin' && access !== 'event_team') {
     return { ok: false, error: NOT_STAFF_MESSAGE, existingHotels: 0, existingRooms: 0 }
   }
@@ -98,7 +99,7 @@ export async function commitHotelImport(
   fileName: string,
   rows: z.infer<typeof hotelCommitRowSchema>[],
 ): Promise<HotelCommitResult> {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   if (access !== 'admin' && access !== 'event_team') {
     return { ok: false, error: NOT_STAFF_MESSAGE, summary: null, failures: [] }
   }

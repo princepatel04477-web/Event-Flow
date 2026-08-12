@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import { revalidatePath } from 'next/cache'
 
 import { supabase } from '@/lib/supabase/client'
 import { generateAccessCode } from '@/lib/auth/codes'

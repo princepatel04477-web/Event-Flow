@@ -38,7 +38,8 @@
 
 import { z } from 'zod'
 
-import { getEventAccess } from '@/lib/supabase/queries'
+// Client-reachable module: must not import queries.ts ('server-only').
+import { getEventAccessClient } from '@/lib/supabase/queries-client'
 import { supabase } from '@/lib/supabase/client'
 import type { Json } from '@/lib/supabase/database.types'
 
@@ -75,7 +76,7 @@ function emptyContext(error: string): ImportContext {
  * render a number.
  */
 export async function readImportContext(eventId: string): Promise<ImportContext> {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   if (access !== 'admin' && access !== 'event_team') {
     return emptyContext(NOT_STAFF_MESSAGE)
   }
@@ -183,7 +184,7 @@ export async function commitImport(
   fileName: string,
   families: z.infer<typeof commitFamilySchema>[],
 ): Promise<CommitResult> {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   if (access !== 'admin' && access !== 'event_team') {
     return { ok: false, error: NOT_STAFF_MESSAGE, summary: null }
   }

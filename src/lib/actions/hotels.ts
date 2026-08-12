@@ -1,7 +1,8 @@
 import { z } from 'zod'
 
 import { supabase } from '@/lib/supabase/client'
-import { getEventAccess } from '@/lib/supabase/queries'
+// Client-reachable module: must not import queries.ts ('server-only').
+import { getEventAccessClient } from '@/lib/supabase/queries-client'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -29,7 +30,7 @@ const createHotelSchema = z.object({
 export type CreateHotelInput = z.infer<typeof createHotelSchema>
 
 export async function createHotel(eventId: string, raw: CreateHotelInput) {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   const block = staffGate(access)
   if (block) return { ok: false as const, error: block }
 
@@ -65,7 +66,7 @@ export async function updateHotel(
   eventId: string,
   patch: Partial<z.infer<typeof createHotelSchema>>,
 ) {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   const block = staffGate(access)
   if (block) return { ok: false as const, error: block }
   const db: Record<string, string | null> = {}
@@ -91,7 +92,7 @@ export async function updateHotel(
 }
 
 export async function deleteHotel(hotelId: string, eventId: string) {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   if (access !== 'admin') return { ok: false as const, error: 'Only admins can delete hotels.' }
 
   // Check for active room allocations
@@ -161,7 +162,7 @@ export async function createRooms(
   mode: 'range' | 'single',
   raw: unknown,
 ): Promise<CreateRoomsResult> {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   const block = staffGate(access)
   if (block) return { ok: false, error: block, created: 0, skipped: 0 }
 
@@ -247,7 +248,7 @@ export async function updateRoom(
     isBlocked?: boolean
   },
 ) {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   const block = staffGate(access)
   if (block) return { ok: false as const, error: block }
   const db: Record<string, boolean | string | number | null> = {}
@@ -280,7 +281,7 @@ export async function updateRoom(
 }
 
 export async function deleteRoom(roomId: string, eventId: string) {
-  const access = await getEventAccess(eventId)
+  const access = await getEventAccessClient(eventId)
   if (access !== 'admin') return { ok: false as const, error: 'Only admins can delete rooms.' }
 
   // Check for active allocations
