@@ -178,11 +178,15 @@ function buildSheet(
   }[]
 
   const aoa: (string | number | boolean | Date)[][] = []
-  // Header row. The note (e.g. "All times IST") rides in the last header cell.
-  aoa.push([
-    ...cols.map((c) => c.header),
-    ...(headerNote ? [headerNote] : []),
-  ])
+
+  // Header row. If the sheet has a header note, append it to the LAST header
+  // cell with a separator so it reads "LastColumn · headerNote" rather than
+  // occupying a stray extra column that confuses the round-trip importer.
+  const headerCells = cols.map((c) => c.header)
+  if (headerNote && headerCells.length > 0) {
+    headerCells[headerCells.length - 1] = `${headerCells[headerCells.length - 1]} · ${headerNote}`
+  }
+  aoa.push(headerCells)
 
   for (const row of rows) {
     const cells: (string | number | boolean | Date)[] = []
@@ -210,12 +214,6 @@ function buildSheet(
       if (!cell) continue
       applyCellFormat(cell, col)
     }
-  }
-
-  // Header note cell (if present) is beyond the last column — leave it plain.
-  if (headerNote) {
-    const noteCell = ws[XLSX.utils.encode_cell({ r: 0, c: cols.length })]
-    if (noteCell) noteCell.s = HEADER_STYLE
   }
 
   // ---- amber exception rows --------------------------------------------

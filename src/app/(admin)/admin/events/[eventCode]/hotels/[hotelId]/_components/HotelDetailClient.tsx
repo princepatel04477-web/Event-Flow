@@ -150,7 +150,7 @@ export function HotelDetailClient({ hotelId, eventId, eventCode, initial }: Prop
             <div key={room.id} className="group flex items-center gap-3 rounded-xl border border-rule bg-surface p-3 text-sm">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand-tint text-brand font-mono text-xs font-bold">{room.room_number}</div>
               <div className="min-w-0 flex-1">
-                <p className="font-medium text-fg">{room.room_type ?? 'Standard'}{room.floor ? ` · Floor ${room.floor}` : ''}</p>
+                <p className="font-medium text-fg">{room.room_type || '—'}{room.floor ? ` · Floor ${room.floor}` : ''}</p>
                 <p className="text-muted">Capacity {room.capacity}{room.occupantCount > 0 ? ` · ${room.occupantCount} occupied` : ''}</p>
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -105,6 +105,7 @@ function familyHeadsSheet(rows: FamilyHeadRow[]): AnySheetDefinition {
       { key: 'adults', header: 'Adults', type: 'number', width: 8 },
       { key: 'children', header: 'Children', type: 'number', width: 8 },
       { key: 'expectedPax', header: 'Expected pax', type: 'number', width: 10 },
+      { key: 'confirmedPax', header: 'Confirmed pax', type: 'number', width: 10 },
       { key: 'rsvpStatus', header: 'RSVP', type: 'string', width: 14 },
       { key: 'priority', header: 'Priority', type: 'number', width: 8 },
       { key: 'attemptCount', header: 'Calls', type: 'number', width: 6 },

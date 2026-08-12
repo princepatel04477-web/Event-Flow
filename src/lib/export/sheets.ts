@@ -59,6 +59,7 @@ export interface FamilyHeadRow {
   adults: number | null
   children: number | null
   expectedPax: number
+  confirmedPax: number | null
   rsvpStatus: string
   priority: number
   room: string
@@ -265,6 +266,7 @@ export function buildFamilyHeadRows(data: ExportData): FamilyHeadRow[] {
       adults: g.adults_confirmed,
       children: g.children_confirmed,
       expectedPax: g.expected_pax,
+      confirmedPax: g.confirmed_pax,
       rsvpStatus: RSVP_STATUS_LABELS[g.rsvp_status] ?? g.rsvp_status,
       priority: g.priority,
       room: roomByGroup.get(g.id) ?? '',
