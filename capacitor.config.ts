@@ -19,6 +19,19 @@ const config: CapacitorConfig = {
   // Static export lives in out/, not public/.
   webDir: 'out',
 
+  server: {
+    // Deliberately no `url`: this is the bundled build, so the WebView loads
+    // local assets. Adding a url here silently turns the APK back into a
+    // remote shell and the bundle in out/ goes unused.
+    //
+    // `androidScheme` must stay 'https'. The WebView serves local assets from
+    // an origin built out of this scheme; on 'http' Android treats it as an
+    // insecure origin and withholds the secure-context APIs the app relies on
+    // — crypto.subtle (code-auth JWT verify) and IndexedDB persistence (the
+    // offline outbox) among them.
+    androidScheme: 'https',
+  },
+
   android: {
     allowMixedContent: false,
   },

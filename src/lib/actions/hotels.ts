@@ -37,7 +37,7 @@ export async function createHotel(eventId: string, raw: CreateHotelInput) {
   const parsed = createHotelSchema.safeParse(raw)
   if (!parsed.success) {
     return { ok: false as const, error: parsed.error.issues[0]?.message ?? 'Invalid data' }
-  }
+  }
   const { data, error } = await supabase
     .from('hotels')
     .insert({
@@ -52,10 +52,16 @@ export async function createHotel(eventId: string, raw: CreateHotelInput) {
     .single()
 
   if (error || !data) {
-    if (error?.code === '23505') {
-      return { ok: false as const, error: 'A hotel with that name already exists for this event.' }
-    }
-    return { ok: false as const, error: error?.message ?? 'Could not create hotel.' }
+    // RAW PostgREST error, on purpose — no friendly copy.
+    //
+    // The 23505 branch that used to live here said "A hotel with that name
+    // already exists", which is a guess: 23505 is *a* unique violation, and it
+    // does not say which index fired. Swallowing the code to say something
+    // reassuring is how a constraint gets misdiagnosed for an hour. Both the
+    // code and the message go through verbatim.
+    const code = error?.code ?? 'unknown'
+    const message = error?.message ?? 'insert returned no row'
+    return { ok: false as const, code, error: `${code}: ${message}` }
   }
 
   return { ok: true as const, hotelId: data.id }
@@ -68,7 +74,7 @@ export async function updateHotel(
 ) {
   const access = await getEventAccessClient(eventId)
   const block = staffGate(access)
-  if (block) return { ok: false as const, error: block }
+  if (block) return { ok: false as const, error: block }
   const db: Record<string, string | null> = {}
   if (patch.name !== undefined) db.name = patch.name
   if (patch.address !== undefined) db.address = patch.address ?? null
@@ -93,7 +99,7 @@ export async function updateHotel(
 
 export async function deleteHotel(hotelId: string, eventId: string) {
   const access = await getEventAccessClient(eventId)
-  if (access !== 'admin') return { ok: false as const, error: 'Only admins can delete hotels.' }
+  if (access !== 'admin') return { ok: false as const, error: 'Only admins can delete hotels.' }
 
   // Check for active room allocations
   const { data: occupants } = await supabase
@@ -190,7 +196,7 @@ export async function createRooms(
         max_capacity: capacity + 1,
         notes: notes ?? null,
       })
-    }
+    }
     let created = 0
     let skipped = 0
     for (const row of rows) {
@@ -214,7 +220,7 @@ export async function createRooms(
     return { ok: false, error: parsed.error.issues[0]?.message, created: 0, skipped: 0 }
   }
 
-  const { roomNumber, roomType, floor, capacity, notes } = parsed.data
+  const { roomNumber, roomType, floor, capacity, notes } = parsed.data
   const { error } = await supabase.from('rooms').insert({
     event_id: eventId,
     hotel_id: hotelId,
@@ -250,7 +256,7 @@ export async function updateRoom(
 ) {
   const access = await getEventAccessClient(eventId)
   const block = staffGate(access)
-  if (block) return { ok: false as const, error: block }
+  if (block) return { ok: false as const, error: block }
   const db: Record<string, boolean | string | number | null> = {}
   if (patch.roomNumber !== undefined) db.room_number = patch.roomNumber
   if (patch.roomType !== undefined) db.room_type = patch.roomType ?? null
@@ -282,7 +288,7 @@ export async function updateRoom(
 
 export async function deleteRoom(roomId: string, eventId: string) {
   const access = await getEventAccessClient(eventId)
-  if (access !== 'admin') return { ok: false as const, error: 'Only admins can delete rooms.' }
+  if (access !== 'admin') return { ok: false as const, error: 'Only admins can delete rooms.' }
 
   // Check for active allocations
   const { data: occupants, error: checkErr } = await supabase
