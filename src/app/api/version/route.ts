@@ -29,7 +29,35 @@ import { NextResponse } from 'next/server'
  * when present and falls back to '?' when they are not.
  */
 
-export const dynamic = 'force-dynamic'
+/**
+ * M2: `force-dynamic` is GONE, and it had to be — `output: 'export'` refuses it
+ * outright ("cannot be used with output: export"). This is now prerendered to a
+ * static file at build time.
+ *
+ * WHAT THAT CHANGES, because it is not nothing:
+ *
+ *  - `commit` is unaffected and arguably stronger. It is baked from the build
+ *    that produced this file, so it cannot report a SHA that differs from the
+ *    bundle being served. scripts/smoke.mjs compares it to local git HEAD and
+ *    that comparison keeps working.
+ *  - `servedAt` NO LONGER MEANS "when this instance came up". There is no
+ *    instance. It is now the BUILD time, frozen. Anything treating it as a
+ *    liveness or uptime signal is reading a constant — renamed in spirit, not
+ *    in key, because scripts/smoke.mjs reads `servedAt` and silently renaming
+ *    it would break the suite that exists to catch stale deploys.
+ *  - `cache-control: no-store` is advisory now; a static file is served by the
+ *    CDN under its own rules. Kept so the intent survives if this ever returns
+ *    to a server.
+ *
+ * The reason this endpoint exists is unchanged and still earned: "deployed" has
+ * been wrong twice (extract-rsvp reported deployed and was not; the voice
+ * recorder reported built and was a placeholder). A baked SHA answers "what is
+ * actually in this bundle" better than a cold-start timestamp ever did.
+ */
+// Required, not redundant: with `output: 'export'` a route handler must declare
+// force-static explicitly. Omitting it fails the build with "force-static /
+// revalidate not configured" rather than defaulting to static.
+export const dynamic = 'force-static'
 
 export function GET() {
   return NextResponse.json(
@@ -38,8 +66,7 @@ export function GET() {
       // the honest answer for `next dev` — the smoke suite treats a missing
       // SHA as "not a real deployment" rather than as a match.
       commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
-      // Evaluated when the serverless function cold-starts, not at build.
-      // Close enough to "when did this instance come up" to be worth having.
+      // Build time, frozen at export. See the note above.
       servedAt: new Date().toISOString(),
     },
     { headers: { 'cache-control': 'no-store' } },
