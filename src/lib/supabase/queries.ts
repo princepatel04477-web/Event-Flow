@@ -109,13 +109,13 @@ export {
 
 import type { Membership } from '@/lib/events/paths'
 
-export type Viewer = {
-  userId: string
-  email: string | null
-  fullName: string | null
-  isAdmin: boolean
-  memberships: Membership[]
-}
+// Defined in queries-types.ts so queries-client.ts can import them without
+// pulling 'server-only' in behind them. Re-exported here so existing
+// `from '@/lib/supabase/queries'` imports keep resolving, and so there is one
+// definition rather than two that can drift apart.
+export type { Viewer, EventAccess, StaffAccess, DeniedReason } from '@/lib/supabase/queries-types'
+
+import type { Viewer, EventAccess, StaffAccess, DeniedReason } from '@/lib/supabase/queries-types'
 
 /**
  * Who is signed in, and what they can reach.
@@ -284,9 +284,6 @@ export async function resolveEventByCode(code: string) {
   return getEventByCode(upper)
 }
 
-/** What `app.is_staff()` / `app.is_member()` would answer for this viewer. */
-export type EventAccess = 'admin' | 'event_team' | 'client' | 'none'
-
 /**
  * Resolve the viewer's role on one event, computed from exactly the three
  * inputs `app.is_staff()` uses: `profiles.global_role`, `profiles.is_active`
@@ -364,9 +361,6 @@ export async function isEventStaff(eventId: string): Promise<boolean> {
   return access === 'admin' || access === 'event_team'
 }
 
-/** The two values `app.is_staff(event_id)` answers true for. */
-export type StaffAccess = Extract<EventAccess, 'admin' | 'event_team'>
-
 /**
  * Page guard: this screen is for event staff.
  *
@@ -402,15 +396,6 @@ export async function requireStaff(
   // invariant is written down rather than assumed.
   notFound()
 }
-
-/**
- * Why `requireAdmin` bounced someone, carried to the dashboard as `?denied=`.
- *
- * A closed union rather than free text: it lands in a URL, and the dashboard
- * looks the message up from a table instead of rendering whatever the query
- * string says. Nobody gets to inject a sentence into the app's own voice.
- */
-export type DeniedReason = 'import' | 'admin'
 
 /**
  * Page guard: this screen is for admins only.

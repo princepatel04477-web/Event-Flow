@@ -49,7 +49,35 @@ export function eventHomePath(
   isAdmin: boolean,
 ): string {
   if (!isAdmin && membership.role === 'client') {
-    return `/${membership.eventCode}/guests`
+    return eventGuestsPath(membership.eventCode)
   }
   return `/${membership.eventCode}`
+}
+
+/**
+ * The one page a client may read in an event.
+ *
+ * A named helper rather than an inline template because the staff and admin
+ * guards both bounce a client here, and M2 turns `[eventCode]` from a route
+ * segment into a query param (UUIDs and tenant slugs cannot be enumerated by
+ * generateStaticParams). When that lands, this function changes and the guards
+ * do not.
+ */
+export function eventGuestsPath(eventCode: string): string {
+  return `/${eventCode}/guests`
+}
+
+/**
+ * The event dashboard, carrying the reason a guard refused a screen.
+ *
+ * `denied` is a closed union, never free text: it lands in a URL and the
+ * dashboard looks the message up from a table rather than rendering whatever
+ * the query string says. Nobody gets to inject a sentence into the app's own
+ * voice.
+ *
+ * The bounce SAYS SO on arrival on purpose. A silent redirect reads as a bug
+ * ("I tapped the link the team sent and it threw me back").
+ */
+export function eventDeniedPath(eventCode: string, reason: 'import' | 'admin'): string {
+  return `/${eventCode}?denied=${reason}`
 }
