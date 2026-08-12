@@ -216,13 +216,12 @@
        so "शर्मा परिवार" renders in the same family as the Latin next to
        it rather than falling back to whatever the WebView has.
      - mono: IBM Plex Mono, which carries every figure in the app. */
-  --font-sans: var(--font-plex-sans), var(--font-plex-devanagari),
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Noto Sans", "Noto Sans Devanagari", sans-serif;
-  --font-display: var(--font-cormorant), ui-serif, Georgia,
-    "Times New Roman", "Noto Serif", serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono",
-    SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-display: ui-serif, Georgia, "Times New Roman",
+    "Noto Serif", serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular,
+    Menlo, Consolas, "Liberation Mono", monospace;
 
   --ease-ledger: var(--ef-ease);
   --ease-seal: var(--ef-ease-seal);

@@ -45,7 +45,7 @@ type PageProps = {
 }
 
 export function generateStaticParams(): Array<Record<string, string>> {
-  return [{}]
+  return []
 }
 
 export default async function EventDashboardPage({ params, searchParams }: PageProps) {

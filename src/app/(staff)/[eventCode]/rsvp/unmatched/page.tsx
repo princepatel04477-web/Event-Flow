@@ -21,7 +21,7 @@ type PageProps = {
  * the tray must not look like a failure state.
  */
 export function generateStaticParams(): Array<Record<string, string>> {
-  return [{}]
+  return []
 }
 
 export default async function UnmatchedTrayPage({ params }: PageProps) {

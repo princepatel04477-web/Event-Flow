@@ -49,7 +49,7 @@ type ReviewQueueRow = {
 }
 
 export function generateStaticParams(): Array<Record<string, string>> {
-  return [{}]
+  return []
 }
 
 export default async function ReviewListPage({ params, searchParams }: PageProps) {

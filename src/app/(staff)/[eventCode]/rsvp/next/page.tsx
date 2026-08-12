@@ -19,7 +19,7 @@ type PageProps = {
  * first, then fewest attempts, then oldest attempt.
  */
 export function generateStaticParams(): Array<Record<string, string>> {
-  return [{}]
+  return []
 }
 
 export default async function RsvpNextPage({ params }: PageProps) {

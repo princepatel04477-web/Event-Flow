@@ -18,7 +18,7 @@ type PageProps = {
  * sendMessages() and writes the messages table with provider status.
  */
 export function generateStaticParams(): Array<Record<string, string>> {
-  return [{}]
+  return []
 }
 
 export default async function SendPage({ params }: PageProps) {

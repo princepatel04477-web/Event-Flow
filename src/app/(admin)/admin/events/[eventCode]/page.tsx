@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: 'Dashboard' }
 type PageProps = { params: Promise<{ eventCode: string }> }
 
 export function generateStaticParams(): Array<Record<string, string>> {
-  return [{}]
+  return []
 }
 
 export default async function AdminEventDashboardPage({ params }: PageProps) {

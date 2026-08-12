@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: 'Hotel' }
 type PageProps = { params: Promise<{ eventCode: string; hotelId: string }> }
 
 export function generateStaticParams(): Array<Record<string, string>> {
-  return [{}]
+  return []
 }
 
 export default async function HotelDetailPage({ params }: PageProps) {

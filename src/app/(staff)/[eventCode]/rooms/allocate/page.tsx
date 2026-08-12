@@ -22,7 +22,7 @@ type PageProps = {
  * run on the server, and committing is a separate action.
  */
 export function generateStaticParams(): Array<Record<string, string>> {
-  return [{}]
+  return []
 }
 
 export default async function AllocatePage({ params }: PageProps) {

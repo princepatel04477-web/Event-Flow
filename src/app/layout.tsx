@@ -1,10 +1,4 @@
 import type { Metadata, Viewport } from 'next'
-import {
-  Cormorant_Garamond,
-  IBM_Plex_Mono,
-  IBM_Plex_Sans,
-  IBM_Plex_Sans_Devanagari,
-} from 'next/font/google'
 import type { ReactNode } from 'react'
 
 import { MotionProvider } from '@/components/motion/MotionProvider'
@@ -21,67 +15,26 @@ import './globals.css'
 // Install Sentry global handlers on the client before anything renders.
 if (typeof window !== 'undefined') {
   initSentry()
-  // tel:/mailto: links belong to the OS, not the WebView — a captured click
-  // on one must go to the system dialer and never navigate the WebView (the
-  // Tier-0 call bug). This wires the document-level interceptor once.
   wireExternalLinkInterception()
 }
 
 /**
- * The four faces of the design, self-hosted.
+ * M2 static export: next/font/google is unavailable in the bundled build
+ * (Turbopack downloads fonts at build time, which fails on the build machine).
+ * Switched to system font stacks. The APK is the only runtime target, and
+ * every Android handset ships a serviceable serif + sans + monospace stack.
  *
- * `next/font/google` downloads and fingerprints these at BUILD time and
- * serves them from our own origin, so the venue's Wi-Fi is never in the
- * critical path — a `<link>` to fonts.googleapis.com would leave staff
- * staring at fallback metrics (or nothing) exactly when the network is
- * worst. It also inlines the font-face metrics, so there is no layout
- * shift when they land.
+ * System stack: 'Georgia, serif' (display), 'system-ui, -apple-system, sans-serif'
+ * (body), 'Menlo, Consolas, monospace' (figures). Devanagari falls back to the
+ * device system font — all Android handsets above API 26 ship Noto Sans
+ * Devanagari, which is a better match for the Excel sheet names than a
+ * download-at-runtime web font over venue Wi-Fi.
  *
- * `display: 'swap'` on all four: fallback text immediately, never a flash
- * of invisible text.
+ * If font fingerprinting is restored, inline the CSS file into the out/
+ * bundle rather than re-adding next/font/google — a downloaded .woff2 is
+ * indistinguishable from a self-hosted one, and the build-time download is
+ * the part that breaks.
  */
-const plexSans = IBM_Plex_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-plex-sans',
-  display: 'swap',
-})
-
-/**
- * The Devanagari cut. Family names come off the Excel sheet in Hindi
- * ("शर्मा परिवार") and sit inline with Latin on the same row — without
- * this they fall back to whatever the Android WebView happens to ship,
- * which is a different weight and a different x-height on every handset.
- */
-const plexDevanagari = IBM_Plex_Sans_Devanagari({
-  subsets: ['devanagari', 'latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-plex-devanagari',
-  display: 'swap',
-})
-
-/** Every figure in the app. Loaded for its tabular numerals. */
-const plexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-plex-mono',
-  display: 'swap',
-})
-
-/** Names, screen titles, the seal. Never a figure — no tabular set. */
-const cormorant = Cormorant_Garamond({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-cormorant',
-  display: 'swap',
-})
-
-const fontVariables = [
-  plexSans.variable,
-  plexDevanagari.variable,
-  plexMono.variable,
-  cormorant.variable,
-].join(' ')
 
 export const metadata: Metadata = {
   title: {
@@ -116,7 +69,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     // attribute with --safe-area-inset-* vars onto <html> (viewport-fit
     // cover) before React hydrates. The server cannot know those values, so
     // we let React keep the WebView's version instead of erroring.
-    <html lang="en" className={`h-full ${fontVariables}`} suppressHydrationWarning>
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <body className="min-h-dvh bg-paper font-sans text-base text-ink antialiased">
         <SentryErrorBoundary>
           <SessionBridge />

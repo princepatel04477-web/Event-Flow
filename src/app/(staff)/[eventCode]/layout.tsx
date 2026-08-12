@@ -1,7 +1,7 @@
 import { EventLayoutClient } from './layout-client'
 
 export function generateStaticParams(): Array<Record<string, string>> {
-  return [{}]
+  return []
 }
 
 type LayoutProps = {

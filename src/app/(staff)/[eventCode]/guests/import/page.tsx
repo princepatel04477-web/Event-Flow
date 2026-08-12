@@ -28,7 +28,7 @@ type PageProps = {
  * not a screen this schema can support.
  */
 export function generateStaticParams(): Array<Record<string, string>> {
-  return [{}]
+  return []
 }
 
 export default async function ImportPage({ params }: PageProps) {
