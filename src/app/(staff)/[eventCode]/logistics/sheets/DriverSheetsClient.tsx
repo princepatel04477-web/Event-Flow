@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 
 import { Badge } from '@/components/ui/Badge'
@@ -28,7 +28,6 @@ export function DriverSheetsClient({ eventId }: Props) {
   const [expandedTrip, setExpandedTrip] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setPhase({ stage: 'loading' })
     try {
       const trips = await readDriverSheets(eventId)
       setPhase({ stage: 'ready', trips })
@@ -37,7 +36,21 @@ export function DriverSheetsClient({ eventId }: Props) {
     }
   }, [eventId])
 
-  useState(() => { load() })
+  /** Retry: back to the spinner, then re-fetch. */
+  const reload = useCallback(() => {
+    setPhase({ stage: 'loading' })
+    void load()
+  }, [load])
+
+  // NOT `useState(() => load())`. A useState initializer runs DURING render,
+  // so the setPhase inside load() fired mid-render ("Cannot update a
+  // component while rendering a different component") and ran on the server
+  // too, which desynced the SSR markup from the first client render and
+  // produced a hydration mismatch on every visit. Fetching is a side effect
+  // and belongs in an effect.
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const formatWhatsApp = (trip: DriverSheetTrip): string => {
     const lines = [
@@ -98,7 +111,7 @@ export function DriverSheetsClient({ eventId }: Props) {
         icon={<FileTextIcon className="h-7 w-7" />}
         title="Could not load driver sheets"
         description={phase.message}
-        action={<Button onClick={load}>Retry</Button>}
+        action={<Button onClick={reload}>Retry</Button>}
       />
     )
   }

@@ -1,6 +1,6 @@
-# EventFlow — Frontend Design Document for Google Stitch
+# Nuvent — Frontend Design Document for Google Stitch
 
-EventFlow is field software for running a large Indian wedding (300–2,000 guests):
+Nuvent is field software for running a large Indian wedding (300–2,000 guests):
 call families to confirm RSVPs, allocate rooms, arrange airport transfers and
 hampers, and account for every guest's arrival and departure. Staff use it on
 cheap Android phones in banquet halls, corridors, and hotel lobbies — often
@@ -235,7 +235,7 @@ zebra-banded lists with the red margin rule → fixed BottomTabs. All pages
 fade in 150ms.
 
 ### 7.1 Login (`/login`)
-Centered on warm paper, max-w-md card. Big "EventFlow" wordmark (28px bold),
+Centered on warm paper, max-w-md card. Big "Nuvent" wordmark (28px bold),
 "Sign in to your event." muted subline, notice box (warning tint) for expired
 magic-link messages, a Card containing the login form (fields + primary
 button), and a footnote: "Accounts are created by an event admin… there is no

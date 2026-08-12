@@ -2,7 +2,7 @@
 -- 0300 ROOMS + HAMPERS + RETURN GIFTS
 -- =====================================================================
 
-create table public.hotels (
+create table if not exists public.hotels (
   id              uuid primary key default gen_random_uuid(),
   event_id        uuid not null references public.events (id) on delete cascade,
   name            text not null,
@@ -16,7 +16,7 @@ create table public.hotels (
   unique (event_id, name)
 );
 
-create table public.rooms (
+create table if not exists public.rooms (
   id           uuid primary key default gen_random_uuid(),
   event_id     uuid not null references public.events (id) on delete cascade,
   hotel_id     uuid not null,
@@ -35,7 +35,7 @@ create table public.rooms (
     references public.hotels (id, event_id) on delete cascade
 );
 
-create index on public.rooms (event_id, hotel_id);
+create index if not exists rooms_event_hotel_idx on public.rooms (event_id, hotel_id);
 
 -- ---------------------------------------------------------------------
 -- ROOM ASSIGNMENTS
@@ -44,7 +44,7 @@ create index on public.rooms (event_id, hotel_id);
 -- pointing at the same room_id. Auto-allocate first, manual always wins.
 -- ---------------------------------------------------------------------
 
-create table public.room_assignments (
+create table if not exists public.room_assignments (
   id              uuid primary key default gen_random_uuid(),
   event_id        uuid not null references public.events (id) on delete cascade,
   room_id         uuid not null,
@@ -71,10 +71,10 @@ create table public.room_assignments (
   check (not is_override or override_reason is not null)
 );
 
-create unique index room_assignments_one_active_per_guest
+create unique index if not exists room_assignments_one_active_per_guest
   on public.room_assignments (guest_id) where released_at is null;
 
-create index room_assignments_active_by_room
+create index if not exists room_assignments_active_by_room
   on public.room_assignments (event_id, room_id) where released_at is null;
 
 -- Refuse to overfill a room unless someone explicitly overrides with a reason.
@@ -113,6 +113,7 @@ begin
 end;
 $$;
 
+drop trigger if exists room_assignments_capacity on public.room_assignments;
 create trigger room_assignments_capacity
   before insert or update on public.room_assignments
   for each row execute function app.guard_room_capacity();
@@ -123,7 +124,7 @@ create trigger room_assignments_capacity
 -- for groups where needs_return_gift is false.
 -- ---------------------------------------------------------------------
 
-create table public.deliverables (
+create table if not exists public.deliverables (
   id           uuid primary key default gen_random_uuid(),
   event_id     uuid not null references public.events (id) on delete cascade,
   kind         app.deliverable_kind not null,
@@ -145,9 +146,9 @@ create table public.deliverables (
   foreign key (room_id,  event_id) references public.rooms  (id, event_id) on delete set null
 );
 
-create index on public.deliverables (event_id, kind, status);
-create index on public.deliverables (event_id, room_id);
-create unique index deliverables_one_per_group_kind
+create index if not exists deliverables_event_kind_status_idx on public.deliverables (event_id, kind, status);
+create index if not exists deliverables_event_room_idx on public.deliverables (event_id, room_id);
+create unique index if not exists deliverables_one_per_group_kind
   on public.deliverables (group_id, kind) where guest_id is null;
 
 -- ---------------------------------------------------------------------
@@ -157,7 +158,7 @@ create unique index deliverables_one_per_group_kind
 -- phone with a fiddled clock cannot backdate a photo.
 -- ---------------------------------------------------------------------
 
-create table public.delivery_proofs (
+create table if not exists public.delivery_proofs (
   id                 uuid primary key default gen_random_uuid(),
   event_id           uuid not null references public.events (id) on delete restrict,
   deliverable_id     uuid not null references public.deliverables (id) on delete restrict,
@@ -177,17 +178,20 @@ create table public.delivery_proofs (
   notes              text
 );
 
-create index on public.delivery_proofs (event_id, recorded_at desc);
-create index on public.delivery_proofs (deliverable_id);
+create index if not exists delivery_proofs_event_recorded_idx on public.delivery_proofs (event_id, recorded_at desc);
+create index if not exists delivery_proofs_deliverable_idx on public.delivery_proofs (deliverable_id);
 
+drop trigger if exists delivery_proofs_server_clock on public.delivery_proofs;
 create trigger delivery_proofs_server_clock
   before insert on public.delivery_proofs
   for each row execute function app.force_server_recorded_at();
 
+drop trigger if exists delivery_proofs_no_update on public.delivery_proofs;
 create trigger delivery_proofs_no_update
   before update on public.delivery_proofs
   for each row execute function app.block_mutation();
 
+drop trigger if exists delivery_proofs_no_delete on public.delivery_proofs;
 create trigger delivery_proofs_no_delete
   before delete on public.delivery_proofs
   for each row execute function app.block_mutation();
@@ -208,6 +212,7 @@ begin
 end;
 $$;
 
+drop trigger if exists delivery_proofs_mark_delivered on public.delivery_proofs;
 create trigger delivery_proofs_mark_delivered
   after insert on public.delivery_proofs
   for each row execute function app.mark_deliverable_delivered();
@@ -218,6 +223,7 @@ select app.attach_standard_triggers('public.room_assignments');
 select app.attach_standard_triggers('public.deliverables');
 
 -- delivery_proofs gets audit on insert only (update/delete are impossible)
+drop trigger if exists delivery_proofs_audit on public.delivery_proofs;
 create trigger delivery_proofs_audit
   after insert on public.delivery_proofs
   for each row execute function app.audit_trigger();

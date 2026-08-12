@@ -2,152 +2,81 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import type { ReactNode } from 'react'
+import { type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
-import {
-  BuildingIcon,
-  CarIcon,
-  ClipboardCheckIcon,
-  GridIcon,
-  PlaneIcon,
-  PhoneIcon,
-  UploadIcon,
-} from '@/components/icons'
+import { SECTIONS, type SectionId, type TabAccess } from '@/lib/sections/config'
 
-type Tab = {
-  /** Path segment after /{eventCode}. Empty string is the dashboard. */
-  segment: string
-  label: string
-  icon: ReactNode
-}
-
-/** The access strings this bar knows how to draw. */
-export type TabAccess = 'admin' | 'event_team' | 'client'
-
-const QUEUE: Tab = {
-  segment: 'queue',
-  label: 'Queue',
-  icon: <PhoneIcon className="h-6 w-6" />,
-}
-const IMPORT: Tab = {
-  segment: 'import',
-  label: 'Import',
-  icon: <UploadIcon className="h-6 w-6" />,
-}
-const REVIEW: Tab = {
-  segment: 'review',
-  label: 'Review',
-  icon: <ClipboardCheckIcon className="h-6 w-6" />,
-}
-const ROOMS: Tab = {
-  segment: 'rooms',
-  label: 'Rooms',
-  icon: <BuildingIcon className="h-6 w-6" />,
-}
-const FLEET: Tab = {
-  segment: 'fleet',
-  label: 'Fleet',
-  icon: <CarIcon className="h-6 w-6" />,
-}
-const LOGISTICS: Tab = {
-  segment: 'logistics',
-  label: 'Trips',
-  icon: <PlaneIcon className="h-6 w-6" />,
-}
-const DEPARTURES: Tab = {
-  segment: 'departures',
-  label: 'Depart',
-  icon: <BuildingIcon className="h-6 w-6" />,
-}
-const DASHBOARD: Tab = {
-  segment: '',
-  label: 'Home',
-  icon: <GridIcon className="h-6 w-6" />,
-}
-
-/**
- * One list per role, built from the session — not three copies of the bar.
- *
- * `client` gets an empty list and therefore no bar at all: a client can reach
- * exactly one page in the event, and a lone tab pointing at the page you are
- * already standing on is decoration that costs 4.75rem of a 360px screen.
- */
-const TABS_BY_ACCESS: Record<TabAccess, Tab[]> = {
-  admin: [QUEUE, IMPORT, REVIEW, ROOMS, FLEET, LOGISTICS, DEPARTURES, DASHBOARD],
-  event_team: [QUEUE, REVIEW, ROOMS, FLEET, LOGISTICS, DEPARTURES, DASHBOARD],
-  client: [],
-}
-
-/**
- * Tailwind scans source for literal class names, so the column count has to
- * be spelled out rather than interpolated. Keeps the grid honest when the
- * list is three tabs instead of four.
- */
-const GRID_COLS: Record<number, string> = {
-  1: 'grid-cols-1',
-  2: 'grid-cols-2',
-  3: 'grid-cols-3',
-  4: 'grid-cols-4',
-  5: 'grid-cols-5',
-  6: 'grid-cols-6',
-  7: 'grid-cols-7',
-  8: 'grid-cols-8',
-}
+export type { TabAccess }
+export { SECTIONS }
 
 export interface BottomTabsProps {
-  /** Canonical event code from the database, not the raw URL segment. */
   eventCode: string
-  /**
-   * The viewer's role on THIS event, resolved on the server by the layout.
-   * Passed in rather than looked up here — this is a client component and
-   * must never touch Supabase.
-   */
   access: TabAccess
 }
 
 /**
- * Thumb-reach navigation. Fixed to the bottom because that is where a hand
- * already is when you are holding a phone and a clipboard.
+ * Section bottom bar — icon + short label per section. Equal-width flex
+ * tabs, evenly distributed. Active state matches the current section by
+ * path segment. Feature-flagged sections are hidden without a placeholder.
+ *
+ * Icons are from the section config — one source of truth shared with the
+ * sidebar, breadcrumbs, and section headers.
  */
 export function BottomTabs({ eventCode, access }: BottomTabsProps) {
   const pathname = usePathname()
-  const tabs = TABS_BY_ACCESS[access] ?? []
-
-  if (tabs.length === 0) return null
-
-  // The event code in the URL may differ in case from the canonical one, so
-  // match on position rather than on the full path.
   const segments = pathname.split('/').filter(Boolean)
-  const current = segments.length > 1 ? segments[1] : ''
+  // segments = [eventCode, section, ...children]
+  const currentSection = segments.length >= 2 ? segments[1] : ''
+
+  // Operational sections that staff and admin can reach, with feature flags respected.
+  const visibleSections = Object.values(SECTIONS).filter(
+    (s) => s.featureFlag === undefined &&
+      ((access === 'admin' && s.roles.includes('admin'))
+        || (access === 'event_team' && s.roles.includes('event_team'))
+        || (access === 'client' && s.roles.includes('client')))
+  )
+
+  if (visibleSections.length === 0) return null
 
   return (
     <nav
       aria-label="Event sections"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pb-safe px-safe"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-rule-strong bg-nav pb-safe px-safe"
     >
-      <ul
-        className={cn(
-          'mx-auto grid w-full max-w-[480px]',
-          GRID_COLS[tabs.length] ?? 'grid-cols-4',
-        )}
-      >
-        {tabs.map((tab) => {
-          const href = tab.segment ? `/${eventCode}/${tab.segment}` : `/${eventCode}`
-          const active = current === tab.segment
+      <ul className="mx-auto grid w-full max-w-[480px]" style={{ gridTemplateColumns: `repeat(${visibleSections.length}, minmax(0, 1fr))` }}>
+        {visibleSections.map((section) => {
+          const defaultChild = section.children.find((c) => c.isDefault)
+          const href = defaultChild
+            ? `/${eventCode}/${section.id}/${defaultChild.segment}`
+            : `/${eventCode}/${section.id}`
+          const active = currentSection === section.id
 
           return (
-            <li key={tab.label}>
+            <li key={section.id} className="relative">
               <Link
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'tap flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-xs font-medium',
-                  active ? 'text-brand' : 'text-muted hover:text-fg',
+                  'tap relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 py-2',
+                  'text-[0.6875rem] leading-tight font-medium',
+                  'transition-colors duration-press ease-ledger',
+                  active ? 'text-brand' : 'text-muted active:text-ink',
                 )}
               >
-                {tab.icon}
-                <span className="leading-none">{tab.label}</span>
+                {active ? (
+                  <span
+                    aria-hidden
+                    className="absolute top-0 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-b-sm bg-brand"
+                  />
+                ) : null}
+                <span className={cn(
+                  'text-brand',
+                  active ? 'text-brand' : 'text-muted'
+                )}>
+                  {section.icon}
+                </span>
+                <span>{section.tabLabel}</span>
               </Link>
             </li>
           )

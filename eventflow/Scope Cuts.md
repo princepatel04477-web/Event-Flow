@@ -5,7 +5,7 @@ updated: 2026-07-31
 
 # Scope Cuts
 
-Back to [[EventFlow]]. Decided in advance so the decision is not made at 2am in August.
+Back to [[Nuvent]]. Decided in advance so the decision is not made at 2am in August.
 
 ## Cut in this order
 

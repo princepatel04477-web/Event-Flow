@@ -1,10 +1,28 @@
 apply plugin: 'com.android.application'
 
+// Release signing. The keystore and its passwords live OUTSIDE the repo
+// (see android/keystore.properties.example); keystore.properties is
+// gitignored. The build FAILS LOUDLY when it is missing rather than silently
+// falling back to the debug keystore — a debug-signed "release" installs
+// happily and then cannot be upgraded by a properly signed build later,
+// which means every staff phone has to uninstall and reinstall mid-event.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+def hasKeystore = keystorePropertiesFile.exists()
+if (hasKeystore) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
-    namespace = "com.eventops.app"
+    // Build output goes outside OneDrive — its NTFS redirector holds locks
+    // on intermediate build files even when sync is paused, and Gradle's
+    // mergeResources task fails with AccessDeniedException on deletion.
+    buildDir = "C:/android-builds/nuvent/debug"
+    
+    namespace = "com.nuvent.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.eventops.app"
+        applicationId "com.nuvent.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -16,10 +34,40 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasKeystore) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled false
+            if (!hasKeystore) {
+                throw new GradleException(
+                    "android/keystore.properties is missing. A release build must be signed " +
+                    "with the real key — never the debug keystore. Copy " +
+                    "android/keystore.properties.example and fill it in, or restore the " +
+                    "keystore from backup. See CLAUDE.md 'Release build'."
+                )
+            }
+            signingConfig signingConfigs.release
+
+            // R8. The keep rules in proguard-rules.pro matter: Capacitor
+            // registers plugins by REFLECTION, so anything R8 cannot see a
+            // direct reference to gets stripped and the plugin silently does
+            // not exist at runtime.
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            // Explicit, not inherited. A debuggable release is remotely
+            // inspectable on a staff member's phone.
+            debuggable false
         }
     }
 }

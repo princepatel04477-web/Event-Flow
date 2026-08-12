@@ -5,7 +5,7 @@ updated: 2026-07-31
 
 # Excel Import
 
-Back to [[EventFlow]]. **Task `p1c` — preview done, commit pending.**
+Back to [[Nuvent]]. **Task `p1c` — preview done, commit pending.**
 
 > [!warning] The database write path does not exist yet
 > The parse pipeline, preview UI, mobile normalisation, column mapper, and idempotent

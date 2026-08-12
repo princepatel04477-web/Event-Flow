@@ -5,7 +5,7 @@ updated: 2026-07-31
 
 # Security Tests
 
-Back to [[EventFlow]]. Task `p1b`, file `test_security.sql`.
+Back to [[Nuvent]]. Task `p1b`, file `test_security.sql`.
 
 ## What it sets up
 

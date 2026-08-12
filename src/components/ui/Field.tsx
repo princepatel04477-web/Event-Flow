@@ -35,10 +35,10 @@ export function Field({
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
       {label ? (
-        <label htmlFor={id} className="text-sm font-medium text-fg">
+        <label htmlFor={id} className="eyebrow mb-0.5">
           {label}
           {required ? (
-            <span className="ml-0.5 text-danger" aria-hidden>
+            <span className="ml-1 text-ledger-red" aria-hidden>
               *
             </span>
           ) : null}
@@ -48,13 +48,17 @@ export function Field({
       {children}
 
       {hint && !error ? (
-        <p id={`${id}-hint`} className="text-sm text-muted">
+        <p id={`${id}-hint`} className="text-sm leading-snug text-muted">
           {hint}
         </p>
       ) : null}
 
       {error ? (
-        <p id={`${id}-error`} role="alert" className="text-sm font-medium text-danger">
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="text-sm leading-snug font-medium text-ledger-red"
+        >
           {error}
         </p>
       ) : null}
@@ -65,13 +69,19 @@ export function Field({
 /**
  * Shared control styling. 16px text is deliberate — smaller and iOS Safari
  * zooms the page on focus.
+ *
+ * The field is a lifted well rather than an outlined box: on the night
+ * ground a 1px outline alone reads as a divider, so the surface is raised
+ * a few percent to say "type here". Focus adds a brass ring, which is the
+ * one place besides the primary button that brass appears as a fill.
  */
 export function fieldControlClasses(hasError: boolean): string {
   return cn(
-    'tap block w-full rounded-xl border bg-surface px-3.5 text-base text-fg',
-    'placeholder:text-subtle transition-colors',
+    'tap block w-full rounded-xl border bg-surface px-4 text-base text-ink',
+    'placeholder:text-subtle transition-colors duration-press ease-ledger',
+    'focus:border-brand focus:ring-3 focus:ring-brand/20 focus:outline-none',
     'disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70',
-    hasError ? 'border-danger' : 'border-border-strong',
+    hasError ? 'border-ledger-red' : 'border-rule-strong',
   )
 }
 

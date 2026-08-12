@@ -32,10 +32,10 @@ export async function acceptExtraction(
     return { ok: false, error: friendlyRpcError(error) }
   }
 
-  revalidatePath(`/${eventCode}/review`)
-  revalidatePath(`/${eventCode}/review/${extractionId}`)
+  revalidatePath(`/${eventCode}/rsvp/review`)
+  revalidatePath(`/${eventCode}/rsvp/review/${extractionId}`)
   revalidatePath(`/${eventCode}`)
-  revalidatePath(`/${eventCode}/queue`)
+  revalidatePath(`/${eventCode}/rsvp/queue`)
 
   return { ok: true }
 }
@@ -113,8 +113,8 @@ export async function rejectExtraction(
     }
   }
 
-  revalidatePath(`/${eventCode}/review`)
-  revalidatePath(`/${eventCode}/review/${extractionId}`)
+  revalidatePath(`/${eventCode}/rsvp/review`)
+  revalidatePath(`/${eventCode}/rsvp/review/${extractionId}`)
 
   return { ok: true }
 }

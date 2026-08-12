@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react'
 
+import { isNativePlatform } from '@/lib/native/platform'
+
 /**
  * Native bridge wiring — mounted once in the root layout.
  *
@@ -10,12 +12,13 @@ import { useEffect } from 'react'
  * - backButton → navigate back through history; exit only at the root. This
  *   overrides the default "any back press kills the app" behaviour.
  *
- * Both are no-ops on the web (the Capacitor global is absent), so this
- * component is safe to render everywhere.
+ * Skipped entirely on the web, so this component is safe to render everywhere.
+ * (The old guard tested for the `window.Capacitor` global and claimed it was
+ * "absent on the web" — it is not; see lib/native/platform.ts.)
  */
 export function NativeBridge() {
   useEffect(() => {
-    if (typeof window === 'undefined' || !(window as any).Capacitor) return
+    if (!isNativePlatform()) return
 
     let handles: Array<{ remove: () => void }> = []
 

@@ -44,5 +44,37 @@ export async function setSentryContext(user: { id: string; role?: string } | nul
   if (eventId) Sentry.setTag('event_id', eventId)
 }
 
+/**
+ * Report a swallowed write failure with its SQLSTATE.
+ *
+ * The call-save path returns a user-facing sentence and keeps the outcome on
+ * the phone — correct for the staff member, useless for diagnosis, because the
+ * SQLSTATE and constraint name never left the device. Server actions log to
+ * the Vercel console, but a queued-and-never-drained completion produces no
+ * server log at all: the request never arrived. This is the client-side half,
+ * and it is the only half that exists for offline failures.
+ *
+ * A no-op without a DSN, so local dev is unaffected.
+ *
+ * @param route      Call-site label, e.g. 'submitCallOutcome'.
+ * @param diagnostic The `step=… code=… constraint=… at=…` string from the action.
+ * @param extra      Ids for narrowing. Never put guest names or numbers here.
+ */
+export function captureDiagnostic(
+  route: string,
+  diagnostic: string | undefined,
+  extra: Record<string, string | number | boolean | null | undefined> = {},
+) {
+  if (!initialized || !DSN) return
+  const sqlstate = /code=(\S+)/.exec(diagnostic ?? '')?.[1] ?? 'unknown'
+  Sentry.withScope((scope) => {
+    scope.setTag('route', route)
+    scope.setTag('sqlstate', sqlstate)
+    scope.setContext('diagnostic', { diagnostic: diagnostic ?? '(none)', ...extra })
+    scope.setLevel('error')
+    Sentry.captureMessage(`${route} failed (${sqlstate})`)
+  })
+}
+
 /** Convenience for callers that already hold the singleton. */
 export { supabase }

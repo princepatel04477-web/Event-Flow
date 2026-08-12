@@ -2,6 +2,8 @@
 
 import { useSyncExternalStore } from 'react'
 
+import { isNativePlatform } from '@/lib/native/platform'
+
 /**
  * Global online/offline state (M9 Part A).
  *
@@ -34,7 +36,7 @@ function getSnapshot(): boolean {
 
 /** Wire the native Network plugin once. */
 async function initNativeNetwork() {
-  if (typeof window === 'undefined' || !(window as any).Capacitor) return
+  if (!isNativePlatform()) return
   try {
     const { Network } = await import('@capacitor/network')
     const status = await Network.getStatus()

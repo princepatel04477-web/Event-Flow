@@ -5,7 +5,7 @@ updated: 2026-07-31
 
 # Project Brief
 
-Back to [[EventFlow]].
+Back to [[Nuvent]].
 
 ## What it replaces
 

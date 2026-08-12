@@ -2,6 +2,12 @@
 -- 0100 FOUNDATION
 -- Extensions, enum types, tenancy (events / profiles / event_members),
 -- helper functions used by every RLS policy, audit log, guard triggers.
+--
+-- IDEMPOTENCY: every statement is safe to re-run. Types and tables are
+-- created IF NOT EXISTS (types inside DO blocks since CREATE TYPE has no
+-- IF NOT EXISTS), functions with CREATE OR REPLACE, triggers with
+-- DROP IF EXISTS + CREATE. This migration is pushed repeatedly over a
+-- live database.
 -- =====================================================================
 
 create extension if not exists pgcrypto;
@@ -15,52 +21,121 @@ grant usage on schema app to authenticated, anon, service_role;
 
 -- Global role. 'admin' = Prince + friend (see and edit every event).
 -- 'member' = anyone whose access is granted per-event in event_members.
-create type app.global_role as enum ('admin', 'member');
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'global_role') then
+    create type app.global_role as enum ('admin', 'member');
+  end if;
+end $$;
 
 -- Per-event role.
 -- 'event_team' = on-ground staff: calling, logistics, hampers, departures.
 -- 'client'     = wedding family: read-only guest profile cards, nothing else.
-create type app.event_role as enum ('event_team', 'client');
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'event_role') then
+    create type app.event_role as enum ('event_team', 'client');
+  end if;
+end $$;
 
-create type app.side          as enum ('bride', 'groom', 'both', 'other');
-create type app.group_type    as enum ('family', 'couple', 'friends', 'single');
-create type app.age_band      as enum ('adult', 'child', 'infant');
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'side') then
+    create type app.side as enum ('bride', 'groom', 'both', 'other');
+  end if;
+end $$;
 
-create type app.rsvp_status as enum (
-  'not_started',   -- never dialled
-  'attempted',     -- dialled, no answer yet
-  'callback',      -- asked us to call back
-  'tentative',     -- maybe / will confirm later
-  'confirmed',     -- coming, pax known
-  'declined',      -- not coming
-  'unreachable'    -- wrong / dead number
-);
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'group_type') then
+    create type app.group_type as enum ('family', 'couple', 'friends', 'single');
+  end if;
+end $$;
 
-create type app.travel_direction as enum ('arrival', 'departure');
-create type app.travel_mode      as enum ('air', 'train', 'bus', 'cab', 'self_drive');
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'age_band') then
+    create type app.age_band as enum ('adult', 'child', 'infant');
+  end if;
+end $$;
 
-create type app.call_outcome as enum (
-  'connected', 'no_answer', 'busy', 'switched_off',
-  'wrong_number', 'callback', 'declined', 'other'
-);
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'rsvp_status') then
+    create type app.rsvp_status as enum (
+      'not_started',   -- never dialled
+      'attempted',     -- dialled, no answer yet
+      'callback',      -- asked us to call back
+      'tentative',     -- maybe / will confirm later
+      'confirmed',     -- coming, pax known
+      'declined',      -- not coming
+      'unreachable'    -- wrong / dead number
+    );
+  end if;
+end $$;
 
-create type app.extraction_status as enum ('pending', 'accepted', 'rejected', 'superseded');
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'travel_direction') then
+    create type app.travel_direction as enum ('arrival', 'departure');
+  end if;
+end $$;
 
-create type app.deliverable_kind   as enum ('hamper', 'return_gift');
-create type app.deliverable_status as enum ('pending', 'assigned', 'delivered', 'not_required');
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'travel_mode') then
+    create type app.travel_mode as enum ('air', 'train', 'bus', 'cab', 'self_drive');
+  end if;
+end $$;
 
-create type app.vehicle_status as enum ('available', 'assigned', 'unavailable');
-create type app.trip_status    as enum ('planned', 'dispatched', 'completed', 'cancelled');
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'call_outcome') then
+    create type app.call_outcome as enum (
+      'connected', 'no_answer', 'busy', 'switched_off',
+      'wrong_number', 'callback', 'declined', 'other'
+    );
+  end if;
+end $$;
 
-create type app.message_status as enum ('queued', 'sent', 'delivered', 'read', 'failed');
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'extraction_status') then
+    create type app.extraction_status as enum ('pending', 'accepted', 'rejected', 'superseded');
+  end if;
+end $$;
 
-create type app.data_source as enum ('excel_import', 'rsvp_call', 'event_team', 'client', 'system');
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'deliverable_kind') then
+    create type app.deliverable_kind as enum ('hamper', 'return_gift');
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'deliverable_status') then
+    create type app.deliverable_status as enum ('pending', 'assigned', 'delivered', 'not_required');
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'vehicle_status') then
+    create type app.vehicle_status as enum ('available', 'assigned', 'unavailable');
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'trip_status') then
+    create type app.trip_status as enum ('planned', 'dispatched', 'completed', 'cancelled');
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'message_status') then
+    create type app.message_status as enum ('queued', 'sent', 'delivered', 'read', 'failed');
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_type where typname = 'data_source') then
+    create type app.data_source as enum ('excel_import', 'rsvp_call', 'event_team', 'client', 'system');
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------
 -- TENANCY
 -- ---------------------------------------------------------------------
 
-create table public.events (
+create table if not exists public.events (
   id            uuid primary key default gen_random_uuid(),
   name          text not null,
   code          text not null unique,          -- short slug, used in exports & logins
@@ -78,7 +153,7 @@ create table public.events (
 comment on table public.events is
   'One row per wedding. EVERY operational table carries event_id and is fenced by it.';
 
-create table public.profiles (
+create table if not exists public.profiles (
   id           uuid primary key references auth.users (id) on delete cascade,
   full_name    text,
   phone        text,
@@ -88,7 +163,7 @@ create table public.profiles (
   updated_at   timestamptz not null default now()
 );
 
-create table public.event_members (
+create table if not exists public.event_members (
   id          uuid primary key default gen_random_uuid(),
   event_id    uuid not null references public.events (id) on delete cascade,
   user_id     uuid not null references auth.users (id) on delete cascade,
@@ -98,7 +173,7 @@ create table public.event_members (
   unique (event_id, user_id)
 );
 
-create index on public.event_members (user_id);
+create index if not exists event_members_user_id_idx on public.event_members (user_id);
 
 comment on table public.event_members is
   'Grants one login access to exactly one event. An event_team or client login '
@@ -123,6 +198,7 @@ begin
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function app.handle_new_user();
@@ -231,7 +307,7 @@ $$;
 -- AUDIT LOG
 -- ---------------------------------------------------------------------
 
-create table public.audit_log (
+create table if not exists public.audit_log (
   id          bigint generated always as identity primary key,
   event_id    uuid,
   table_name  text not null,
@@ -243,8 +319,8 @@ create table public.audit_log (
   at          timestamptz not null default now()
 );
 
-create index on public.audit_log (event_id, at desc);
-create index on public.audit_log (table_name, record_id);
+create index if not exists audit_log_event_id_at_idx on public.audit_log (event_id, at desc);
+create index if not exists audit_log_table_record_idx on public.audit_log (table_name, record_id);
 
 create or replace function app.audit_trigger()
 returns trigger
@@ -292,6 +368,9 @@ declare
   v_has_updated boolean;
 begin
   execute format(
+    'drop trigger if exists %I on %s', v_name || '_audit', p_table
+  );
+  execute format(
     'create trigger %I after insert or update or delete on %s
        for each row execute function app.audit_trigger()',
     v_name || '_audit', p_table
@@ -304,6 +383,9 @@ begin
   ) into v_has_updated;
 
   if v_has_updated then
+    execute format(
+      'drop trigger if exists %I on %s', v_name || '_touch', p_table
+    );
     execute format(
       'create trigger %I before update on %s
          for each row execute function app.touch_updated_at()',

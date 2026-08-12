@@ -35,10 +35,56 @@
         </provider>
     </application>
 
+    <!--
+      Package visibility (Android 11+ / API 30, and this app targets 36).
+
+      Without this, resolveActivity()/queryIntentActivities() against a tel:
+      intent return null even though a dialer is installed, and any code that
+      checks before starting the intent concludes there is no dialer. That
+      includes Capacitor's own external-URL handling. The dial then fails
+      silently — no dialer, no error, nothing in logcat.
+
+      Declaring the intents we actually fire is the documented fix. It grants
+      visibility of dialer apps only, not a general package listing.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.CALL" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tel" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- M6: direct dial (ACTION_CALL) + automatic call-state tracking. -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- H1: call-recording harvest. MANAGE_EXTERNAL_STORAGE would be rejected
+         by Play Store review. We sideload the APK, so this is acceptable. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <!-- H5: voice-note recorder.
+
+         MODIFY_AUDIO_SETTINGS is NOT optional and its absence is not harmless.
+         Capacitor's BridgeWebChromeClient.onPermissionRequest() asks for BOTH
+         RECORD_AUDIO and MODIFY_AUDIO_SETTINGS whenever the WebView requests
+         AUDIO_CAPTURE, and its result callback ANDs every entry in the result
+         map. An undeclared permission comes back denied, so `granted` was
+         always false and the bridge called request.deny() — getUserMedia
+         rejected with NotAllowedError no matter what the staff member tapped,
+         and the microphone looked broken rather than un-permitted.
+
+         The native recorder (capacitor-voice-recorder) does not go through
+         that path, but the web fallback in a desktop/mobile browser does, and
+         the two must not disagree about whether recording is possible. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>

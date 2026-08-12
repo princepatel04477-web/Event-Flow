@@ -5,7 +5,7 @@ updated: 2026-07-31
 
 # RSVP Capture Pipeline
 
-Back to [[EventFlow]]. Tasks `p1f` → `p1i`. Guarantee #4: **AI output is evidence, not data.**
+Back to [[Nuvent]]. Tasks `p1f` → `p1i`. Guarantee #4: **AI output is evidence, not data.**
 
 ```
 tel: dial → call recording (native Capacitor module) or post-call voice note

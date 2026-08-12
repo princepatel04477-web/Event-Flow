@@ -5,7 +5,7 @@ updated: 2026-08-02
 
 # Status
 
-Back to [[EventFlow]]. As of **2 August 2026**.
+Back to [[Nuvent]]. As of **2 August 2026**.
 
 ## Done
 

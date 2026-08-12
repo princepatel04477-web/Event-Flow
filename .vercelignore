@@ -1,0 +1,24 @@
+# Keep the upload small. Vercel builds from source, so nothing generated
+# locally needs to travel — and on this connection (TEST-LOG "Environment
+# note": roughly one connect in three times out) a 90MB upload simply never
+# finished. Excluding these took it to a few MB.
+
+# Local build output — Vercel runs its own `next build`.
+.next/
+out/
+
+# Cloudflare/OpenNext output, kept inert in the repo pending adapter support.
+.open-next/
+.wrangler/
+
+# The Android shell. It is a native wrapper around the deployed site and has
+# no part in the web build; ~74MB of Gradle output and APKs.
+android/
+
+# Test artefacts.
+test-results/
+playwright-report/
+e2e/results.json
+
+# Session notes.
+eventflow/

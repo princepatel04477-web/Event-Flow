@@ -43,7 +43,11 @@ export function ErrorState({
         <ShieldAlertIcon className="h-7 w-7" />
       </span>
 
-      <h2 className="font-display text-lg text-ledger-red text-balance">{title}</h2>
+      {/* Sans, not the display serif. Cormorant is a high-contrast face with
+          thin hairlines; set untracked at 20px in signal red on the night
+          ground it renders as a whisper on a cheap LCD — and this is the one
+          sentence on the screen someone reads when something has broken. */}
+      <h2 className="text-lg font-medium text-balance text-ledger-red">{title}</h2>
 
       {description ? (
         <p className="max-w-sm text-base leading-relaxed text-ink text-pretty">

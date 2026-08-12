@@ -7,22 +7,11 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Spinner } from '@/components/ui/Spinner'
 import { StatCard } from '@/components/dashboard/StatCard'
-import {
-  ArrowDownCircleIcon,
-  ArrowUpCircleIcon,
-  BoxIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  GiftIcon,
-  UsersIcon,
-  UserIcon,
-  IndianRupeeIcon,
-  ShieldAlertIcon,
-} from '@/components/icons'
+import { ShieldAlertIcon } from '@/components/icons'
 import { readDashboard, readTodayLegs, readAttention, type DashboardRow, type TodayLeg, type AttentionRow } from '@/lib/actions/dashboard'
 
 import { TodayPanel } from './TodayPanel'
-import { AttentionPanel } from './AttentionPanel'
+import { AttentionPanel } from '@/components/dashboard/AttentionPanel'
 
 interface Props {
   eventId: string
@@ -95,25 +84,25 @@ export function DashboardClient({ eventId, eventCode }: Props) {
     <div className="flex flex-col gap-6">
       {/* ---- Numbers ---- */}
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-fg">RSVP</h2>
+        <h2 className="eyebrow mb-3">RSVP</h2>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Total groups" value={dash.totalGroups} icon={<UsersIcon className="h-5 w-5" />} note="families on the list" />
-          <StatCard label="Total pax" value={dash.totalPax} icon={<UserIcon className="h-5 w-5" />} note="confirmed, else expected" />
-          <StatCard label="Confirmed" value={dash.rsvpConfirmed} tone="success" icon={<CheckCircleIcon className="h-5 w-5" />} />
-          <StatCard label="Pending" value={dash.rsvpPending} tone="warning" icon={<ClockIcon className="h-5 w-5" />} />
+          <StatCard label="Total groups" value={dash.totalGroups} note="families on the list" />
+          <StatCard label="Total pax" value={dash.totalPax} note="confirmed, else expected" />
+          <StatCard label="Confirmed" value={dash.rsvpConfirmed} tone="success" />
+          <StatCard label="Pending" value={dash.rsvpPending} tone="warning" />
         </div>
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-fg">Today</h2>
+        <h2 className="eyebrow mb-3">Today</h2>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Arrivals today" value={dash.arrivalsToday} tone="info" icon={<ArrowDownCircleIcon className="h-5 w-5" />} />
-          <StatCard label="Departures today" value={dash.departuresToday} tone="info" icon={<ArrowUpCircleIcon className="h-5 w-5" />} />
+          <StatCard label="Arrivals today" value={dash.arrivalsToday} tone="info" />
+          <StatCard label="Departures today" value={dash.departuresToday} tone="info" />
         </div>
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-fg">Rooms</h2>
+        <h2 className="eyebrow mb-3">Rooms</h2>
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Guests roomed" value={dash.guestsRoomed} tone="info" />
           <StatCard label="Rooms available" value={null} tone="neutral" note="see Rooms screen" />
@@ -121,23 +110,23 @@ export function DashboardClient({ eventId, eventCode }: Props) {
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-fg">Deliveries</h2>
+        <h2 className="eyebrow mb-3">Deliveries</h2>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Hampers done" value={dash.hampersDelivered} tone="success" icon={<GiftIcon className="h-5 w-5" />} />
-          <StatCard label="Hampers pending" value={dash.hampersPending} tone="warning" icon={<BoxIcon className="h-5 w-5" />} />
+          <StatCard label="Hampers done" value={dash.hampersDelivered} tone="success" />
+          <StatCard label="Hampers pending" value={dash.hampersPending} tone="warning" />
         </div>
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-fg">Money</h2>
+        <h2 className="eyebrow mb-3">Money</h2>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Logistics spend" value={dash.logisticsExpense} tone="neutral" icon={<IndianRupeeIcon className="h-5 w-5" />} note="from trip expenses" />
+          <StatCard label="Logistics spend" value={dash.logisticsExpense} tone="neutral" note="from trip expenses" />
         </div>
       </section>
 
       {/* ---- Messages ---- */}
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-fg">WhatsApp</h2>
+        <h2 className="eyebrow mb-3">WhatsApp</h2>
         <div className="grid grid-cols-2 gap-3">
           <Link
             href={`/admin/events/${eventCode}/messages`}
@@ -166,6 +155,20 @@ export function DashboardClient({ eventId, eventCode }: Props) {
           >
             <span className="text-sm font-semibold text-fg">Message log</span>
             <span className="text-xs text-muted">Status of every send</span>
+          </Link>
+        </div>
+      </section>
+
+      {/* ---- Access ---- */}
+      <section>
+        <h2 className="eyebrow mb-3">Access</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <Link
+            href={`/admin/events/${eventCode}/codes`}
+            className="tap flex flex-col gap-1 rounded-2xl border border-border bg-surface p-4"
+          >
+            <span className="text-sm font-semibold text-fg">Access codes</span>
+            <span className="text-xs text-muted">Issue a team or client code</span>
           </Link>
         </div>
       </section>

@@ -5,7 +5,7 @@ updated: 2026-07-31
 
 # Known Traps
 
-Back to [[EventFlow]]. Learned the hard way — **do not rediscover these.**
+Back to [[Nuvent]]. Learned the hard way — **do not rediscover these.**
 
 For places where docs disagree with the SQL, see [[Schema Reality Check]] instead.
 

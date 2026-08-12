@@ -17,13 +17,13 @@ export function LoginForm({ next }: LoginFormProps) {
   const [state, formAction, pending] = useActionState(signIn, INITIAL_STATE)
 
   return (
-    <form action={formAction} className="flex flex-col gap-5" noValidate>
+    <form action={formAction} className="flex flex-col gap-3" noValidate>
       <input type="hidden" name="next" value={next} />
 
       {state.error ? (
         <p
           role="alert"
-          className="rounded-xl border border-danger bg-tint-danger px-4 py-3 text-base font-medium text-danger"
+          className="rounded-xl border border-ledger-red bg-red-tint px-4 py-3 text-sm leading-snug font-medium text-ledger-red"
         >
           {state.error}
         </p>
@@ -52,8 +52,8 @@ export function LoginForm({ next }: LoginFormProps) {
         required
       />
 
-      <Button type="submit" size="lg" fullWidth loading={pending}>
-        {pending ? 'Signing in…' : 'Sign in'}
+      <Button type="submit" size="lg" fullWidth loading={pending} className="mt-2">
+        {pending ? 'Signing in…' : 'Enter event'}
       </Button>
     </form>
   )

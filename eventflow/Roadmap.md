@@ -5,7 +5,7 @@ updated: 2026-08-02
 
 # Roadmap
 
-Back to [[EventFlow]]. Current position in [[Status]].
+Back to [[Nuvent]]. Current position in [[Status]].
 
 ## Phase 1 — RSVP
 

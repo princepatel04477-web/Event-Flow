@@ -31,7 +31,7 @@ export function AdminLink({ show }: AdminLinkProps) {
       href="/admin/events"
       aria-label="Admin"
       title="Admin"
-      className="tap flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-fg"
+      className="tap flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-fg active:bg-surface-2 active:opacity-80"
     >
       <SlidersIcon className="h-5 w-5" />
     </Link>

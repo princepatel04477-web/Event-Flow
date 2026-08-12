@@ -5,7 +5,7 @@ updated: 2026-08-05
 
 # Prince's Brief (2026-08-05) — plain-terms product requirements
 
-Back to [[EventFlow]]. This is the product owner's own words, captured verbatim as a
+Back to [[Nuvent]]. This is the product owner's own words, captured verbatim as a
 reference. It is the *what*; the *how* lives in the schema and code notes linked below.
 Where this note and a code note disagree, the code note wins — but flag it, because the
 product owner is the source of truth.

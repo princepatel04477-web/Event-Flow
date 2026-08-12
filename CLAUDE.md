@@ -61,7 +61,7 @@ Supabase project (cloud):
 
 | | |
 |---|---|
-| Project | EventFlow |
+| Project | Nuvent |
 | Ref | `xktxnkuzplhzxkevwrcj` |
 | Org | Varunya Technologies (`cuwsovksnpfsoaonyteg`) |
 | Region | ap-northeast-2 |
@@ -94,46 +94,155 @@ this section is the first place a new session looks.
 **Mode: REMOTE SHELL (M2-ALT).** The static-export audit returned HEAVY, so the APK is a
 native shell over the deployed site, not a static bundle. **Offline support is NOT available
 in this mode** — venue Wi-Fi is a single point of failure until M9 lands a client data layer.
-The deployed URL is a placeholder in `capacitor.config.ts` (`<DEPLOYED_APP_URL>`) — set
-`CAP_REMOTE_URL` (or edit the config) before building the release APK.
+The WebView URL comes from **`CAP_SERVER_URL`** (there is no `CAP_REMOTE_URL`; that name
+appeared only in this file). It defaults to `http://localhost:3000`, and `<DEPLOYED_APP_URL>`
+is still a placeholder — set `CAP_SERVER_URL` before building the release APK.
 
-**Toolchain (working as of Aug 2026):** JDK 26 at `C:\Program Files\Java\jdk-26.0.2`, Android
-SDK at `C:\Users\rebel\AppData\Local\Android\Sdk`, Android Studio JBR (25). The Gradle wrapper
-was bumped to **9.4.0** (8.14.3 cannot run on Java 26). `android/gradle.properties` pins
-`org.gradle.java.home` to Gradle's auto-downloaded **Temurin 21** and enables toolchain
-auto-download — the locally-installed JDK 26 is too new for AGP 8.13's `JdkImageTransform`.
-Do not revert those three settings or the build breaks.
+#### Running it on a phone — read this before anything else
 
 ```bash
-# find LAN IP (the machine running next dev)
-#   Windows:  ipconfig | findstr IPv4
-#   macOS:    ipconfig getifaddr en0
-#   Linux:    hostname -I
-export CAP_DEV_HOST=192.168.1.42
-
-# build the debug APK (env vars must be set in the same shell)
-set JAVA_HOME=C:\Program Files\Java\jdk-26.0.2
-set ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk
-set ANDROID_SDK_ROOT=%LOCALAPPDATA%\Android\Sdk
-cd android && gradlew.bat assembleDebug      # -> app/build/outputs/apk/debug/app-debug.apk
-
-# live reload on handset (M5): edits show up ~2s, no APK rebuild
-npm run mobile:dev
-
-# production: point capacitor.config.ts at the real URL, then
-npm run mobile            # next build + cap sync android
-cd android && gradlew.bat assembleRelease    # -> app/build/outputs/apk/release/app-release-unsigned.apk
+npm run mobile:dev        # the ONLY supported way to run on a handset
 ```
 
-Debug vs release: `capacitor.config.dev.ts` enables cleartext for LAN http. The release
-manifest must never contain `usesCleartextTraffic` — grep `android/app/src/main/AndroidManifest.xml`
-before shipping.
+That script (`scripts/mobile-dev.mjs`) detects the LAN IP, starts `next dev` on 0.0.0.0,
+waits for it to answer, rebuilds + installs **only if the baked URL changed**, and launches
+`com.nuvent.app/.MainActivity`. Override the IP with `CAP_DEV_HOST` if auto-detection picks a
+virtual adapter.
+
+**Do NOT open the LAN URL in the phone's browser, and do NOT run
+`adb shell am start -a android.intent.action.VIEW -d http://...`.** Both give you a Chrome tab,
+not the app. In a browser tab there is no native bridge, so `Capacitor.isNativePlatform()` is
+false, the `Call` plugin does not exist, and dialing degrades to browser behaviour. This has
+cost the project a full debugging session already — see "Known traps".
+
+`npm run mobile:launch` just re-launches the installed APK without touching the build.
+
+**Toolchain (verified Aug 2026):** the only JDK installed is **JDK 17** at
+`C:\Program Files\Java\jdk-17` — an earlier note here claimed JDK 26 at `jdk-26.0.2`, which
+does not exist on this machine. JAVA_HOME only launches the Gradle wrapper; the build itself
+runs on the Temurin 21 pinned by `org.gradle.java.home` in `android/gradle.properties`
+(auto-downloaded to `~/.gradle/jdks`). Android SDK at
+`C:\Users\rebel\AppData\Local\Android\Sdk`. Gradle wrapper **9.4.0**. Do not revert the
+`gradle.properties` toolchain settings or the build breaks.
+
+```bash
+# manual debug build (mobile:dev does this for you)
+export JAVA_HOME="C:/Program Files/Java/jdk-17"
+export ANDROID_HOME="$LOCALAPPDATA/Android/Sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+cd android && ./gradlew.bat assembleDebug    # -> app/build/outputs/apk/debug/app-debug.apk
+
+# production: set the real URL, then
+CAP_SERVER_URL=https://<real-host> npm run mobile   # next build + cap sync android
+cd android && ./gradlew.bat assembleRelease
+```
+
+If `adb install` fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, the installed build was
+signed with a different debug keystore — `adb uninstall com.nuvent.app` first. That clears the
+session, so the phone needs one re-login.
+
+Debug vs release cleartext: **`android/app/src/debug/AndroidManifest.xml`** adds
+`usesCleartextTraffic` and is merged into debug builds only. (An earlier note credited
+`capacitor.config.dev.ts` — that file was orphaned, read by nothing, and has been deleted.)
+The release manifest must never contain `usesCleartextTraffic` — grep the **merged** manifest
+under `android/app/build/intermediates/merged_manifest/` before shipping, not just the source.
 
 Native code (M6 dialer, M7 recorder, M8 camera proof) lives in
-`android/app/src/main/java/com/eventops/app/`. Any change there requires a full APK rebuild —
+`android/app/src/main/java/com/nuvent/app/` — the package was renamed from `com.eventops.app`.
+Any change there, to `AndroidManifest.xml`, or to the plugin list requires a full APK rebuild —
 OTA (M11) ships JS/HTML/CSS only.
 
+### Deployment — Vercel (live since 2026-08-10)
+
+| | |
+|---|---|
+| URL | `https://nuvent-ppzhi25o0-rebelmaker1258-2015s-projects.vercel.app` |
+| Project | `nuvent`, scope `rebelmaker1258-2015s-projects`, id `prj_MOyao678WL7786GHPQh5XH9JLm98` |
+| Region | **`icn1` (Seoul)** — set in `vercel.json` |
+| Verified by | `X-Vercel-Id: bom1::icn1::…` — request enters the Mumbai edge, the function runs in Seoul |
+
+Seoul was chosen to sit beside Supabase (`ap-northeast-2`): the admin dashboard makes
+~10 sequential DB calls per load, and from Mumbai each crossed ~6,000km. **This trade-off
+is unproven for the guest list**, which makes few DB calls and is dominated by the
+user↔server leg instead — deployed S1 timings were 7.4s and 9.9s against a 5s budget.
+Those were measured from a laptop whose own link varies wildly (TTFB 0.58s–6.5s on the
+same URL), so they do not settle it. Measure from a phone on mobile data before changing
+the region; `bom1` is the alternative if the guest list is the page that matters most.
+
+**Env vars live in Vercel, never in the repo.** Only three exist:
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (both public by design) and
+`APP_JWT_SECRET` (server-only, verifies code-auth JWTs). The service-role key and
+`SARVAM_API_KEY` are **not** here and must never be — the app never uses them; they live
+in Supabase Edge Function secrets. Client bundle verified clean against all of them.
+
+**Deployment Protection must stay OFF.** It was on by default
+(`ssoProtection: all_except_custom_domains`) and every request 302'd to `vercel.com/sso-api`
+— staff would have hit a Vercel login wall. Disabled via the API; re-check after any
+project settings change.
+
+**Rollback:** `npx vercel ls` to list deployments, then
+`npx vercel rollback <deployment-url>` — or promote an older one from the dashboard's
+Deployments tab. Each deployment keeps its own immutable URL, so the previous build is
+always reachable even before promoting it.
+
+**`.vercelignore` matters.** Without it the upload was 90MB (mostly `android/` and
+`.next/`) and never finished on this connection. It is a few MB now.
+
+#### Cloudflare Pages — BLOCKED, revisit later
+
+Not a configuration problem, a hard incompatibility:
+
+- Next 16 renamed middleware to `proxy.ts` and made it **Node-runtime only** — setting
+  `runtime: 'edge'` fails the Next build with "Proxy does not support Edge runtime".
+- `@opennextjs/cloudflare` **refuses Node middleware** — hard-coded in
+  `dist/cli/build/build.js:67`, no flag, no opt-out.
+
+The only route through is deleting `src/proxy.ts` and relocating `updateSession()`, i.e.
+rewriting session refresh. `wrangler.jsonc` and `open-next.config.ts` are committed and
+inert, with Smart Placement already declared, ready for when the adapter supports Node
+middleware.
+
 ### Release build (M10) — run on a machine with Android Studio + JDK
+
+**DONE 2026-08-10 — the release pipeline is wired and a signed APK exists.**
+
+```
+APK      android/app/build/outputs/apk/release/app-release.apk   6,142,584 bytes
+Download https://xktxnkuzplhzxkevwrcj.supabase.co/storage/v1/object/public/app-releases/nuvent-1.0.apk
+sha256   b274872035226ccbbef322a9899a114b9648914528eeca264fa19b0a032fbf84
+Signer   CN=Nuvent, O=Varunya Technologies, L=Surat   SHA-256 e865d4c1b3865da6…
+```
+
+**⚠ LOSING THE KEYSTORE MEANS EVERY PHONE MUST UNINSTALL AND REINSTALL.** Android
+identifies an app by its signature; a differently-signed build cannot upgrade an installed
+one. Mid-event that means every staff member stops, uninstalls, reinstalls and logs in
+again. Backed up in two places, checksums verified identical:
+
+```
+C:\Users\rebel\NuventKeys\                 local, not synced
+C:\Users\rebel\OneDrive\NuventKeys-backup\ syncs off-machine
+```
+
+Both hold `nuvent-release.jks` + `keystore.properties`. `*.jks`, `*.keystore` and
+`android/keystore.properties` are gitignored; only `keystore.properties.example` is
+tracked. **A third copy on separate physical media is still worth making.**
+
+Things that are already true and should not be re-derived:
+
+- `cleartext` is **derived**, not hardcoded: `!serverUrl.startsWith('https://')` in
+  `capacitor.config.ts`. A release on https gets `false`; `npm run mobile:dev` on a
+  `http://<LAN_IP>:3000` still gets `true` and keeps working. Hardcoding either value
+  breaks one of the two.
+- The release build **throws** if `android/keystore.properties` is missing rather than
+  falling back to debug signing — see the warning above for why that fallback is a trap.
+- `minifyEnabled true` + `shrinkResources true`, with Capacitor keep rules in
+  `proguard-rules.pro`. Capacitor registers plugins by reflection, so without them R8
+  strips the classes and the plugin silently does not exist — no crash, no log, the JS
+  call just never resolves.
+- Verified on the **merged** manifest (`merged_manifest/release/…`), not the source:
+  `usesCleartextTraffic` ABSENT, `debuggable` ABSENT, `<queries>` + `tel:` PRESENT.
+
+Original steps, kept for reference:
 
 1. `keytool` the keystore, store it OUTSIDE the repo in two places.
    Copy `android/keystore.properties.example` → `android/keystore.properties`.
@@ -223,6 +332,30 @@ Enforced at the **database level**, not in application code. Do not weaken them.
    only a human-reviewed commit becomes data. Fields below ~0.8 confidence render amber.
    Nothing auto-writes. `apply_rsvp_extraction()` is the only path from AI output into
    guest data.
+9. **Paired attribution columns — `_staff` siblings.** A code-auth (team) session has no
+   `auth.uid()`; its identity is the selected `staff_members.id`. Every attribution column
+   (`locked_by`, `caller_id`, `created_by`, `uploaded_by`, `assigned_by`, `imported_by`)
+   therefore has a nullable `_staff` sibling (`locked_by_staff`, `caller_id_staff`, ...) with
+   `ON DELETE RESTRICT` to `staff_members(id)`. Rules:
+   - A `CHECK` (`num_nonnulls(pair) <= 1`, or `= 1` where the column was NOT NULL) makes
+     double-attribution impossible — "who did this" is always answerable.
+   - A `BEFORE INSERT` trigger (`app.route_attribution`) writes the staff column for a
+     team session (`jwt_staff_member_id` present) and the auth column for an admin.
+   - **`delivery_proofs` was the exception, not the precedent.** Until
+     `20260809130000` it had *neither* the CHECK nor the trigger, while this section
+     claimed it set the pattern. L1 found a team session could write a proof carrying
+     **both** `captured_by` and `captured_by_staff` — and proofs are insert-only, so the
+     row could never be corrected. That migration adds the `delivery_proofs` branch to
+     `route_attribution`, drops the stale `app.current_identity()` defaults, and requires
+     `captured_by is null` in the insert policy. **The pair CHECK is still missing**: two
+     live rows have neither column set and cannot be repaired or deleted. See `TEST-LOG.md`.
+   - `app.route_attribution` dispatches on `TG_TABLE_NAME`. Attaching it to a new table
+     without adding a branch silently does nothing — it falls through to `return NEW`.
+   - `claim_group` / `release_group` write/clear the lock pair.
+   - Read paths (the call/RSVP "in-flight" checks, "you" labels, the export's `deliveredBy`)
+     resolve whichever column is populated — never assume one.
+   - Do NOT re-point these to a single FK: a team id is not an auth user and vice versa
+     (the original `23503`). Add a sibling column, don't drop the FK.
 
 ---
 
@@ -231,11 +364,19 @@ Enforced at the **database level**, not in application code. Do not weaken them.
 - **The calling unit is the group, not the guest.** You dial one number and the family head
   answers for six people. PAX lives on `guest_groups` (`expected_pax` / `confirmed_pax`),
   not scattered across individual guests. The SRS contradicts itself here; the group wins.
+- **The caller lock is dormant (2026-08-12).** `claim_group()`, `release_group()`, and
+  `locked_by`/`locked_until` columns still exist in the database but are NOT called from
+  any client code path. Two handsets can open the same family simultaneously. Presence is
+  now non-blocking: `last_opened_by_staff` / `last_opened_at` on `guest_groups` are
+  fire-and-forget and surfaced as quiet text on the queue row. The attribution CHECK on
+  `call_attempts` (`num_nonnulls(caller_id, caller_id_staff) = 1`) is NOT the lock and
+  is NOT negotiable — it must never be softened.
 - **Individual member names are collected later**, at room allocation — not over the phone.
 - **Hampers and return gifts are the same shape.** One `deliverables` table with a `kind`
   enum, one insert-only `delivery_proofs` table. Do not build it twice.
 - **Groups are locked to a caller for 15 minutes** on open (`claim_group()` defaults to
   `p_minutes => 15`). With a 10-person calling team, two people *will* dial the same uncle.
+  **DORMANT as of 2026-08-12** — the call path no longer uses this. See above.
 - **`travel_legs` holds arrival and departure in one table**, so arrivals-vs-departures
   reconciliation is one query (`v_travel_ledger`).
 - **Fleet is live inventory and capacities are luggage-adjusted.** The sticker number lies:
@@ -282,7 +423,11 @@ only an admin can change `global_role`.
 
 **Hampers / return gifts** — `deliverables`, `delivery_proofs`
 
+**(Production)** — reserved, not built yet. See §8a.
+
 **Logistics** — `vehicle_types`, `vehicles`, `trips`, `trip_passengers`
+
+**Messaging / import** — `message_templates`, `messages`, `import_batches`, `import_rows`
 
 **Messaging / import** — `message_templates`, `messages`, `import_batches`, `import_rows`
 
@@ -345,28 +490,93 @@ Feed the group's **existing record** into the prompt as context — that is what
 Instruct the model to emit `null` rather than guess, especially on flight numbers.
 A hallucinated PNR is worse than a blank.
 
+### The STT step — `transcribe-recording` Edge Function
+
+Sarvam Saaras v3, batch, with diarization (~₹45/hour). Key is in Edge Function secrets
+only (`SARVAM_API_KEY`) — the APK is a zip file and anyone can read its strings.
+
+**Trigger: a Database Webhook, not a direct invoke from the app.** Migration
+`20260810120000_transcribe_webhook.sql` puts an `after insert` trigger on
+`call_recordings` that calls the function through `pg_net`. Chosen because the phone is
+the least reliable component here: a client-driven invoke fires from the same handset
+that just lost signal mid-upload, so "recording committed" and "transcription attempted"
+would routinely diverge with nothing recording that a transcript was ever expected.
+There is also no app-side producer today — the M7 upload path is unwired, so a direct
+invoke has no call site. **The trigger swallows every error**: a failure to enqueue must
+never block the insert, because a recording with no transcript is recoverable and lost
+audio is not.
+
+Setup is two Vault secrets (`transcribe_webhook_url`, `transcribe_webhook_secret`) plus
+the matching `TRANSCRIBE_WEBHOOK_SECRET` Edge Function secret — see the migration header.
+Until those exist the trigger warns and does nothing; recordings still save.
+
+Things that are not what you'd assume:
+
+- **`transcripts.text` is `NOT NULL`** — a legacy column from `0200` that predates
+  `full_text`. The pending row is inserted with `text = ''` before Sarvam is called, and
+  both `text` and `full_text` are set on completion. Do not "fix" this by nulling `text`
+  without a migration.
+- **`transcripts` has no `group_id`.** It carries `event_id` and `recording_id` only; the
+  group is reached via `recording_id → call_recordings.group_id`.
+- **The cost counter is derived, never stored** — cumulative hours are summed from
+  `call_recordings.duration_sec` over completed transcripts. Same reasoning as §5.4:
+  a stored counter drifts, and one that drifts upward silences the alert exactly when a
+  retry loop is burning money. Alert threshold 50h against a ~40h expected ceiling.
+- **`raw_response` keeps the entire Sarvam payload, untrimmed.** Re-running extraction is
+  ~₹0.03; re-running STT is ~₹0.75. Never discard a field and force the expensive path.
+- **4xx is never retried**, 5xx and timeouts are retried 3× with exponential backoff. A
+  4xx fails identically every time and each attempt is billable.
+- **Recordings under 10s are skipped** with `status='failed'`, `error_text='too_short'`,
+  and no API call — a misdial is not worth ₹0.75.
+- `v_transcription_backlog` is the retry work list: recordings with no transcript, or one
+  stuck `pending`/`processing`/`failed`.
+- **The function runs on the service role, so RLS cannot constrain what it writes.** Its
+  restraint (transcripts only) is enforced by review, not by the grant system — see the
+  header of `tests/l2_transcribe.sql`. Making that a hard guarantee means moving it to a
+  dedicated database role with explicit grants.
+
 ---
 
 ## 10. Where the schema differs from what you'd assume
 
 Verified against the migrations. Do not go looking for things in this list — they aren't there.
 
-- **Room double-booking is *not* prevented by an `EXCLUDE` constraint.** There is no
-  `btree_gist`, no `stay_range` column, no exclusion constraint anywhere. What exists is
-  `app.guard_room_capacity()`, a `before insert or update` trigger that counts active
-  assignments and raises `23514` if occupancy would exceed `rooms.capacity`, bypassable with
-  `is_override = true` plus a non-null `override_reason`. Plus a partial unique index
-  `room_assignments_one_active_per_guest on (guest_id) where released_at is null`, so one
-  guest cannot hold two active rooms. **Date ranges are not considered at all** —
-  `check_in_date` / `check_out_date` are informational. Two guests in the same room on
-  non-overlapping dates still both count against capacity. If true date-range exclusion is
-  wanted, it is new work.
+- **Room double-booking IS prevented — by a trigger, not an `EXCLUDE` constraint.**
+  There is no `btree_gist` and no exclusion constraint, but since `20260805140000`
+  there *is* a date-range overlap guard: `app.guard_room_overlap()`, a
+  `before insert or update` trigger raising `23514` when two **active** (unreleased)
+  stays overlap on the same room, using `daterange(..., '[)')` so a checkout day and the
+  next checkin day do not collide. A trigger was chosen deliberately over `EXCLUDE`
+  because `room_assignments` uses soft-release and an `EXCLUDE` cannot be partial —
+  released history would wrongly block new bookings. Verified by L1
+  (`L1.4-room-overlap`, `L1.4-room-adjacent`).
+  Alongside it: `app.guard_room_capacity()` counts active assignments and raises `23514`
+  if occupancy would exceed `rooms.max_capacity` (the extra-bed ceiling; `capacity` is the
+  base), bypassable with `is_override = true` plus a non-null `override_reason`. Plus a
+  partial unique index `room_assignments_one_active_per_guest on (guest_id) where
+  released_at is null`, so one guest cannot hold two active rooms.
+  *(An earlier version of this section claimed no overlap guard existed at all and that
+  date ranges were ignored. Both were wrong.)*
 - **There is no "disputed proof" mechanism.** `delivery_proofs` has no `disputed` column and
   no admin flow to mark one. The row is genuinely immutable. Building this means a new
   sibling table — do not add a column to `delivery_proofs`.
 - **There are no `desk` or `hamper` roles.** `app.event_role` is exactly
   `('event_team', 'client')`. A finer field-staff split needs an enum value plus new RLS, and
   every existing `app.is_staff()` call would need revisiting.
+- **There is no `admin_users` table.** Admin identity is `profiles.global_role = 'admin'`.
+  The admin-related tables that *do* exist are `admin_devices`, `event_access_codes`,
+  `code_reveal_log` and `login_attempt_log`. Likewise the extraction table is
+  `rsvp_extractions`, not `extractions`.
+- **Revoking or rotating an access code now ends live sessions** (`20260809140000`).
+  Before it, `verifyCodeAuthToken` checked signature and expiry only and RLS read claims
+  straight from the JWT, so a revoked code left a phone with full read *and write* access
+  until the token expired — confirmed against the live project, 30-day tokens. Enforcement
+  is `app.code_is_live()`, folded into `app.is_staff()` / `app.is_member()` so PostgREST is
+  covered too, plus `public.session_code_live()` for the app layer. `app.rotate_access_code`
+  now retires the old row and inserts a replacement (it used to stamp `rotated_at` and then
+  null it on the same row, marking nothing). Session lifetime is **7 days**, not 30.
+  Uniqueness is a partial index over live codes only, so retired rows persist —
+  they must, or a retired session could not be recognised.
 - **Audit trigger coverage is not universal.** Attached to: `events`, `profiles`,
   `event_members`, `guest_groups`, `guests`, `travel_legs`, `call_attempts`,
   `call_recordings`, `rsvp_extractions`, `hotels`, `rooms`, `room_assignments`,
@@ -402,7 +612,7 @@ Verified against the migrations. Do not go looking for things in this list — t
   capacity guard fires, two callers can't lock the same group.
 
 Both were verified against a Postgres 16 instance. **Neither has been applied to the live
-EventFlow project**, which runs Postgres 17 — re-run `test_security.sql` there after the
+Nuvent project**, which runs Postgres 17 — re-run `test_security.sql` there after the
 first `db push`.
 
 **Next up**
@@ -437,6 +647,32 @@ first `db push`.
   It is why the native Capacitor module exists.
 - **`delivery_proofs` insert requires `captured_by = auth.uid()`** in the RLS check. Setting
   it to anyone else fails, even for an admin.
+- **A browser tab is not the app, and it silently fakes being one.** Opening the LAN URL in
+  Chrome (or `am start -a VIEW -d <url>`) looks like the product but has no native bridge.
+  Always launch via `npm run mobile:dev`. See "Running it on a phone" above.
+- **`window.Capacitor` exists in the browser too.** `@capacitor/core` installs the global
+  everywhere, so `Boolean(window.Capacitor)` is NOT a native check — it was true in Chrome and
+  five call sites branched on it. Use `isNativePlatform()` from `src/lib/native/platform.ts`
+  (wraps `Capacitor.isNativePlatform()`).
+- **Never fire `tel:` from `window.open()`.** Two reasons: `'_system'` is a Cordova target that
+  Capacitor 8 does not implement, and the dial happens *after* `await startCallAttempt(...)`,
+  which expires the transient user activation — so the browser blocks it as a popup. **A blocked
+  popup returns `null`, it does not throw**, so a `try/catch` fallback never runs and the tap
+  silently does nothing. Go through `openExternalUrl()` in `src/lib/native/navigation.ts`
+  (AppLauncher on native, `location.href` on web).
+- **`<queries>` is required for `tel:` on API 30+.** This app targets 36. Without the
+  `<queries>` block in `AndroidManifest.xml`, `resolveActivity()` returns null even though a
+  dialer is installed, and the dial fails with nothing in logcat.
+- **`allowNavigation` is an allowlist of hosts the WebView MAY navigate to itself** — it is not
+  a way to mark URLs as "hand to the OS". It once listed `tel:*`/`mailto:*` with a comment
+  claiming the opposite. It IS how you stop the LAN dev URL from opening in the system browser
+  when `androidScheme` is `https` and `server.url` is `http`.
+- **`set VAR=value ` in cmd.exe keeps the trailing space.** `CAP_SERVER_URL` was baked into
+  `capacitor.config.json` as `"http://192.168.29.44:3000 "`. Capacitor `Uri.parse()`s it
+  unmodified. The config now `.trim()`s; do not remove that.
+- **npm scripts run through cmd.exe on Windows, where `&` is sequential, not backgrounding.**
+  `"next dev & npx cap run android"` started the server and never launched anything. Use a
+  Node script (`scripts/mobile-dev.mjs`), not shell backgrounding.
 
 ---
 

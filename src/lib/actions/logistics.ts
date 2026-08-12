@@ -2,6 +2,12 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { friendlyDbError } from '@/lib/errors'
+import {
+  pack,
+  type PackOptions,
+  type PackProposal,
+  type PackVehicle,
+} from '@/lib/logistics/pack'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -333,6 +339,103 @@ export async function commitTrips(
     if (paxErr) {
       return { ok: false, error: friendlyDbError(paxErr) }
     }
+
+    tripCount++
+  }
+
+  return { ok: true, tripCount }
+}
+
+// ---------------------------------------------------------------------------
+// R3: luggage-adjusted engine entry point + commit
+// ---------------------------------------------------------------------------
+
+export interface PackRequest {
+  legs: {
+    travelLegId: string
+    groupId: string
+    headName: string
+    date: string | null
+    time: string | null
+    point: string | null
+    pax: number
+    hasElderly?: boolean
+  }[]
+  vehicles: PackVehicle[]
+  direction: 'arrival' | 'departure'
+  options?: Partial<PackOptions>
+}
+
+export interface PackResult {
+  ok: boolean
+  error: string | null
+  proposal: PackProposal | null
+}
+
+/**
+ * Run the R3 pack engine (luggage-adjusted, no-split, turnaround-aware)
+ * over an explicit leg/vehicle set. Pure computation — nothing is written.
+ */
+export async function runPack(input: PackRequest): Promise<PackResult> {
+  const proposal = pack(input.legs, input.vehicles, input.direction, {
+    windowMinutes: input.options?.windowMinutes ?? 45,
+    elderlyWindowMinutes: input.options?.elderlyWindowMinutes ?? 20,
+    travelTimeToVenueMinutes: input.options?.travelTimeToVenueMinutes ?? 60,
+    turnaroundBufferMinutes: input.options?.turnaroundBufferMinutes ?? 20,
+    terminalBufferMinutes: input.options?.terminalBufferMinutes ?? 120,
+    loadingBufferMinutes: input.options?.loadingBufferMinutes ?? 15,
+  })
+  return { ok: true, error: null, proposal }
+}
+
+/**
+ * Commit an R3 pack proposal: create trips + trip_passengers, mark vehicles
+ * assigned. Mirrors commitTrips but drives off the pack engine's shape.
+ */
+export async function commitPackProposal(
+  eventId: string,
+  proposal: PackProposal,
+): Promise<{ ok: true; tripCount: number } | { ok: false; error: string }> {
+  const supabase = await createClient()
+
+  const vehicleIds = proposal.trips.map((t) => t.vehicleId)
+  if (vehicleIds.length > 0) {
+    await supabase
+      .from('vehicles')
+      .update({ status: 'assigned', updated_at: new Date().toISOString() })
+      .in('id', vehicleIds)
+  }
+
+  let tripCount = 0
+  for (const trip of proposal.trips) {
+    const { data: tripRow, error: tripErr } = await supabase
+      .from('trips')
+      .insert({
+        event_id: eventId,
+        vehicle_id: trip.vehicleId,
+        direction: trip.direction,
+        scheduled_at: trip.scheduledAt,
+        pickup_point: trip.pickupPoint,
+        drop_point: null,
+        driver_name: trip.driverName,
+        driver_mobile: trip.driverMobile,
+        status: 'planned',
+        seats_capacity: trip.capacity,
+      })
+      .select('id')
+      .single()
+
+    if (tripErr) return { ok: false, error: friendlyDbError(tripErr) }
+
+    const passengerRows = trip.groups.map((g) => ({
+      event_id: eventId,
+      trip_id: tripRow.id,
+      group_id: g.groupId,
+      travel_leg_id: g.travelLegId,
+      pax: g.pax,
+    }))
+    const { error: paxErr } = await supabase.from('trip_passengers').insert(passengerRows)
+    if (paxErr) return { ok: false, error: friendlyDbError(paxErr) }
 
     tripCount++
   }

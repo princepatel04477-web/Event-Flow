@@ -1,4 +1,4 @@
-# Static Export Audit — EventFlow → Capacitor APK
+# Static Export Audit — Nuvent → Capacitor APK
 
 **Date:** 2026-08-04
 **Scope:** Next.js 15 App Router, TypeScript, Tailwind v4, Supabase (Postgres 16, Auth, Storage, Edge Functions, Realtime)

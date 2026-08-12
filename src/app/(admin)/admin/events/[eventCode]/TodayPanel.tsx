@@ -84,10 +84,10 @@ export function TodayPanel({ arrivals, departures, date, eventCode }: Props) {
       )}
 
       <div className="flex gap-2">
-        <LinkButton fullWidth variant="secondary" href={`/${eventCode}/fleet`}>
+        <LinkButton fullWidth variant="secondary" href={`/${eventCode}/logistics/fleet`}>
           Fleet
         </LinkButton>
-        <LinkButton fullWidth variant="secondary" href={`/${eventCode}/departures`}>
+        <LinkButton fullWidth variant="secondary" href={`/${eventCode}/logistics/departures`}>
           Departures
         </LinkButton>
       </div>

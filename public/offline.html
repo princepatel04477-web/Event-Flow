@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#071a1d" />
+    <title>Nuvent — no connection</title>
+    <!--
+      Shown by the native shell when the WebView cannot reach the app
+      (capacitor.config.ts -> server.errorPath).
+
+      In REMOTE SHELL mode there is no local bundle, so an unreachable server
+      previously surfaced Chromium's own "webpage not available" error — grey,
+      branded Chrome, with the URL printed on it. That is the most
+      browser-looking screen in the product, and it appears at exactly the
+      moment staff are least able to reason about it (bad venue Wi-Fi).
+
+      Deliberately self-contained: no external CSS, fonts or images, because
+      by definition nothing can be fetched when this renders.
+    -->
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        background: #071a1d;
+        color: #f5ead8;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);
+        text-align: center;
+      }
+      main {
+        max-width: 22rem;
+      }
+      .mark {
+        font-size: 2rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        margin: 0 0 1.5rem;
+      }
+      h1 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 0 0 0.75rem;
+      }
+      p {
+        margin: 0 0 1rem;
+        opacity: 0.8;
+      }
+      button {
+        margin-top: 0.5rem;
+        width: 100%;
+        min-height: 48px;
+        padding: 0 1.5rem;
+        border: 0;
+        border-radius: 10px;
+        background: #f5ead8;
+        color: #071a1d;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:active {
+        opacity: 0.85;
+      }
+      .hint {
+        margin-top: 1.5rem;
+        font-size: 0.8125rem;
+        opacity: 0.55;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="mark">Nuvent</p>
+      <h1>Can't reach the app</h1>
+      <p>
+        The phone is online but the Nuvent server did not answer. This is almost always venue Wi-Fi
+        rather than anything you did.
+      </p>
+      <p>Move to where there is signal, then try again.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+      <p class="hint">Nothing you entered has been lost.</p>
+    </main>
+  </body>
+</html>

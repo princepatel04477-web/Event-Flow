@@ -2,7 +2,7 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "EventFlow"
+project_id = "Nuvent"
 
 [api]
 enabled = true
@@ -412,3 +412,18 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# Code-based login. Callers have no JWT yet (that is the point of the
+# function), so the platform must not require one. The function performs
+# its own hash lookup + rate limiting and mints the session JWT.
+[functions.verify-access-code]
+verify_jwt = false
+
+# Called by the call_recordings AFTER INSERT trigger through pg_net, which
+# sends only `x-webhook-secret` — there is no Authorization header and no
+# session behind it. With verify_jwt on, the platform gateway returns 401
+# before the function runs; the trigger swallows that by design, so the
+# symptom is transcripts silently never appearing. The function does its own
+# shared-secret check instead.
+[functions.transcribe-recording]
+verify_jwt = false

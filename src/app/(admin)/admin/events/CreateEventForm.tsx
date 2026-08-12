@@ -44,6 +44,36 @@ export function CreateEventForm() {
 
   const codePreview = normaliseEventCode(rawCode)
 
+  // Success: show the access codes exactly once, then hand over to the
+  // event. The codes are never persisted in plaintext — this is the only
+  // reveal, so the copy says so.
+  if (state.created) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="rounded-2xl border border-border bg-surface p-5">
+          <h3 className="font-display text-lg text-ink">Event created</h3>
+          <p className="mt-1 text-sm text-muted">
+            Share these access codes with your team and the client. They will only be shown
+            this once — the event admin screen can reveal them again later, with every reveal
+            logged.
+          </p>
+
+          <div className="mt-4 flex flex-col gap-3">
+            <CodeReveal label="Event team" code={state.created.teamCode} />
+            <CodeReveal label="Client (read-only)" code={state.created.clientCode} />
+          </div>
+        </div>
+
+        <a
+          href={`/${state.created.eventCode}`}
+          className="tap inline-flex min-h-14 w-full items-center justify-center rounded-xl border border-transparent bg-ink px-5 py-3.5 text-lg font-semibold text-paper active:opacity-85"
+        >
+          Open {state.created.eventCode}
+        </a>
+      </div>
+    )
+  }
+
   return (
     <form action={formAction} className="flex flex-col gap-5" noValidate>
       {state.error ? (
@@ -139,6 +169,25 @@ export function CreateEventForm() {
         {pending ? 'Creating…' : 'Create event'}
       </Button>
     </form>
+  )
+}
+
+/** One access code with its role label, monospace, copyable. */
+function CodeReveal({ label, code }: { label: string; code: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border-strong bg-surface-2 px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wide text-subtle">{label}</p>
+        <p className="mt-0.5 font-mono text-xl font-semibold tracking-[0.15em] text-fg">{code}</p>
+      </div>
+      <button
+        type="button"
+        onClick={() => navigator.clipboard?.writeText(code)}
+        className="tap min-h-12 shrink-0 rounded-lg border border-rule-strong bg-surface px-3 text-sm font-semibold text-ink active:bg-surface-2"
+      >
+        Copy
+      </button>
+    </div>
   )
 }
 

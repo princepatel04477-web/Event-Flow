@@ -7,5 +7,5 @@ import type { ReactNode } from 'react'
  * tab bar, because everything it needs is keyed by [eventCode].
  */
 export default function StaffLayout({ children }: { children: ReactNode }) {
-  return <div className="flex min-h-dvh flex-col bg-bg">{children}</div>
+  return <div className="flex min-h-dvh flex-col bg-paper">{children}</div>
 }

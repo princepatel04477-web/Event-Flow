@@ -6,6 +6,12 @@ import { createClient } from '@/lib/supabase/server'
 import { friendlyDbError, isFrozenRowError } from '@/lib/errors'
 import type { CallCompletionPayload, CallAttemptRow, GuestGroupRow } from '@/lib/call/types'
 
+function extractConstraintName(error: { message?: string | null } | null | undefined): string | null {
+  if (!error?.message) return null
+  const match = /constraint\s+"(\w+)"/i.exec(error.message)
+  return match?.[1] ?? null
+}
+
 /**
  * Server actions for the call screen (p1f).
  *
@@ -112,7 +118,19 @@ export async function claimGroupForCall(
 
 export type StartCallAttemptResult =
   | { ok: true; attempt: CallAttemptRow }
-  | { ok: false; message: string }
+  | { ok: false; message: string; /** One-line diagnostic: step + SQLSTATE-or-status + constraint + timestamp. */ diagnostic?: string }
+
+function buildDiagnostic(
+  step: string,
+  error: { message?: string | null; code?: string | null; details?: string | null } | null,
+  eventId: string,
+  groupId: string,
+): string {
+  const constraint = extractConstraintName(error)
+  const sqlstate = error?.code ?? 'unknown'
+  const now = new Date().toISOString()
+  return `step=${step} code=${sqlstate}${constraint ? ` constraint=${constraint}` : ''} event=${eventId.slice(0, 8)} group=${groupId.slice(0, 8)} at=${now}`
+}
 
 /**
  * Creates the `call_attempts` row. Must complete BEFORE the `tel:` link
@@ -149,7 +167,22 @@ export async function startCallAttempt(input: {
     .single()
 
   if (error || !data) {
-    return { ok: false, message: friendlyDbError(error) }
+    const diag = buildDiagnostic('startCallAttempt', error, input.eventId, input.groupId)
+    // Log constraint violations to the server console so the SQLSTATE and
+    // constraint name are in the Vercel log — 23514 with no constraint name
+    // is how this bug was diagnosed, and a generic user message would have
+    // sent the developer on a wild goose chase without this.
+    if (error?.code === '23514') {
+      const constraint = extractConstraintName(error)
+      console.error('[startCallAttempt] CHECK violation', {
+        sqlstate: error.code,
+        constraint,
+        eventId: input.eventId,
+        groupId: input.groupId,
+        message: error.message?.slice(0, 200),
+      })
+    }
+    return { ok: false, message: friendlyDbError(error), diagnostic: diag }
   }
 
   return { ok: true, attempt: data }
@@ -161,7 +194,13 @@ export async function startCallAttempt(input: {
 
 export type SubmitCallOutcomeResult =
   | { ok: true }
-  | { ok: false; alreadyFinalized: boolean; message: string }
+  | {
+      ok: false
+      alreadyFinalized: boolean
+      message: string
+      /** `step=… code=… constraint=… at=…`. For Sentry, never shown to staff. */
+      diagnostic?: string
+    }
 
 /**
  * The single freezing update. `app.guard_call_attempt()` stamps
@@ -207,27 +246,57 @@ export async function submitCallOutcome(
 
   if (error) {
     const alreadyFinalized = isFrozenRowError(error)
+    if (!alreadyFinalized) {
+      console.error('[submitCallOutcome] update failed', {
+        sqlstate: error.code,
+        constraint: extractConstraintName(error),
+        attemptId: payload.attemptId,
+        eventId: payload.eventId,
+        message: error.message?.slice(0, 200),
+      })
+    }
     return {
       ok: false,
       alreadyFinalized,
       message: alreadyFinalized
         ? 'This call was already completed — nothing more to save.'
         : friendlyDbError(error),
+      diagnostic: alreadyFinalized
+        ? undefined
+        : buildDiagnostic('submitCallOutcome', error, payload.eventId, payload.groupId),
     }
   }
 
   if (!data || data.length === 0) {
+    // Zero rows matched. There is no Postgres error to log — this is the
+    // silent case the `.select()` exists to expose, and it is the one worth
+    // knowing about, so it gets its own synthetic code rather than 'unknown'.
+    console.error('[submitCallOutcome] zero rows matched', {
+      attemptId: payload.attemptId,
+      eventId: payload.eventId,
+    })
     return {
       ok: false,
       alreadyFinalized: false,
       message:
         'The outcome was not saved — the database matched no such call for your account. ' +
         'Your session may have expired. Sign in again; this outcome is still held on this phone.',
+      diagnostic: buildDiagnostic(
+        'submitCallOutcome',
+        { code: 'zero_rows' },
+        payload.eventId,
+        payload.groupId,
+      ),
     }
   }
 
+  // Both route trees are live: the five-section IA added `/[eventCode]/rsvp/queue`
+  // while `/[eventCode]/queue` still resolves. Revalidating only one leaves
+  // whichever the staff member is actually on showing a stale attempt count.
+  revalidatePath(`/${payload.eventCode}/rsvp/queue`)
   revalidatePath(`/${payload.eventCode}/queue`)
-  revalidatePath(`/${payload.eventCode}`)
+  revalidatePath(`/${payload.eventCode}/rsvp/status/${payload.groupId}`)
+  revalidatePath(`/${payload.eventCode}/dashboard`)
 
   return { ok: true }
 }
@@ -258,15 +327,17 @@ export async function releaseGroupAfterCall(
 
   const { data } = await supabase
     .from('guest_groups')
-    .select('locked_by, locked_until')
+    .select('locked_by, locked_by_staff, locked_until')
     .eq('id', groupId)
     .eq('event_id', eventId)
     .maybeSingle()
 
-  revalidatePath(`/${eventCode}/queue`)
+  revalidatePath(`/${eventCode}/rsvp/queue`)
 
   const stillLocked = Boolean(
-    data?.locked_by && data.locked_until && new Date(data.locked_until).getTime() > Date.now(),
+    (data?.locked_by || data?.locked_by_staff) &&
+      data.locked_until &&
+      new Date(data.locked_until).getTime() > Date.now(),
   )
 
   if (stillLocked) {
