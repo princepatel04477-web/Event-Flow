@@ -107,6 +107,17 @@ export default async function AdminEventsPage() {
             </Card>
           </Link>
 
+          <Link href="/admin/rooms" className="block">
+            <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
+              <CardBody className="py-3">
+                <p className="font-semibold text-fg">Room grid and allocation</p>
+                <p className="mt-0.5 text-sm text-muted">
+                  Propose an allocation, then move, place and release guests room by room.
+                </p>
+              </CardBody>
+            </Card>
+          </Link>
+
           <Link href="/admin/export" className="block">
             <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
               <CardBody className="py-3">
