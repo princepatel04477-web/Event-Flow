@@ -44,7 +44,12 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     roles: ['admin', 'event_team'],
     children: [
       { segment: 'list', label: 'Guest list', roles: ['admin','event_team','client'], isDefault: true },
-      { segment: 'import', label: 'Import', roles: ['admin'] },
+      // Import is event_team too, not admin-only. It was admin-only, which is
+      // why staff reported the button "missing": a code-auth session is
+      // event_team, so the nav entry rendered nowhere for the people actually
+      // holding the phones. The preview-before-write step in the wizard is
+      // what protects the data here, not the role gate.
+      { segment: 'import', label: 'Import', roles: ['admin', 'event_team'] },
       { segment: 'export', label: 'Export', roles: ['admin','event_team'] },
     ],
   },
