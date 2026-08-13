@@ -123,14 +123,57 @@ function toHHMM(total: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-/** A family's pickup time. Arrivals: the leg time itself. Departures:
- *  computed backwards from the leg time (the "flight time") minus travel,
- *  terminal and loading buffers. */
+/**
+ * THE ENGINE WORKS ON AN ABSOLUTE TIMELINE, NOT A CLOCK FACE.
+ *
+ * Minute-of-day arithmetic produced two wrong answers, both live:
+ *
+ *   1. A 02:00 departure needs a pickup 195 minutes earlier — 22:45 the
+ *      PREVIOUS evening. Wrapping modulo 1440 discarded the day rollover and
+ *      stamped 22:45 on the flight's own date, ~21 hours AFTER the flight.
+ *   2. Families arriving 10:00 on the 20th and 10:00 on the 23rd compared as
+ *      "same window" (both 600) and were packed into one trip on the 20th,
+ *      collecting the second family three days early.
+ *
+ * Both vanish once every time is `dayIndex * 1440 + minuteOfDay`: different
+ * days are automatically ≥1440 minutes apart, so no window can span them, and
+ * a negative pickup simply belongs to the previous day.
+ *
+ * Still pure: Date.UTC/getUTC* here are calendar arithmetic on given values,
+ * never a read of the current time, so identical inputs give identical plans.
+ */
+const DAY_MS = 86_400_000
+const EPOCH_MS = Date.UTC(2000, 0, 1)
+
+/** Whole days from 2000-01-01. Undated legs collapse to day 0 together,
+ *  which is the old behaviour and keeps them out of dated legs' windows. */
+function dayIndex(date: string | null): number {
+  if (!date) return 0
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date.trim())
+  if (!m) return 0
+  return Math.round((Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) - EPOCH_MS) / DAY_MS)
+}
+
+/** Absolute minutes back to "YYYY-MM-DDTHH:MM:SS", carrying the day rollover. */
+function toIsoDateTime(absoluteMinutes: number): string {
+  const dayOffset = Math.floor(absoluteMinutes / 1440)
+  const minuteOfDay = absoluteMinutes - dayOffset * 1440
+  const d = new Date(EPOCH_MS + dayOffset * DAY_MS)
+  const yyyy = d.getUTCFullYear()
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(d.getUTCDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}T${toHHMM(minuteOfDay)}:00`
+}
+
+/** A family's pickup, in absolute minutes. Arrivals: the leg time itself.
+ *  Departures: computed backwards from the leg time (the "flight time") minus
+ *  travel, terminal and loading buffers — which may land on the previous day. */
 function pickupTimeMinutes(leg: PackLeg, options: PackOptions, direction: 'arrival' | 'departure'): number | null {
   const t = toMinutes(leg.time)
   if (t === null) return null
-  if (direction === 'arrival') return t
-  return t - options.travelTimeToVenueMinutes - options.terminalBufferMinutes - options.loadingBufferMinutes
+  const absolute = dayIndex(leg.date) * 1440 + t
+  if (direction === 'arrival') return absolute
+  return absolute - options.travelTimeToVenueMinutes - options.terminalBufferMinutes - options.loadingBufferMinutes
 }
 
 /**
@@ -225,15 +268,16 @@ export function pack(
       continue
     }
 
-    const scheduledAt = toHHMM(pickup)
     trips.push({
       vehicleId: used.id,
       vehicleLabel: used.label,
       capacity: used.capacity,
       seatsUsed: leg.pax,
-      groups: [{ ...leg, pickupTime: scheduledAt }],
+      groups: [{ ...leg, pickupTime: toHHMM(pickup) }],
       pickupPoint: leg.point ?? '',
-      scheduledAt: `${leg.date ?? '2000-01-01'}T${scheduledAt}:00`,
+      // Derived from the absolute timeline, so a pre-dawn departure whose
+      // pickup falls the night before gets the PREVIOUS date, not the leg's.
+      scheduledAt: toIsoDateTime(pickup),
       driverName: used.driverName,
       driverMobile: used.driverMobile,
       direction,

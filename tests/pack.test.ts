@@ -204,3 +204,65 @@ describe('pack — vehicle reuse with turnaround', () => {
     expect(result.unplaced.map((u) => u.travelLegId)).toContain('l2')
   })
 })
+
+describe('pack — dates are part of the timeline, not decoration', () => {
+  // Both cases below shipped broken in 044fb8c and were caught only after the
+  // engine went live. The engine used to work in minute-of-day space, so a
+  // time of 10:00 was the number 600 regardless of which day it fell on.
+
+  it('puts a pre-dawn departure pickup on the PREVIOUS day', () => {
+    const result = pack(
+      [leg({ travelLegId: 'l1', pax: 4, time: '02:00', date: '2026-12-22' })],
+      [vehicle({ id: 'tempo', capacity: 12 })],
+      'departure',
+      OPTIONS,
+    )
+    // 02:00 - (60 travel + 120 terminal + 15 loading) = 22:45 the night before.
+    // Wrapping modulo 1440 used to stamp this 2026-12-22T22:45 — a pickup
+    // scheduled ~21 hours AFTER the flight it was meant to catch.
+    expect(result.trips[0].scheduledAt).toBe('2026-12-21T22:45:00')
+  })
+
+  it('keeps a same-day departure on its own day', () => {
+    const result = pack(
+      [leg({ travelLegId: 'l1', pax: 4, time: '06:00', date: '2026-12-22' })],
+      [vehicle({ id: 'tempo', capacity: 12 })],
+      'departure',
+      OPTIONS,
+    )
+    expect(result.trips[0].scheduledAt).toBe('2026-12-22T02:45:00')
+  })
+
+  it('never pools families arriving on different days', () => {
+    const result = pack(
+      [
+        leg({ travelLegId: 'l1', pax: 4, time: '10:00', date: '2026-12-20' }),
+        leg({ travelLegId: 'l2', pax: 4, time: '10:00', date: '2026-12-23' }),
+      ],
+      [vehicle({ id: 'tempo', capacity: 12 })],
+      'arrival',
+      OPTIONS,
+    )
+    // These used to share one trip on the 20th, collecting the second family
+    // three days early. Different days are >= 1440 minutes apart, so no
+    // window can span them.
+    expect(result.trips).toHaveLength(2)
+    for (const trip of result.trips) {
+      expect(trip.groups).toHaveLength(1)
+    }
+  })
+
+  it('still pools families on the SAME day inside the window', () => {
+    const result = pack(
+      [
+        leg({ travelLegId: 'l1', pax: 4, time: '10:00', date: '2026-12-20' }),
+        leg({ travelLegId: 'l2', pax: 4, time: '10:20', date: '2026-12-20' }),
+      ],
+      [vehicle({ id: 'tempo', capacity: 12 })],
+      'arrival',
+      OPTIONS,
+    )
+    expect(result.trips).toHaveLength(1)
+    expect(result.trips[0].seatsUsed).toBe(8)
+  })
+})
