@@ -49,6 +49,11 @@ next-env.d.ts
 /.idea/
 /.commandcode/
 /.claude/
+/.agents/
+# Agent scratch scripts. These run against the LIVE project with the
+# service-role key from .env.test (RLS bypassed) — they must never be
+# committed, and must never be re-run casually. See the 2026-08-13 triage.
+/$COMMANDCODE_SCRATCHPAD/
 /.testsprite/
 /testsprite_tests/tmp/
 
