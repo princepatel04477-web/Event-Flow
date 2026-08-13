@@ -30,6 +30,43 @@ import type { CapacitorConfig } from '@capacitor/cli'
  */
 const serverUrl = (process.env.CAP_SERVER_URL ?? 'http://localhost:3000').trim()
 
+/**
+ * Refuse to bake an IMMUTABLE Vercel deployment URL into the APK.
+ *
+ * Vercel hands out two shapes of hostname:
+ *
+ *   nuvent-<scope>.vercel.app           alias — follows whatever is promoted
+ *   nuvent-<hash>-<scope>.vercel.app    immutable — pinned to ONE build, forever
+ *
+ * In remote-shell mode the WebView loads whatever is baked here, so baking the
+ * immutable form pins every installed handset to a single deployment for the
+ * life of the install. New deploys land and are invisible; already-fixed
+ * features keep reading as broken; and nothing anywhere reports an error. It
+ * has already happened once on this project — `.last-installed-url` held
+ * `nuvent-ppzhi25o0-…` while this config had moved on to the alias, and
+ * `mobile-dev.mjs` only reinstalls when the baked URL *changes*, so no rebuild
+ * was ever triggered.
+ *
+ * This throws rather than warns because a warning in a build log is exactly
+ * what gets scrolled past at 11pm the night before an event, and the symptom
+ * appears days later on someone else's phone. Set CAP_ALLOW_PINNED_URL=1 if
+ * you genuinely want a handset frozen on one deployment (e.g. reproducing a
+ * bug against an old build).
+ */
+if (
+  !process.env.CAP_ALLOW_PINNED_URL &&
+  /^https:\/\/[a-z0-9-]+-[a-z0-9]{8,10}-[a-z0-9-]+\.vercel\.app\/?$/.test(serverUrl)
+) {
+  throw new Error(
+    `CAP_SERVER_URL looks like an immutable Vercel deployment URL:\n` +
+      `  ${serverUrl}\n\n` +
+      `Baking this pins every handset to one build permanently — new deploys ` +
+      `become invisible and fixed features keep reading as broken.\n` +
+      `Use the project alias instead (the form without the deployment hash), ` +
+      `or set CAP_ALLOW_PINNED_URL=1 if pinning is genuinely what you want.`,
+  )
+}
+
 const config: CapacitorConfig = {
   appId: 'com.nuvent.app',
   appName: 'Nuvent',
