@@ -12,9 +12,10 @@ import { createHotel } from '@/lib/actions/hotels'
 interface Props {
   eventId: string
   eventCode: string
+  eventName: string
 }
 
-export function HotelCreateForm({ eventId, eventCode }: Props) {
+export function HotelCreateForm({ eventId, eventCode, eventName }: Props) {
   const router = useRouter()
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
@@ -80,7 +81,7 @@ export function HotelCreateForm({ eventId, eventCode }: Props) {
       <div className="flex items-center gap-3 sticky bottom-0 bg-paper pt-2 pb-safe">
         <Button type="button" variant="ghost" onClick={() => router.back()} disabled={submitting}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={submitting} className="flex-1">
-          {submitting ? 'Creating…' : 'Create hotel'}
+          {submitting ? 'Creating…' : `Add hotel to ${eventName}`}
         </Button>
       </div>
     </form>

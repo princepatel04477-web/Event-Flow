@@ -12,5 +12,5 @@ export default async function NewHotelPage({ params }: PageProps) {
   const { eventCode } = await params
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
-  return <HotelCreateForm eventId={event.id} eventCode={event.code} />
+  return <HotelCreateForm eventId={event.id} eventCode={event.code} eventName={event.name} />
 }
