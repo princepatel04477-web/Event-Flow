@@ -60,7 +60,7 @@ export function LogisticsClient({ eventId }: Props) {
         }
 
         const proposal = await traceFetch(`logistics :: packTrips(${dir})`, () =>
-          packTrips(legs, vehicles),
+          packTrips(legs, vehicles, dir),
         )
         return { legs, vehicles, proposal }
       }),
