@@ -1,32 +1,52 @@
 [
   {
     "id": "TC001",
-    "title": "postapiauthloginwithvalidadmincredentials",
-    "description": "Verify that POST /api/auth/login with valid admin credentials returns 200 with an authenticated session or JWT, and subsequent GET requests return admin routing context with full access."
+    "title": "get login page without session",
+    "description": "Verify that a GET request to /login without an active session returns a 200 status with the HTML sign-in form and accepts an optional next redirect parameter."
   },
   {
     "id": "TC002",
-    "title": "geteventscopedrecordswithvalideventcontext",
-    "description": "Verify that GET requests for event-scoped records return only rows for the current event, and POST requests with matching event_id create records successfully, enforcing multi-tenancy and fencing."
+    "title": "get auth callback with valid code and next",
+    "description": "Verify that a GET request to /auth/callback with a valid code and a same-origin next parameter sets a session cookie and responds with a 307 redirect to the next URL."
   },
   {
     "id": "TC003",
-    "title": "getapirsvpqueueandclaimgroup",
-    "description": "Verify that GET /api/rsvp/queue returns prioritized groups needing contact, and POST /api/rsvp/claim_group locks a group exclusively, preventing concurrent claims."
+    "title": "get auth callback with malicious next parameter",
+    "description": "Verify that a GET request to /auth/callback with a valid code but a non-same-origin next parameter sanitizes the redirect target and responds with a 307 redirect to /."
   },
   {
     "id": "TC004",
-    "title": "getapiroomshotelsandassignments",
-    "description": "Verify that GET /api/rooms/hotels and /api/rooms/rooms return available inventory, and POST /api/rooms/assignments enforces capacity and prevents overlapping bookings."
+    "title": "get root with authenticated session",
+    "description": "Verify that a GET request to / with a valid authenticated session returns a 200 status with the HTML event picker or dashboard."
   },
   {
     "id": "TC005",
-    "title": "postapideliveriesanddeliveryproofs",
-    "description": "Verify that POST /api/deliveries with in-app photo capture creates delivery records, and POST /api/delivery_proofs creates immutable, server-stamped proof records."
+    "title": "get root without session",
+    "description": "Verify that a GET request to / without an authenticated session responds with a 307 redirect to /login."
   },
   {
     "id": "TC006",
-    "title": "postapiimportpreviewandcommit",
-    "description": "Verify that POST /api/import/preview returns a preview of inserts, updates, and skips, and POST /api/import/commit commits the import preserving idempotency via source-row hashes."
+    "title": "get event dashboard with authorized user",
+    "description": "Verify that a GET request to /{eventCode} with an authenticated user who is a member of the event returns a 200 status with the HTML dashboard and event counters."
+  },
+  {
+    "id": "TC007",
+    "title": "get event dashboard with unauthorized user",
+    "description": "Verify that a GET request to /{eventCode} with an authenticated user who is not a member of the event returns a 404 status indicating unknown event code or not-a-member response."
+  },
+  {
+    "id": "TC008",
+    "title": "get client guest list with client role",
+    "description": "Verify that a GET request to /{eventCode}/guests with an authenticated client role user returns a 200 status with the HTML guest list."
+  },
+  {
+    "id": "TC009",
+    "title": "get admin events with admin role",
+    "description": "Verify that a GET request to /admin/events with an authenticated admin session returns a 200 status with the HTML event list and create-event form."
+  },
+  {
+    "id": "TC010",
+    "title": "get admin events with non admin role",
+    "description": "Verify that a GET request to /admin/events with an authenticated event_team session returns a 307 redirect to /, denying access to non-admin users."
   }
 ]

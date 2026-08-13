@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 
 import { CalendarIcon, ChevronLeftIcon } from '@/components/icons'
 import { Badge } from '@/components/ui/Badge'
-import { Card } from '@/components/ui/Card'
+import { Card, CardBody } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { friendlyDbError } from '@/lib/errors'
 import { createClient } from '@/lib/supabase/server'
@@ -88,6 +88,49 @@ export default async function AdminEventsPage() {
           </ul>
         )}
       </section>
+
+      {!error && events.length > 0 ? (
+        <section aria-labelledby="tools-heading" className="flex flex-col gap-3">
+          <h2 id="tools-heading" className="text-lg font-semibold text-fg">
+            Tools
+          </h2>
+
+          <Link href="/admin/hotels" className="block">
+            <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
+              <CardBody className="py-3">
+                <p className="font-semibold text-fg">Hotels and rooms</p>
+                <p className="mt-0.5 text-sm text-muted">
+                  Set up hotels, add rooms in bulk, and recover allocations from the imported
+                  sheet.
+                </p>
+              </CardBody>
+            </Card>
+          </Link>
+
+          <Link href="/admin/rooms" className="block">
+            <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
+              <CardBody className="py-3">
+                <p className="font-semibold text-fg">Room grid and allocation</p>
+                <p className="mt-0.5 text-sm text-muted">
+                  Propose an allocation, then move, place and release guests room by room.
+                </p>
+              </CardBody>
+            </Card>
+          </Link>
+
+          <Link href="/admin/export" className="block">
+            <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
+              <CardBody className="py-3">
+                <p className="font-semibold text-fg">Download to Excel</p>
+                <p className="mt-0.5 text-sm text-muted">
+                  Guests, families, arrivals and departures — one workbook, ready to hand to a
+                  desk.
+                </p>
+              </CardBody>
+            </Card>
+          </Link>
+        </section>
+      ) : null}
 
       <section aria-labelledby="create-heading" className="flex flex-col gap-4">
         <div>
