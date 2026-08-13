@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { CheckCircleIcon, InboxIcon, MinusIcon, PlusIcon } from '@/components/icons'
 import { saveRsvpLog } from '@/lib/actions/rsvp'
+import { releaseGroupAfterCall } from '@/lib/actions/call'
 import { cn, formatDateTime } from '@/lib/utils'
 import { rsvpStatusLabel, rsvpStatusTone } from '@/lib/rsvp'
 import { formatMobile } from '@/lib/phone'
@@ -183,6 +184,32 @@ export function RsvpLogForm({
     if (!result.ok) {
       setError(result.message)
       return
+    }
+
+    // Release the caller lock the RSVP status screen claimed on open. The
+    // `save_rsvp_log` RPC already clears it in the same transaction as the
+    // outcome; this is the belt to that braces.
+    //
+    // Guard on holding the lock rather than delegating the decision to
+    // release_group. Migration 20260813000000 removed that function's
+    // `or app.is_admin()` branch — which used to let any admin clear
+    // whichever caller held the lock — so the RPC is now safe on its own.
+    // The guard stays because it is the call site's job to know whether it
+    // holds a lock, and because it keeps this screen correct if the RPC's
+    // semantics ever drift again. See tests/l4_lock_release.sql.
+    const holdsLock =
+      group.locked_by === viewerId ||
+      (group.locked_by_staff !== null && group.locked_by_staff === viewerId)
+    if (holdsLock) {
+      const release = await releaseGroupAfterCall(eventId, group.id, eventCode)
+      if (!release.ok) {
+        console.error('[rsvp-status] release_group after save failed', {
+          groupId: group.id,
+          message: release.message,
+        })
+        setError(release.message ?? 'The family record was saved, but the caller lock could not be released.')
+        return
+      }
     }
 
     // The entry is written and the lock released. Drop the draft so the next

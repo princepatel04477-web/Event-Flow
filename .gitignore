@@ -83,6 +83,8 @@ testsprite_tests\tmp\config.json
 /e2e/routes-*.json
 
 # Scratch files and captured console/error dumps from debugging sessions
+/gradle-final02.log
+/skills-lock.json
 /all-console-errors.txt
 /playwright-err.txt
 /scratchpad_err.txt
