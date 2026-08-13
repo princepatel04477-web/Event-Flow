@@ -113,68 +113,6 @@ export type VehicleResult =
   | { ok: true; id: string }
   | { ok: false; error: string }
 
-export async function addVehicle(eventId: string, input: Omit<VehicleInput, 'eventId'>): Promise<VehicleResult> {
-  const supabase = await createClient()
-
-  const parsed = vehicleSchema.safeParse({ ...input, eventId })
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues.map((i) => i.message).join('; ') }
-  }
-
-  const { data, error } = await supabase
-    .from('vehicles')
-    .insert({
-      event_id: eventId,
-      vehicle_type_id: parsed.data.vehicleTypeId,
-      label: parsed.data.label,
-      registration_no: parsed.data.registrationNo || null,
-      capacity: parsed.data.capacity,
-      driver_name: parsed.data.driverName || null,
-      driver_mobile: parsed.data.driverMobile || null,
-      vendor_name: parsed.data.vendorName || null,
-      rate_note: parsed.data.rateNote || null,
-      status: parsed.data.status,
-      notes: parsed.data.notes || null,
-    })
-    .select('id')
-    .single()
-
-  if (error) return { ok: false, error: friendlyDbError(error) }
-  return { ok: true, id: data.id }
-}
-
-export async function updateVehicle(
-  vehicleId: string,
-  input: Omit<VehicleInput, 'eventId'>,
-): Promise<VehicleResult> {
-  const supabase = await createClient()
-
-  const parsed = vehicleSchema.safeParse({ ...input, eventId: '00000000-0000-0000-0000-000000000000' })
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues.map((i) => i.message).join('; ') }
-  }
-
-  const { error } = await supabase
-    .from('vehicles')
-    .update({
-      vehicle_type_id: parsed.data.vehicleTypeId,
-      label: parsed.data.label,
-      registration_no: parsed.data.registrationNo || null,
-      capacity: parsed.data.capacity,
-      driver_name: parsed.data.driverName || null,
-      driver_mobile: parsed.data.driverMobile || null,
-      vendor_name: parsed.data.vendorName || null,
-      rate_note: parsed.data.rateNote || null,
-      status: parsed.data.status,
-      notes: parsed.data.notes || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', vehicleId)
-
-  if (error) return { ok: false, error: friendlyDbError(error) }
-  return { ok: true, id: vehicleId }
-}
-
 export async function deleteVehicle(vehicleId: string): Promise<VehicleResult> {
   const supabase = await createClient()
   const { error } = await supabase.from('vehicles').delete().eq('id', vehicleId)
