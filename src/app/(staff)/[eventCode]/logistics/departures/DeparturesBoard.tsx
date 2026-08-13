@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Badge } from '@/components/ui/Badge'
 import { SearchIcon, CheckCircleIcon, AlertTriangleIcon } from '@/components/icons'
 import { LinkButton } from '@/components/ui/LinkButton'
+import { FleetAddCard } from '@/components/fleet/FleetAddCard'
 import { createClient } from '@/lib/supabase/client'
 import { markDeparted } from '@/lib/actions/event-day'
 import { traceFetch } from '@/lib/perf'
@@ -208,6 +209,10 @@ export function DeparturesBoard({ eventId, eventCode }: DeparturesBoardProps) {
           <Count label="Gift flags" value={flaggedToday} tone={flaggedToday > 0 ? 'warning' : 'neutral'} />
         </CardBody>
       </Card>
+
+      {/* Fleet: same event fleet arrivals use, addable without leaving this
+          screen. Departure day is when the gap gets found. */}
+      <FleetAddCard eventId={eventId} eventCode={eventCode} />
 
       {/* Search + filters */}
       <div className="flex flex-col gap-2">

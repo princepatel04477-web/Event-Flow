@@ -8,6 +8,7 @@ import { Card, CardBody } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LinkButton } from '@/components/ui/LinkButton'
 import {
+  CarIcon,
   ShieldAlertIcon,
   UsersIcon,
 } from '@/components/icons'
@@ -26,6 +27,7 @@ import { cn } from '@/lib/utils'
 
 interface Props {
   eventId: string
+  eventCode: string
 }
 
 type Tab = 'arrivals' | 'departures'
@@ -36,27 +38,44 @@ interface LogisticsData {
   proposal: LogisticsProposal | null
 }
 
-export function LogisticsClient({ eventId }: Props) {
+/** Why there is nothing to plan. `no-vehicles` is the actionable one. */
+interface EmptyReason {
+  empty: string
+  reason: 'no-vehicles' | 'no-legs'
+}
+
+export function LogisticsClient({ eventId, eventCode }: Props) {
   const [tab, setTab] = useState<Tab>('arrivals')
   const [saving, setSaving] = useState(false)
   const [committed, setCommitted] = useState(false)
   const [commitError, setCommitError] = useState<string | null>(null)
 
   const loadFor = useCallback(
-    (dir: 'arrival' | 'departure'): Promise<LogisticsData | { empty: string }> =>
+    (dir: 'arrival' | 'departure'): Promise<LogisticsData | EmptyReason> =>
       traceFetch(`logistics :: readData(${dir})`, async () => {
         const [legs, vehicles] = await Promise.all([
           readUnplacedTravelLegs(eventId, dir),
           readAvailableVehicles(eventId),
         ])
 
+        // An empty fleet is not the same problem as an empty leg list, and
+        // the difference decides what the user must do next — so carry the
+        // reason, not just a sentence. A fleet gap is the only one of these
+        // that is fixable from here, and it is the one that silently
+        // produces a plan with nothing in it.
         if (legs.length === 0 || vehicles.length === 0) {
-          const msg = legs.length === 0 && vehicles.length === 0
-            ? 'No travel legs need transport and no vehicles are available.'
-            : legs.length === 0
-              ? `No ${dir} legs need transport right now.`
-              : 'No vehicles available — add vehicles to the fleet first.'
-          return { empty: msg }
+          if (vehicles.length === 0) {
+            return {
+              empty: legs.length === 0
+                ? 'No vehicles in the fleet, and no travel legs need transport yet.'
+                : `No vehicles in the fleet. ${legs.length} ${dir} ${legs.length === 1 ? 'leg needs' : 'legs need'} transport and none can be scheduled until the fleet has vehicles.`,
+              reason: 'no-vehicles' as const,
+            }
+          }
+          return {
+            empty: `No ${dir} legs need transport right now.`,
+            reason: 'no-legs' as const,
+          }
         }
 
         const proposal = await traceFetch(`logistics :: packTrips(${dir})`, () =>
@@ -71,11 +90,11 @@ export function LogisticsClient({ eventId }: Props) {
   // renders from cache on the second visit instead of re-querying Supabase.
   // The departure direction is mounted lazily — fetching both directions on
   // first load would do ~12s of cumulative work just to show one tab.
-  const arrivals = useStableData<LogisticsData | { empty: string }>(
+  const arrivals = useStableData<LogisticsData | EmptyReason>(
     `logistics:arrival:${eventId}`,
     () => loadFor('arrival'),
   )
-  const departures = useStableData<LogisticsData | { empty: string }>(
+  const departures = useStableData<LogisticsData | EmptyReason>(
     `logistics:departure:${eventId}`,
     () => loadFor('departure'),
     // Mount only once the user opens the departures tab; until then the
@@ -153,12 +172,29 @@ export function LogisticsClient({ eventId }: Props) {
   if (!data || 'empty' in data) {
     const message =
       data && 'empty' in data ? data.empty : 'No travel legs or vehicles on file yet.'
+    const noVehicles = Boolean(data && 'empty' in data && data.reason === 'no-vehicles')
+
+    // A missing fleet is fixable, so say where — an empty state that only
+    // names the problem sends staff hunting through the nav on a handset.
     return (
       <EmptyState
-        icon={<UsersIcon className="h-7 w-7" />}
-        title="Nothing to plan"
+        icon={noVehicles ? <CarIcon className="h-7 w-7" /> : <UsersIcon className="h-7 w-7" />}
+        title={noVehicles ? 'No vehicles in the fleet' : 'Nothing to plan'}
         description={message}
-        action={<Button onClick={active.reload}>Refresh</Button>}
+        action={
+          noVehicles ? (
+            <div className="flex flex-col items-center gap-2">
+              <LinkButton href={`/${eventCode}/logistics/fleet`} size="md">
+                Add vehicles to the fleet
+              </LinkButton>
+              <Button variant="secondary" onClick={active.reload}>
+                Refresh
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={active.reload}>Refresh</Button>
+          )
+        }
       />
     )
   }

@@ -10,11 +10,11 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { CarIcon, PlusIcon, ShieldAlertIcon } from '@/components/icons'
 import {
   readFleet,
-  quickAddVehicles,
   deleteVehicle,
   type FleetData,
   type VehicleRow,
 } from '@/lib/actions/fleet'
+import { QuickAddVehicles } from '@/components/fleet/QuickAddVehicles'
 import { useStableData } from '@/lib/use-stable-data'
 import type { StatusTone } from '@/lib/status'
 import { traceFetch } from '@/lib/perf'
@@ -36,7 +36,6 @@ const STATUS_META: Record<string, { label: string; tone: StatusTone }> = {
 
 export function FleetClient({ eventId }: Props) {
   const [showAdd, setShowAdd] = useState(false)
-  const [quickCounts, setQuickCounts] = useState<Record<string, number>>({})
   const [actionError, setActionError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -44,20 +43,6 @@ export function FleetClient({ eventId }: Props) {
     `fleet:${eventId}`,
     () => traceFetch('fleet :: readFleet', () => readFleet(eventId)),
   )
-
-  const handleQuickAdd = async (typeId: string | null) => {
-    const count = quickCounts[typeId ?? '__none__'] ?? 1
-    if (count < 1) return
-    setSaving(true)
-    const result = await quickAddVehicles(eventId, typeId, count, null)
-    if (result.ok) {
-      setQuickCounts((prev) => ({ ...prev, [typeId ?? '__none__']: 0 }))
-      await reload()
-    } else {
-      setActionError(result.error)
-    }
-    setSaving(false)
-  }
 
   const handleRemove = async (vehicleId: string) => {
     setSaving(true)
@@ -130,7 +115,7 @@ export function FleetClient({ eventId }: Props) {
         </p>
       )}
 
-      {/* Quick-add panel */}
+      {/* Quick-add panel — shared with the departures screen. */}
       {showAdd && (
         <Card>
           <CardHeader>
@@ -139,79 +124,8 @@ export function FleetClient({ eventId }: Props) {
               <p className="text-sm text-muted">Set a count for each type, then tap &ldquo;Add&rdquo; — repeat to build the fleet.</p>
             </div>
           </CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            {data.types.map((type) => (
-              <div key={type.id} className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-fg">{type.name}</p>
-                  <p className="flex items-center gap-1.5 text-xs text-muted">
-                    <span className="font-semibold text-fg">{type.defaultCapacity}</span>
-                    {' with luggage'}
-                    {type.seatLabel && (
-                      <span className="text-subtle">({type.seatLabel})</span>
-                    )}
-                  </p>
-                </div>
-                <select
-                  value={quickCounts[type.id] ?? 0}
-                  onChange={(e) =>
-                    setQuickCounts((prev) => ({
-                      ...prev,
-                      [type.id]: Math.max(0, parseInt(e.target.value, 10) || 0),
-                    }))
-                  }
-                  className="h-9 w-16 rounded-lg border border-border bg-surface px-2 text-sm text-fg"
-                >
-                  {Array.from({ length: 11 }, (_, i) => (
-                    <option key={i} value={i}>
-                      {i}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  size="md"
-                  variant="primary"
-                  disabled={(quickCounts[type.id] ?? 0) < 1 || saving}
-                  loading={saving}
-                  onClick={() => handleQuickAdd(type.id)}
-                >
-                  Add
-                </Button>
-              </div>
-            ))}
-
-            {/* Custom (no type) */}
-            <div className="flex items-center gap-3 border-t border-border pt-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-fg">Custom</p>
-                <p className="text-xs text-muted">No pre-set type</p>
-              </div>
-              <select
-                value={quickCounts['__none__'] ?? 0}
-                onChange={(e) =>
-                  setQuickCounts((prev) => ({
-                    ...prev,
-                    __none__: Math.max(0, parseInt(e.target.value, 10) || 0),
-                  }))
-                }
-                className="h-9 w-16 rounded-lg border border-border bg-surface px-2 text-sm text-fg"
-              >
-                {Array.from({ length: 6 }, (_, i) => (
-                  <option key={i} value={i}>
-                    {i}
-                  </option>
-                ))}
-              </select>
-              <Button
-                size="md"
-                variant="primary"
-                disabled={(quickCounts['__none__'] ?? 0) < 1 || saving}
-                loading={saving}
-                onClick={() => handleQuickAdd(null)}
-              >
-                Add
-              </Button>
-            </div>
+          <CardBody>
+            <QuickAddVehicles eventId={eventId} types={data.types} onAdded={reload} />
           </CardBody>
         </Card>
       )}

@@ -19,5 +19,5 @@ export default async function LogisticsPage({ params }: PageProps) {
 
   await requireStaff(event.id, event.code)
 
-  return <LogisticsClient eventId={event.id} />
+  return <LogisticsClient eventId={event.id} eventCode={event.code} />
 }
