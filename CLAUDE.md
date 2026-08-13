@@ -86,8 +86,22 @@ npx supabase db reset                              # local stack, wipes and repl
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f test_security.sql
 ```
 
-Once the Next.js app exists, record its `dev` / `build` / `lint` / `test` commands here —
-this section is the first place a new session looks.
+App commands (the app exists — §2 above is stale on this point):
+
+```bash
+npm run dev          # next dev
+npm run build        # next build
+npm run typecheck    # tsc --noEmit   — MUST be clean, treat any error as a break
+npm run lint         # eslint
+npm run test:run     # vitest run     — 133 tests, 11 files, ~6s
+```
+
+**`npm run lint` exits 1 on a clean tree.** There are ~273 pre-existing errors and
+~2,846 warnings, concentrated in `src/lib/allocate/allocator.ts`,
+`tests/extraction-eval.test.ts` and `src/lib/export/sheets.ts` — mostly `prefer-const`
+and unused vars. A non-zero exit therefore proves nothing. Lint the files you touched
+(`npx eslint <paths>`) and require *those* to be clean; do not try to read the
+repo-wide total as a signal.
 
 ### Mobile (Capacitor)
 
@@ -385,6 +399,21 @@ Enforced at the **database level**, not in application code. Do not weaken them.
   reconciliation is one query (`v_travel_ledger`).
 - **Fleet is live inventory and capacities are luggage-adjusted.** The sticker number lies:
   traveller 17→14, 20→17, 24→20, 33→29. Buses seeded at 30 and 50 — **placeholder, unconfirmed.**
+- **One fleet per event, shared by both directions. Do not split it.**
+  `readAvailableVehicles(eventId)` filters on `event_id` and `status != 'unavailable'`
+  and nothing else — no direction, no date, no leg predicate. Arrivals and departures
+  read the identical set, and `vehicles` has no direction column to split on. This is
+  deliberate: a vehicle is a physical object, and modelling "arrival fleet" separately
+  from "departure fleet" would let the same bus be promised twice while looking correct
+  on both screens. If a future change appears to need per-direction fleets, it almost
+  certainly wants per-direction *availability* instead — see the next bullet.
+- **Nothing prevents cross-direction double-booking. Known gap, not a bug to "discover".**
+  `readAvailableVehicles` does not exclude vehicles already committed to a trip, so the
+  same vehicle can be packed into an arrival trip and a departure trip at overlapping
+  times. `pack.ts` has turnaround awareness *within* a single run; there is no check
+  *across* runs. For SHARMA26 the mitigation is procedural — humans commit every plan
+  and can see the trip list. The fix, when it comes, is a committed-trip overlap filter
+  in `readAvailableVehicles`, not a second fleet.
 - **Vehicle suggestion is advisory.** Greedy PAX fit, always human-overridable.
 - **No custom dialer.** `tel:` deep link + one-tap outcome logging
   (Confirmed / Declined / No answer / Callback / Wrong number).
@@ -632,8 +661,64 @@ first `db push`.
 
 ---
 
+## 11b. Event-day operational limits (known numbers, not surprises)
+
+Things that are *acceptable* but must not be discovered at 11pm on event eve.
+
+- **Stuck caller lock → wait 15 minutes. There is no manual override.**
+  Migration `20260813000000` removed `release_group`'s `or app.is_admin()` branch
+  because it let any admin clear a lock held by someone else (see
+  `tests/l4_lock_release.sql`). That branch was *also*, accidentally, the only path
+  by which anyone other than the holder could clear a lock. **`locked_until`
+  expiry is now the sole recovery mechanism.**
+  Concretely: a caller's phone dies mid-RSVP holding family G. G is uneditable on
+  the RSVP status screen until the lock expires. Nobody on the floor can shorten it.
+  Mitigations that exist: the blocked screen names the holder and shows the exact
+  clear time ("releases automatically by 21:47"), and the call screen is NOT
+  affected — G can still be dialled, only the RSVP *logging* is blocked.
+  Mitigations that do NOT exist: no admin UI lists locked families, and the queue
+  row's presence label ("Ravi, 2 min ago") is presence, not lock state — a frozen
+  family looks normal in the queue. Discovery is one family at a time, by walking
+  into it.
+  If 15 minutes ever becomes too long, the fix is a NEW, explicitly named RPC
+  (`force_release_lock`) with its own admin-only UI — not restoring the silent
+  branch inside the ordinary release path.
+
+- **`bash tests/run-l4.sh` needs Docker Desktop running and the local Supabase
+  stack up.** It self-heals a stale template (it fingerprints the migration set
+  into the template database and rebuilds on drift), but it cannot start Docker
+  for you. Container defaults to `supabase_db_Nuvent`; override with
+  `CONTAINER=… bash tests/run-l4.sh` or pass it as `$1`.
+
+---
+
 ## 12. Known traps (learned the hard way — do not rediscover these)
 
+- **An immutable Vercel deployment URL baked into the APK freezes the phone forever.**
+  Vercel gives every deployment a permanent per-deployment URL
+  (`nuvent-<hash>-<scope>.vercel.app`) *and* a project alias
+  (`nuvent-<scope>.vercel.app`) that follows whatever is promoted to production.
+  In remote-shell mode the APK loads the URL baked into `capacitor.config.json`,
+  so baking the **per-deployment** URL pins every handset to one build for the life
+  of the install — new deploys land and are invisible, and every fixed feature reads
+  as still broken. `android/.last-installed-url` recorded `nuvent-ppzhi25o0-…`
+  (immutable) while the config had since been corrected to the alias; `mobile-dev.mjs`
+  only rebuilds when the baked URL *changes*, so nothing forced the reinstall.
+  **Always bake the alias.** To check a handset without guessing, hit `/api/version`
+  — it returns only a SHA. If it does not match `git rev-parse HEAD`, the phone is
+  frozen and the fix is a rebuild, not a feature.
+- **A section can be complete, deployed, and still invisible — check `SECTIONS` roles.**
+  `src/lib/sections/config.tsx` gates each nav child on `roles: TabAccess[]`. A
+  code-auth staff session is `event_team`, so anything marked `['admin']` renders
+  nowhere for the people on the phones — no tab, no sidebar entry, no error. Guests >
+  Import sat like this and was reported as a missing button. Before debugging "the
+  feature disappeared", grep `SECTIONS` for its segment.
+- **`$COMMANDCODE_SCRATCHPAD/` holds live-database mutation scripts. Read, never run.**
+  They build a service-role client from `.env.test` — RLS fully bypassed — and at
+  least one (`repoint-exec.mjs`) moves a `hotels` row across an `event_id` boundary
+  and deletes another, with no dry-run flag and no transaction. The directory is
+  gitignored. Treat anything in it as a record of what a past session did, not as a
+  tool to re-run.
 - **Storage paths must start with the event id.** Bucket policies read the first folder
   segment as the tenant key and cast it to uuid:
   `delivery-proofs/{event_id}/{deliverable_id}/{uuid}.jpg`,
