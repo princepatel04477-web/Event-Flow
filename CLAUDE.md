@@ -713,6 +713,33 @@ below exists to manage.
 
 ---
 
+## 11c. The parked static-export branch — `feat/m2-static-export-bundle`
+
+**Parked branch, NOT merged. Do not merge it without first re-deciding the static export
+question in §11a.** Static export was deferred to v2 on **12 August 2026**; the event build
+is the remote shell (§11b). Do not resume this branch before the event.
+
+The branch is pushed, so it is recoverable — these are the only two SHAs recording that
+work, and they are written down nowhere else:
+
+| | |
+|---|---|
+| `803104a` | savepoint: uncommitted work from a concurrent session, committed unreviewed |
+| `10ffd94` | trailingSlash, bundled androidScheme, pinned event params, raw hotel insert error |
+
+Both subjects carry a stray leading `@` (PowerShell here-string syntax used in bash).
+**This is DELIBERATE — DO NOT FIX.** Left as-is because the branch is a pushed
+recoverability anchor, and rewriting published history to correct a cosmetic defect is a
+worse trade than the defect. A future session that "tidies" these subjects is undoing a
+decision, not fixing a typo.
+
+Note on provenance: on the branch this text was a `**Stopped — static export deferred to
+v2**` block inside its own §11, positioned within a status list (`P1`, `P3`, `P1G/P1H`
+bullets) that master's §11 does not carry. It is a standalone section here so it depends on
+no anchor outside itself; nothing was dropped in the move.
+
+---
+
 ## 12. Known traps (learned the hard way — do not rediscover these)
 
 - **Storage paths must start with the event id.** Bucket policies read the first folder
