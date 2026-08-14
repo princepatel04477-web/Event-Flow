@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase/server'
@@ -69,24 +70,37 @@ export default async function PickStaffPage() {
             : 'Your event admin has not added staff names yet. Nothing is blocked: go back and carry on. If you want your work recorded under your name, ask whoever gave you this code to add you.'
         }
         action={
-          isAdmin ? (
-            <form
-              action={async () => {
-                'use server'
-                const supabase2 = await createClient()
-                const { data: ev } = await supabase2
-                  .from('events')
-                  .select('code')
-                  .eq('id', claims.eventId)
-                  .maybeSingle()
-                if (ev) redirect(`/admin/events/${ev.code}/staff`)
-              }}
+          // Everyone gets a way forward. This screen used to be a hard stop
+          // for a non-admin — no names, no button, no route on — back when a
+          // staff identity was required to write anything. It is optional now,
+          // so leaving a dead end here would strand the one person who cannot
+          // fix it: the staff member on the floor.
+          <div className="flex w-full flex-col gap-2">
+            {isAdmin ? (
+              <form
+                action={async () => {
+                  'use server'
+                  const supabase2 = await createClient()
+                  const { data: ev } = await supabase2
+                    .from('events')
+                    .select('code')
+                    .eq('id', claims.eventId)
+                    .maybeSingle()
+                  if (ev) redirect(`/admin/events/${ev.code}/staff`)
+                }}
+              >
+                <Button type="submit" size="lg" fullWidth>
+                  Add staff members
+                </Button>
+              </form>
+            ) : null}
+            <Link
+              href={`/${event.code}`}
+              className="tap flex min-h-12 w-full items-center justify-center rounded-2xl border border-rule text-sm font-semibold text-muted active:bg-surface-2"
             >
-              <Button type="submit" size="lg">
-                Add staff members
-              </Button>
-            </form>
-          ) : undefined
+              Continue without a name
+            </Link>
+          </div>
         }
       />
     )

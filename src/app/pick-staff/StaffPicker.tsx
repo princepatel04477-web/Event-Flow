@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { UserIcon } from '@/components/icons'
@@ -115,8 +116,23 @@ export function StaffPicker({ members, eventCode }: { members: StaffMember[]; ev
         ))}
       </ul>
 
+      {/* Skip exists because the RLS write gate is gone (migration
+          20260814140000): a name is no longer required to use the app, only to
+          record who did what. Without this control the screen would be a hard
+          stop for anyone whose name is not on the list yet — on a wedding
+          morning, with a staff member standing in front of a family, that is
+          the worst possible time to be blocked by an admin task. */}
+      <Link
+        href={`/${eventCode}`}
+        className="tap flex min-h-12 w-full items-center justify-center rounded-2xl border border-rule text-sm font-semibold text-muted active:bg-surface-2"
+      >
+        Skip for now
+      </Link>
+
       <p className="text-xs leading-relaxed text-subtle">
-        Picked the wrong one? There is a &quot;Not you? Switch&quot; option in settings later.
+        Skipping is fine — everything still works. Your calls, photos and room changes
+        just will not have your name on them, and that cannot be added afterwards.
+        There is a &quot;Not you? Switch&quot; option in settings later.
       </p>
     </div>
   )
