@@ -6,8 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveEventByCode } from '@/lib/supabase/queries'
 import { DashboardClient } from './DashboardClient'
 import { readHotelImportContext } from '@/lib/actions/import-hotels'
-import { Button } from '@/components/ui/Button'
-import { BuildingIcon } from '@/components/icons'
+import { BuildingIcon, UsersIcon } from '@/components/icons'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 
@@ -31,12 +30,37 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
   return (
     <div className="flex flex-col gap-8">
       {staffCount === 0 ? (
-        <div className="rounded-xl bg-tint-warning px-4 py-3 text-sm font-medium text-warning">
-          No staff members on this event. Nobody can log in — add at least one name.
-        </div>
+        // A gate that names a problem has to point at the fix. This banner
+        // used to be a dead end: it is the ONLY warning that an event cannot
+        // be written to at all (every insert policy ANDs
+        // `app.has_staff_identity`), and it offered no way to add the name it
+        // was asking for.
+        <Link
+          href={`/admin/events/${event.code}/staff`}
+          className="tap block rounded-xl bg-tint-warning px-4 py-3 text-sm font-medium text-warning underline"
+        >
+          No staff members on this event. Nobody can log in and nothing can be saved —
+          add at least one name.
+        </Link>
       ) : null}
 
       <DashboardClient eventId={event.id} eventCode={event.code} />
+
+      <Link
+        href={`/admin/events/${event.code}/staff`}
+        className="tap flex items-center gap-4 rounded-2xl border border-rule bg-surface p-4 transition-colors hover:bg-surface-2 active:bg-surface-2"
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-tint text-brand">
+          <UsersIcon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-fg">Staff</p>
+          <p className="text-sm text-muted">
+            {staffCount === 1 ? '1 person' : `${staffCount ?? 0} people`} can log calls and
+            save data
+          </p>
+        </div>
+      </Link>
 
       <Link
         href={`/admin/events/${event.code}/hotels`}
