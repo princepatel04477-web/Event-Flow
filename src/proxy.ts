@@ -13,6 +13,12 @@ export const config = {
      * inside updateSession() rather than excluded here, so the session cookie
      * still gets refreshed while sitting on /login.
      *
+     * `xlsx` is here for the blank import template. It is a static asset with
+     * no data in it — two invented example families — and the import screen
+     * links it with `download`. Left matched, the proxy 307s it to /login and
+     * the download silently yields a login page saved as a .xlsx, which opens
+     * as garbage. Confirmed: it returned 307 before this was added.
+     *
      * `html` and `apk` are in the exclusion list for a specific reason:
      * `public/install.html` is the page staff open to INSTALL the app, and it
      * was being matched here and 307'd to /login?next=%2Finstall.html. The
@@ -24,6 +30,6 @@ export const config = {
      * either. No App Router route ends in either extension, so excluding them
      * costs nothing.
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|html|apk)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|html|apk|xlsx)$).*)',
   ],
 }
