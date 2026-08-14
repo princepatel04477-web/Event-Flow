@@ -57,9 +57,23 @@
     <!-- WhatsApp renames attachments and can recompress them, which is how a
          team ends up on mismatched builds without anyone noticing. The
          checksum is the only way to tell a good copy from a mangled one, so
-         it is on the page rather than in a doc nobody opens. -->
+         it is on the page rather than in a doc nobody opens.
+
+         ORDER MATTERS, and it is not the obvious one. `webDir: 'public'` means
+         cap sync copies THIS FILE into the APK at assets/public/install.html,
+         so editing the hash below changes the very APK the hash describes.
+         Rebuilding after updating this number invalidates it again, forever.
+
+         The sequence that terminates:
+           1. build the APK
+           2. sha256sum it
+           3. put that value here and deploy the WEB only
+           4. distribute the APK from step 1 — do NOT rebuild
+         The stale copy of this page inside the APK is never rendered (the
+         WebView loads the deployed site), so it costing nothing is the whole
+         reason this works. -->
     <p style="margin:0;font-size:12px;color:var(--muted)">
-      SHA-256 <code style="font-size:11px;word-break:break-all">93c02afe3121277f3695f6ab04339cf06979eb0379b0c06d5c00302ececda1a0</code>
+      SHA-256 <code style="font-size:11px;word-break:break-all">32ae6457fd85cb667004007c6f5ba4cb89f23c037ca21adda552ac41214e2520</code>
     </p>
   </div>
 
