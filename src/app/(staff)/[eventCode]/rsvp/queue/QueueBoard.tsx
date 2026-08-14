@@ -34,6 +34,29 @@ export interface QueueBoardProps {
    * a client component and must never ask Supabase who it is talking to.
    */
   canImport: boolean
+  /**
+   * How many groups the SERVER can see on this event, counted during the
+   * page render under a session that has already passed `requireStaff`.
+   *
+   * This exists to separate two states that are byte-identical on the client.
+   * A PostgREST read that RLS refuses does not fail — it returns `[]` with no
+   * error — so `rows.length === 0` means EITHER "this event has no families
+   * yet" OR "this session was not allowed to see them". The board used to
+   * assume the first and tell staff "the guest list has not been imported
+   * yet", which sends someone hunting for an import that already ran. It was
+   * reproduced on SAMPLE2026: 782 groups on the event, empty board, that
+   * exact sentence.
+   *
+   * The commonest cause is a client session whose durable code token is
+   * missing or expired while the httpOnly cookie is still valid — the server
+   * renders the page fine and the browser's own query goes out anonymous.
+   *
+   * The server's count is the ground truth the client cannot obtain for
+   * itself: if it is greater than zero and the client still sees nothing,
+   * the read was refused, and the honest thing to show is a failure with a
+   * way out rather than a story about the import.
+   */
+  knownGroupCount: number
 }
 
 type LoadState =
@@ -65,7 +88,12 @@ function getOrCreateOffset(): number {
   return offset
 }
 
-export function QueueBoard({ eventId, eventCode, canImport }: QueueBoardProps) {
+export function QueueBoard({
+  eventId,
+  eventCode,
+  canImport,
+  knownGroupCount,
+}: QueueBoardProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -247,7 +275,20 @@ export function QueueBoard({ eventId, eventCode, canImport }: QueueBoardProps) {
       {state.phase === 'loading' ? (
         <LoadingRows count={8} />
       ) : rows === null ? null : rows.length === 0 ? (
-        filtersActive ? (
+        // Order matters: the refused-read case is checked BEFORE the filter
+        // case. A stale session returns zero rows whether or not a filter is
+        // set, and "no families match these filters" would be just as wrong an
+        // explanation as the import one — it would send a caller clearing
+        // filters that were never the problem.
+        knownGroupCount > 0 ? (
+          <ErrorState
+            title="Could not load the calling queue"
+            description={`This event has ${knownGroupCount} ${
+              knownGroupCount === 1 ? 'family' : 'families'
+            } on file, so this is a loading problem, not an empty list. Your sign-in may have expired — retry, and sign in again if it keeps happening.`}
+            onRetry={retry}
+          />
+        ) : filtersActive ? (
           <EmptyState
             icon={<InboxIcon className="h-7 w-7" />}
             title="No families match these filters"
