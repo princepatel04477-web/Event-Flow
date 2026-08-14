@@ -690,6 +690,24 @@ Things that are *acceptable* but must not be discovered at 11pm on event eve.
   for you. Container defaults to `supabase_db_Nuvent`; override with
   `CONTAINER=… bash tests/run-l4.sh` or pass it as `$1`.
 
+- **Wi-Fi drops → wait. Do NOT reload.** This is a training line, not a code item.
+  Remote-shell mode has no local bundle, so there is nothing behind the current
+  screen: a reload or a navigation during an outage lands on `offline.html` and
+  the app is unreachable until signal returns. What survives is narrow but real —
+  writes already submitted are queued in IndexedDB (delivery proofs, call
+  attempts, voice notes) and drain on reconnect, and the screen already rendered
+  stays usable.
+
+  Tell staff in these words, because the instinct is to reload and reloading is
+  the single action that makes it worse:
+
+  > **If the app stops responding, don't reload and don't press back. Wait.**
+  > Whatever is on your screen still works, and anything you already saved will
+  > send itself when the signal comes back. Reloading loses the screen you are on.
+
+  The fix is a client data layer (M9) and it is post-event. Until then this
+  sentence is the mitigation.
+
 ---
 
 ## 12. Known traps (learned the hard way — do not rediscover these)
