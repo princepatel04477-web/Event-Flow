@@ -61,7 +61,11 @@ const BASE_URL = (env.SMOKE_BASE_URL ?? '').replace(/\/$/, '')
 const SUPABASE_URL = (env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/$/, '')
 const ANON_KEY = env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
 const SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY ?? ''
-const EVENT_CODE = env.SMOKE_EVENT_CODE ?? 'SHARMA26'
+// No default. A fallback event code is how a pre-event gate ends up cheerfully
+// green against an event nobody is running: SHARMA26 was hardcoded here, and
+// the suite kept certifying it long after it stopped being the live event.
+// Refusing to run is the only honest behaviour when the target is unstated.
+const EVENT_CODE = env.SMOKE_EVENT_CODE ?? ''
 
 const HTTP_TIMEOUT_MS = 25_000
 
@@ -150,14 +154,26 @@ async function countRows(table, eventId) {
 function preflight() {
   const missing = []
   if (!BASE_URL) missing.push('SMOKE_BASE_URL')
+  if (!EVENT_CODE) missing.push('SMOKE_EVENT_CODE')
   if (!SUPABASE_URL) missing.push('SUPABASE_URL')
   if (!ANON_KEY) missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY')
   if (!SERVICE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY')
+  // The spec falls back to E2E_TEAM_CODE when SMOKE_TEAM_CODE is unset, and
+  // that fallback belongs to whichever event the E2E fixtures use. When the
+  // two disagree, the whole critical path signs into event A and then browses
+  // event B: every walk fails, none of the failures are real, and the suite
+  // has never once exercised the event it prints at the top of its own report.
+  // That happened — SMOKE_TEAM_CODE was empty while SMOKE_EVENT_CODE was set —
+  // and it also tripped a React #310 on the cross-event notFound() path, which
+  // read as a product crash for hours. Refuse rather than infer.
+  if (!env.SMOKE_TEAM_CODE) missing.push(`SMOKE_TEAM_CODE (a TEAM code for ${EVENT_CODE || 'SMOKE_EVENT_CODE'})`)
   if (missing.length) {
     console.error('\nSmoke cannot start. Missing from .env.test / .env.local:\n  ' + missing.join('\n  '))
     console.error(
       '\nSMOKE_BASE_URL must be the STABLE production alias (e.g. https://nuvent-five.vercel.app),\n' +
-        'never a per-deployment URL — those keep answering 200 forever while serving old code.\n',
+        'never a per-deployment URL — those keep answering 200 forever while serving old code.\n' +
+        'SMOKE_TEAM_CODE and SMOKE_CLIENT_CODE must belong to SMOKE_EVENT_CODE. A code from a\n' +
+        'different event produces a suite that fails everything for reasons that are not real.\n',
     )
     process.exit(2)
   }
