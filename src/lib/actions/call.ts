@@ -332,7 +332,14 @@ export async function releaseGroupAfterCall(
     .eq('event_id', eventId)
     .maybeSingle()
 
+  // BOTH queue routes, because there are genuinely two of them. `/queue` is
+  // not a redirect to `/rsvp/queue` — they are two page trees rendering two
+  // copies of the same board, and the bottom nav reaches one while a
+  // bookmark or a back-button reaches the other. Revalidating only the
+  // `/rsvp/queue` path left a caller sitting on `/queue` looking at a lock
+  // this call had just released, on the highest-traffic screen in the app.
   revalidatePath(`/${eventCode}/rsvp/queue`)
+  revalidatePath(`/${eventCode}/queue`)
 
   const stillLocked = Boolean(
     (data?.locked_by || data?.locked_by_staff) &&
