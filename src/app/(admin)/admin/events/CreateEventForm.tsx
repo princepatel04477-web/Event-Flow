@@ -64,33 +64,24 @@ export function CreateEventForm() {
           </div>
         </div>
 
-        {/* Staff first, event second — and not as a suggestion.
-            A new event has no `staff_members` rows, and every insert and
-            update policy in the schema ANDs `app.has_staff_identity(event_id)`,
-            which is minted only by tapping a name on /pick-staff. So an event
-            with an empty staff list is fully readable and completely
-            unwritable: the team code signs in, every screen loads, and nothing
-            anyone types ever saves. Handing over the codes before a single
-            name exists is handing over an event that cannot be used. */}
-        <div className="rounded-2xl border border-rule bg-tint-warning px-4 py-3">
-          <p className="text-sm font-medium text-warning">
-            Nobody can save anything on {state.created.eventCode} yet. Add the staff names
-            first — until one exists, the team code signs in but every write is refused.
-          </p>
-        </div>
-
+        {/* The event is usable the moment it exists. This block used to warn
+            that nothing could be saved until a staff name was added, and made
+            "Add staff" the primary action — correct while every insert policy
+            ANDed `app.has_staff_identity`, wrong since migration
+            20260814140000 removed that gate. Adding names is now purely about
+            attribution, so it is offered, not demanded. */}
         <a
-          href={`/admin/events/${state.created.eventCode}/staff`}
+          href={`/${state.created.eventCode}`}
           className="tap inline-flex min-h-14 w-full items-center justify-center rounded-xl border border-transparent bg-ink px-5 py-3.5 text-lg font-semibold text-paper active:opacity-85"
         >
-          Add staff to {state.created.eventCode}
+          Open {state.created.eventCode}
         </a>
 
         <a
-          href={`/${state.created.eventCode}`}
+          href={`/admin/events/${state.created.eventCode}/staff`}
           className="tap inline-flex min-h-14 w-full items-center justify-center rounded-xl border border-rule-strong bg-surface px-5 py-3.5 text-base font-semibold text-ink active:bg-surface-2"
         >
-          Skip — open {state.created.eventCode}
+          Add staff names (optional)
         </a>
       </div>
     )

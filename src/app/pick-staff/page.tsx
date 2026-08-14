@@ -65,8 +65,8 @@ export default async function PickStaffPage() {
         title="No staff on this event yet"
         description={
           isAdmin
-            ? 'There are no team members assigned to this event yet. Add at least one from the admin screen before anyone can write data.'
-            : 'Your event admin has not added staff names yet. Ask whoever gave you this code to add you. Once a name is on the list, refreshing this page will let you pick it.'
+            ? 'No names on this event yet. Nothing is blocked — writes work either way since migration 20260814140000 — but they will not record who made them. Add names from the admin screen if you want that.'
+            : 'Your event admin has not added staff names yet. Nothing is blocked: go back and carry on. If you want your work recorded under your name, ask whoever gave you this code to add you.'
         }
         action={
           isAdmin ? (

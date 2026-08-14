@@ -112,7 +112,23 @@ export function CodeLoginForm({ next }: { next: string }) {
       // Persisted BEFORE the redirecting server action: setCodeAuthSession
       // ends in redirect(), and anything after it on the client is not
       // guaranteed to run.
-      const target = body.app_role === 'team' ? '/pick-staff' : '/'
+      // Team sessions used to be routed to /pick-staff, because every write
+      // policy required a staff_member_id claim and one had to be bound before
+      // anything could be saved. Migration 20260814140000 removed that gate,
+      // so the picker no longer unblocks anything — it would just be a screen
+      // asking a question whose answer is no longer used.
+      //
+      // /pick-staff and the admin staff screen both still exist. Naming
+      // yourself is now optional: do it and writes carry your name, skip it
+      // and they carry nobody.
+      //
+      // `next` was being ignored entirely — both branches of the old ternary
+      // discarded it — so anyone arriving from a deep link (the proxy sends
+      // /login?next=<path> for any guarded URL) was dropped at the root after
+      // signing in, and had to find their way back by hand. Only same-origin
+      // paths are honoured: a value starting `//` is a protocol-relative URL
+      // pointing at another host, which is an open redirect, not a route.
+      const target = next?.startsWith('/') && !next.startsWith('//') ? next : '/'
       await persistClaims({ token: body.access_token, staffMemberId: null, eventCode: null })
       await setCodeAuthSession(body.access_token, target)
     } catch (err) {

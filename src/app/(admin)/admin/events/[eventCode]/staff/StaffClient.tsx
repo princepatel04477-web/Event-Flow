@@ -110,9 +110,9 @@ export function StaffClient({
           role="alert"
           className="rounded-xl border border-rule bg-tint-warning px-4 py-3 text-sm font-medium text-warning"
         >
-          Nobody is on this list, so nothing can be saved on this event — not a call
-          outcome, not a room, not an import. Reading works; every write is refused.
-          Add one name to fix it.
+          Nobody is on this list. The event works — calls, rooms, imports and photos all
+          save — but none of them will say who did it. Adding names here is the only way
+          to get that back; it cannot be filled in afterwards.
         </div>
       ) : null}
 

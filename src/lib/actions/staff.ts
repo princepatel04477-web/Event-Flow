@@ -6,27 +6,24 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 
 /**
- * Staff members — the identity that every write in this app is gated on.
+ * Staff members — now attribution only, not a gate.
  *
- * `app.has_staff_identity(event_id)` reads the `staff_member_id` claim off the
- * session JWT, and EVERY insert/update policy in the schema ANDs it with
- * `app.is_staff(event_id)`: hotels, rooms, guests, guest_groups,
- * import_batches, import_rows, trips, vehicles, deliverables, travel_legs,
- * room_assignments, call_attempts, call_recordings, transcripts,
- * rsvp_extractions, messages. Eighteen tables, no exceptions.
+ * HISTORY, because the code reads oddly without it. Every insert/update policy
+ * on 18 tables used to be `app.is_staff(event_id) AND
+ * app.has_staff_identity(event_id)`, where the second half required a
+ * `staff_member_id` JWT claim minted by tapping a name on /pick-staff. An event
+ * with no staff rows was fully readable and completely unwritable, and from a
+ * phone that did not look like a permission problem: the screen loaded, the
+ * form submitted, the spinner never stopped. SHARMA26 shipped in that state.
  *
- * That claim is only minted when someone taps their name on /pick-staff, and
- * that list is `staff_members` for the event. So an event with no staff rows
- * is an event where every read works perfectly and every single write is
- * refused by RLS — which from a phone does not look like a permission problem
- * at all. The screen loads, the form submits, the spinner never stops.
- *
- * SHARMA26 shipped in exactly that state. Until this module there was no code
- * path anywhere in the app that inserted a `staff_members` row: the admin
- * dashboard warned "add at least one name" and pointed nowhere, and
- * /pick-staff offered an admin a button to `/admin/events/<code>/staff`, a
- * route that did not exist. The two live staff rows on SAMPLE2026 were
- * inserted by hand against the database.
+ * Migration 20260814140000 removed the gate at the owner's instruction. Writes
+ * no longer require an identity, so this module no longer unblocks anything.
+ * What it still does is make attribution POSSIBLE: with a name bound, the
+ * `_staff` sibling columns (caller_id_staff, captured_by_staff, ...) are filled
+ * by `app.route_attribution`; without one they stay null and "who did this" has
+ * no answer. delivery_proofs are insert-only and immutable, so an unattributed
+ * proof can never be corrected — this is not something to fix up after the
+ * event.
  *
  * Writes here are admin-only and the DATABASE is the fence —
  * `staff_members_ins with check (app.is_admin())`, same for update and

@@ -30,17 +30,17 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
   return (
     <div className="flex flex-col gap-8">
       {staffCount === 0 ? (
-        // A gate that names a problem has to point at the fix. This banner
-        // used to be a dead end: it is the ONLY warning that an event cannot
-        // be written to at all (every insert policy ANDs
-        // `app.has_staff_identity`), and it offered no way to add the name it
-        // was asking for.
+        // Advisory since migration 20260814140000. This used to say nothing
+        // could be saved without a staff name, which was true while every
+        // insert policy ANDed `app.has_staff_identity`. That gate is gone, so
+        // the old wording would now be a false alarm — and a warning that
+        // cries wolf is worse than none, because the next real one is ignored.
         <Link
           href={`/admin/events/${event.code}/staff`}
           className="tap block rounded-xl bg-tint-warning px-4 py-3 text-sm font-medium text-warning underline"
         >
-          No staff members on this event. Nobody can log in and nothing can be saved —
-          add at least one name.
+          No staff names on this event. Everything still works, but calls,
+          photos and room changes will be recorded against nobody.
         </Link>
       ) : null}
 
