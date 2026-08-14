@@ -123,7 +123,11 @@ export function ImportPreview({
           <PreviewStep
             eventId={eventId}
             fileName={fileName}
-            outcome={outcome}
+            // `layout` exists only on the known-layout success. Its absence is
+            // how we know parseImportFile fell through to the contacts sheet:
+            // both shapes carry the same `result`, which is precisely why the
+            // fallback was invisible.
+            outcome={{ ...outcome, contactsFallback: !('layout' in outcome) }}
             context={context}
             onCommitted={handleStartOver}
           />

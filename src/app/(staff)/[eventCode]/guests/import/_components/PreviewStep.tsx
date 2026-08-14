@@ -23,6 +23,20 @@ export interface PreviewOutcome {
   /** Optional-column notes, for the preview's info lines. */
   notes: LayoutNote[]
   result: ParsedFamilySheet
+  /**
+   * True when the full CALLING MASTER LIST layout did NOT resolve and
+   * `parseImportFile` fell back to the contacts layout (name + mobile only).
+   *
+   * The fallback is deliberate and useful — a plain two-column contact list
+   * is a legitimate way to start an event. What is NOT acceptable is that it
+   * looked identical to a full import: a sheet headed
+   * Family/Serial/Guest Name/City/Phone/Headcount parses happily, reports its
+   * families and guests, and silently discards Pax and every travel column.
+   * Those are exactly the headers someone writes when inventing their own
+   * sheet, and the gap only surfaces later, when room allocation has no
+   * headcount to work with.
+   */
+  contactsFallback: boolean
 }
 
 export interface PreviewStepProps {
@@ -89,6 +103,38 @@ export function PreviewStep({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Top of the screen, not buried in the warnings list. This is the one
+          thing that changes what the operator should DO — everything below it
+          describes an import that is about to drop half their columns. */}
+      {outcome.contactsFallback ? (
+        <div
+          role="alert"
+          className="rounded-2xl border border-ledger-red bg-red-tint px-4 py-3"
+        >
+          <p className="text-sm font-semibold text-ledger-red">
+            Reading this as a contacts sheet: name and mobile only.
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-fg">
+            The full calling-list columns were not found, so{' '}
+            <span className="font-semibold">Pax and every travel column will be
+            ignored</span>{' '}
+            — arrival and departure dates, times, modes, pickup and drop. Names
+            and phone numbers still import correctly.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-fg">
+            If you expected those to import, stop and{' '}
+            <a
+              href="/nuvent-guest-list-template.xlsx"
+              download
+              className="font-semibold text-ledger-red underline underline-offset-2"
+            >
+              download the template
+            </a>{' '}
+            — its headers are the ones this importer looks for.
+          </p>
+        </div>
+      ) : null}
+
       <Card>
         <CardBody className="flex flex-col gap-2">
           <p className="text-sm text-muted">
