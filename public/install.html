@@ -50,7 +50,22 @@
 
   <div class="card">
     <span class="version">final-03 (build 3)</span>
-    <a class="download" href="nuvent-final-03.apk" download>Download APK</a>
+    <!-- ABSOLUTE, and pointing at the storage bucket rather than this host.
+         It was a relative `nuvent-final-03.apk`, which resolved against
+         whatever origin served this page — and the APK has never been in
+         `public/`. On Vercel the request therefore fell through the static
+         handler into the `[eventCode]` route, which answered 200 with ~23KB
+         of HTML. Not a 404: the browser saved an HTML page under an .apk
+         name, and the package installer rejected it as a corrupt archive.
+         A 404 would at least have said "missing"; a 200 said "here is your
+         app" and handed over a web page.
+
+         The bucket is also the only origin that is right from every context
+         this link is opened in — the deployed site, a copy of this file
+         mailed to someone, and the stale copy `cap sync` bakes into the APK
+         itself at assets/public/install.html. A relative href is wrong in
+         two of those three. -->
+    <a class="download" href="https://xktxnkuzplhzxkevwrcj.supabase.co/storage/v1/object/public/app-releases/nuvent-final-03.apk" download>Download APK</a>
     <p style="margin:0 0 10px;font-size:14px;color:var(--muted)">
       If the download is blocked or renamed, use a computer and a USB cable, or ask the event tech lead for the file.
     </p>
@@ -73,7 +88,7 @@
          WebView loads the deployed site), so it costing nothing is the whole
          reason this works. -->
     <p style="margin:0;font-size:12px;color:var(--muted)">
-      SHA-256 <code style="font-size:11px;word-break:break-all">1a819c32f7d1807072b58864046caac521201cb782378d8f09af9c76b68e3425</code>
+      SHA-256 <code style="font-size:11px;word-break:break-all">04f800bcac263fdf047b8ea5e55f217fa248cf4bf1e974bacbe3658d67baa00e</code>
     </p>
   </div>
 
