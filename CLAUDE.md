@@ -386,8 +386,26 @@ Enforced at the **database level**, not in application code. Do not weaken them.
   caller only ever releases their own lock, never relying on `release_group`'s
   `or app.is_admin()` branch). Two handsets can still open the same family for a CALL,
   but only one can hold the RSVP logging lock at a time. The attribution CHECK on
-  `call_attempts` (`num_nonnulls(caller_id, caller_id_staff) = 1`) is NOT the lock and
-  is NOT negotiable — it must never be softened.
+  `call_attempts` is NOT the lock — do not confuse the two.
+- **The `call_attempts` attribution CHECK is `<= 1`, softened 2026-08-14.**
+  It read `num_nonnulls(caller_id, caller_id_staff) = 1` and this section said it
+  must never be softened. It was softened deliberately, by migration
+  `20260814140000` (see also commit `87dd3b9`), and the reason overrode the rule:
+  `= 1` meant a code-auth session with no staff identity could not insert a call
+  attempt at all, and since every insert policy also required
+  `app.has_staff_identity`, an event with no staff roster was fully readable and
+  completely unwritable. SHARMA26 shipped in that state — every screen loaded,
+  every form submitted, nothing saved.
+  **The trade, stated plainly:** an unnamed caller's writes land unattributed and
+  stay that way. `call_attempts` freezes once `outcome` is set and
+  `delivery_proofs` are insert-only with `block_mutation` triggers, so neither can
+  be back-filled — not by an admin, not by the service role.
+  **The mitigations are a routing default and a habit, not a constraint:**
+  team login goes to `/pick-staff` so the question is always asked, and the picker
+  offers Skip rather than blocking. **Operational rule: every caller picks their
+  name at the start of the day.** That is a checklist item. Nothing enforces it.
+  Post-event, revisit whether this should return to `= 1` behind a
+  roster-required-at-event-creation flow. Not before.
 - **Individual member names are collected later**, at room allocation — not over the phone.
 - **Hampers and return gifts are the same shape.** One `deliverables` table with a `kind`
   enum, one insert-only `delivery_proofs` table. Do not build it twice.
