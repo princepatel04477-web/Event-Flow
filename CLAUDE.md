@@ -661,6 +661,46 @@ first `db push`.
 
 ---
 
+## 11a. Static export — v2 scope, and why it is not a config flip
+
+`output: 'export'` is set and the app compiles. It cannot finish, and the blocker is
+structural rather than a matter of remaining effort.
+
+**The real requirement: convert every nested dynamic segment to a query param.**
+Twelve segments, `[groupId]`, `[hotelId]`, `[roomId]`, `[deliverableId]`,
+`[extractionId]`, spanning the call screen, RSVP detail, review screen, hotel detail,
+room edit and delivery detail. None of these are optional screens.
+
+**Why the error message misleads.** `next/dist/build/index.js:1362`:
+
+```js
+const hasGenerateStaticParams = workerResult.prerenderedRoutes && workerResult.prerenderedRoutes.length > 0
+if (config.output === 'export' && isDynamic && !hasGenerateStaticParams) throw ...
+  // "Page X is missing generateStaticParams() ..."
+```
+
+It does not test whether the export exists. It tests whether the page **produced at
+least one route**. A `generateStaticParams` that returns `[]` is present and still
+fatal. Two things follow, both of which cost a session to learn:
+
+- A codemod flipping `return [{}]` → `return []` (see `scripts/m2-fix-brackets.mjs` in
+  `803104a`) swaps one zero-route form for another. Both throw. It cannot work.
+- The page named in the error **varies between runs** — 15 parallel workers, first
+  thrower wins. Do not chase the named page; it is not special.
+
+**Baking row ids into `generateStaticParams` is REJECTED.** It "works" on the build
+machine and fails in the field: any guest group, hotel, room, deliverable or extraction
+created after the build has no prebuilt route, so the screen is unreachable on every
+handset until the next APK ships. An event where staff add rows all day would be
+generating dead links continuously. Querying Supabase at build time also bakes real row
+ids into an artifact anyone can unzip.
+
+Also still open if this is picked up again: 58 per-page `return []` stubs override the
+layout above them and must be deleted rather than edited, and
+`(admin)/admin/events/[eventCode]/` has no layout at all.
+
+---
+
 ## 11b. Event-day operational limits (known numbers, not surprises)
 
 Things that are *acceptable* but must not be discovered at 11pm on event eve.
@@ -707,6 +747,76 @@ Things that are *acceptable* but must not be discovered at 11pm on event eve.
 
   The fix is a client data layer (M9) and it is post-event. Until then this
   sentence is the mitigation.
+
+## 11c. The event build, and the event-day checklist
+
+**The event build is the remote shell.** Verified 12 August 2026:
+
+```
+path      C:\android-builds\nuvent\debug\outputs\apk\release\app-release.apk
+copy      C:\android-builds\nuvent\nuvent-2.0-release.apk   (identical)
+size      6,551,504 bytes
+sha256    357586be5547f47aaae0296705feaf3dfe0ab5dd7f991b0d64b15112198d20b3
+version   versionCode 2 / versionName 2.0   (read from the APK, not the source)
+signer    CN=Nuvent, O=Varunya Technologies   SHA-256 e865d4c1b3865da6…
+baked url https://nuvent-five.vercel.app     (read from assets/capacitor.config.json
+                                              INSIDE the apk; exact, 30 chars, no
+                                              trailing space or slash)
+```
+
+Note the path: `android/app/build.gradle` sets `buildDir = "C:/android-builds/nuvent/debug"`
+to escape OneDrive's file locks, so **nothing is ever written to
+`android/app/build/outputs/`** despite what every Android tutorial says.
+
+**What remote shell means on the day.** The WebView fetches the entire app from Vercel
+at launch. There is no bundled copy. Network is a hard dependency, not a degradation —
+this is the cost of deferring static export (§11a) and it is the thing the checklist
+below exists to manage.
+
+### Event-day checklist
+
+- [ ] **Launch the app on every handset, on known-good Wi-Fi, before leaving for the
+      venue.** First launch is when the WebView pulls and caches the JS bundle, and when
+      each staff member's session is established. Doing that for the first time on venue
+      Wi-Fi means doing the single most network-hungry step of the day at the worst
+      moment available. Confirm each phone reaches a real screen, not the splash.
+- [ ] **Mobile data enabled on every handset**, as the fallback path. Venue Wi-Fi is the
+      documented single point of failure (§3) and in remote-shell mode there is nothing
+      local to fall back to. A phone with mobile data off has no second route.
+- [ ] **Do not force-close the app during the event.** Backgrounding is fine and expected
+      — `tel:` backgrounds the WebView on every call. Force-closing is not: it discards
+      `sessionStorage`, which holds the in-flight `call_attempts` id that the resume-first
+      dial flow rehydrates on return (§12). Kill the app mid-call and that row never gets
+      its `outcome`, so the attempt stays open forever — and per §5.4 the row is
+      append-only, so it cannot be tidied up afterwards. It also forces a full re-fetch
+      from Vercel on the next launch.
+
+---
+
+## 11d. The parked static-export branch — `feat/m2-static-export-bundle`
+
+**Parked branch, NOT merged. Do not merge it without first re-deciding the static export
+question in §11a.** Static export was deferred to v2 on **12 August 2026**; the event build
+is the remote shell (§11c). Do not resume this branch before the event.
+
+The branch is pushed, so it is recoverable — these are the only two SHAs recording that
+work, and they are written down nowhere else:
+
+| | |
+|---|---|
+| `803104a` | savepoint: uncommitted work from a concurrent session, committed unreviewed |
+| `10ffd94` | trailingSlash, bundled androidScheme, pinned event params, raw hotel insert error |
+
+Both subjects carry a stray leading `@` (PowerShell here-string syntax used in bash).
+**This is DELIBERATE — DO NOT FIX.** Left as-is because the branch is a pushed
+recoverability anchor, and rewriting published history to correct a cosmetic defect is a
+worse trade than the defect. A future session that "tidies" these subjects is undoing a
+decision, not fixing a typo.
+
+Note on provenance: on the branch this text was a `**Stopped — static export deferred to
+v2**` block inside its own §11, positioned within a status list (`P1`, `P3`, `P1G/P1H`
+bullets) that master's §11 does not carry. It is a standalone section here so it depends on
+no anchor outside itself; nothing was dropped in the move.
 
 ---
 
