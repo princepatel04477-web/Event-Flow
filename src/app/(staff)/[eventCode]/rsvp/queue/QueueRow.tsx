@@ -58,11 +58,14 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
 
   // Presence signal: when staff opened this group within the last 15 min.
   // guest_groups columns added by migration 20260812000000_presence_columns.
-  const lastOpenedBy = (row as Record<string, unknown>).last_opened_by_staff as string | null
+  // `now` is captured once at mount (useState initialiser) — Date.now() in
+  // render violates React's purity rule; a stale-by-a-render "now" is fine
+  // for a 15-minute presence window.
+  const [now] = useState(() => Date.now())
   const lastOpenedAt = (row as Record<string, unknown>).last_opened_at as string | null
   const openedRecently =
     lastOpenedAt != null &&
-    new Date(lastOpenedAt).getTime() > Date.now() - 15 * 60_000
+    new Date(lastOpenedAt).getTime() > now - 15 * 60_000
 
   // Resolve the staff name from the view's own joined column
   const lastOpenedByName = (row as Record<string, unknown>).last_opened_by_name as string | undefined
