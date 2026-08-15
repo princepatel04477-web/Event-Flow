@@ -15,6 +15,7 @@ import {
   type VehicleRow,
 } from '@/lib/actions/fleet'
 import { QuickAddVehicles } from '@/components/fleet/QuickAddVehicles'
+import { DriverRoster } from '@/components/fleet/DriverRoster'
 import { OdometerEntry, OdometerRecent } from '@/components/fleet/OdometerEntry'
 import { KmDashboard } from '@/components/fleet/KmDashboard'
 import { VehicleAvailabilityPanel } from '@/components/fleet/VehicleAvailability'
@@ -132,6 +133,12 @@ export function FleetClient({ eventId }: Props) {
           </CardBody>
         </Card>
       )}
+
+      {/* Driver roster + who has which car today. */}
+      <DriverRoster
+        eventId={eventId}
+        vehicles={data.vehicles.map((v) => ({ id: v.id, label: v.label }))}
+      />
 
       {/* Daily KM entry (§3.3) — the event team's manual odometer form. */}
       <OdometerEntry

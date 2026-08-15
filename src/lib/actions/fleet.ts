@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { friendlyDbError } from '@/lib/errors'
+import { normalisedMobile } from '@/lib/phone'
 import { z } from 'zod'
 
 // ---------------------------------------------------------------------------
@@ -306,13 +307,24 @@ export async function createDriver(
     return { ok: false, error: parsed.error.issues.map((i) => i.message).join('; ') }
   }
 
+  // `drivers.mobile` is documented in the migration as "normalised 10-digit,
+  // or null" and this action was writing whatever was typed. The number is
+  // dialled from the fleet screen and messaged by the pickup summary, so a
+  // "+91 98765 43210" stored verbatim is a tel: link that may not dial and a
+  // to_number the provider may reject. Same helper the guest import uses.
+  const typedMobile = parsed.data.mobile?.trim()
+  const mobile = typedMobile ? normalisedMobile(typedMobile) : null
+  if (typedMobile && !mobile) {
+    return { ok: false, error: 'That mobile number is not a valid 10-digit Indian number.' }
+  }
+
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('drivers')
     .insert({
       event_id: parsed.data.eventId,
       full_name: parsed.data.fullName,
-      mobile: parsed.data.mobile || null,
+      mobile,
       notes: parsed.data.notes || null,
     })
     .select('id')
@@ -320,6 +332,121 @@ export async function createDriver(
 
   if (error) return { ok: false, error: friendlyDbError(error) }
   return { ok: true, id: data.id }
+}
+
+// ---------------------------------------------------------------------------
+// Driver <-> vehicle assignment, per day
+// ---------------------------------------------------------------------------
+
+export interface VehicleAssignmentRow {
+  id: string
+  assignDate: string
+  vehicleId: string
+  vehicleLabel: string | null
+  driverId: string
+  driverName: string
+  driverMobile: string | null
+}
+
+/**
+ * Who is driving what, on a given day. Drivers swap cars between days, which
+ * is why this is a table and not a column on `vehicles` — the per-vehicle
+ * `driver_name` / `driver_mobile` columns predate the roster and describe the
+ * vendor's default driver, not today's.
+ */
+export async function readVehicleAssignments(
+  eventId: string,
+  date?: string,
+): Promise<{ ok: true; rows: VehicleAssignmentRow[] } | { ok: false; error: string }> {
+  const supabase = await createClient()
+
+  let query = supabase
+    .from('vehicle_assignments')
+    .select('id, assign_date, vehicle_id, driver_id, vehicles(label), drivers(full_name, mobile)')
+    .eq('event_id', eventId)
+
+  if (date) query = query.eq('assign_date', date)
+
+  const { data, error } = await query.order('assign_date', { ascending: false })
+  if (error) return { ok: false, error: friendlyDbError(error) }
+
+  const rows: VehicleAssignmentRow[] = (data ?? []).map((r) => {
+    const vehicle = r.vehicles as unknown as { label: string | null } | null
+    const driver = r.drivers as unknown as { full_name: string; mobile: string | null } | null
+    return {
+      id: r.id,
+      assignDate: r.assign_date,
+      vehicleId: r.vehicle_id,
+      vehicleLabel: vehicle?.label ?? null,
+      driverId: r.driver_id,
+      driverName: driver?.full_name ?? 'Unknown driver',
+      driverMobile: driver?.mobile ?? null,
+    }
+  })
+
+  return { ok: true, rows }
+}
+
+const assignmentSchema = z.object({
+  eventId: z.string().uuid(),
+  vehicleId: z.string().uuid(),
+  driverId: z.string().uuid(),
+  assignDate: z.string().min(1, 'Pick a date'),
+})
+
+export type VehicleAssignmentInput = z.infer<typeof assignmentSchema>
+
+/**
+ * Pair a driver with a vehicle for one day.
+ *
+ * Two partial unique indexes back this: one vehicle takes one driver per day,
+ * and one driver takes one vehicle per day. Rather than clearing whatever is
+ * in the way, a collision is reported and the existing row is left alone —
+ * "this car already has a driver today" is information the desk needs, and
+ * silently reassigning is how two people end up believing different things
+ * about the same car. Remove the existing pairing first.
+ */
+export async function assignDriverToVehicle(
+  input: VehicleAssignmentInput,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const parsed = assignmentSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((i) => i.message).join('; ') }
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('vehicle_assignments')
+    .insert({
+      event_id: parsed.data.eventId,
+      vehicle_id: parsed.data.vehicleId,
+      driver_id: parsed.data.driverId,
+      assign_date: parsed.data.assignDate,
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    if (error.code === '23505') {
+      return {
+        ok: false,
+        error:
+          'Already assigned for that date — either this car already has a driver, ' +
+          'or this driver already has a car. Remove the existing pairing first.',
+      }
+    }
+    return { ok: false, error: friendlyDbError(error) }
+  }
+  return { ok: true, id: data.id }
+}
+
+export async function unassignDriver(
+  assignmentId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('vehicle_assignments').delete().eq('id', assignmentId)
+  if (error) return { ok: false, error: friendlyDbError(error) }
+  return { ok: true }
 }
 
 // ---------------------------------------------------------------------------
