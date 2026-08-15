@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { PageTitle } from '@/components/ui/PageTitle'
+import { CheckCircleIcon } from '@/components/icons'
 import { createHotel } from '@/lib/actions/hotels'
 
 interface Props {
@@ -14,6 +16,12 @@ interface Props {
   eventCode: string
   eventName: string
 }
+
+// How long to wait before admitting the automatic navigation might not be
+// coming. Not a timeout that cancels anything — router.push has no cancel
+// API — just the point where staring at "opening…" stops being honest and
+// the slow-connection hint appears next to the link that was already there.
+const SLOW_NAV_HINT_MS = 4000
 
 export function HotelCreateForm({ eventId, eventCode, eventName }: Props) {
   const router = useRouter()
@@ -24,10 +32,52 @@ export function HotelCreateForm({ eventId, eventCode, eventName }: Props) {
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  // Distinct from `submitting` so the button can say "Created — opening…"
-  // rather than sitting on "Creating…" while the RSC navigation is in flight.
-  // The write is already durable at that point and the label should say so.
-  const [created, setCreated] = useState(false)
+  // Holds the created hotel's id+name once the write lands, so the success
+  // view can build a real link — not just a label — the instant it renders.
+  const [created, setCreated] = useState<{ id: string; name: string } | null>(null)
+  const [slow, setSlow] = useState(false)
+
+  // `router.push()` fetches the destination's RSC payload over the network.
+  // On venue Wi-Fi that fetch can stall for a long time, and push has no
+  // built-in timeout or escape hatch — once fired, this component had
+  // nothing else to show. It waited on "Created — opening…" forever with
+  // no link, no retry, nothing to tap. This is that escape hatch: it does
+  // not cancel the push (there's nothing to cancel), it just stops
+  // pretending the wait is short.
+  useEffect(() => {
+    if (!created) return
+    const t = setTimeout(() => setSlow(true), SLOW_NAV_HINT_MS)
+    return () => clearTimeout(t)
+  }, [created])
+
+  if (created) {
+    const href = `/admin/events/${eventCode}/hotels/${created.id}`
+    return (
+      <div className="flex flex-col items-center gap-5 py-12 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-tint text-ledger-green">
+          <CheckCircleIcon className="h-7 w-7" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-fg">{created.name} added</h2>
+          <p className="mt-1 text-sm text-muted">
+            {slow
+              ? 'Still opening — this connection is slow. Tap below whenever you\'re ready.'
+              : 'Opening it now…'}
+          </p>
+        </div>
+        {/* A real <Link>, not a second router.push — visible from the first
+            frame, not gated behind the slow-connection timer above. The
+            automatic push above may still land first; this is what's here
+            if it doesn't. */}
+        <Link
+          href={href}
+          className="tap inline-flex min-h-11 w-full max-w-xs items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-brand-fg"
+        >
+          Open {created.name}
+        </Link>
+      </div>
+    )
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -39,11 +89,15 @@ export function HotelCreateForm({ eventId, eventCode, eventName }: Props) {
         contactMobile: contactMobile || null, notes: notes || null,
       })
       if (result.ok) {
-        // Deliberately leaves `submitting` true — navigation is in flight and
-        // re-enabling the button here invites a duplicate insert.
-        setCreated(true)
+        // Deliberately leaves `submitting` true — the create button stays
+        // disabled once `created` is set anyway, since this branch stops
+        // rendering the form.
+        setCreated({ id: result.hotelId, name })
         router.push(`/admin/events/${eventCode}/hotels/${result.hotelId}`)
-        router.refresh()
+        // No router.refresh() here: the destination has no cache entry to
+        // invalidate (it's a hotel that didn't exist a moment ago), so this
+        // was a second fetch competing for bytes with the push that was
+        // already struggling on the same connection, for no benefit.
         return
       }
       setError(result.error ?? 'Failed to create hotel.')
@@ -109,7 +163,7 @@ export function HotelCreateForm({ eventId, eventCode, eventName }: Props) {
       <div className="sticky bottom-nav flex items-center gap-3 bg-paper pt-2 pb-2 md:bottom-0 md:pb-safe">
         <Button type="button" variant="ghost" onClick={() => router.back()} disabled={submitting}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={submitting} className="flex-1">
-          {created ? 'Created — opening…' : submitting ? 'Creating…' : `Add hotel to ${eventName}`}
+          {submitting ? 'Creating…' : `Add hotel to ${eventName}`}
         </Button>
       </div>
     </form>
