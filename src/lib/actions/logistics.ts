@@ -141,6 +141,57 @@ export async function readAvailableVehicles(eventId: string): Promise<VehicleFor
 }
 
 // ---------------------------------------------------------------------------
+// §4.2 — vehicle suggestion by arriving PAX. The system PROPOSES, a human
+// commits. Capacity read live from the vehicles table (luggage-adjusted),
+// never hardcoded. Pure engine in src/lib/logistics/suggestVehicle.ts.
+// ---------------------------------------------------------------------------
+
+import { suggestVehiclesForPax } from '@/lib/logistics/suggestVehicle'
+
+export interface PaxVehicleSuggestion {
+  vehicleId: string
+  vehicleLabel: string | null
+  capacity: number
+  reason: string
+  spareSeats: number
+}
+
+export interface PaxSuggestionResult {
+  pax: number
+  suggestions: PaxVehicleSuggestion[]
+  tooLarge: boolean
+  tooLargeReason: string | null
+}
+
+/**
+ * Suggest vehicles for a group of `pax` at a time slot. Reads the fleet
+ * live, delegates the ranking to the pure engine. Proposes only — nothing
+ * is committed here; the event team's human-commits rule applies.
+ */
+export async function suggestVehiclesForArrival(
+  eventId: string,
+  pax: number,
+): Promise<PaxSuggestionResult> {
+  const vehicles = await readAvailableVehicles(eventId)
+  const result = suggestVehiclesForPax(
+    pax,
+    vehicles.map((v) => ({ id: v.id, label: v.label, capacity: v.capacity })),
+  )
+  return {
+    pax,
+    suggestions: result.suggestions.map((s) => ({
+      vehicleId: s.vehicleId,
+      vehicleLabel: s.vehicleLabel,
+      capacity: s.capacity,
+      reason: s.reason,
+      spareSeats: s.spareSeats,
+    })),
+    tooLarge: result.tooLarge,
+    tooLargeReason: result.tooLargeReason,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Packer: delegates to src/lib/logistics/pack.ts (R3 engine)
 // ---------------------------------------------------------------------------
 // The adapter conforms to pack.ts, not the reverse. It maps the logistics

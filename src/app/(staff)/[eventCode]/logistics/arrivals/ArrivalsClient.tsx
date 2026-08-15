@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
@@ -12,6 +11,7 @@ import { SearchIcon, CheckCircleIcon, AlertTriangleIcon } from '@/components/ico
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton'
 import { createClient } from '@/lib/supabase/client'
 import { markArrived } from '@/lib/actions/event-day'
+import { suggestVehiclesForArrival, type PaxSuggestionResult } from '@/lib/actions/logistics'
 import { traceFetch } from '@/lib/perf'
 import { useStableData } from '@/lib/use-stable-data'
 import { cn, formatDate } from '@/lib/utils'
@@ -315,6 +315,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
               title="Today"
               rows={todayRows}
               pendingGroup={pendingGroup}
+              eventId={eventId}
               onArrive={handleArrive}
             />
           ) : null}
@@ -323,6 +324,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
               title="Later"
               rows={laterRows}
               pendingGroup={pendingGroup}
+              eventId={eventId}
               onArrive={handleArrive}
             />
           ) : null}
@@ -336,11 +338,13 @@ function DayBlock({
   title,
   rows,
   pendingGroup,
+  eventId,
   onArrive,
 }: {
   title: string
   rows: ArrivalRow[]
   pendingGroup: string | null
+  eventId: string
   onArrive: (row: ArrivalRow) => void
 }) {
   return (
@@ -352,6 +356,7 @@ function DayBlock({
             key={row.leg.id}
             row={row}
             index={i}
+            eventId={eventId}
             pending={pendingGroup === row.group.id}
             onArrive={() => onArrive(row)}
           />
@@ -373,11 +378,13 @@ function DayBlock({
 function ArrivalRowCard({
   row,
   index,
+  eventId,
   pending,
   onArrive,
 }: {
   row: ArrivalRow
   index: number
+  eventId: string
   pending: boolean
   onArrive: () => void
 }) {
@@ -386,6 +393,35 @@ function ArrivalRowCard({
   const adults = row.group.adults_confirmed ?? 0
   const children = row.group.children_confirmed ?? 0
   const mode = row.leg.mode ? (MODE_LABELS[row.leg.mode] ?? row.leg.mode) : null
+
+  // §4.2 — vehicle suggestion by PAX. Proposes only; a human commits.
+  const [showSuggest, setShowSuggest] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestion, setSuggestion] = useState<PaxSuggestionResult | null>(null)
+  const [suggestError, setSuggestError] = useState<string | null>(null)
+
+  const pax = adults + children > 0 ? adults + children : row.group.expected_pax
+
+  async function handleSuggest() {
+    if (suggesting) return
+    if (showSuggest && suggestion) {
+      setShowSuggest(false)
+      return
+    }
+    setSuggesting(true)
+    setSuggestError(null)
+    try {
+      const result = await traceFetch(`arrivals :: suggest(${row.leg.id})`, () =>
+        suggestVehiclesForArrival(eventId, pax),
+      )
+      setSuggestion(result)
+      setShowSuggest(true)
+    } catch (e) {
+      setSuggestError(e instanceof Error ? e.message : 'Could not suggest a vehicle.')
+      setShowSuggest(true)
+    }
+    setSuggesting(false)
+  }
 
   return (
     <li
@@ -443,7 +479,50 @@ function ArrivalRowCard({
             {row.group.primary_mobile ? (
               <WhatsAppButton mobile={row.group.primary_mobile} name={row.group.head_name} />
             ) : null}
+            {/* §4.2 — vehicle suggestion by PAX. Proposes only; the pack
+                board is where a human commits. */}
+            {!arrived ? (
+              <button
+                type="button"
+                onClick={() => void handleSuggest()}
+                disabled={suggesting}
+                className="tap inline-flex min-h-11 items-center gap-1 rounded-lg px-2 font-medium text-brand active:opacity-70 disabled:opacity-55"
+              >
+                {suggesting ? '…' : 'Suggest vehicle'}
+              </button>
+            ) : null}
           </div>
+
+          {/* §4.2 — the suggestion panel. Read-only proposal; a human
+              commits on the trip board. */}
+          {showSuggest ? (
+            <div className="mt-2.5 rounded-lg border border-rule bg-surface-2 p-3">
+              {suggestError ? (
+                <p className="text-sm text-ledger-red">{suggestError}</p>
+              ) : suggestion ? (
+                <>
+                  <p className="text-xs font-semibold tracking-eyebrow text-muted uppercase">
+                    {suggestion.pax} people · {suggestion.suggestions.length} option{suggestion.suggestions.length === 1 ? '' : 's'}
+                  </p>
+                  {suggestion.tooLarge ? (
+                    <p className="mt-1.5 text-sm text-ledger-red">{suggestion.tooLargeReason}</p>
+                  ) : (
+                    <ul className="mt-1.5 flex flex-col gap-1.5">
+                      {suggestion.suggestions.map((s) => (
+                        <li key={s.vehicleId} className="text-sm text-ink">
+                          <span className="font-medium">{s.vehicleLabel ?? 'Unnamed'}</span>
+                          <span className="text-muted"> · {s.reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="mt-2 text-xs text-muted">
+                    Proposal only — commit it on the trip planning screen.
+                  </p>
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
 
