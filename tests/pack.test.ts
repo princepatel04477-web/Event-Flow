@@ -23,6 +23,7 @@ const OPTIONS: PackOptions = {
   turnaroundBufferMinutes: 20,
   terminalBufferMinutes: 120,
   loadingBufferMinutes: 15,
+  routeBufferMinutes: 90,
 }
 
 function leg(partial: Partial<PackLeg> & { travelLegId: string }): PackLeg {
@@ -109,7 +110,7 @@ describe('pack — luggage-adjusted capacity only', () => {
 })
 
 describe('pack — departure backwards computation', () => {
-  it('computes pickup = departure − travel − terminal − loading', () => {
+  it('computes pickup = departure − travel − terminal − loading − route buffer', () => {
     const result = pack(
       [leg({ travelLegId: 'l1', pax: 2, time: '14:00' })], // 2:00pm flight
       [vehicle({ id: 'suv', capacity: 4 })],
@@ -117,12 +118,12 @@ describe('pack — departure backwards computation', () => {
       OPTIONS,
     )
     expect(result.trips).toHaveLength(1)
-    // 14:00 − 60 (travel) − 120 (terminal) − 15 (loading) = 10:45
-    expect(result.trips[0].scheduledAt).toBe('2026-12-05T10:45:00')
+    // 14:00 − 60 (travel) − 120 (terminal) − 15 (loading) − 90 (route buffer) = 09:15
+    expect(result.trips[0].scheduledAt).toBe('2026-12-05T09:15:00')
   })
 
   it('flags a departure whose pickup is already in the past', () => {
-    // Pickup 10:45 for a "yesterday" date — the plan must not silently
+    // Pickup 09:15 for a "yesterday" date — the plan must not silently
     // schedule an impossible pickup.
     const result = pack(
       [leg({ travelLegId: 'l1', pax: 2, time: '06:00', date: '2026-12-05' })],
@@ -130,8 +131,8 @@ describe('pack — departure backwards computation', () => {
       'departure',
       OPTIONS,
     )
-    // 06:00 − 60 − 120 − 15 = 02:45 — still same day; verify the math.
-    expect(result.trips[0].scheduledAt).toBe('2026-12-05T02:45:00')
+    // 06:00 − 60 − 120 − 15 − 90 = 01:15 — still same day; verify the math.
+    expect(result.trips[0].scheduledAt).toBe('2026-12-05T01:15:00')
   })
 })
 
@@ -217,10 +218,11 @@ describe('pack — dates are part of the timeline, not decoration', () => {
       'departure',
       OPTIONS,
     )
-    // 02:00 - (60 travel + 120 terminal + 15 loading) = 22:45 the night before.
+    // 02:00 - (60 travel + 120 terminal + 15 loading + 90 route buffer)
+    // = 21:15 the night before.
     // Wrapping modulo 1440 used to stamp this 2026-12-22T22:45 — a pickup
     // scheduled ~21 hours AFTER the flight it was meant to catch.
-    expect(result.trips[0].scheduledAt).toBe('2026-12-21T22:45:00')
+    expect(result.trips[0].scheduledAt).toBe('2026-12-21T21:15:00')
   })
 
   it('keeps a same-day departure on its own day', () => {
@@ -230,7 +232,7 @@ describe('pack — dates are part of the timeline, not decoration', () => {
       'departure',
       OPTIONS,
     )
-    expect(result.trips[0].scheduledAt).toBe('2026-12-22T02:45:00')
+    expect(result.trips[0].scheduledAt).toBe('2026-12-22T01:15:00')
   })
 
   it('never pools families arriving on different days', () => {

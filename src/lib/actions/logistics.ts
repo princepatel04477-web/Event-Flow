@@ -179,26 +179,32 @@ export async function packTrips(
 
   const result = pack(packLegs, packVehicles, direction)
 
-  const trips: ProposedTrip[] = result.trips.map((t) => ({
-    vehicleId: t.vehicleId,
-    vehicleLabel: t.vehicleLabel,
-    capacity: t.capacity,
-    seatsUsed: t.seatsUsed,
-    groups: t.groups.map((g) => ({
-      groupId: g.groupId,
-      headName: g.headName,
-      travelLegId: g.travelLegId,
-      pax: g.pax,
-      travelDate: g.date,
-      travelTime: g.time,
-      point: g.point,
-    })),
-    pickupPoint: t.pickupPoint,
-    scheduledTime: scheduledTimeFromIso(t.scheduledAt),
-    driverName: t.driverName,
-    driverMobile: t.driverMobile,
-    direction: t.direction,
-  }))
+  const trips: ProposedTrip[] = result.trips
+    .map((t) => ({
+      vehicleId: t.vehicleId,
+      vehicleLabel: t.vehicleLabel,
+      capacity: t.capacity,
+      seatsUsed: t.seatsUsed,
+      groups: t.groups.map((g) => ({
+        groupId: g.groupId,
+        headName: g.headName,
+        travelLegId: g.travelLegId,
+        pax: g.pax,
+        travelDate: g.date,
+        travelTime: g.time,
+        point: g.point,
+      })),
+      pickupPoint: t.pickupPoint,
+      scheduledTime: scheduledTimeFromIso(t.scheduledAt),
+      driverName: t.driverName,
+      driverMobile: t.driverMobile,
+      direction: t.direction,
+    }))
+    // §4.1: the pack engine emits trips in leg-processing order
+    // (largest-family-first). The board reads best in time order — a
+    // transport lead works down the clock, not down the load list. Display
+    // and query-order only; nothing about the proposal itself changes.
+    .sort((a, b) => (a.scheduledTime ?? '').localeCompare(b.scheduledTime ?? ''))
 
   const unplaced: UnplacedLeg[] = result.unplaced.map((u) => ({
     travelLegId: u.travelLegId,

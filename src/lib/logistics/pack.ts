@@ -98,6 +98,13 @@ export interface PackOptions {
   terminalBufferMinutes: number
   /** Extra loading buffer (departures only). */
   loadingBufferMinutes: number
+  /**
+   * Configurable route-time buffer (§4.3) — the event team asked for 1 to
+   * 1.5 hours of slack in route time suggestions. A setting, not a
+   * hardcoded constant: callers may pass their own value, and the default
+   * sits at the top of that range.
+   */
+  routeBufferMinutes: number
 }
 
 export const DEFAULT_PACK_OPTIONS: PackOptions = {
@@ -107,6 +114,7 @@ export const DEFAULT_PACK_OPTIONS: PackOptions = {
   turnaroundBufferMinutes: 20,
   terminalBufferMinutes: 120, // domestic flight default
   loadingBufferMinutes: 15,
+  routeBufferMinutes: 90, // 1.5h — event team's 1–1.5h ask, top of range
 }
 
 function toMinutes(hhmm: string | null): number | null {
@@ -167,13 +175,14 @@ function toIsoDateTime(absoluteMinutes: number): string {
 
 /** A family's pickup, in absolute minutes. Arrivals: the leg time itself.
  *  Departures: computed backwards from the leg time (the "flight time") minus
- *  travel, terminal and loading buffers — which may land on the previous day. */
+ *  travel, terminal, loading and the configurable route buffer — which may
+ *  land on the previous day. */
 function pickupTimeMinutes(leg: PackLeg, options: PackOptions, direction: 'arrival' | 'departure'): number | null {
   const t = toMinutes(leg.time)
   if (t === null) return null
   const absolute = dayIndex(leg.date) * 1440 + t
   if (direction === 'arrival') return absolute
-  return absolute - options.travelTimeToVenueMinutes - options.terminalBufferMinutes - options.loadingBufferMinutes
+  return absolute - options.travelTimeToVenueMinutes - options.terminalBufferMinutes - options.loadingBufferMinutes - options.routeBufferMinutes
 }
 
 /**

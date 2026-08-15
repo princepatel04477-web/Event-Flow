@@ -454,6 +454,118 @@ export async function generateMessages(
 }
 
 // ---------------------------------------------------------------------------
+// Driver pickup summary (§4.4)
+//
+// Reuses the existing `messages` table — a driver's day summary is just a
+// message row with to_number = driver mobile and a body listing their
+// pickups. No new schema; the WhatsApp cut left these tables and they fit
+// this use case exactly (confirmed in §2.1 recon).
+// ---------------------------------------------------------------------------
+
+export interface DriverPickupSummary {
+  driverName: string
+  driverMobile: string | null
+  date: string
+  pickups: { time: string | null; headName: string; pax: number; point: string | null }[]
+  totalPax: number
+}
+
+/** A driver's committed trips for one day, from trips + trip_passengers. */
+export async function readDriverPickupSummary(
+  eventId: string,
+  driverId: string,
+  date: string,
+): Promise<{ ok: true; summary: DriverPickupSummary } | { ok: false; error: string }> {
+  const supabase = await createClient()
+
+  const { data: driver } = await supabase
+    .from('drivers')
+    .select('full_name, mobile')
+    .eq('id', driverId)
+    .eq('event_id', eventId)
+    .maybeSingle()
+  if (!driver) return { ok: false, error: 'Driver not found.' }
+
+  const { data: trips, error } = await supabase
+    .from('trips')
+    .select(
+      'id, scheduled_at, pickup_point, driver_id, trip_passengers(group_id, pax, guest_groups(head_name))',
+    )
+    .eq('event_id', eventId)
+    .eq('driver_id', driverId)
+    .not('status', 'eq', 'cancelled')
+    .order('scheduled_at', { ascending: true })
+
+  if (error) return { ok: false, error: friendlyDbError(error) }
+
+  const pickups: DriverPickupSummary['pickups'] = []
+  let totalPax = 0
+  for (const t of trips ?? []) {
+    const time = t.scheduled_at ? new Date(t.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null
+    for (const p of (t.trip_passengers ?? []) as Array<{ pax: number; guest_groups: { head_name: string } | null }>) {
+      pickups.push({
+        time,
+        headName: p.guest_groups?.head_name ?? 'Guest',
+        pax: p.pax,
+        point: t.pickup_point,
+      })
+      totalPax += p.pax
+    }
+  }
+
+  return {
+    ok: true,
+    summary: {
+      driverName: driver.full_name,
+      driverMobile: driver.mobile,
+      date,
+      pickups,
+      totalPax,
+    },
+  }
+}
+
+/** Queue a driver's day-summary message through the existing messages table. */
+export async function sendDriverPickupSummary(
+  eventId: string,
+  driverId: string,
+  date: string,
+): Promise<{ ok: true; messageId: string } | { ok: false; error: string }> {
+  const supabase = await createClient()
+  const res = await readDriverPickupSummary(eventId, driverId, date)
+  if (!res.ok) return res
+  const { summary } = res
+
+  if (!summary.driverMobile) {
+    return { ok: false, error: 'Driver has no mobile number on file.' }
+  }
+  if (summary.pickups.length === 0) {
+    return { ok: false, error: 'No pickups committed for this driver on this date.' }
+  }
+
+  const lines = summary.pickups.map(
+    (p) => `${p.time ?? '—'} · ${p.headName} (${p.pax} ${p.pax === 1 ? 'person' : 'people'})${p.point ? ` · ${p.point}` : ''}`,
+  )
+  const body = `Your pickups for ${summary.date}:\n${lines.join('\n')}\nTotal: ${summary.totalPax} guests.`
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      event_id: eventId,
+      to_number: summary.driverMobile,
+      template_key: 'driver_pickup_summary',
+      body,
+      provider: 'manual',
+      status: 'queued',
+    })
+    .select('id')
+    .single()
+
+  if (error) return { ok: false, error: friendlyDbError(error) }
+  return { ok: true, messageId: data.id }
+}
+
+// ---------------------------------------------------------------------------
 // Log
 // ---------------------------------------------------------------------------
 
