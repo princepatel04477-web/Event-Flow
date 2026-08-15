@@ -478,6 +478,12 @@ only an admin can change `global_role`.
 
 **Logistics** — `vehicle_types`, `vehicles`, `trips`, `trip_passengers`
 
+**Fleet (15 Aug 2026)** — `drivers`, `vehicle_assignments`, `odometer_logs`.
+`vehicles` carries `created_by`/`created_by_staff`; `trips` has optional
+`driver_id`. All derived-state: KM totals, availability and fairness are
+query-time, never stored. RLS on these tables is the CURRENT live shape
+(`app.is_staff` only, no `has_staff_identity`) — see DECISIONS.md.
+
 **Messaging / import** — `message_templates`, `messages`, `import_batches`, `import_rows`
 
 **Messaging / import** — `message_templates`, `messages`, `import_batches`, `import_rows`
@@ -592,6 +598,10 @@ Things that are not what you'd assume:
 
 Verified against the migrations. Do not go looking for things in this list — they aren't there.
 
+- **JW Marriott row `54857ae6-…` is correctly scoped to SHARMA26.** The
+  duplicate `J W Mariott ` (trailing space) was deleted 2026-08-13; verified
+  via service-role 2026-08-15. The separate `Marriott` row in Sample 2 is a
+  different, legitimate hotel. Do not re-open this.
 - **Room double-booking IS prevented — by a trigger, not an `EXCLUDE` constraint.**
   There is no `btree_gist` and no exclusion constraint, but since `20260805140000`
   there *is* a date-range overlap guard: `app.guard_room_overlap()`, a

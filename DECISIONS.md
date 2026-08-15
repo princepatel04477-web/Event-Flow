@@ -1,7 +1,51 @@
 # DECISIONS.md
 
-Non-obvious decisions, newest first. Per CLAUDE.md §14: record it here as it is
-made, so the next session does not re-litigate it.
+Non-obvious decisions, newest first. Per CLAUDE.md §14: record it here as it
+is made, so the next session does not re-litigate it.
+
+---
+
+## 15 August 2026 — Fleet module, reform runbook, consent gate
+
+### Fleet tables follow the CURRENT RLS shape, not `apply_staff_policies()`
+
+`20260814140000` removed the `has_staff_identity` gate from the 17 existing
+tables by creating new policies INLINE — it never edited
+`app.apply_staff_policies()`, whose 1901 body still carries the conjunct.
+The fleet migration (20260815120000) initially called the helper and the
+new tables ended up gated: a team session could read but not write them.
+Fixed in 20260815130000 by creating the fleet tables' policies explicitly
+in the current shape (`app.is_staff(event_id)` only). Rule for future
+tables: match the LIVE shape, not the helper.
+
+### `trips.driver_id` is optional; driver identity lives in `vehicle_assignments`
+
+A trip is planned before it is assigned, so the unassigned state must be
+representable. `commitTrips` does not resolve `driver_id` — driver identity
+is read from `vehicle_assignments` (driver ↔ vehicle per day) at query time.
+
+### Hampers are per-GROUP, and §5.4 surfaces the multi-room edge case
+
+One `deliverables` row per group (guest_id null). A group with multiple
+rooms therefore has ONE hamper; per-room red/green is ambiguous. The rooms
+grid's hamper dot has an explicit 'mixed' state (brand-coloured) for a room
+holding part of a family whose hamper status differs — surfaced, never
+silently resolved. The event team should confirm the real per-room rule.
+
+### §6.1 consent: application gate now, CHECK proposed, not applied
+
+All 10 live `call_recordings` rows have `consent_given = false` (synthetic
+test rows, sample event). A strict `consent_given = true` CHECK would
+break the table. The real protection is layered: capture requires consent
+(harvest-upload / voice-note), and transcribe-recording now refuses
+non-consented audio BEFORE any ₹0.75 spend (2026-08-15). The CHECK
+constraint remains proposed; the 10 rows' fate is Prince's data decision.
+
+### Extract-rsvp confirmed NOT deployed (2026-08-15)
+
+`functions list` shows only verify-access-code, bind-staff-member,
+transcribe-recording. extract-rsvp source exists; deploy + Vault secrets
+are Prince's to run (runbook §6.2).
 
 ---
 
