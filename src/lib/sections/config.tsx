@@ -5,10 +5,11 @@ import {
   CarIcon,
   BuildingIcon,
   GridIcon,
+  GiftIcon,
   ClipboardCheckIcon,
 } from '@/components/icons'
 
-export type SectionId = 'dashboard' | 'guests' | 'rsvp' | 'logistics' | 'hospitality' | 'production'
+export type SectionId = 'dashboard' | 'guests' | 'rsvp' | 'logistics' | 'hospitality' | 'hamper' | 'production'
 
 export type TabAccess = 'admin' | 'event_team' | 'client'
 
@@ -76,25 +77,43 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     ],
   },
   /**
-   * Hospitality is the one section for everything that happens to a guest
-   * once they are on the ground: what they receive, where they sleep, and
-   * whether they are currently in the building.
+   * Hotel and Hamper are SEPARATE TOP-LEVEL SECTIONS, and that is not a
+   * styling preference — it is the only level of this navigation that a
+   * person can reach.
    *
-   * The tab used to read "Stay", which is now the name of a child — a parent
-   * and one of its children sharing a name is how a person concludes the
-   * other two screens live somewhere else. `rooms` stays the default landing
-   * screen because it is the section's largest surface; the child order
-   * follows the order they were asked for.
+   * `children` looks like a sub-navigation and is not one. BottomTabs reads
+   * it for exactly one purpose: to pick which screen a tab lands on
+   * (`children.find(isDefault)`). Nothing renders a child tab strip — not the
+   * bottom bar, not MoreSheet, nothing. So a screen listed as a non-default
+   * child of a section is unreachable, no matter what it is labelled.
+   *
+   * That is why hampers were reported missing while being fully built: they
+   * were a child of Hospitality, whose default child is `rooms`, so the tab
+   * always landed on rooms and there was no second step to take. Renaming the
+   * child "Hamper" changed nothing, because the label was never displayed.
+   * CLAUDE.md §12 already warns about this class of bug; this is a second
+   * instance of it with a different cause.
+   *
+   * Promoting Hamper to a section makes it a tab, which is the one thing that
+   * is actually navigable. If a real child tab strip is ever built, these two
+   * can go back to being one section — until then, one section means one
+   * reachable screen.
    */
   hospitality: {
-    id: 'hospitality', label: 'Hospitality', tabLabel: 'Hospitality',
+    id: 'hospitality', label: 'Hotel', tabLabel: 'Hotel',
     icon: <BuildingIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
     children: [
-      { segment: 'deliveries', label: 'Hamper', roles: ['admin','event_team'] },
       { segment: 'rooms', label: 'Stay', roles: ['admin','event_team'], isDefault: true },
       { segment: 'checkin', label: 'Check-in / out', roles: ['admin','event_team'] },
     ],
+  },
+  hamper: {
+    id: 'hamper', label: 'Hamper', tabLabel: 'Hamper',
+    icon: <GiftIcon className="h-6 w-6" />,
+    roles: ['admin', 'event_team'],
+    // No children: the section IS the screen, at /{eventCode}/hamper.
+    children: [],
   },
   production: {
     id: 'production', label: 'Production', tabLabel: 'Prep',

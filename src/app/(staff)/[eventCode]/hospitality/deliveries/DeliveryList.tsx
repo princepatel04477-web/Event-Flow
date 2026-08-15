@@ -29,11 +29,25 @@ export interface DeliveryListProps {
   eventId: string
   eventCode: string
   canImport: boolean // admin — shows the generate control
+  /**
+   * Route segment this list lives under, so a row links to a detail screen in
+   * the SAME section. Defaults to the hospitality tree it was written in.
+   *
+   * Without this the link was hardcoded to `/hospitality/deliveries/…`, so
+   * opening a hamper from the Hamper tab navigated into Hospitality and the
+   * bottom bar switched tabs underneath the person using it.
+   */
+  detailBase?: string
 }
 
 const KIND_LABEL: Record<string, string> = { hamper: 'Hamper', return_gift: 'Return gift' }
 
-export function DeliveryList({ eventId, eventCode, canImport }: DeliveryListProps) {
+export function DeliveryList({
+  eventId,
+  eventCode,
+  canImport,
+  detailBase = 'hospitality/deliveries',
+}: DeliveryListProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -244,7 +258,7 @@ export function DeliveryList({ eventId, eventCode, canImport }: DeliveryListProp
         <ul className="flex flex-col gap-2.5">
           {filtered.map((r, i) => (
             <li key={r.id} style={{ animationDelay: `${Math.min(i, 8) * 45}ms` }}>
-              <DeliveryRunCard row={r} eventCode={eventCode} />
+              <DeliveryRunCard row={r} eventCode={eventCode} detailBase={detailBase} />
             </li>
           ))}
         </ul>
@@ -274,7 +288,7 @@ export function DeliveryList({ eventId, eventCode, canImport }: DeliveryListProp
  * like a record and "not done" has to look like a blank waiting to be
  * filled.
  */
-function DeliveryRunCard({ row, eventCode }: { row: DeliveryRunRow; eventCode: string }) {
+function DeliveryRunCard({ row, eventCode, detailBase }: { row: DeliveryRunRow; eventCode: string; detailBase: string }) {
   const sealed = row.status === 'delivered'
   const place = [row.hotel_name, row.room_number ? `Room ${row.room_number}` : null]
     .filter(Boolean)
@@ -282,7 +296,7 @@ function DeliveryRunCard({ row, eventCode }: { row: DeliveryRunRow; eventCode: s
 
   return (
     <Link
-      href={`/${eventCode}/hospitality/deliveries/${row.id}`}
+      href={`/${eventCode}/${detailBase}/${row.id}`}
       className={`list-fade tap block rounded-xl p-3.5 transition-colors duration-press ease-ledger ${
         sealed
           ? 'border border-ledger-green/35 border-l-4 border-l-ledger-green bg-green-tint active:bg-green-tint/70'
