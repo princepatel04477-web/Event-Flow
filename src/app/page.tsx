@@ -42,7 +42,7 @@ export default async function HomePage() {
     return (
       <div className="flex min-h-dvh flex-col bg-bg">
         <StickyHeader
-          title="Nuvent"
+          title="EventFlow"
           subtitle={who}
           right={
             <>

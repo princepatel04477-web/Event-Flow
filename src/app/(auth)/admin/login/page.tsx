@@ -17,7 +17,7 @@ export default function AdminLoginPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1 text-center">
-        <h1 className="font-display text-3xl tracking-tight text-fg">Nuvent admin</h1>
+        <h1 className="font-display text-3xl tracking-tight text-fg">EventFlow admin</h1>
         <p className="text-base text-muted">Sign in with your admin account.</p>
       </div>
 

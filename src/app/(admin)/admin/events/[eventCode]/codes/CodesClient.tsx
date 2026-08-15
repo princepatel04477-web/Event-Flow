@@ -92,7 +92,7 @@ export function CodesClient({
   }
 
   const whatsappText = issued
-    ? `Nuvent — ${eventName}\n\nYour access code: ${issued.code}\n\nOpen the app and enter it on the sign-in screen. Do not share this code.`
+    ? `EventFlow — ${eventName}\n\nYour access code: ${issued.code}\n\nOpen the app and enter it on the sign-in screen. Do not share this code.`
     : ''
 
   return (

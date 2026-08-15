@@ -85,15 +85,15 @@ const fontVariables = [
 
 export const metadata: Metadata = {
   title: {
-    default: 'Nuvent',
-    template: '%s · Nuvent',
+    default: 'EventFlow',
+    template: '%s · EventFlow',
   },
   description:
     'Wedding event operations — guest groups, RSVP calling, rooms, hampers and logistics.',
-  applicationName: 'Nuvent',
+  applicationName: 'EventFlow',
   appleWebApp: {
     capable: true,
-    title: 'Nuvent',
+    title: 'EventFlow',
     statusBarStyle: 'default',
   },
 }

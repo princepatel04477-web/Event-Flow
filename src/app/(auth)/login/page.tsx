@@ -37,7 +37,7 @@ export default async function LoginPage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1 text-center">
-        <h1 className="font-display text-3xl tracking-tight text-fg">Nuvent</h1>
+        <h1 className="font-display text-3xl tracking-tight text-fg">EventFlow</h1>
         <p className="text-base text-muted">Sign in with your access code.</p>
       </div>
 

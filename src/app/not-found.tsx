@@ -19,7 +19,7 @@ import { StickyHeader } from '@/components/ui/StickyHeader'
 export default function RootNotFound() {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
-      <StickyHeader title="Nuvent" subtitle="Page not found" />
+      <StickyHeader title="EventFlow" subtitle="Page not found" />
       <main className="mx-auto w-full max-w-[480px] flex-1 px-4 py-8">
         <EmptyState
           icon={<InboxIcon className="h-7 w-7" />}

@@ -54,7 +54,7 @@ export default function EvidencePage() {
   return (
     <main className="mx-auto w-full max-w-[480px] px-4 pt-6 pb-16">
       <PageTitle note="Field software for a wedding, on a cheap Android phone at 11pm.">
-        Nuvent
+        EventFlow
       </PageTitle>
 
       {/* Palette */}

@@ -225,7 +225,7 @@ export function WelcomeOverlay() {
         initial="hidden"
         animate="visible"
       >
-        <span className="font-display text-4xl leading-none text-ink">Nuvent</span>
+        <span className="font-display text-4xl leading-none text-ink">EventFlow</span>
         <span className="font-sans text-xs tracking-eyebrow text-muted uppercase">
           Varunya Technologies
         </span>

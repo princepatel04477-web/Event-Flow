@@ -46,7 +46,7 @@ export default function GlobalError({
         }}
       >
         <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 500 }}>
-          Nuvent could not start
+          EventFlow could not start
         </h1>
         <p
           style={{
