@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { AdminLink } from '@/components/nav/AdminLink'
 import { BottomTabs } from '@/components/nav/BottomTabs'
+import { SectionTabs } from '@/components/nav/SectionTabs'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { StickyHeader } from '@/components/ui/StickyHeader'
 import { getSessionClaims } from '@/lib/auth/server'
@@ -111,6 +112,10 @@ export default async function EventLayout({ children, params }: LayoutProps) {
             showTabs ? 'pb-nav' : 'pb-8',
           )}
         >
+          {/* The second navigation level. Renders nothing for a section with
+              fewer than two reachable children, so most screens are unchanged
+              — see SectionTabs. */}
+          <SectionTabs eventCode={event.code} access={access} />
           {children}
         </div>
       </main>
