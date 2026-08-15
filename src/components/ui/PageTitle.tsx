@@ -32,7 +32,7 @@ export function PageTitle({ children, right, note, className }: PageTitleProps) 
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
       <div className="flex min-h-11 items-center justify-between gap-3">
-        <h2 className="font-display text-xl leading-none font-medium tracking-[0.14em] text-ink uppercase">
+        <h2 className="font-display text-xl leading-none font-semibold tracking-[0.05em] text-ink uppercase">
           {children}
         </h2>
         {right ? (

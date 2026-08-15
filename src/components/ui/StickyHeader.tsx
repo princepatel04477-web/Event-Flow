@@ -15,10 +15,16 @@ export interface StickyHeaderProps {
   /** A second row under the title — filters, tabs, a search box. */
   children?: ReactNode
   /**
-   * `screen` is the section title: Cormorant, wide-tracked, uppercase —
-   * "CALL QUEUE", "ROOMS", "FLEET". `entity` is a specific thing you have
-   * drilled into (a family, a room), which is set in the sans face
-   * because those names are frequently Devanagari.
+   * `screen` is the section title: uppercase and tracked — "CALL QUEUE",
+   * "ROOMS", "FLEET". `entity` is a specific thing you have drilled into
+   * (a family, a room), set without the tracking because those names are
+   * frequently Devanagari.
+   *
+   * The tracking was 0.14em, set when this was Cormorant Garamond — a
+   * narrow display serif that could afford it. Be Vietnam Pro is a wide
+   * grotesque, and at 0.14em an event name truncated to "NUVENT EV…" after
+   * ten characters on a 400px handset. 0.05em is the design language's own
+   * label tracking and buys back roughly a third of the line.
    */
   variant?: 'screen' | 'entity'
   className?: string
@@ -61,7 +67,7 @@ export function StickyHeader({
             className={cn(
               'truncate text-ink',
               variant === 'screen'
-                ? 'font-display text-xl leading-none font-medium tracking-[0.14em] uppercase'
+                ? 'font-display text-xl leading-none font-semibold tracking-[0.05em] uppercase'
                 : 'text-lg leading-tight font-medium',
             )}
           >

@@ -41,13 +41,13 @@ const LEDGER_SAMPLES = ['balanced', 'departure_missing', 'no_arrival'] as const
 const ROOM_SAMPLES = ['empty', 'partly_full', 'full', 'over_capacity'] as const
 
 const PALETTE = [
-  { name: 'Ground', token: 'bg-paper', hex: '#071A1D', note: 'the page' },
-  { name: 'Surface', token: 'bg-surface', hex: '#0E272B', note: 'every card' },
-  { name: 'Chalk', token: 'bg-ink', hex: '#EDF3F2', note: 'reading text · 15.3:1' },
-  { name: 'Slate', token: 'bg-muted', hex: '#8FA9AE', note: 'secondary · 7.2:1' },
-  { name: 'Brass', token: 'bg-brand', hex: '#C9A96B', note: 'the accent · 8.0:1' },
-  { name: 'Verdigris', token: 'bg-ledger-green', hex: '#4FC1A0', note: 'COMPLETED · 8.1:1' },
-  { name: 'Signal', token: 'bg-ledger-red', hex: '#F2705F', note: 'ATTENTION · 6.2:1' },
+  { name: 'Ivory', token: 'bg-paper', hex: '#F8F9FA', note: 'the page' },
+  { name: 'Surface', token: 'bg-surface', hex: '#FFFFFF', note: 'every card' },
+  { name: 'Charcoal', token: 'bg-ink', hex: '#191C1D', note: 'reading text · 16.8:1' },
+  { name: 'Warm slate', token: 'bg-muted', hex: '#4D4635', note: 'secondary · 8.9:1' },
+  { name: 'Gold', token: 'bg-brand', hex: '#735C00', note: 'the accent · 7.4:1' },
+  { name: 'Emerald', token: 'bg-ledger-green', hex: '#006B59', note: 'COMPLETED · 6.4:1' },
+  { name: 'Signal', token: 'bg-ledger-red', hex: '#BA1A1A', note: 'ATTENTION · 6.2:1' },
 ]
 
 export default function EvidencePage() {
@@ -76,7 +76,7 @@ export default function EvidencePage() {
           ))}
         </ul>
         <p className="text-xs leading-relaxed text-muted">
-          Verdigris means COMPLETED and signal means ATTENTION. Neither is ever used
+          Emerald means COMPLETED and signal means ATTENTION. Neither is ever used
           decoratively — the moment signal appears on a heading it stops meaning &ldquo;look
           here&rdquo;.
         </p>
@@ -88,12 +88,12 @@ export default function EvidencePage() {
         <div className="flex flex-col gap-3 rounded-2xl border border-rule bg-surface p-4">
           <div>
             <p className="eyebrow mb-1.5">Display · Be Vietnam Pro</p>
-            <p className="font-display text-2xl tracking-[0.14em] text-ink uppercase">
+            <p className="font-display text-2xl tracking-[0.05em] text-ink uppercase">
               Call queue
             </p>
             <p className="mt-1 text-xs text-muted">
-              Screen titles, the couple&rsquo;s names, the seal. Nothing else — and never a
-              figure, it has no tabular set.
+              Screen titles and section headings, uppercase and lightly tracked. Figures
+              still go to the mono face below, so a column of them lines up.
             </p>
           </div>
           <div className="border-t border-rule pt-3">

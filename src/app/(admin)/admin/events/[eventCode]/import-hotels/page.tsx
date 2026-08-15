@@ -18,7 +18,7 @@ export default async function ImportHotelsPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-display text-xl font-medium tracking-[0.14em] uppercase">Import hotels</h1>
+      <h1 className="font-display text-xl font-semibold tracking-[0.05em] uppercase">Import hotels</h1>
       {ctx.ok ? (
         <p className="text-sm text-muted">
           {ctx.existingHotels} hotel{ctx.existingHotels === 1 ? '' : 's'},{' '}
