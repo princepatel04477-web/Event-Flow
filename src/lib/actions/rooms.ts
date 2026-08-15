@@ -254,6 +254,10 @@ export interface RoomGridGuest {
   guestName: string
   groupId: string
   headName: string
+  /** The family head's mobile — shown on the room tap panel (§5.3). */
+  primaryMobile: string | null
+  /** True when the group's hamper is delivered (§5.3/§5.4). */
+  hamperDelivered: boolean
   ageBand: string
   isHead: boolean
   assignmentId: string
@@ -307,8 +311,17 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
     .eq('event_id', eventId)
   const groupsRes = await supabase
     .from('guest_groups')
-    .select('id, head_name, rsvp_status')
+    .select('id, head_name, primary_mobile, rsvp_status')
     .eq('event_id', eventId)
+  // Hamper delivered state per group, for the room-tap panel (§5.3) and the
+  // per-room hamper coding (§5.4). Group-level hamper: kind=hamper, guest_id
+  // null (the house model — one hamper per family, not per room).
+  const hampersRes = await supabase
+    .from('deliverables')
+    .select('group_id, status')
+    .eq('event_id', eventId)
+    .eq('kind', 'hamper')
+    .is('guest_id', null)
   timing.mark('reads')
 
   const roomsRaw = roomsRes.data ?? []
@@ -316,9 +329,14 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
   const hotelRows = hotelsRes.data ?? []
   const guestsAll = guestsRes.data ?? []
   const groupRows = groupsRes.data ?? []
+  const hamperRows = hampersRes.data ?? []
 
   const hotelNames = new Map(hotelRows.map((h) => [h.id, h.name]))
   const groupNames = new Map(groupRows.map((g) => [g.id, g.head_name]))
+  const groupMobiles = new Map(groupRows.map((g) => [g.id, g.primary_mobile]))
+  const hamperDeliveredByGroup = new Map(
+    (hamperRows ?? []).filter((d) => d.status === 'delivered').map((d) => [d.group_id, true]),
+  )
   const confirmedGroupIds = new Set(
     groupRows.filter((g) => g.rsvp_status === 'confirmed').map((g) => g.id),
   )
@@ -353,6 +371,8 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
         guestName: guestNames.get(a.guest_id) ?? 'Guest',
         groupId: a.group_id,
         headName: groupNames.get(a.group_id) ?? 'Unknown',
+        primaryMobile: groupMobiles.get(a.group_id) ?? null,
+        hamperDelivered: hamperDeliveredByGroup.has(a.group_id),
         ageBand: guest?.age_band ?? 'adult',
         isHead: guest?.is_head ?? false,
         assignmentId: a.id,

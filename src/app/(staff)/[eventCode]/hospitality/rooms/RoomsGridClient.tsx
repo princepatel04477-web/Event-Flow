@@ -91,6 +91,40 @@ function occupancyDots(room: RoomGridRow): string {
   return out
 }
 
+/**
+ * §5.4 — hamper colour coding per room.
+ *
+ * The house model is ONE hamper per GROUP (deliverables.group_id, guest_id
+ * null), and a group can span multiple rooms. So a room's hamper state is:
+ *   - 'delivered'   every occupant group's hamper is delivered
+ *   - 'pending'     no occupant group's hamper is delivered
+ *   - 'mixed'       some delivered, some not — the multi-room edge case the
+ *                   runbook says to surface rather than silently resolve.
+ * The mixed state is deliberately NOT green or red: it means "ask the team
+ * which room the hamper went to", which is a different fact from either.
+ */
+type HamperState = 'delivered' | 'pending' | 'mixed'
+
+function hamperState(room: RoomGridRow): HamperState {
+  if (room.occupants.length === 0) return 'pending'
+  const delivered = room.occupants.filter((o) => o.hamperDelivered).length
+  if (delivered === room.occupants.length) return 'delivered'
+  if (delivered === 0) return 'pending'
+  return 'mixed'
+}
+
+const HAMPER_DOT: Record<HamperState, string> = {
+  delivered: 'bg-ledger-green',
+  pending: 'bg-ledger-red',
+  mixed: 'bg-brand',
+}
+
+const HAMPER_LABEL: Record<HamperState, string> = {
+  delivered: 'Hamper delivered',
+  pending: 'Hamper not delivered',
+  mixed: 'Mixed hamper state — some families in this room have theirs, some not',
+}
+
 export function RoomsGridClient({ eventId, eventCode, access }: Props) {
   const [state, setState] = useState<LoadState>({ phase: 'loading' })
   const [hotelIdx, setHotelIdx] = useState(0)
@@ -487,11 +521,20 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
                   backgroundImage: s === 'blocked' ? BLOCKED_HATCH : undefined,
                 }}
                 className={cn(
-                  'list-fade tap flex min-h-16 w-full flex-col items-center justify-center gap-1.5 rounded-lg',
+                  'list-fade tap relative flex min-h-16 w-full flex-col items-center justify-center gap-1.5 rounded-lg',
                   'transition-transform duration-press ease-ledger active:scale-95',
                   TILE_SKINS[s],
                 )}
               >
+                {/* §5.4: hamper dot — green = delivered, red = pending,
+                    brand = mixed (multi-room family, ask the team). */}
+                <span
+                  aria-hidden
+                  className={cn(
+                    'absolute top-1 right-1 h-2 w-2 rounded-full',
+                    HAMPER_DOT[hamperState(room)],
+                  )}
+                />
                 <span className="figure text-base leading-none font-medium">
                   {room.roomNumber}
                 </span>
@@ -502,7 +545,8 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
                   {occupancyDots(room)}
                 </span>
                 <span className="sr-only">
-                  {TILE_LABELS[s]}, {room.occupants.length} of {room.capacity} beds
+                  {TILE_LABELS[s]}, {room.occupants.length} of {room.capacity} beds,{' '}
+                  {HAMPER_LABEL[hamperState(room)]}
                 </span>
               </button>
             </li>
@@ -566,6 +610,24 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
                         <span className="font-medium text-ink">{occ.guestName}</span>
                         {occ.isHead ? <Badge className="ml-2">Head</Badge> : null}
                         <span className="mt-0.5 block text-sm text-muted">{occ.headName}</span>
+                        {/* §5.3: mobile + hamper status on the room-tap panel. */}
+                        {occ.primaryMobile ? (
+                          <a
+                            href={`tel:${occ.primaryMobile}`}
+                            className="tap mt-0.5 inline-block font-mono text-sm text-brand active:opacity-70"
+                          >
+                            {occ.primaryMobile}
+                          </a>
+                        ) : null}
+                        <span
+                          className={
+                            occ.hamperDelivered
+                              ? 'mt-0.5 block text-sm text-ledger-green'
+                              : 'mt-0.5 block text-sm text-ledger-red'
+                          }
+                        >
+                          {occ.hamperDelivered ? 'Hamper delivered' : 'Hamper not delivered'}
+                        </span>
                       </button>
                       <button
                         type="button"

@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { LinkButton } from '@/components/ui/LinkButton'
 import {
   CarIcon,
+  MapPinIcon,
   ShieldAlertIcon,
   UsersIcon,
 } from '@/components/icons'
@@ -23,6 +24,8 @@ import {
 } from '@/lib/actions/logistics'
 import { traceFetch } from '@/lib/perf'
 import { useStableData } from '@/lib/use-stable-data'
+import { mapsDirectionsHref } from '@/lib/phone'
+import { openExternalAppUrl } from '@/lib/native/navigation'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -283,6 +286,23 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
                   <div className="mb-2 flex gap-2 text-xs text-muted">
                     <span>{trip.pickupPoint}</span>
                     {trip.scheduledTime && <span>· {trip.scheduledTime}</span>}
+                    {/* §5.7: source → destination directions link. Plain maps
+                        deep link, no API. Opens in the OS, never the WebView. */}
+                    {(() => {
+                      const href = mapsDirectionsHref(trip.pickupPoint, null)
+                      if (!href) return null
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => openExternalAppUrl(href)}
+                          aria-label={`Directions for ${trip.pickupPoint || 'this trip'}`}
+                          className="tap ml-auto inline-flex min-h-8 items-center gap-1 rounded-md px-2 font-medium text-brand active:opacity-70"
+                        >
+                          <MapPinIcon className="h-4 w-4" />
+                          Directions
+                        </button>
+                      )
+                    })()}
                   </div>
 
                   <ul className="flex flex-col gap-1">

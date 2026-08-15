@@ -7,6 +7,7 @@ import { PhoneIcon } from '@/components/icons'
 import { Badge } from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Spinner'
 import { StatusPill } from '@/components/ui/StatusPill'
+import { WhatsAppButton } from '@/components/ui/WhatsAppButton'
 import { rsvpStatusLabel } from '@/lib/rsvp'
 import { statusTone, type StatusTone } from '@/lib/status'
 import { cn } from '@/lib/utils'
@@ -82,60 +83,71 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
         disabled && pending && 'opacity-70',
       )}
     >
-      <button
-        type="button"
-        onClick={handleTap}
-        disabled={disabled}
-        aria-busy={pending || undefined}
-        className="tap w-full px-3.5 py-3.5 text-left transition-colors duration-press ease-ledger active:bg-surface-2 disabled:cursor-not-allowed"
-      >
-        <div className="flex items-start justify-between gap-2.5">
-          <div className="min-w-0">
-            <span className="block text-lg leading-snug font-medium text-ink">
-              {headName}
-            </span>
-            {mobile ? (
-              <span className="mt-0.5 block font-mono text-sm text-muted tabular-nums">
-                {mobile}
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={handleTap}
+          disabled={disabled}
+          aria-busy={pending || undefined}
+          className="tap min-w-0 flex-1 px-3.5 py-3.5 text-left transition-colors duration-press ease-ledger active:bg-surface-2 disabled:cursor-not-allowed"
+        >
+          <div className="flex items-start justify-between gap-2.5">
+            <div className="min-w-0">
+              <span className="block text-lg leading-snug font-medium text-ink">
+                {headName}
               </span>
-            ) : null}
+              {mobile ? (
+                <span className="mt-0.5 block font-mono text-sm text-muted tabular-nums">
+                  {mobile}
+                </span>
+              ) : null}
+            </div>
           </div>
 
-          <span
-            aria-hidden
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-brand/45 bg-brand-tint text-brand"
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            {side ? <Badge>{side}</Badge> : null}
+            <span className="figure text-sm text-ink">{pax} pax</span>
+            <span className="figure text-sm text-muted">
+              · {attemptCount} {attemptCount === 1 ? 'attempt' : 'attempts'}
+            </span>
+            <StatusPill tone={statusTone(status)} className="ml-auto">
+              {rsvpStatusLabel(status)}
+            </StatusPill>
+          </div>
+
+          {/* Secondary facts */}
+          {openedRecently || nextCallbackAt ? (
+            <div className="mt-2.5 flex flex-wrap gap-x-3 border-t border-rule pt-2.5 font-mono text-xs">
+              {openedRecently && lastOpenedByName ? (
+                <span className="text-muted">
+                  {lastOpenedByName}, {relativeTimeLabel(lastOpenedAt!)}
+                </span>
+              ) : null}
+              {nextCallbackAt ? (
+                <span className="text-brand">
+                  Callback {formatRelativeDateTime(nextCallbackAt)}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </button>
+
+        {/* Call + WhatsApp actions. Sits OUTSIDE the tappable row body so the
+            two deep links are real buttons, not nested buttons. §5.1: the
+            WhatsApp link sits beside the call affordance on the family row. */}
+        <div className="flex shrink-0 flex-col justify-center gap-1 border-l border-rule px-2">
+          <button
+            type="button"
+            onClick={handleTap}
+            disabled={disabled}
+            aria-label={pending ? `Calling ${headName}` : `Call ${headName}`}
+            className="tap flex h-12 w-12 items-center justify-center rounded-full border border-brand/45 bg-brand-tint text-brand active:opacity-70 disabled:cursor-not-allowed"
           >
             {pending ? <Spinner size="sm" label={null} /> : <PhoneIcon className="h-5 w-5" />}
-          </span>
+          </button>
+          <WhatsAppButton mobile={mobile} name={headName} className="h-12 w-12" />
         </div>
-
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          {side ? <Badge>{side}</Badge> : null}
-          <span className="figure text-sm text-ink">{pax} pax</span>
-          <span className="figure text-sm text-muted">
-            · {attemptCount} {attemptCount === 1 ? 'attempt' : 'attempts'}
-          </span>
-          <StatusPill tone={statusTone(status)} className="ml-auto">
-            {rsvpStatusLabel(status)}
-          </StatusPill>
-        </div>
-
-        {/* Secondary facts */}
-        {openedRecently || nextCallbackAt ? (
-          <div className="mt-2.5 flex flex-wrap gap-x-3 border-t border-rule pt-2.5 font-mono text-xs">
-            {openedRecently && lastOpenedByName ? (
-              <span className="text-muted">
-                {lastOpenedByName}, {relativeTimeLabel(lastOpenedAt!)}
-              </span>
-            ) : null}
-            {nextCallbackAt ? (
-              <span className="text-brand">
-                Callback {formatRelativeDateTime(nextCallbackAt)}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-      </button>
+      </div>
     </div>
   )
 }

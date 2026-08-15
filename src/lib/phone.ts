@@ -207,6 +207,24 @@ export function telHref(raw: string | null | undefined): string | null {
 }
 
 /**
+ * A Google Maps directions deep link between two free-text points (§5.7).
+ * Plain link, no API, no dependency. Returns null when neither point is
+ * usable — a link with an empty origin/destination is worse than none.
+ */
+export function mapsDirectionsHref(
+  origin: string | null | undefined,
+  destination: string | null | undefined,
+): string | null {
+  const from = origin?.trim()
+  const to = destination?.trim()
+  if (!from && !to) return null
+  const params = new URLSearchParams({ api: '1' })
+  if (from) params.set('origin', from)
+  if (to) params.set('destination', to)
+  return `https://www.google.com/maps/dir/?${params.toString()}`
+}
+
+/**
  * `wa.me` deep link for a stored number, or null when there is nothing
  * messageable.
  *
