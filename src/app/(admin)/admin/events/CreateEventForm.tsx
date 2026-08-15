@@ -47,15 +47,27 @@ export function CreateEventForm() {
   // Success: show the access codes exactly once, then hand over to the
   // event. The codes are never persisted in plaintext — this is the only
   // reveal, so the copy says so.
+  //
+  // This paragraph used to promise "the event admin screen can reveal them
+  // again later, with every reveal logged". It cannot: only the sha256 is
+  // stored (see 20260807000500_code_auth_tables.sql), so there is no
+  // plaintext for any screen to reveal. `code_reveal_log` exists but is
+  // written on ISSUE, not on a later reveal. The wording sent an admin
+  // looking for a button that cannot exist, and — worse — invited them to
+  // close this screen without writing the codes down.
   if (state.created) {
     return (
       <div className="flex flex-col gap-4">
         <div className="rounded-2xl border border-border bg-surface p-5">
           <h3 className="font-display text-lg text-ink">Event created</h3>
           <p className="mt-1 text-sm text-muted">
-            Share these access codes with your team and the client. They will only be shown
-            this once — the event admin screen can reveal them again later, with every reveal
-            logged.
+            Share these access codes with your team and the client.{' '}
+            <strong className="font-semibold text-ink">
+              This is the only time they are shown.
+            </strong>{' '}
+            They are stored hashed and can never be looked up again — if they are lost,
+            the only remedy is to issue replacements from the event&apos;s access-codes
+            screen, which signs out everyone still using the old ones.
           </p>
 
           <div className="mt-4 flex flex-col gap-3">
