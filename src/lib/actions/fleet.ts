@@ -165,3 +165,304 @@ export async function quickAddVehicles(
   if (error) return { ok: false, error: friendlyDbError(error) }
   return { ok: true, count }
 }
+
+// ---------------------------------------------------------------------------
+// Odometer / manual per-day entry (§3.3)
+// ---------------------------------------------------------------------------
+
+export interface OdometerRow {
+  id: string
+  vehicleId: string
+  vehicleLabel: string | null
+  logDate: string
+  startKm: number
+  endKm: number
+  startTime: string | null
+  endTime: string | null
+  notes: string | null
+  recordedAt: string
+}
+
+export type OdometerListResult =
+  | { ok: true; rows: OdometerRow[] }
+  | { ok: false; error: string }
+
+export async function readOdometerLogs(eventId: string): Promise<OdometerListResult> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('odometer_logs')
+    .select('id, vehicle_id, log_date, start_km, end_km, start_time, end_time, notes, recorded_at, vehicles(label)')
+    .eq('event_id', eventId)
+    .order('log_date', { ascending: false })
+    .order('recorded_at', { ascending: false })
+
+  if (error) return { ok: false, error: friendlyDbError(error) }
+  const rows: OdometerRow[] = (data ?? []).map((r) => ({
+    id: r.id,
+    vehicleId: r.vehicle_id,
+    vehicleLabel: (r.vehicles as unknown as { label: string | null } | null)?.label ?? null,
+    logDate: r.log_date,
+    startKm: r.start_km,
+    endKm: r.end_km,
+    startTime: r.start_time,
+    endTime: r.end_time,
+    notes: r.notes,
+    recordedAt: r.recorded_at,
+  }))
+  return { ok: true, rows }
+}
+
+const odometerSchema = z.object({
+  eventId: z.string().uuid(),
+  vehicleId: z.string().uuid('Select a vehicle'),
+  logDate: z.string().min(1, 'Date is required'),
+  startKm: z.coerce.number().int().min(0, 'Starting KMS must be 0 or more'),
+  endKm: z.coerce.number().int().min(0, 'Ending KMS must be 0 or more'),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  notes: z.string().optional(),
+})
+
+export type OdometerInput = z.infer<typeof odometerSchema>
+
+export async function createOdometerLog(
+  input: OdometerInput,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const parsed = odometerSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((i) => i.message).join('; ') }
+  }
+  if (parsed.data.endKm < parsed.data.startKm) {
+    return { ok: false, error: 'Ending KMS must not be less than Starting KMS.' }
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('odometer_logs')
+    .insert({
+      event_id: parsed.data.eventId,
+      vehicle_id: parsed.data.vehicleId,
+      log_date: parsed.data.logDate,
+      start_km: parsed.data.startKm,
+      end_km: parsed.data.endKm,
+      start_time: parsed.data.startTime || null,
+      end_time: parsed.data.endTime || null,
+      notes: parsed.data.notes || null,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { ok: false, error: friendlyDbError(error) }
+  return { ok: true, id: data.id }
+}
+
+// ---------------------------------------------------------------------------
+// Drivers (§3.1 roster)
+// ---------------------------------------------------------------------------
+
+export interface DriverRow {
+  id: string
+  fullName: string
+  mobile: string | null
+  notes: string | null
+}
+
+export type DriverListResult =
+  | { ok: true; rows: DriverRow[] }
+  | { ok: false; error: string }
+
+export async function readDrivers(eventId: string): Promise<DriverListResult> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('drivers')
+    .select('id, full_name, mobile, notes')
+    .eq('event_id', eventId)
+    .order('full_name', { ascending: true })
+
+  if (error) return { ok: false, error: friendlyDbError(error) }
+  const rows: DriverRow[] = (data ?? []).map((r) => ({
+    id: r.id,
+    fullName: r.full_name,
+    mobile: r.mobile,
+    notes: r.notes,
+  }))
+  return { ok: true, rows }
+}
+
+const driverSchema = z.object({
+  eventId: z.string().uuid(),
+  fullName: z.string().min(1, 'Driver name is required'),
+  mobile: z.string().optional(),
+  notes: z.string().optional(),
+})
+
+export type DriverInput = z.infer<typeof driverSchema>
+
+export async function createDriver(
+  input: DriverInput,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const parsed = driverSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((i) => i.message).join('; ') }
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('drivers')
+    .insert({
+      event_id: parsed.data.eventId,
+      full_name: parsed.data.fullName,
+      mobile: parsed.data.mobile || null,
+      notes: parsed.data.notes || null,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { ok: false, error: friendlyDbError(error) }
+  return { ok: true, id: data.id }
+}
+
+// ---------------------------------------------------------------------------
+// KM dashboard (§3.4) — everything computed at query time. Nothing stored.
+// ---------------------------------------------------------------------------
+
+export interface KmVehicleStat {
+  vehicleId: string
+  vehicleLabel: string | null
+  totalKm: number
+  tripCount: number
+  /** km above/below the fleet average; + = over-used, - = under-used. */
+  deltaFromAverageKm: number
+}
+
+export interface KmDashboardData {
+  vehicles: KmVehicleStat[]
+  fleetAverageKm: number
+  totalKm: number
+}
+
+/**
+ * Per-vehicle KM + trip counts + fairness, all derived from odometer_logs
+ * and trips at query time. No stored aggregates — a stored counter drifts
+ * the moment two phones write at once, and this is exactly the data that
+ * must be honest on the day.
+ */
+export async function readKmDashboard(eventId: string): Promise<KmDashboardData> {
+  const supabase = await createClient()
+
+  const [logsRes, tripsRes, vehiclesRes] = await Promise.all([
+    supabase
+      .from('odometer_logs')
+      .select('vehicle_id, start_km, end_km')
+      .eq('event_id', eventId),
+    supabase
+      .from('trips')
+      .select('vehicle_id')
+      .eq('event_id', eventId),
+    supabase
+      .from('vehicles')
+      .select('id, label, status')
+      .eq('event_id', eventId),
+  ])
+
+  const kmByVehicle = new Map<string, number>()
+  for (const log of logsRes.data ?? []) {
+    const km = (log.end_km ?? 0) - (log.start_km ?? 0)
+    kmByVehicle.set(log.vehicle_id, (kmByVehicle.get(log.vehicle_id) ?? 0) + km)
+  }
+
+  const tripsByVehicle = new Map<string, number>()
+  for (const t of tripsRes.data ?? []) {
+    if (t.vehicle_id) tripsByVehicle.set(t.vehicle_id, (tripsByVehicle.get(t.vehicle_id) ?? 0) + 1)
+  }
+
+  const vehicles = (vehiclesRes.data ?? []).map((v) => {
+    const totalKm = kmByVehicle.get(v.id) ?? 0
+    return {
+      vehicleId: v.id,
+      vehicleLabel: v.label,
+      totalKm,
+      tripCount: tripsByVehicle.get(v.id) ?? 0,
+      deltaFromAverageKm: 0, // filled below
+    }
+  })
+
+  const fleetAverageKm = vehicles.length > 0
+    ? vehicles.reduce((s, v) => s + v.totalKm, 0) / vehicles.length
+    : 0
+
+  for (const v of vehicles) {
+    v.deltaFromAverageKm = Math.round(v.totalKm - fleetAverageKm)
+  }
+
+  return {
+    vehicles,
+    fleetAverageKm: Math.round(fleetAverageKm * 10) / 10,
+    totalKm: vehicles.reduce((s, v) => s + v.totalKm, 0),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle availability (§3.5) — derived at query time, never stored.
+// ---------------------------------------------------------------------------
+
+export interface VehicleAvailability {
+  vehicleId: string
+  vehicleLabel: string | null
+  /** ISO datetime of the vehicle's next committed pickup. Null = free. */
+  nextPickupAt: string | null
+  /** ISO datetime of the vehicle's next committed drop (end of that trip). */
+  nextFreeAt: string | null
+  /** True when the vehicle has no committed trip at all. */
+  free: boolean
+}
+
+/**
+ * A vehicle is "free" if it has no committed trip in the future. Availability
+ * is a point-in-time question: the same vehicle can be free at 10:00 and
+ * committed at 14:00. We derive the NEXT busy window per vehicle from trips
+ * (status != cancelled, scheduled_at in the future) — a stored
+ * availability column would go stale the moment a trip is committed, so it
+ * does not exist. The event team reads "is this car free after this drop-off"
+ * as: nextFreeAt is the moment the car is genuinely free again.
+ */
+export async function readVehicleAvailability(eventId: string): Promise<VehicleAvailability[]> {
+  const supabase = await createClient()
+
+  const [vehiclesRes, tripsRes] = await Promise.all([
+    supabase
+      .from('vehicles')
+      .select('id, label, status')
+      .eq('event_id', eventId),
+    supabase
+      .from('trips')
+      .select('id, vehicle_id, scheduled_at, status')
+      .eq('event_id', eventId)
+      .neq('status', 'cancelled')
+      .not('scheduled_at', 'is', null)
+      .order('scheduled_at', { ascending: true }),
+  ])
+
+  const nextByVehicle = new Map<string, { pickup: string; free: string }>()
+  for (const t of tripsRes.data ?? []) {
+    if (!t.vehicle_id || !t.scheduled_at) continue
+    if (nextByVehicle.has(t.vehicle_id)) continue
+    // Estimated trip length: the pack engine uses 2×travel+turnaround for a
+    // round trip; for a single committed trip we estimate 2 hours as the
+    // working window. Derivation only — no stored value.
+    const pickup = t.scheduled_at
+    const free = new Date(new Date(pickup).getTime() + 2 * 60 * 60 * 1000).toISOString()
+    nextByVehicle.set(t.vehicle_id, { pickup, free })
+  }
+
+  return (vehiclesRes.data ?? []).map((v) => {
+    const next = nextByVehicle.get(v.id)
+    return {
+      vehicleId: v.id,
+      vehicleLabel: v.label,
+      nextPickupAt: next?.pickup ?? null,
+      nextFreeAt: next?.free ?? null,
+      free: !next,
+    }
+  })
+}

@@ -15,6 +15,9 @@ import {
   type VehicleRow,
 } from '@/lib/actions/fleet'
 import { QuickAddVehicles } from '@/components/fleet/QuickAddVehicles'
+import { OdometerEntry, OdometerRecent } from '@/components/fleet/OdometerEntry'
+import { KmDashboard } from '@/components/fleet/KmDashboard'
+import { VehicleAvailabilityPanel } from '@/components/fleet/VehicleAvailability'
 import { useStableData } from '@/lib/use-stable-data'
 import type { StatusTone } from '@/lib/status'
 import { traceFetch } from '@/lib/perf'
@@ -129,6 +132,20 @@ export function FleetClient({ eventId }: Props) {
           </CardBody>
         </Card>
       )}
+
+      {/* Daily KM entry (§3.3) — the event team's manual odometer form. */}
+      <OdometerEntry
+        eventId={eventId}
+        vehicles={data.vehicles.map((v) => ({ id: v.id, label: v.label }))}
+        onSaved={reload}
+      />
+      <OdometerRecent eventId={eventId} />
+
+      {/* KM dashboard (§3.4) — read-only, derived at query time. */}
+      <KmDashboard eventId={eventId} />
+
+      {/* Availability (§3.5) — next committed pickup per vehicle. */}
+      <VehicleAvailabilityPanel eventId={eventId} />
 
       {/* Vehicle list */}
       {data.vehicles.length === 0 ? (

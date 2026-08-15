@@ -675,6 +675,78 @@ export type Database = {
           },
         ]
       }
+      drivers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_staff: string | null
+          event_id: string
+          full_name: string
+          id: string
+          mobile: string | null
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_staff?: string | null
+          event_id: string
+          full_name: string
+          id?: string
+          mobile?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_staff?: string | null
+          event_id?: string
+          full_name?: string
+          id?: string
+          mobile?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drivers_created_by_staff_fkey"
+            columns: ["created_by_staff"]
+            isOneToOne: false
+            referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drivers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drivers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "drivers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_board"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "drivers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_dashboard"
+            referencedColumns: ["event_id"]
+          },
+        ]
+      }
       event_access_codes: {
         Row: {
           code_hash: string
@@ -1637,6 +1709,100 @@ export type Database = {
           },
         ]
       }
+      odometer_logs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_staff: string | null
+          end_km: number
+          end_time: string | null
+          event_id: string
+          id: string
+          log_date: string
+          notes: string | null
+          recorded_at: string
+          start_km: number
+          start_time: string | null
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_staff?: string | null
+          end_km: number
+          end_time?: string | null
+          event_id: string
+          id?: string
+          log_date: string
+          notes?: string | null
+          recorded_at?: string
+          start_km: number
+          start_time?: string | null
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_staff?: string | null
+          end_km?: number
+          end_time?: string | null
+          event_id?: string
+          id?: string
+          log_date?: string
+          notes?: string | null
+          recorded_at?: string
+          start_km?: number
+          start_time?: string | null
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "odometer_logs_created_by_staff_fkey"
+            columns: ["created_by_staff"]
+            isOneToOne: false
+            referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "odometer_logs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "odometer_logs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "odometer_logs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_board"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "odometer_logs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_dashboard"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "odometer_logs_vehicle_id_event_id_fkey"
+            columns: ["vehicle_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id", "event_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -2408,6 +2574,7 @@ export type Database = {
           created_by: string | null
           created_by_staff: string | null
           direction: Database["app"]["Enums"]["travel_direction"]
+          driver_id: string | null
           driver_mobile: string | null
           driver_name: string | null
           drop_point: string | null
@@ -2429,6 +2596,7 @@ export type Database = {
           created_by?: string | null
           created_by_staff?: string | null
           direction: Database["app"]["Enums"]["travel_direction"]
+          driver_id?: string | null
           driver_mobile?: string | null
           driver_name?: string | null
           drop_point?: string | null
@@ -2450,6 +2618,7 @@ export type Database = {
           created_by?: string | null
           created_by_staff?: string | null
           direction?: Database["app"]["Enums"]["travel_direction"]
+          driver_id?: string | null
           driver_mobile?: string | null
           driver_name?: string | null
           drop_point?: string | null
@@ -2473,6 +2642,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "staff_members"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trips_driver_fk"
+            columns: ["driver_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id", "event_id"]
           },
           {
             foreignKeyName: "trips_event_id_fkey"
@@ -2504,6 +2680,92 @@ export type Database = {
           },
           {
             foreignKeyName: "trips_vehicle_id_event_id_fkey"
+            columns: ["vehicle_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id", "event_id"]
+          },
+        ]
+      }
+      vehicle_assignments: {
+        Row: {
+          assign_date: string
+          created_at: string
+          created_by: string | null
+          created_by_staff: string | null
+          driver_id: string
+          event_id: string
+          id: string
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          assign_date: string
+          created_at?: string
+          created_by?: string | null
+          created_by_staff?: string | null
+          driver_id: string
+          event_id: string
+          id?: string
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          assign_date?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_staff?: string | null
+          driver_id?: string
+          event_id?: string
+          id?: string
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_assignments_created_by_staff_fkey"
+            columns: ["created_by_staff"]
+            isOneToOne: false
+            referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_assignments_driver_id_event_id_fkey"
+            columns: ["driver_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id", "event_id"]
+          },
+          {
+            foreignKeyName: "vehicle_assignments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_assignments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "vehicle_assignments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_board"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "vehicle_assignments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_dashboard"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "vehicle_assignments_vehicle_id_event_id_fkey"
             columns: ["vehicle_id", "event_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
@@ -2580,6 +2842,8 @@ export type Database = {
         Row: {
           capacity: number
           created_at: string
+          created_by: string | null
+          created_by_staff: string | null
           driver_mobile: string | null
           driver_name: string | null
           event_id: string
@@ -2597,6 +2861,8 @@ export type Database = {
         Insert: {
           capacity: number
           created_at?: string
+          created_by?: string | null
+          created_by_staff?: string | null
           driver_mobile?: string | null
           driver_name?: string | null
           event_id: string
@@ -2614,6 +2880,8 @@ export type Database = {
         Update: {
           capacity?: number
           created_at?: string
+          created_by?: string | null
+          created_by_staff?: string | null
           driver_mobile?: string | null
           driver_name?: string | null
           event_id?: string
@@ -2629,6 +2897,13 @@ export type Database = {
           vendor_name?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "vehicles_created_by_staff_fkey"
+            columns: ["created_by_staff"]
+            isOneToOne: false
+            referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "vehicles_event_id_fkey"
             columns: ["event_id"]
