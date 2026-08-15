@@ -393,12 +393,31 @@ Deno.serve(async (req) => {
   //    caller — a caller-supplied event_id would be a tenancy hole.
   const { data: rec, error: recErr } = await db
     .from('call_recordings')
-    .select('id, event_id, group_id, storage_bucket, storage_path, duration_sec, mime_type')
+    .select('id, event_id, group_id, storage_bucket, storage_path, duration_sec, mime_type, consent_given')
     .eq('id', recordingId)
     .maybeSingle()
 
   if (recErr || !rec) {
     return Response.json({ error: 'Recording not found' }, { status: 404 })
+  }
+
+  // 1b. CONSENT GATE (§6.1) — the application-layer defence in depth.
+  //  Non-consented audio must never reach the STT provider: transcribing a
+  //  call the guest did not agree to is a privacy breach that costs real
+  //  money and cannot be undone. consent_given defaults to false and is set
+  //  true only when the guest was read the disclosure script and agreed.
+  //  This check happens BEFORE any spend, and before any transcript row is
+  //  claimed — a refused recording stays silent, with no ₹0.75 burned.
+  if (rec.consent_given !== true) {
+    return Response.json(
+      {
+        ok: false,
+        skipped: 'consent_missing',
+        recording_id: recordingId,
+        error: 'Recording has no consent on file — refusing to transcribe.',
+      },
+      { status: 200 },
+    )
   }
 
   // 2. Claim the transcript row FIRST, before any spend. A crash after this
