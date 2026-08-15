@@ -33,8 +33,28 @@ import { describeRoom, groupTypeLabel, sideLabel } from './_components/format'
  * is for finding one family, not paging the world.
  */
 
-/** Fixed pixel height of one virtualised row. Must match GuestListRow's CSS. */
-const ROW_HEIGHT = 76
+/**
+ * Fixed pixel height of one virtualised row. Must match GuestListRow's CSS.
+ *
+ * THE NUMBER IS A BUDGET, AND IT WAS OVERDRAWN. The row wrapper spends
+ * `py-2` (16px) before the card gets anything, and the card renders three
+ * lines: name (text-base, 24px line box), room (text-sm + mt-0.5, 22px) and
+ * the chips (text-xs + mt-0.5, 18px). That is 64px of content and 16px of
+ * padding — 80px, plus the card's own 2px of border — inside what used to be
+ * 76. The third line therefore rendered THROUGH the card's bottom border and
+ * into the row beneath it, which reads on a handset as struck-through text
+ * and rows that collide.
+ *
+ * The overflow is arithmetic and predates the re-skin; Be Vietnam Pro's
+ * taller x-height is what made a marginal 4px spill into an obvious one.
+ * Raised to 88 so the content fits with headroom rather than trimming a line
+ * the event team asked for.
+ *
+ * If a fourth line is ever added here, this number moves with it. There is no
+ * mechanism that catches the mismatch — the wrapper and the card agree only
+ * because a human keeps them in step.
+ */
+const ROW_HEIGHT = 88
 /** Rows rendered above and below the viewport so scrolling never flashes empty. */
 const OVERSCAN = 6
 /** Debounce before firing a server search. */

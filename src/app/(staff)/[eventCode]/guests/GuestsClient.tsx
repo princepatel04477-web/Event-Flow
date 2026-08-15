@@ -33,8 +33,18 @@ import { describeRoom, groupTypeLabel, sideLabel } from './_components/format'
  * is for finding one family, not paging the world.
  */
 
-/** Fixed pixel height of one virtualised row. Must match GuestListRow's CSS. */
-const ROW_HEIGHT = 76
+/**
+ * Fixed pixel height of one virtualised row. Must match GuestListRow's CSS.
+ *
+ * 76 was 4px short of the three lines the card renders (see the long note in
+ * `guests/list/GuestsClient.tsx`, of which this file is a byte-for-byte
+ * duplicate): the chips line rendered through the card's bottom border and
+ * into the row beneath it.
+ *
+ * This file and `guests/list/GuestsClient.tsx` are the SAME SCREEN on two
+ * live routes. A fix to one is a fix to neither until it is made in both.
+ */
+const ROW_HEIGHT = 88
 /** Rows rendered above and below the viewport so scrolling never flashes empty. */
 const OVERSCAN = 6
 /** Debounce before firing a server search. */
