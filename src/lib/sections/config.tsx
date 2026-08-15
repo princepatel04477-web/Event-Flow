@@ -75,14 +75,25 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
       { segment: 'trips', label: 'Trips', roles: ['admin','event_team'] },
     ],
   },
+  /**
+   * Hospitality is the one section for everything that happens to a guest
+   * once they are on the ground: what they receive, where they sleep, and
+   * whether they are currently in the building.
+   *
+   * The tab used to read "Stay", which is now the name of a child — a parent
+   * and one of its children sharing a name is how a person concludes the
+   * other two screens live somewhere else. `rooms` stays the default landing
+   * screen because it is the section's largest surface; the child order
+   * follows the order they were asked for.
+   */
   hospitality: {
-    id: 'hospitality', label: 'Hospitality', tabLabel: 'Stay',
+    id: 'hospitality', label: 'Hospitality', tabLabel: 'Hospitality',
     icon: <BuildingIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
     children: [
-      { segment: 'rooms', label: 'Rooms', roles: ['admin','event_team'], isDefault: true },
-      { segment: 'checkin', label: 'Check-in', roles: ['admin','event_team'] },
-      { segment: 'deliveries', label: 'Deliveries', roles: ['admin','event_team'] },
+      { segment: 'deliveries', label: 'Hamper', roles: ['admin','event_team'] },
+      { segment: 'rooms', label: 'Stay', roles: ['admin','event_team'], isDefault: true },
+      { segment: 'checkin', label: 'Check-in / out', roles: ['admin','event_team'] },
     ],
   },
   production: {

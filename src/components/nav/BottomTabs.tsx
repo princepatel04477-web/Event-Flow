@@ -76,7 +76,11 @@ export function BottomTabs({ eventCode, access }: BottomTabsProps) {
                 )}>
                   {section.icon}
                 </span>
-                <span>{section.tabLabel}</span>
+                {/* `truncate` and `max-w-full` are load-bearing: a long tab
+                    label ("Hospitality") would otherwise set the flex item's
+                    min-content width and push the five-tab bar wider than the
+                    screen. */}
+                <span className="max-w-full truncate">{section.tabLabel}</span>
               </Link>
             </li>
           )
