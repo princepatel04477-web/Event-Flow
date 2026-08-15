@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import {
-  Cormorant_Garamond,
+  Be_Vietnam_Pro,
   IBM_Plex_Mono,
-  IBM_Plex_Sans,
   IBM_Plex_Sans_Devanagari,
 } from 'next/font/google'
 import type { ReactNode } from 'react'
@@ -40,10 +39,13 @@ if (typeof window !== 'undefined') {
  * `display: 'swap'` on all four: fallback text immediately, never a flash
  * of invisible text.
  */
-const plexSans = IBM_Plex_Sans({
+const beVietnam = Be_Vietnam_Pro({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-plex-sans',
+  // 400 body, 500/600 labels and headlines, 700 display — the four weights
+  // the design language names. Nothing else is loaded: each extra weight is
+  // another file over venue Wi-Fi.
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-be-vietnam',
   display: 'swap',
 })
 
@@ -68,19 +70,15 @@ const plexMono = IBM_Plex_Mono({
   display: 'swap',
 })
 
-/** Names, screen titles, the seal. Never a figure — no tabular set. */
-const cormorant = Cormorant_Garamond({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-cormorant',
-  display: 'swap',
-})
-
+/**
+ * Cormorant Garamond is gone. The design language puts Be Vietnam Pro
+ * "across all tiers", so `font-display` now resolves to it, and shipping a
+ * serif nothing references is a font file downloaded for no reason.
+ */
 const fontVariables = [
-  plexSans.variable,
+  beVietnam.variable,
   plexDevanagari.variable,
   plexMono.variable,
-  cormorant.variable,
 ].join(' ')
 
 export const metadata: Metadata = {
@@ -107,7 +105,7 @@ export const viewport: Viewport = {
   // One colour, both media: the staff app does not follow the OS, so the
   // system chrome must not either. A white status bar over the teal
   // ground is the tell that the two disagree.
-  themeColor: '#071a1d',
+  themeColor: '#f8f9fa',
 }
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

@@ -87,7 +87,7 @@ export default function EvidencePage() {
         <SectionHead eyebrow="Type" title="Three roles" />
         <div className="flex flex-col gap-3 rounded-2xl border border-rule bg-surface p-4">
           <div>
-            <p className="eyebrow mb-1.5">Display · Cormorant Garamond</p>
+            <p className="eyebrow mb-1.5">Display · Be Vietnam Pro</p>
             <p className="font-display text-2xl tracking-[0.14em] text-ink uppercase">
               Call queue
             </p>
@@ -97,7 +97,7 @@ export default function EvidencePage() {
             </p>
           </div>
           <div className="border-t border-rule pt-3">
-            <p className="eyebrow mb-1.5">Body · IBM Plex Sans + Devanagari</p>
+            <p className="eyebrow mb-1.5">Body · Be Vietnam Pro + Plex Devanagari</p>
             <p className="text-lg text-ink">शर्मा परिवार · Rajesh Sharma</p>
             <p className="mt-1 text-xs text-muted">
               Both scripts, one family, one weight. Family names come off the Excel sheet in

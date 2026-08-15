@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 /* ====================================================================
-   Nuvent tokens — the NuventPhone design
+   EventFlow tokens — Royal Ivory & Gold (DESIGN.md)
 
    Field software, not a dashboard: high contrast, 16px base, big touch
-   targets, readable outdoors on a cheap Android phone at 11pm.
+   targets, readable on a cheap Android phone.
 
    Tailwind v4 is CSS-first. There is no tailwind.config.js and there
    must not be one.
@@ -13,83 +13,109 @@
    ---------------
    The app has exactly two skins and neither follows the OS.
 
-   1. Staff — a dark teal night ground (#071A1D) with a brass accent.
-      Staff work corridors, car parks and banquet halls after dark; a
-      cream screen at full brightness is a torch in the face. Fixed dark
-      so a caller's screen looks the same as the person's next to them
-      when they compare a row.
+   1. Staff — warm ivory (#F8F9FA) with a gold accent and deep-charcoal
+      text. "Corporate Modern with a Minimalist Luxury lean": calm
+      authority, back-of-house efficiency, no clinical SaaS coldness.
+      Fixed light so a caller's screen looks the same as the person's
+      next to them when they compare a row.
 
    2. Client — warm cream paper (#F4EFE4), scoped by
       `[data-theme='client']`. Read in a hotel lobby in daylight, by the
-      oldest user of the app, and it must not look like an ops console.
+      oldest user of the app.
 
-   This replaces the previous OS-following light/dark pair. The skin is a
-   property of WHO IS LOOKING, not of a system setting.
+   The skin is a property of WHO IS LOOKING, not of a system setting.
+
+   WHAT CHANGED, AND THE ONE THING TO WEIGH BEFORE KEEPING IT
+   ---------------------------------------------------------
+   This ground was a dark teal night palette (#071A1D + brass), chosen
+   because staff work corridors, car parks and banquet halls after dark
+   and a bright screen at full brightness is a torch in the face. That
+   reasoning has not been disproved — it has been overridden by the
+   product's design language. If night legibility turns out to matter
+   more than the brand, the revert is this token block and nothing else:
+   every component reads these names, which is the same property that
+   let the whole re-skin happen here rather than across 76 routes.
 
    THE COLOUR RULE (unchanged, and absolute)
    -----------------------------------------
-   - Brass  (#C9A96B) is the accent: the primary action, the current tab,
-     the figure being read. It is not a status.
-   - Verdigris (#4FC1A0) means COMPLETED, and only that: delivered,
-     confirmed, balanced, sealed.
-   - Signal (#F2705F) means ATTENTION, and only that: overdue callbacks,
+   - Gold (#735C00, champagne #D4AF37 on dark planes) is the accent: the
+     primary action, the current tab, the figure being read. Not a status.
+   - Jewel emerald (#006B59) means COMPLETED, and only that: delivered,
+     confirmed, balanced, sealed. A "luxury jewel tone", never a traffic
+     light.
+   - Signal (#BA1A1A) means ATTENTION, and only that: overdue callbacks,
      unbalanced families, over-capacity rooms, destructive confirmations.
      The moment it appears on a heading it stops meaning "look here".
-   - Neither verdigris nor signal is ever used decoratively.
+   - Neither emerald nor signal is ever used decoratively.
 
    Every text-on-surface pair below is annotated with its measured WCAG
-   ratio. All pass AA; most pass AAA.
+   ratio. All pass AA; most pass AAA. Where the design language and AA
+   disagreed, AA won and the deviation is commented at the token.
    ==================================================================== */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* Ground — the night teal the whole staff app sits on. */
-  --ef-paper: #071a1d;
-  /* Alternating list band, one step off the ground. */
-  --ef-paper-band: #0b2126;
-  /* Cards sit on the ground. */
-  --ef-surface: #0e272b;
-  --ef-surface-2: #143036;
+  /* Ground — warm ivory. Royal Ivory & Gold, `surface` / `background`. */
+  --ef-paper: #f8f9fa;
+  /* Alternating list band — `surface-container-low`. */
+  --ef-paper-band: #f3f4f5;
+  /* Cards are the bright plane: "active containers and cards use
+     Surface-bright (White)". */
+  --ef-surface: #ffffff;
+  --ef-surface-2: #edeeef;
 
-  /* Chalk — the reading colour. 15.3:1 on ground, 13.4:1 on surface. */
-  --ef-ink: #edf3f2;
-  /* Slate — secondary text. 7.2:1 on ground, 6.3:1 on surface. AAA/AA. */
-  --ef-muted: #8fa9ae;
-  /* Tertiary. Same slate: below it nothing clears AA on this ground, and
-     a footnote nobody can read is not a footnote. */
-  --ef-subtle: #8fa9ae;
+  /* Deep charcoal, not pure black — `on-surface`. 16.8:1 on ivory,
+     17.6:1 on white. */
+  --ef-ink: #191c1d;
+  /* Warm secondary — `on-surface-variant`. 8.9:1 on ivory. */
+  --ef-muted: #4d4635;
+  /* Tertiary — `secondary`. 6.4:1 on ivory. */
+  --ef-subtle: #5d5e61;
 
-  /* Hairline — chalk at low alpha, so it adapts to any surface. */
-  --ef-rule: #edf3f212;
-  --ef-rule-strong: #edf3f224;
+  /* Hairline — charcoal at low alpha. "1px borders in Surface-dim for
+     structural separation", kept as alpha so it adapts to both planes. */
+  --ef-rule: #191c1d14;
+  --ef-rule-strong: #191c1d29;
 
-  /* Signal — ATTENTION only. 6.2:1 on ground, 5.4:1 on surface. */
-  --ef-ledger-red: #f2705f;
-  --ef-ledger-red-strong: #f68b7d;
-  --ef-red-tint: #f2705f26;
+  /* Signal — ATTENTION only. `error`, 6.2:1 on ivory. */
+  --ef-ledger-red: #ba1a1a;
+  --ef-ledger-red-strong: #93000a;
+  --ef-red-tint: #ffdad6;
 
-  /* Verdigris — COMPLETED only. 8.1:1 on ground, 7.0:1 on surface. */
-  --ef-ledger-green: #4fc1a0;
-  --ef-ledger-green-strong: #6fd3b6;
-  --ef-green-tint: #4fc1a024;
+  /* Jewel emerald — COMPLETED only. `tertiary`, 6.4:1 on ivory. The tint
+     is the spec's "Deep Teal at 10% opacity" chip background. */
+  --ef-ledger-green: #006b59;
+  --ef-ledger-green-strong: #004f41;
+  --ef-green-tint: #006b591a;
 
-  /* Brass — the accent. 8.0:1 on ground, 6.9:1 on surface. */
-  --ef-brand: #c9a96b;
-  --ef-brand-hover: #b99a5d;
-  --ef-brand-strong: #dcc08a;
-  --ef-brand-fg: #071a1d;
-  --ef-brand-tint: #c9a96b24;
+  /* Gold — the accent.
+     `primary` (#735c00), NOT champagne (#d4af37), and the difference
+     matters. This token is both the primary fill AND accent text, and
+     champagne on ivory is 1.9:1 — an accent nobody can read outdoors.
+     The spec's own pairing of a champagne fill with WHITE text is 1.9:1
+     too and fails AA outright. #735c00 carries white text at 7.4:1 as a
+     fill and reads 7.4:1 as text on ivory, so one token serves both.
+     Champagne survives as `brand-strong`, for accents on the dark
+     charcoal plane where it is a legitimate 8.6:1. */
+  --ef-brand: #735c00;
+  --ef-brand-hover: #574500;
+  --ef-brand-strong: #d4af37;
+  --ef-brand-fg: #ffffff;
+  --ef-brand-tint: #d4af372e;
 
   /* The margin rule down the leading edge of a register. */
   --ef-margin-rule: var(--ef-ledger-red);
 
-  /* Focus ring. Brass on the dark ground — chalk disappears into the
-     card borders, brass never does. */
-  --ef-ring: #c9a96b;
+  /* Focus ring — "on focus, the border transitions to Gold". */
+  --ef-ring: #735c00;
 
-  /* The tab bar sits a shade under the ground so it reads as a shelf. */
-  --ef-nav: #091f23;
+  /* The tab bar sits one step off the ground so it reads as a shelf.
+     Deliberately NOT the spec's charcoal sidebar: that rule describes a
+     desktop vertical nav, and this is a mobile tab bar whose labels are
+     painted with --ef-muted. Charcoal here would put 4.5:1-on-ivory text
+     on a dark plane and lose it. */
+  --ef-nav: #f3f4f5;
 
   /* Motion. One ease family; everything fast, because staff are in a
      corridor. Collapses entirely under prefers-reduced-motion. */
@@ -109,8 +135,9 @@
   --ef-text-xl: 1.5rem;     /* 24px — display */
   --ef-text-2xl: 1.75rem;   /* 28px — the one thing on the screen */
 
-  /* Eyebrow tracking. The mono small-caps label above every section. */
-  --ef-tracking-eyebrow: 0.16em;
+  /* Eyebrow tracking — the spec's `label-md` 0.05em, uppercase, "to mimic
+     luxury signage". Was 0.16em. */
+  --ef-tracking-eyebrow: 0.05em;
 }
 
 /* --------------------------------------------------------------------
@@ -210,17 +237,21 @@
   --color-tint-info: var(--ef-surface-2);
 
   /* Type roles.
-     - display: Cormorant Garamond, the one characterful face. Names,
-       screen titles, the seal. Never a figure — it has no tabular set.
-     - sans: IBM Plex Sans, with the Devanagari cut immediately after it
-       so "शर्मा परिवार" renders in the same family as the Latin next to
-       it rather than falling back to whatever the WebView has.
-     - mono: IBM Plex Mono, which carries every figure in the app. */
-  --font-sans: var(--font-plex-sans), var(--font-plex-devanagari),
+     - sans AND display are both Be Vietnam Pro: "utilised across all
+       tiers". Display keeps its own token so headline weight/tracking
+       stays a separate decision from body, but the family is now one.
+     - The Devanagari cut stays immediately after it. Be Vietnam Pro has
+       no Devanagari coverage, and family names come off the Excel sheet
+       in Hindi ("शर्मा परिवार") inline with Latin on the same row —
+       without this they fall back to whatever the WebView ships.
+     - mono: IBM Plex Mono, which carries every figure in the app. The
+       spec does not name a mono face; this one stays because the figures
+       are tabular and a column of room numbers has to line up. */
+  --font-sans: var(--font-be-vietnam), var(--font-plex-devanagari),
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Noto Sans", "Noto Sans Devanagari", sans-serif;
-  --font-display: var(--font-cormorant), ui-serif, Georgia,
-    "Times New Roman", "Noto Serif", serif;
+  --font-display: var(--font-be-vietnam), var(--font-plex-devanagari),
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono",
     SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
@@ -232,14 +263,16 @@
 
   --tracking-eyebrow: var(--ef-tracking-eyebrow);
 
-  /* Radii. The mockup is a rounded-rectangle language, not a pill one:
-     cards 16px, controls 14px, tiles 12px. Pills are reserved for status
-     and filter chips, which say `rounded-full` explicitly — so a pill in
-     this app always means "a chip", never "a button". Set as theme
-     variables rather than `@utility` overrides so `rounded-xl` and
-     friends keep their normal Tailwind behaviour. */
-  --radius-lg: 0.75rem;
-  --radius-xl: 0.875rem;
+  /* Radii — "Rounded Eight". Buttons and inputs at 8px, cards and modals
+     at 16px, and pills still reserved for status and filter chips, which
+     say `rounded-full` explicitly — so a pill in this app always means
+     "a chip", never "a button". Mapped by ACTUAL USAGE rather than by the
+     spec's key names: this codebase dresses controls in `rounded-xl` and
+     cards in `rounded-2xl`, so those are the two that must land on 8 and
+     16. Set as theme variables rather than `@utility` overrides so the
+     classes keep their normal Tailwind behaviour. */
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.5rem;
   --radius-2xl: 1rem;
 
   /* Spacing scale, 4px base. */
