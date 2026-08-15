@@ -14,9 +14,18 @@ interface Props {
   hotelId: string
   eventCode: string
   hotelName: string
+  /**
+   * Where "Back to hotel" goes when finished.
+   *
+   * Defaults to the admin hotel page, which is the only caller this form had.
+   * The staff room-create route passes its own, because `/admin/**` is behind
+   * a layout that redirects any non-admin to `/` — sending an event_team user
+   * there on success would bounce them off the app right after a good write.
+   */
+  backHref?: string
 }
 
-export function RoomCreateForm({ eventId, hotelId, eventCode, hotelName }: Props) {
+export function RoomCreateForm({ eventId, hotelId, eventCode, hotelName, backHref }: Props) {
   const router = useRouter()
   const [mode, setMode] = useState<'range' | 'single'>('range')
   const [prefix, setPrefix] = useState('')
@@ -56,7 +65,7 @@ export function RoomCreateForm({ eventId, hotelId, eventCode, hotelName }: Props
         </div>
         <div className="flex gap-3">
           <Button variant="ghost" onClick={() => { setResult(null); setPrefix(''); setStart('1'); setEnd('10'); setRoomNumber('') }}>Add more</Button>
-          <Button variant="primary" onClick={() => { router.push(`/admin/events/${eventCode}/hotels/${hotelId}`); router.refresh() }}>Back to hotel</Button>
+          <Button variant="primary" onClick={() => { router.push(backHref ?? `/admin/events/${eventCode}/hotels/${hotelId}`); router.refresh() }}>Back to hotel</Button>
         </div>
       </div>
     )

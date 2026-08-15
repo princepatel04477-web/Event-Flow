@@ -289,14 +289,29 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
         }
         action={
           <div className="flex flex-col gap-2 w-full max-w-xs">
+            {/* Admin-only, and it was not gated. /admin/** is behind a layout
+                that redirects any non-admin to `/`, so an event_team user who
+                tapped this was thrown out of the section — while the text
+                beside it was already telling them to ask an admin. */}
+            {isAdmin ? (
+              <LinkButton
+                href={`/admin/events/${eventCode}/hotels/new`}
+                variant="primary"
+                leadingIcon={<PlusIcon className="h-5 w-5" />}
+                size="md"
+                fullWidth
+              >
+                Add hotel
+              </LinkButton>
+            ) : null}
             <LinkButton
-              href={`/admin/events/${eventCode}/hotels/new`}
-              variant="primary"
+              href={`/${eventCode}/hospitality/rooms/new`}
+              variant={isAdmin ? 'secondary' : 'primary'}
               leadingIcon={<PlusIcon className="h-5 w-5" />}
               size="md"
               fullWidth
             >
-              Add hotel
+              Add rooms
             </LinkButton>
             {isAdmin ? (
               <LinkButton
@@ -320,7 +335,19 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageTitle right={`${placedCount} / ${bedCount}`}>Rooms</PageTitle>
+      <div className="flex items-center justify-between gap-3">
+        <PageTitle right={`${placedCount} / ${bedCount}`}>Rooms</PageTitle>
+        {/* Once rooms exist the empty state is gone, so without this there is
+            no route to room creation from anywhere in the staff tree. */}
+        <LinkButton
+          href={`/${eventCode}/hospitality/rooms/new`}
+          variant="secondary"
+          size="md"
+          leadingIcon={<PlusIcon className="h-5 w-5" />}
+        >
+          Add rooms
+        </LinkButton>
+      </div>
 
       {/* Placing banner. The screen is modal while a guest is in hand, and
           it says so in a bar you cannot scroll past — a two-tap move where
