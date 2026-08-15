@@ -47,6 +47,32 @@ constraint remains proposed; the 10 rows' fate is Prince's data decision.
 transcribe-recording. extract-rsvp source exists; deploy + Vault secrets
 are Prince's to run (runbook §6.2).
 
+### Runbook §6.4 (`generateStaticParams`) is closed as not-applicable
+
+Zero occurrences in `src/` on this branch; `git log -S` puts every one on
+`feat/m2-static-export-bundle` (`fd60e01`, `10ffd94`). The runbook item was
+written against the static-export branch's shape. It becomes live again only
+if §11a is re-decided and that branch resumes — at which point it is part of
+the export decision, not a separate cleanup. Do not go looking for the
+pattern here.
+
+### §6.3: the abandon path is deliberately NOT fixed with `visibilitychange`
+
+`releaseGroupAfterCall` is wired (`RsvpLogForm.tsx:204`) and the happy path
+releases. Three paths still hold a lock to expiry: abandon without saving,
+force-kill, and a save that fails offline. The obvious fix — release on
+`pagehide`/`visibilitychange` — is a trap: `tel:` backgrounds the WebView on
+every call, so the listener fires mid-dial and drops the lock exactly when
+the caller needs it. The recommended change is CLAUDE.md §11b's shape
+instead: a new, explicitly named `force_release_lock` RPC with an admin-only
+UI, plus the locked-families list that does not exist today. Proposed only —
+see `docs/reform-remaining.md`.
+
+Coverage note found while writing it up: `l4_lock_release.sql` and
+`e2e/tier1.spec.ts` T1.1 both test *taking* the lock and refusing to steal
+it. **No test at any layer asserts the lock is released after a save** — the
+exact behaviour W3 was about.
+
 ---
 
 ## 10 August 2026 — The client view, and the app icon
