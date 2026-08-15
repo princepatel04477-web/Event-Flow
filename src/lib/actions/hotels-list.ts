@@ -11,19 +11,48 @@ export interface HotelListItem {
   address: string | null
 }
 
-export async function readHotelList(eventId: string): Promise<HotelListItem[]> {
+export type HotelListResult =
+  | { ok: true; hotels: HotelListItem[] }
+  | { ok: false; error: string }
+
+/**
+ * Read the hotels for one event.
+ *
+ * EVERY FAILURE USED TO RETURN `[]`. A session without staff access, an RLS
+ * refusal and a broken query all collapsed into an empty array, and the list
+ * screen renders an empty array as "No hotels yet — add the first hotel".
+ * That empty state asserts a fact about the event; what it actually meant was
+ * "this request could not see them". A hotel that exists, that another session
+ * can see, reads as a hotel that was never created — and the obvious next
+ * action it offers is to create a duplicate.
+ *
+ * So failures are now distinguishable from emptiness. `{ ok: true, hotels: [] }`
+ * is the only thing that means the event genuinely has no hotels.
+ */
+export async function readHotelList(eventId: string): Promise<HotelListResult> {
   const access = await getEventAccess(eventId)
-  if (access !== 'admin' && access !== 'event_team') return []
+  if (access !== 'admin' && access !== 'event_team') {
+    return {
+      ok: false,
+      error:
+        `This session has no staff access to this event (resolved: ${access}), so its ` +
+        `hotels are hidden. They have not been deleted — sign in again, or check you are ` +
+        `on the right event.`,
+    }
+  }
 
   const supabase = await createClient()
 
-  const { data: hotels } = await supabase
+  const { data: hotels, error: hotelsError } = await supabase
     .from('hotels')
     .select('id, name, address')
     .eq('event_id', eventId)
     .order('name')
 
-  if (!hotels || hotels.length === 0) return []
+  if (hotelsError) {
+    return { ok: false, error: `Could not read hotels: ${hotelsError.message}` }
+  }
+  if (!hotels || hotels.length === 0) return { ok: true, hotels: [] }
 
   const { data: roomCounts } = await supabase
     .from('rooms')
@@ -53,11 +82,14 @@ export async function readHotelList(eventId: string): Promise<HotelListItem[]> {
     if (hId) occupiedByHotel.set(hId, (occupiedByHotel.get(hId) ?? 0) + 1)
   }
 
-  return hotels.map(h => ({
-    id: h.id,
-    name: h.name,
-    address: h.address,
-    roomCount: roomCountByHotel.get(h.id) ?? 0,
-    occupiedCount: occupiedByHotel.get(h.id) ?? 0,
-  }))
+  return {
+    ok: true,
+    hotels: hotels.map(h => ({
+      id: h.id,
+      name: h.name,
+      address: h.address,
+      roomCount: roomCountByHotel.get(h.id) ?? 0,
+      occupiedCount: occupiedByHotel.get(h.id) ?? 0,
+    })),
+  }
 }

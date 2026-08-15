@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { PageTitle } from '@/components/ui/PageTitle'
 import { PlusIcon, BuildingIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
-import { updateHotel, deleteHotel } from '@/lib/actions/hotels'
+import { updateHotel } from '@/lib/actions/hotels'
 import { deleteRoom } from '@/lib/actions/hotels'
 
 interface Props {
@@ -88,7 +88,10 @@ export function HotelDetailClient({ hotelId, eventId, eventCode, initial }: Prop
     setSubmitting(false)
   }
 
-  async function handleDeleteRoom(roomId: string) {
+  async function handleDeleteRoom(roomId: string, roomNumber: string) {
+    // Deleting a room is not undoable and the control sits next to Edit, one
+    // thumb-width away. It asked nothing before.
+    if (!window.confirm(`Delete room ${roomNumber}?\n\nThis cannot be undone.`)) return
     const result = await deleteRoom(roomId, eventId)
     if (result.ok) setRooms(r => r.filter(r => r.id !== roomId))
     else alert(result.error)
@@ -153,9 +156,14 @@ export function HotelDetailClient({ hotelId, eventId, eventCode, initial }: Prop
                 <p className="font-medium text-fg">{room.room_type ?? 'Standard'}{room.floor ? ` · Floor ${room.floor}` : ''}</p>
                 <p className="text-muted">Capacity {room.capacity}{room.occupantCount > 0 ? ` · ${room.occupantCount} occupied` : ''}</p>
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Link href={`/admin/events/${eventCode}/hotels/${hotelId}/rooms/${room.id}`} className="tap flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-2"><EditIcon /></Link>
-                <button type="button" onClick={() => void handleDeleteRoom(room.id)} aria-label={`Delete room ${room.room_number}`} className="tap flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-tint-danger hover:text-danger"><TrashIcon /></button>
+              {/* Was `opacity-0 group-hover:opacity-100`. A phone has no hover,
+                  so Edit and Delete were invisible on every handset — rooms
+                  could not be edited at all from the field — while still being
+                  tappable, which made Delete an unlabelled trap. Always visible
+                  now, at 44px per the mobile tap-target rule. */}
+              <div className="flex shrink-0 items-center gap-1">
+                <Link href={`/admin/events/${eventCode}/hotels/${hotelId}/rooms/${room.id}`} aria-label={`Edit room ${room.room_number}`} className="tap flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-surface-2 active:bg-surface-2"><EditIcon /></Link>
+                <button type="button" onClick={() => void handleDeleteRoom(room.id, room.room_number)} aria-label={`Delete room ${room.room_number}`} className="tap flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-tint-danger hover:text-danger active:bg-tint-danger active:text-danger"><TrashIcon /></button>
               </div>
             </div>
           ))}

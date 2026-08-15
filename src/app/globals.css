@@ -319,6 +319,17 @@
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
 }
 
+/* Sticky offset that clears the fixed tab bar plus the gesture bar.
+   `sticky bottom-0` sticks to the bottom of the VIEWPORT, which on a phone is
+   underneath AdminMobileNav (`fixed bottom-0`, min-h-16 rows) — so a sticky
+   action bar holding the primary submit hides behind the tab bar the moment
+   the form is long enough to scroll. pb-nav solves this for page flow; this
+   solves it for sticky children. Pair with `md:bottom-0`, since the tab bar
+   is `md:hidden`. */
+@utility bottom-nav {
+  bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
 /* Kill the 300ms grey flash on Android taps. */
 @utility tap {
   touch-action: manipulation;

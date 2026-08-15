@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 import { Button } from '@/components/ui/Button'
-import { Card, CardBody } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { PageTitle } from '@/components/ui/PageTitle'
 import { PlusIcon, BuildingIcon, ChevronRightIcon } from '@/components/icons'
@@ -24,11 +23,27 @@ export function HotelListClient({ eventId, eventCode }: Props) {
 
   useEffect(() => {
     readHotelList(eventId)
-      .then(data => { setHotels(data); setLoading(false) })
-      .catch(() => { setError('Could not load hotels.'); setLoading(false) })
+      .then(res => {
+        if (res.ok) setHotels(res.hotels)
+        // A refusal is not an empty list. Showing "No hotels yet" for a read
+        // this session was not allowed to make is how an existing hotel reads
+        // as a missing one.
+        else setError(res.error)
+        setLoading(false)
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : 'Could not load hotels.')
+        setLoading(false)
+      })
   }, [eventId])
 
-  async function handleDelete(hotelId: string) {
+  async function handleDelete(hotelId: string, hotelName: string) {
+    // There was no confirmation here at all, and the button that called it was
+    // invisible on a touch device (see the row markup below). Deleting a hotel
+    // is not recoverable from this screen.
+    if (!window.confirm(`Delete ${hotelName}?\n\nIts rooms go with it. This cannot be undone.`)) {
+      return
+    }
     setDeleting(hotelId)
     const result = await deleteHotel(hotelId, eventId)
     if (result.ok) {
@@ -86,10 +101,17 @@ export function HotelListClient({ eventId, eventCode }: Props) {
       ) : (
         <div className="flex flex-col gap-3">
           {hotels.map(hotel => (
-            <div key={hotel.id} className="group relative">
+            /* The delete button was `absolute top-3 right-3` with
+               `opacity-0 group-hover:opacity-100`, overlaying the Link. A phone
+               has no hover, so it was permanently invisible — but opacity does
+               not stop pointer events, so it was still tappable. Tapping the
+               top-right of a hotel card silently deleted it, with no
+               confirmation. It is now a real sibling control: visible, 44px,
+               outside the Link, and it asks first. */
+            <div key={hotel.id} className="flex items-center rounded-xl border border-rule bg-surface">
               <Link
                 href={`/admin/events/${eventCode}/hotels/${hotel.id}`}
-                className="tap flex items-center gap-3 rounded-xl border border-rule bg-surface p-4 transition-colors hover:bg-surface-2 active:bg-surface-2"
+                className="tap flex min-w-0 flex-1 items-center gap-3 rounded-l-xl p-4 transition-colors hover:bg-surface-2 active:bg-surface-2"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-tint text-brand">
                   <BuildingIcon className="h-5 w-5" />
@@ -105,10 +127,10 @@ export function HotelListClient({ eventId, eventCode }: Props) {
               </Link>
               <button
                 type="button"
-                onClick={e => { e.preventDefault(); void handleDelete(hotel.id) }}
+                onClick={() => void handleDelete(hotel.id, hotel.name)}
                 disabled={deleting === hotel.id}
                 aria-label={`Delete ${hotel.name}`}
-                className="tap absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-lg text-muted opacity-0 transition-opacity hover:bg-tint-danger hover:text-danger group-hover:opacity-100"
+                className="tap mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-tint-danger hover:text-danger active:bg-tint-danger active:text-danger disabled:opacity-40"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6" />
