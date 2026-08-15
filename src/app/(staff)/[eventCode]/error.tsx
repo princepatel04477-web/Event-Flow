@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { RefreshIcon, ShieldAlertIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { ErrorReference } from '@/components/ui/ErrorReference'
 
 /**
  * Catches an unhandled throw anywhere in the event subtree.
@@ -43,12 +44,7 @@ export default function EventError({
         <>
           Something went wrong fetching this page. It is usually the connection — try
           again, and if it keeps happening tell your admin.
-          {error.digest ? (
-            <>
-              {' '}
-              <span className="font-mono text-xs text-subtle">({error.digest})</span>
-            </>
-          ) : null}
+          <ErrorReference digest={error.digest} />
         </>
       }
       action={

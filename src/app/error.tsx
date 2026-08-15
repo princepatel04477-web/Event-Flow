@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { RefreshIcon, ShieldAlertIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { LinkButton } from '@/components/ui/LinkButton'
+import { ErrorReference } from '@/components/ui/ErrorReference'
 
 /**
  * The app-wide safety net.
@@ -54,9 +55,7 @@ export default function AppError({
           Something went wrong before the page could be drawn. It is usually the
           connection — try again, and if it keeps happening tell your admin.
         </p>
-        {error.digest ? (
-          <p className="figure mt-1 text-xs text-muted">Reference {error.digest}</p>
-        ) : null}
+        <ErrorReference digest={error.digest} />
       </div>
 
       <div className="flex w-full max-w-xs flex-col gap-2.5">
