@@ -486,13 +486,40 @@ export async function readDriverPickupSummary(
     .maybeSingle()
   if (!driver) return { ok: false, error: 'Driver not found.' }
 
+  // A trip is planned before anyone is assigned to it, so `trips.driver_id` is
+  // usually null — `commitTrips` does not resolve it. Driver identity for a day
+  // lives in `vehicle_assignments` (driver <-> vehicle, per date), which is
+  // where this has to look or the summary is empty for every driver. Both are
+  // accepted: the assignment for the day, and a trip with an explicit driver.
+  const { data: assigned } = await supabase
+    .from('vehicle_assignments')
+    .select('vehicle_id')
+    .eq('event_id', eventId)
+    .eq('driver_id', driverId)
+    .eq('assign_date', date)
+
+  const vehicleIds = (assigned ?? []).map((a) => a.vehicle_id)
+  const match = vehicleIds.length
+    ? `driver_id.eq.${driverId},vehicle_id.in.(${vehicleIds.join(',')})`
+    : `driver_id.eq.${driverId}`
+
+  // Bound to the requested day. Without this the query returned every trip the
+  // driver has ever had and the message still said "your pickups for <date>".
+  // The window is UTC, matching how commitTrips stamps scheduled_at on the
+  // deployed (UTC) server; a pickup before 05:30 IST therefore lands on the
+  // previous window, which is worth knowing before dawn runs are planned.
+  const dayStart = `${date}T00:00:00Z`
+  const dayEnd = new Date(new Date(dayStart).getTime() + 86_400_000).toISOString()
+
   const { data: trips, error } = await supabase
     .from('trips')
     .select(
       'id, scheduled_at, pickup_point, driver_id, trip_passengers(group_id, pax, guest_groups(head_name))',
     )
     .eq('event_id', eventId)
-    .eq('driver_id', driverId)
+    .or(match)
+    .gte('scheduled_at', dayStart)
+    .lt('scheduled_at', dayEnd)
     .not('status', 'eq', 'cancelled')
     .order('scheduled_at', { ascending: true })
 
