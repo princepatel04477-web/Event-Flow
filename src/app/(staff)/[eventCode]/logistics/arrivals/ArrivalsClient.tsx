@@ -291,8 +291,16 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
             Not arrived
           </Chip>
         </div>
+        {/* `min-w-0` is the load-bearing class, not `overflow-x-auto`. A flex
+            item defaults to min-width:auto, which resolves to its min-content
+            width — six nowrap chips — so without this the scroller reports a
+            width wider than the screen, the column stretches to match, and
+            EVERY sibling on the page (the section rules, their counts) gets
+            pushed past the right edge with it. The overflow then belongs to
+            the document, not to this row, which is why the symptom shows up
+            on elements that have nothing to do with the chips. */}
         <div
-          className="flex gap-2 overflow-x-auto pb-1"
+          className="flex min-w-0 gap-2 overflow-x-auto pb-1"
           role="group"
           aria-label="Filter by travel mode"
         >

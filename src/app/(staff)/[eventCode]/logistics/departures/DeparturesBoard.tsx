@@ -249,7 +249,7 @@ export function DeparturesBoard({ eventId, eventCode }: DeparturesBoardProps) {
             Not departed
           </button>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
           {['', 'air', 'train', 'bus', 'cab', 'self_drive'].map((m) => (
             <button
               key={m}

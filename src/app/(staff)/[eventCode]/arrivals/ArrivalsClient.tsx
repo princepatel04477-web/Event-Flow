@@ -292,7 +292,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
           </Chip>
         </div>
         <div
-          className="flex gap-2 overflow-x-auto pb-1"
+          className="flex min-w-0 gap-2 overflow-x-auto pb-1"
           role="group"
           aria-label="Filter by travel mode"
         >

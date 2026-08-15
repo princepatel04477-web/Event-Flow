@@ -53,7 +53,7 @@ export function QueueFilters({ filters, onChange }: QueueFiltersProps) {
   return (
     <div className="flex flex-col gap-3">
       <div
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1"
+        className="-mx-4 flex min-w-0 gap-2 overflow-x-auto px-4 pb-1"
         role="group"
         aria-label="Filter by RSVP status"
       >
