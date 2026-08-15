@@ -24,20 +24,45 @@ export function HotelCreateForm({ eventId, eventCode, eventName }: Props) {
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // Distinct from `submitting` so the button can say "Created — opening…"
+  // rather than sitting on "Creating…" while the RSC navigation is in flight.
+  // The write is already durable at that point and the label should say so.
+  const [created, setCreated] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setSubmitting(true)
-    const result = await createHotel(eventId, {
-      name, address: address || null, contactName: contactName || null,
-      contactMobile: contactMobile || null, notes: notes || null,
-    })
-    if (result.ok) {
-      router.push(`/admin/events/${eventCode}/hotels/${result.hotelId}`)
-      router.refresh()
-    } else {
+    try {
+      const result = await createHotel(eventId, {
+        name, address: address || null, contactName: contactName || null,
+        contactMobile: contactMobile || null, notes: notes || null,
+      })
+      if (result.ok) {
+        // Deliberately leaves `submitting` true — navigation is in flight and
+        // re-enabling the button here invites a duplicate insert.
+        setCreated(true)
+        router.push(`/admin/events/${eventCode}/hotels/${result.hotelId}`)
+        router.refresh()
+        return
+      }
       setError(result.error ?? 'Failed to create hotel.')
+      setSubmitting(false)
+    } catch (err: unknown) {
+      // A server action can REJECT rather than return — a dropped connection
+      // mid-flight is the ordinary cause on venue Wi-Fi. There was no catch
+      // here, so the rejection escaped, `setSubmitting(false)` never ran, and
+      // the button sat on "Creating…" forever showing nothing at all.
+      //
+      // The insert commits server-side BEFORE the response is lost, so the
+      // hotel may well exist. Saying so matters: the natural response to a
+      // stuck button is to press it again, and the retry then fails on the
+      // unique (event_id, name) index with "already exists" — which reads as
+      // a second, unrelated bug.
+      setError(
+        `${err instanceof Error ? err.message : 'The request did not complete.'} — ` +
+          `the hotel may still have been created. Check the hotel list before adding it again.`,
+      )
       setSubmitting(false)
     }
   }
@@ -78,10 +103,13 @@ export function HotelCreateForm({ eventId, eventCode, eventName }: Props) {
         </label>
       </div>
 
-      <div className="flex items-center gap-3 sticky bottom-0 bg-paper pt-2 pb-safe">
+      {/* bottom-nav, not bottom-0: the tab bar is `fixed bottom-0`, so a bar
+          stuck to the viewport bottom sits underneath it and takes the submit
+          with it. md:bottom-0 because the tab bar is md:hidden. */}
+      <div className="sticky bottom-nav flex items-center gap-3 bg-paper pt-2 pb-2 md:bottom-0 md:pb-safe">
         <Button type="button" variant="ghost" onClick={() => router.back()} disabled={submitting}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={submitting} className="flex-1">
-          {submitting ? 'Creating…' : `Add hotel to ${eventName}`}
+          {created ? 'Created — opening…' : submitting ? 'Creating…' : `Add hotel to ${eventName}`}
         </Button>
       </div>
     </form>
