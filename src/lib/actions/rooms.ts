@@ -477,6 +477,124 @@ export async function commitAllocations(
 }
 
 // ---------------------------------------------------------------------------
+// Write: materialise a family's member rows
+// ---------------------------------------------------------------------------
+
+export interface EnsureMembersResult {
+  /** guest ids for the group, head first, after any top-up. */
+  guestIds: string[]
+  /** How many rows this call had to create. */
+  created: number
+}
+
+/**
+ * Give a family as many `guests` rows as it has people.
+ *
+ * THE BUG THIS EXISTS TO FIX. The Excel import creates ONE `guests` row per
+ * family — the head (CLAUDE.md §12) — while the headcount lives on
+ * `guest_groups.confirmed_pax` / `expected_pax`. Rooms are assigned per
+ * GUEST ROW (`room_assignments.guest_id`, one active row per guest). So a
+ * family of six had exactly one assignable person: the planner sized a room
+ * for six, the commit placed the head, and the other five silently went
+ * nowhere. No error — the screen reported success and the room showed 1 of 6
+ * beds taken, which then let the capacity guard hand the same beds out again.
+ *
+ * This is the step CLAUDE.md §6 always described — "individual member names
+ * are collected later, at room allocation" — that nothing had implemented.
+ *
+ * Names are placeholders, and deliberately readable rather than blank:
+ * `full_name` is NOT NULL, and these rows surface to the client through
+ * `client_guest_profiles`, so "Rajesh Sharma (guest 2)" is honest about what
+ * is known while still naming the family the person belongs to. Renaming
+ * them is ordinary guest editing.
+ *
+ * Idempotent: it tops up to the headcount and never trims. If a family
+ * shrinks after members were placed, the extra rows are somebody's decision
+ * to release, not this function's to delete — deleting a guest row would
+ * take its room history with it.
+ */
+export async function ensureGroupMembers(
+  eventId: string,
+  groupId: string,
+): Promise<{ ok: true; result: EnsureMembersResult } | { ok: false; error: string }> {
+  const supabase = await createClient()
+
+  const { data: group, error: groupErr } = await supabase
+    .from('guest_groups')
+    .select('id, head_name, expected_pax, confirmed_pax')
+    .eq('id', groupId)
+    .eq('event_id', eventId)
+    .maybeSingle()
+
+  if (groupErr) return { ok: false, error: friendlyDbError(groupErr) }
+  if (!group) return { ok: false, error: 'That family is not on this event.' }
+
+  const { data: existing, error: guestsErr } = await supabase
+    .from('guests')
+    .select('id, is_head')
+    .eq('event_id', eventId)
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: true })
+
+  if (guestsErr) return { ok: false, error: friendlyDbError(guestsErr) }
+
+  const rows = (existing ?? []) as { id: string; is_head: boolean }[]
+  // confirmed_pax is the number a human heard on the phone; expected_pax is
+  // the one the spreadsheet guessed. Prefer the confirmed one when it exists.
+  const pax = group.confirmed_pax ?? group.expected_pax ?? rows.length
+  const missing = Math.max(0, pax - rows.length)
+
+  const headName = (group.head_name ?? '').trim() || 'Family'
+  let created = 0
+
+  if (missing > 0) {
+    const toInsert = Array.from({ length: missing }, (_, i) => ({
+      event_id: eventId,
+      group_id: groupId,
+      // 1-based position in the family. With the head already on file as
+      // guest 1, a family of six gets guests 2..6.
+      full_name: `${headName} (guest ${rows.length + i + 1})`,
+      is_head: false,
+    }))
+
+    const { data: inserted, error: insertErr } = await supabase
+      .from('guests')
+      .insert(toInsert)
+      .select('id')
+
+    if (insertErr) return { ok: false, error: friendlyDbError(insertErr) }
+    created = inserted?.length ?? 0
+    for (const r of inserted ?? []) rows.push({ id: r.id, is_head: false })
+  }
+
+  // Head first, so whichever room takes the first seat shows the family name.
+  const head = rows.find((r) => r.is_head)
+  const guestIds = head
+    ? [head.id, ...rows.filter((r) => r.id !== head.id).map((r) => r.id)]
+    : rows.map((r) => r.id)
+
+  return { ok: true, result: { guestIds, created } }
+}
+
+/** Top up several families in one call — the allocation commit path. */
+export async function ensureMembersForGroups(
+  eventId: string,
+  groupIds: string[],
+): Promise<{ ok: true; byGroup: Record<string, string[]>; created: number } | { ok: false; error: string }> {
+  const byGroup: Record<string, string[]> = {}
+  let created = 0
+
+  for (const groupId of groupIds) {
+    const res = await ensureGroupMembers(eventId, groupId)
+    if (!res.ok) return res
+    byGroup[groupId] = res.result.guestIds
+    created += res.result.created
+  }
+
+  return { ok: true, byGroup, created }
+}
+
+// ---------------------------------------------------------------------------
 // Write: move a guest between rooms
 // ---------------------------------------------------------------------------
 
@@ -632,29 +750,18 @@ export async function assignGroupToRoom(
 ): Promise<AssignGroupResult> {
   const supabase = await createClient()
 
-  const { data: guests } = await supabase
-    .from('guests')
-    .select('id')
-    .eq('event_id', eventId)
-    .eq('group_id', groupId)
+  // Top up the family's member rows to its headcount FIRST. Without this the
+  // import's single head row is the only assignable person, so "assign this
+  // family to room 701" put one of six people in the room and reported
+  // success. ensureGroupMembers returns them head-first, which is the order
+  // this loop wanted anyway.
+  const ensured = await ensureGroupMembers(eventId, groupId)
+  if (!ensured.ok) return { ok: false, error: ensured.error, code: 'other' }
 
-  const list = (guests ?? []) as unknown as { id: string }[]
-  if (list.length === 0) {
+  const ordered = ensured.result.guestIds
+  if (ordered.length === 0) {
     return { ok: false, error: 'This family has no guests to assign.', code: 'other' }
   }
-
-  // Assign head first so the room shows the family name, then the rest.
-  const { data: head } = await supabase
-    .from('guests')
-    .select('id')
-    .eq('event_id', eventId)
-    .eq('group_id', groupId)
-    .eq('is_head', true)
-    .maybeSingle()
-
-  const ordered = head
-    ? [head.id, ...list.filter((g) => g.id !== head.id).map((g) => g.id)]
-    : list.map((g) => g.id)
 
   let assigned = 0
   for (const guestId of ordered) {

@@ -8,7 +8,7 @@ import type {
   AllocationResult,
 } from '@/lib/allocate/allocator'
 import type { AllocationData } from '@/lib/actions/rooms'
-import { commitAllocations } from '@/lib/actions/rooms'
+import { commitAllocations, ensureMembersForGroups } from '@/lib/actions/rooms'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { LinkButton } from '@/components/ui/LinkButton'
@@ -60,18 +60,32 @@ export function AllocateClient({ eventId, eventCode, data }: Props) {
     const assignments: Record<string, string> = {}
     const overrides: Record<string, string> = {}
 
+    // Give every placed family as many guest rows as it has people, BEFORE
+    // mapping people into rooms.
+    //
+    // The loop below is bounded by the number of guest rows. The import only
+    // creates one per family — the head — so a family of six had exactly one
+    // assignable person: the planner sized a room for six, this loop wrote a
+    // single assignment, and the other five were dropped without an error.
+    // The screen said "committed" and the room showed 1 of 6 beds taken,
+    // which then let the capacity guard hand those same beds to someone else.
+    const placedGroupIds = proposal.placed.filter((p) => p.placed).map((p) => p.groupId)
+    const ensured = await ensureMembersForGroups(eventId, placedGroupIds)
+    if (!ensured.ok) {
+      setPhase({ ...current, stage: 'ready', committed: false, commitError: ensured.error })
+      return
+    }
+
     for (const pg of proposal.placed) {
       if (!pg.placed) continue
-      // Map guests to rooms from the proposal
+      // Head-first ids for this family, topped up to its headcount above.
+      const groupGuestIds = ensured.byGroup[pg.groupId] ?? []
       let guestOffset = 0
-      const groupGuests = data.guests.filter((g) => data.groups.find(
-        (gr) => gr.id === pg.groupId,
-      )?.guestIds.includes(g.id))
 
       for (const room of pg.rooms) {
         if (room.alreadyHeld) continue
-        for (let i = 0; i < room.paxInRoom && guestOffset < groupGuests.length; i++, guestOffset++) {
-          assignments[groupGuests[guestOffset].id] = room.roomId
+        for (let i = 0; i < room.paxInRoom && guestOffset < groupGuestIds.length; i++, guestOffset++) {
+          assignments[groupGuestIds[guestOffset]] = room.roomId
         }
         if (room.bedsRemaining < 0) {
           // Negative remaining means we pushed over capacity — record override
