@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { PageTitle } from '@/components/ui/PageTitle'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { SearchIcon, CheckCircleIcon, AlertTriangleIcon } from '@/components/icons'
+import { WhatsAppButton } from '@/components/ui/WhatsAppButton'
 import { createClient } from '@/lib/supabase/client'
 import { markArrived } from '@/lib/actions/event-day'
 import { traceFetch } from '@/lib/perf'
@@ -438,6 +439,9 @@ function ArrivalRowCard({
               >
                 {formatMobile(row.group.primary_mobile)}
               </a>
+            ) : null}
+            {row.group.primary_mobile ? (
+              <WhatsAppButton mobile={row.group.primary_mobile} name={row.group.head_name} />
             ) : null}
           </div>
         </div>

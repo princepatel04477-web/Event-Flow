@@ -77,6 +77,47 @@ export function isSystemScheme(url: string): boolean {
   return /^(tel|mailto):/i.test(url)
 }
 
+/**
+ * Open an `https:` URL that belongs to ANOTHER APP — a `wa.me` chat, a maps
+ * link. Never in the WebView.
+ *
+ * `openExternalUrl` above is right for `tel:`/`mailto:`, where a plain
+ * `location.href` hands the URL straight to the OS. An `https:` URL is a
+ * different problem in both environments:
+ *
+ *  - Inside Capacitor, `location.href = 'https://wa.me/…'` NAVIGATES THE
+ *    WEBVIEW. The app unloads, and the remount puts a cookie-only code-auth
+ *    session back on /login — the same Tier-0 failure this module was
+ *    written for. `isSystemScheme` does not match https, so the document
+ *    interceptor never sees these links; they must be handled at the call
+ *    site.
+ *  - On the web, a same-tab navigation loses the screen the user was on,
+ *    which on venue Wi-Fi means a full reload to get back. A new tab keeps it.
+ *
+ * Call this synchronously from the click handler. `window.open` needs the
+ * transient user activation, so awaiting anything first gets it blocked —
+ * and a blocked popup returns null rather than throwing.
+ */
+export function openExternalAppUrl(url: string): void {
+  if (typeof window === 'undefined') return
+
+  const seam = (window as NuvWindow).__NUVENT_OPEN_EXTERNAL__
+  if (typeof seam === 'function') {
+    void seam(url)
+    return
+  }
+
+  if (isNativePlatform()) {
+    // AppLauncher resolves the intent (WhatsApp, Maps) without touching the
+    // WebView. Its own fallback is location.href, which is only reached when
+    // the plugin is missing entirely.
+    void openExternalUrl(url)
+    return
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 let wired = false
 
 /**

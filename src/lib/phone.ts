@@ -205,3 +205,27 @@ export function dialTarget(raw: string | null | undefined): DialTarget | null {
 export function telHref(raw: string | null | undefined): string | null {
   return dialTarget(raw)?.href ?? null
 }
+
+/**
+ * `wa.me` deep link for a stored number, or null when there is nothing
+ * messageable.
+ *
+ * Built on `dialTarget` so it inherits the same refusal to guess: a cell that
+ * will not reduce to a real number gets null, and the UI renders a disabled
+ * button. Opening a WhatsApp chat with a stranger is the same failure as
+ * dialling one, and it is worse in one respect — the message can be sent
+ * before anyone notices the name at the top is wrong.
+ *
+ * wa.me wants the full international number with no `+` and no separators:
+ * an Indian mobile becomes `91XXXXXXXXXX`.
+ */
+export function whatsappHref(raw: string | null | undefined): string | null {
+  const target = dialTarget(raw)
+  if (!target) return null
+
+  const digits = target.international
+    ? target.dialedNumber.slice(1) // stored as +<cc><number>
+    : `91${target.dialedNumber}`
+
+  return `https://wa.me/${digits}`
+}
