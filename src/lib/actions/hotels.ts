@@ -20,13 +20,39 @@ function staffGate(access: string) {
 // Hotels
 // ---------------------------------------------------------------------------
 
+/**
+ * `.trim()` is not tidiness — it is what keeps the unique index meaningful.
+ *
+ * `hotels` is `unique (event_id, name)`, and Postgres compares the raw
+ * string, so "Marriott" and "Marriott " are two different hotels as far as
+ * that index is concerned. Nothing trimmed on the way in, so a trailing space
+ * — which a phone keyboard adds readily, and which is invisible in every
+ * screen that displays the name — bought a second row that looked identical
+ * to the first. Two rows are already in the data this way ("Marriott " on
+ * E00000, "Weekend Address " on E12345); see the duplicate check below.
+ */
 const createHotelSchema = z.object({
-  name: z.string().min(1, 'Hotel name is required'),
-  address: z.string().nullable().optional(),
-  contactName: z.string().nullable().optional(),
-  contactMobile: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
+  name: z.string().trim().min(1, 'Hotel name is required'),
+  address: z.string().trim().nullable().optional(),
+  contactName: z.string().trim().nullable().optional(),
+  contactMobile: z.string().trim().nullable().optional(),
+  notes: z.string().trim().nullable().optional(),
 })
+
+/**
+ * Normalise for COMPARISON only — never for storage. Case-folded, ends
+ * trimmed, internal runs of whitespace collapsed.
+ *
+ * Deliberately not more aggressive than that. Stripping punctuation would
+ * also fuse "Hotel 1" and "Hotel-1", which are plausibly two real hotels,
+ * and this check refuses the insert rather than merely flagging it. It
+ * catches the failure mode that actually occurs — whitespace — and does not
+ * pretend to catch misspellings: "Mariott" and "Marriott" are different
+ * strings and no normaliser should be deciding otherwise.
+ */
+function normaliseHotelName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').toLowerCase()
+}
 
 export type CreateHotelInput = z.infer<typeof createHotelSchema>
 
@@ -41,6 +67,32 @@ export async function createHotel(eventId: string, raw: CreateHotelInput) {
   }
 
   const supabase = await createClient()
+
+  // Warn BEFORE inserting rather than letting the unique index decide. The
+  // index only fires on a byte-exact match, so it would happily accept the
+  // trailing-space twin it is supposed to prevent — and by then the row
+  // exists and someone has to spot it by eye.
+  const { data: siblings, error: siblingsError } = await supabase
+    .from('hotels')
+    .select('id, name')
+    .eq('event_id', eventId)
+
+  if (siblingsError) {
+    return { ok: false as const, error: `Could not check for existing hotels: ${siblingsError.message}` }
+  }
+
+  const target = normaliseHotelName(parsed.data.name)
+  const clash = (siblings ?? []).find((h) => normaliseHotelName(h.name) === target)
+  if (clash) {
+    return {
+      ok: false as const,
+      error:
+        `"${clash.name}" already exists on this event. Open it instead of adding a ` +
+        `second copy — or give this one a name that tells them apart.`,
+      duplicateOf: clash.id,
+    }
+  }
+
   const { data, error } = await supabase
     .from('hotels')
     .insert({
