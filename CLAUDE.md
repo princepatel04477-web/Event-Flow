@@ -875,6 +875,19 @@ no anchor outside itself; nothing was dropped in the move.
   and deletes another, with no dry-run flag and no transaction. The directory is
   gitignored. Treat anything in it as a record of what a past session did, not as a
   tool to re-run.
+- **The `nuvent_*` cookie and storage keys are FROZEN. Renaming one signs out every
+  staff member.** The product display name is EventFlow as of 2026-08-15, so these read
+  as leftovers and a future session will try to tidy them. They are not cosmetic:
+  `nuvent_code_auth` and `nuvent_staff_member` (cookies, `src/lib/auth/cookies.ts`),
+  `nuvent_device_id` (`src/lib/device.ts`), `nuvent_code_jwt` / `nuvent_staff_member` /
+  `nuvent_event_code` (native session keeper), `nuvent_session_restored`
+  (`SessionBridge`) and `nuvent.welcome.played` (cold-start). A rename does not migrate
+  the old value — it makes the app look for a key that was never written, so every
+  handset lands on the sign-in screen mid-event and each one needs its code re-entered.
+  The same applies to `NUVENT_PERF_BASELINE`, `appId com.nuvent.app` (a new appId is a
+  different Android app: no upgrade path, uninstall and reinstall on every phone), and
+  the `/nuvent-guest-list-template.xlsx` asset path. Brand names in the UI are copy;
+  these are identifiers.
 - **Storage paths must start with the event id.** Bucket policies read the first folder
   segment as the tenant key and cast it to uuid:
   `delivery-proofs/{event_id}/{deliverable_id}/{uuid}.jpg`,
