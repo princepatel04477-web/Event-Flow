@@ -669,27 +669,58 @@ export async function ensureGroupMembers(
   const pax = group.confirmed_pax ?? group.expected_pax ?? rows.length
   const missing = Math.max(0, pax - rows.length)
 
-  const headName = (group.head_name ?? '').trim() || 'Family'
+  // A family must always have exactly one head. The import creates the head
+  // row, but a group with zero guest rows (or one that lost its head) would
+  // otherwise get N placeholder rows all with is_head false — the family
+  // then renders as the literal word "Guest" in the rooms grid and client
+  // profile card. When no head exists, the first materialised row is the
+  // head, named from guest_groups.head_name.
+  const hasHead = rows.some((r) => r.is_head)
+  const headName = (group.head_name ?? '').trim()
+  const headLabel = headName || 'Family head'
   let created = 0
 
-  if (missing > 0) {
-    const toInsert = Array.from({ length: missing }, (_, i) => ({
-      event_id: eventId,
-      group_id: groupId,
-      // 1-based position in the family. With the head already on file as
-      // guest 1, a family of six gets guests 2..6.
-      full_name: `${headName} (guest ${rows.length + i + 1})`,
-      is_head: false,
-    }))
+  // A head must always exist. Cases:
+  //  - missing > 0 and no head: create the head first (named from head_name),
+  //    then the remaining members.
+  //  - missing > 0 and head exists: create the members only (current behaviour).
+  //  - missing == 0 and no head: the family is already at headcount but every
+  //    row is is_head false (the T2.7 shape) — create exactly one head row.
+  //    guests_single_head_per_group forbids a second head, so this only fires
+  //    when none exists.
+  if (missing > 0 || !hasHead) {
+    const toInsert: { event_id: string; group_id: string; full_name: string; is_head: boolean }[] = []
+    if (!hasHead) {
+      toInsert.push({
+        event_id: eventId,
+        group_id: groupId,
+        full_name: headLabel,
+        is_head: true,
+      })
+    }
+    // Members to create: everything missing, minus the head row if we are
+    // creating one. When missing == 0 (head-only case) this is zero.
+    const membersToInsert = Math.max(0, missing - (hasHead ? 0 : 1))
+    // Members number from the current row count + the head row (if created)
+    // + 1, so a zero-row family gets head "X" then "X (guest 2)".."X (guest N)".
+    const memberStart = rows.length + (hasHead ? 0 : 1) + 1
+    for (let i = 0; i < membersToInsert; i += 1) {
+      toInsert.push({
+        event_id: eventId,
+        group_id: groupId,
+        full_name: `${headLabel} (guest ${memberStart + i})`,
+        is_head: false,
+      })
+    }
 
     const { data: inserted, error: insertErr } = await supabase
       .from('guests')
       .insert(toInsert)
-      .select('id')
+      .select('id, is_head')
 
     if (insertErr) return { ok: false, error: friendlyDbError(insertErr) }
     created = inserted?.length ?? 0
-    for (const r of inserted ?? []) rows.push({ id: r.id, is_head: false })
+    for (const r of inserted ?? []) rows.push({ id: r.id, is_head: r.is_head })
   }
 
   // Head first, so whichever room takes the first seat shows the family name.
