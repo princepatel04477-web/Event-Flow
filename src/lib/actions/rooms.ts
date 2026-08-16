@@ -246,6 +246,99 @@ export async function suggestRoomAssignments(eventId: string): Promise<SuggestRo
 }
 
 // ---------------------------------------------------------------------------
+// Read: under-bedded families (Phase 3 — placed but below headcount)
+// ---------------------------------------------------------------------------
+
+export interface UnderBeddedFamily {
+  groupId: string
+  headName: string
+  headcount: number
+  /** Number of guest rows materialized for this family. */
+  memberRows: number
+  /** Number of active (unreleased) room assignments this family holds. */
+  placed: number
+  /** headcount - placed. Positive means the family still needs beds. */
+  shortfall: number
+  /** True when member rows are fewer than headcount — a top-up is needed. */
+  needsTopUp: boolean
+}
+
+export interface UnderBeddedResult {
+  ok: boolean
+  error: string | null
+  families: UnderBeddedFamily[]
+}
+
+/**
+ * List every confirmed family that is placed but UNDER its headcount —
+ * the gap ensureGroupMembers cannot heal by itself, because both suggest and
+ * allocate skip families already holding a room (see suggestRoomAssignments).
+ * A family imported with one head row, assigned one bed of six, then marked
+ * placed would otherwise never surface its five missing beds.
+ *
+ * Read-only. It REPORTS the shortfall; the UI tops up via ensureGroupMembers /
+ * assignGuestToRoom, which are already idempotent and head-count-aware.
+ */
+export async function readUnderBeddedFamilies(eventId: string): Promise<UnderBeddedResult> {
+  const supabase = await createClient()
+
+  const [groupsRes, guestsRes, assignmentsRes] = await Promise.all([
+    supabase
+      .from('guest_groups')
+      .select('id, head_name, expected_pax, confirmed_pax')
+      .eq('event_id', eventId)
+      .eq('rsvp_status', 'confirmed'),
+    supabase
+      .from('guests')
+      .select('id, group_id')
+      .eq('event_id', eventId),
+    supabase
+      .from('room_assignments')
+      .select('group_id')
+      .eq('event_id', eventId)
+      .is('released_at', null),
+  ])
+
+  if (groupsRes.error) return { ok: false, error: friendlyDbError(groupsRes.error), families: [] }
+  if (guestsRes.error) return { ok: false, error: friendlyDbError(guestsRes.error), families: [] }
+  if (assignmentsRes.error) return { ok: false, error: friendlyDbError(assignmentsRes.error), families: [] }
+
+  const rowsByGroup = new Map<string, number>()
+  for (const g of (guestsRes.data ?? []) as { group_id: string }[]) {
+    rowsByGroup.set(g.group_id, (rowsByGroup.get(g.group_id) ?? 0) + 1)
+  }
+  const placedByGroup = new Map<string, number>()
+  for (const a of (assignmentsRes.data ?? []) as { group_id: string }[]) {
+    placedByGroup.set(a.group_id, (placedByGroup.get(a.group_id) ?? 0) + 1)
+  }
+
+  const families: UnderBeddedFamily[] = []
+  for (const g of (groupsRes.data ?? []) as {
+    id: string
+    head_name: string
+    expected_pax: number
+    confirmed_pax: number | null
+  }[]) {
+    const headcount = g.confirmed_pax ?? g.expected_pax
+    if (!headcount || headcount <= 0) continue
+    const memberRows = rowsByGroup.get(g.id) ?? 0
+    const placed = placedByGroup.get(g.id) ?? 0
+    if (placed >= headcount) continue
+    families.push({
+      groupId: g.id,
+      headName: g.head_name,
+      headcount,
+      memberRows,
+      placed,
+      shortfall: headcount - placed,
+      needsTopUp: memberRows < headcount,
+    })
+  }
+
+  return { ok: true, error: null, families }
+}
+
+// ---------------------------------------------------------------------------
 // Read: rooms grid for the manual override screen
 // ---------------------------------------------------------------------------
 
@@ -279,6 +372,8 @@ export interface RoomsGridData {
   rooms: RoomGridRow[]
   /** Guests not currently assigned to any room. */
   unplaced: { guestId: string; guestName: string; groupId: string; headName: string }[]
+  /** Confirmed families placed but below their headcount (Phase 3). */
+  underBedded: UnderBeddedFamily[]
 }
 
 export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
@@ -311,7 +406,7 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
     .eq('event_id', eventId)
   const groupsRes = await supabase
     .from('guest_groups')
-    .select('id, head_name, primary_mobile, rsvp_status')
+    .select('id, head_name, primary_mobile, rsvp_status, expected_pax, confirmed_pax')
     .eq('event_id', eventId)
   // Hamper delivered state per group, for the room-tap panel (§5.3) and the
   // per-room hamper coding (§5.4). Group-level hamper: kind=hamper, guest_id
@@ -340,6 +435,32 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
   const confirmedGroupIds = new Set(
     groupRows.filter((g) => g.rsvp_status === 'confirmed').map((g) => g.id),
   )
+
+  // Materialize member rows to each confirmed family's headcount BEFORE the
+  // unplaced list is built. A family imported with one head row and
+  // confirmed_pax 6 would otherwise show one unplaced guest and one bed
+  // claimed; the headcount gap would be invisible. ensureMembersForGroups is
+  // idempotent and only inserts what is missing (never trims), so a read
+  // crossing into a write here is bounded and self-healing — this is the
+  // sanctioned way to make "unplaced" reflect headcount, not rows.
+  if (confirmedGroupIds.size > 0) {
+    const ensured = await ensureMembersForGroups(eventId, [...confirmedGroupIds])
+    if (!ensured.ok) {
+      // A failure to top up must not take the whole grid down — the rooms
+      // themselves are still readable. The assign path tops up again before
+      // any write, so the shortfall still resolves at assignment time.
+      console.error('[rooms] ensureMembersForGroups failed in readRoomsGrid', ensured.error)
+    }
+    // Re-read guests after materialization so the grid reflects the new rows.
+    const refreshed = await supabase
+      .from('guests')
+      .select('id, group_id, age_band, is_head')
+      .eq('event_id', eventId)
+    if (refreshed.data) {
+      guestsAll.length = 0
+      guestsAll.push(...(refreshed.data as typeof guestsAll))
+    }
+  }
 
   // Precompute lookup maps once, so the per-room assembly below is O(rooms +
   // assignments + guests) instead of O(rooms × assignments × guests). With
@@ -404,9 +525,39 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
       headName: groupNames.get(g.group_id) ?? 'Unknown',
     }))
 
+  // Under-bedded: confirmed families placed but below their headcount.
+  // This is the Phase 3 surface — families the suggest/allocate paths skip
+  // (they already hold a room) but which still have unclaimed beds.
+  const assignedByGroup = new Map<string, number>()
+  for (const a of assignments) {
+    assignedByGroup.set(a.group_id, (assignedByGroup.get(a.group_id) ?? 0) + 1)
+  }
+  const memberRowsByGroup = new Map<string, number>()
+  for (const g of guestsAll) {
+    memberRowsByGroup.set(g.group_id, (memberRowsByGroup.get(g.group_id) ?? 0) + 1)
+  }
+  const underBedded: UnderBeddedFamily[] = []
+  for (const g of groupRows) {
+    if (g.rsvp_status !== 'confirmed') continue
+    const headcount = g.confirmed_pax ?? g.expected_pax
+    if (!headcount || headcount <= 0) continue
+    const placed = assignedByGroup.get(g.id) ?? 0
+    if (placed >= headcount) continue
+    const memberRows = memberRowsByGroup.get(g.id) ?? 0
+    underBedded.push({
+      groupId: g.id,
+      headName: g.head_name,
+      headcount,
+      memberRows,
+      placed,
+      shortfall: headcount - placed,
+      needsTopUp: memberRows < headcount,
+    })
+  }
+
   timing.mark('assemble')
   timing.report()
-  return { rooms, unplaced }
+  return { rooms, unplaced, underBedded }
 }
 
 // ---------------------------------------------------------------------------
@@ -696,6 +847,17 @@ export async function assignGuestToRoom(
     return { ok: false, error: 'Guest not found.', code: 'other' }
   }
 
+  // Top up the family to its headcount BEFORE placing anyone. The import
+  // creates one guest row per family (the head), so without this a six-pax
+  // family has exactly one assignable person: "assign the head" silently
+  // leaves five beds unclaimed and the room reads 1 of 6 occupied.
+  // Idempotent, never trims. This mirrors assignGroupToRoom's top-up so the
+  // grid's single-guest path and the suggestion panel behave identically.
+  const ensured = await ensureGroupMembers(eventId, guest.group_id)
+  if (!ensured.ok) {
+    return { ok: false, error: ensured.error, code: 'other' }
+  }
+
   const { error } = await supabase
     .from('room_assignments')
     .insert({
@@ -748,8 +910,6 @@ export async function assignGroupToRoom(
   groupId: string,
   roomId: string,
 ): Promise<AssignGroupResult> {
-  const supabase = await createClient()
-
   // Top up the family's member rows to its headcount FIRST. Without this the
   // import's single head row is the only assignable person, so "assign this
   // family to room 701" put one of six people in the room and reported

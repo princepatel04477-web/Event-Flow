@@ -87,6 +87,41 @@ function occupancyDots(room: RoomGridRow): string {
   return out
 }
 
+interface UnplacedRow {
+  guestId: string
+  guestName: string
+  groupId: string
+  headName: string
+}
+
+/**
+ * Group the unplaced list by family, head first, so members render nested
+ * beneath the head. A family with no head row (import edge) still groups
+ * under its groupId with all rows as members.
+ */
+function groupUnplacedByFamily(unplaced: UnplacedRow[]): {
+  groupId: string
+  head: UnplacedRow | null
+  members: UnplacedRow[]
+}[] {
+  const byGroup = new Map<string, UnplacedRow[]>()
+  for (const u of unplaced) {
+    const list = byGroup.get(u.groupId) ?? []
+    list.push(u)
+    byGroup.set(u.groupId, list)
+  }
+  const out: { groupId: string; head: UnplacedRow | null; members: UnplacedRow[] }[] = []
+  for (const [groupId, rows] of byGroup) {
+    const head = rows.find((r) => r.guestName === r.headName) ?? rows[0]
+    out.push({
+      groupId,
+      head,
+      members: rows.filter((r) => r !== head),
+    })
+  }
+  return out
+}
+
 export function RoomsGridClient({ eventId }: Props) {
   const [state, setState] = useState<LoadState>({ phase: 'loading' })
   const [hotelIdx, setHotelIdx] = useState(0)
@@ -289,6 +324,27 @@ export function RoomsGridClient({ eventId }: Props) {
     <div className="flex flex-col gap-4">
       <PageTitle right={`${placedCount} / ${bedCount}`}>Rooms</PageTitle>
 
+      {/* Under-bedded families. Placed but below headcount — the suggest and
+          allocate paths skip them once they hold a room, so their missing
+          beds would never surface otherwise. */}
+      {data.underBedded.length > 0 ? (
+        <section className="flex flex-col gap-2 rounded-xl border border-warning/50 bg-tint-warning px-3.5 py-3">
+          <p className="text-sm font-semibold text-warning">
+            {data.underBedded.length} famil{data.underBedded.length === 1 ? 'y' : 'ies'} under-bedded
+          </p>
+          <ul className="flex flex-col gap-1">
+            {data.underBedded.map((f) => (
+              <li key={f.groupId} className="flex items-center justify-between gap-2 text-sm text-ink">
+                <span className="min-w-0 truncate font-medium">{f.headName}</span>
+                <span className="shrink-0 text-muted">
+                  {f.placed} of {f.headcount} placed · {f.shortfall} bed{f.shortfall === 1 ? '' : 's'} short
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {/* Placing banner. The screen is modal while a guest is in hand, and
           it says so in a bar you cannot scroll past — a two-tap move where
           the first tap is invisible is a move people make by accident. */}
@@ -324,7 +380,9 @@ export function RoomsGridClient({ eventId }: Props) {
       ) : null}
 
       {/* Unplaced guests. Above the grid because they are the reason you
-          came: a guest with no bed is the open item, not the rooms. */}
+          came: a guest with no bed is the open item, not the rooms. Members
+          of a family are nested under the head, so a 6-pax family shows as
+          one bold head with its unplaced members beneath it. */}
       {data.unplaced.length > 0 ? (
         <section className="flex flex-col gap-2.5">
           <SectionHead
@@ -332,29 +390,62 @@ export function RoomsGridClient({ eventId }: Props) {
             right={`${data.unplaced.length}`}
             inline
           />
-          <div className="flex flex-wrap gap-2">
-            {data.unplaced.map((u) => {
-              const on = selectedUnplaced === u.guestId
+          <div className="flex flex-col gap-1.5">
+            {groupUnplacedByFamily(data.unplaced).map((family) => {
+              const head = family.head
               return (
-                <button
-                  key={u.guestId}
-                  type="button"
-                  onClick={() => {
-                    setSelectedUnplaced(on ? null : u.guestId)
-                    setSelectedGuest(null)
-                    setActionError(null)
-                  }}
-                  aria-pressed={on}
-                  className={cn(
-                    'tap min-h-12 rounded-full border px-4 text-left text-sm transition-colors duration-press ease-ledger',
-                    on
-                      ? 'border-brand bg-brand-tint text-brand'
-                      : 'border-rule-strong bg-surface text-ink active:bg-surface-2',
-                  )}
-                >
-                  <span className="font-medium">{u.guestName}</span>
-                  <span className="ml-2 text-muted">{u.headName}</span>
-                </button>
+                <div key={family.groupId} className="flex flex-col gap-1.5">
+                  {/* Head — bold, the family anchor. */}
+                  {head ? (
+                    <button
+                      key={head.guestId}
+                      type="button"
+                      onClick={() => {
+                        setSelectedUnplaced(selectedUnplaced === head.guestId ? null : head.guestId)
+                        setSelectedGuest(null)
+                        setActionError(null)
+                      }}
+                      aria-pressed={selectedUnplaced === head.guestId}
+                      className={cn(
+                        'tap min-h-12 rounded-xl border px-4 text-left text-sm font-semibold transition-colors duration-press ease-ledger',
+                        selectedUnplaced === head.guestId
+                          ? 'border-brand bg-brand-tint text-brand'
+                          : 'border-rule-strong bg-surface text-ink active:bg-surface-2',
+                      )}
+                    >
+                      {head.guestName}
+                    </button>
+                  ) : null}
+                  {/* Members — nested beneath the head, normal weight. */}
+                  {family.members.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pl-4">
+                      {family.members.map((u) => {
+                        const on = selectedUnplaced === u.guestId
+                        return (
+                          <button
+                            key={u.guestId}
+                            type="button"
+                            onClick={() => {
+                              setSelectedUnplaced(on ? null : u.guestId)
+                              setSelectedGuest(null)
+                              setActionError(null)
+                            }}
+                            aria-pressed={on}
+                            className={cn(
+                              'tap min-h-11 rounded-full border px-3.5 text-left text-sm transition-colors duration-press ease-ledger',
+                              on
+                                ? 'border-brand bg-brand-tint text-brand'
+                                : 'border-rule-strong bg-surface text-ink active:bg-surface-2',
+                            )}
+                          >
+                            <span className="font-medium">{u.guestName}</span>
+                            <span className="ml-2 text-muted">{u.headName}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                </div>
               )
             })}
           </div>
