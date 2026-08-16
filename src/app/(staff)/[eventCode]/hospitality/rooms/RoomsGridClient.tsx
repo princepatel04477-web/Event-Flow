@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { Badge } from '@/components/ui/Badge'
 import { BottomSheet } from '@/components/ui/BottomSheet'
@@ -14,10 +15,11 @@ import { Textarea } from '@/components/ui/Textarea'
 import { BuildingIcon, PlusIcon, UploadIcon, ShieldAlertIcon } from '@/components/icons'
 import {
   readRoomsGrid,
-  moveGuestToRoom,
+  moveGuestsToRoom,
   releaseGuestFromRoom,
   assignGuestToRoom,
   ensureGroupMembers,
+  addGuestMember,
   type RoomsGridData,
   type RoomGridRow,
   type RoomGridGuest,
@@ -162,10 +164,13 @@ const HAMPER_LABEL: Record<HamperState, string> = {
 }
 
 export function RoomsGridClient({ eventId, eventCode, access }: Props) {
+  const queryClient = useQueryClient()
   const [state, setState] = useState<LoadState>({ phase: 'loading' })
   const [hotelIdx, setHotelIdx] = useState(0)
   const [openRoomId, setOpenRoomId] = useState<string | null>(null)
-  const [selectedGuest, setSelectedGuest] = useState<RoomGridGuest | null>(null)
+  // The select-then-place tray: placed occupants picked for a move. Tap a
+  // member to toggle it in; tap the head to lift the whole group.
+  const [tray, setTray] = useState<RoomGridGuest[]>([])
   const [selectedUnplaced, setSelectedUnplaced] = useState<string | null>(null)
   const [overrideRoom, setOverrideRoom] = useState<{ roomId: string; roomNumber: string } | null>(
     null,
@@ -175,6 +180,8 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
   const [releasingAssignment, setReleasingAssignment] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // Placement toast: { roomNumber } + a 5s UNDO that reverses the move.
+  const [toast, setToast] = useState<{ roomNumber: string; undo: () => void } | null>(null)
 
   const load = useCallback(async () => {
     setState({ phase: 'loading' })
@@ -215,18 +222,60 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
     : []
   const openRoom = rooms.find((r) => r.roomId === openRoomId) ?? null
 
-  const placing = selectedGuest ?? (selectedUnplaced ? { assignmentId: '' } : null)
+  const placing = tray.length > 0 || Boolean(selectedUnplaced)
 
   function clearSelection() {
-    setSelectedGuest(null)
+    setTray([])
     setSelectedUnplaced(null)
     setActionError(null)
   }
 
+  // STEP 1 — selection. Tap a member row toggles it into the tray; tap the
+  // head lifts the head + every member of the group. Selection survives
+  // scroll because the tray is a fixed bottom bar, not a floating element.
+  function toggleTrayMember(occ: RoomGridGuest) {
+    setActionError(null)
+    setTray((prev) =>
+      prev.some((o) => o.assignmentId === occ.assignmentId)
+        ? prev.filter((o) => o.assignmentId !== occ.assignmentId)
+        : [...prev, occ],
+    )
+  }
+
+  function toggleTrayGroup(groupId: string, occupants: RoomGridGuest[]) {
+    setActionError(null)
+    const groupMembers = occupants.filter((o) => o.groupId === groupId)
+    const allIn = groupMembers.every((o) => tray.some((t) => t.assignmentId === o.assignmentId))
+    setTray((prev) =>
+      allIn
+        ? prev.filter((o) => !groupMembers.some((g) => g.assignmentId === o.assignmentId))
+        : [
+            ...prev.filter((o) => !groupMembers.some((g) => g.assignmentId === o.assignmentId)),
+            ...groupMembers,
+          ],
+    )
+  }
+
+  // STEP 2 — targeting. While the tray is non-empty, every tile shows FREE
+  // BEDS and is tappable only when the room fits the whole selection. Pure
+  // client-side from the already-loaded grid data.
+  const trayFreeNeeded = tray.length
+  const roomEligible = useCallback(
+    (room: RoomGridRow) => {
+      if (tray.length === 0) return true
+      if (room.isBlocked) return false
+      // Free beds = capacity - occupants, ignoring the source room (the
+      // move is a pure room_id change, so the selected rows leave it).
+      return room.capacity - room.occupants.length >= trayFreeNeeded
+    },
+    [tray, trayFreeNeeded],
+  )
+
   async function handleTapRoom(room: RoomGridRow) {
     // Placing mode: the tile is the drop target. Otherwise it opens detail.
-    if (selectedGuest) {
-      await attemptMove(selectedGuest.assignmentId, room.roomId, room.roomNumber)
+    if (tray.length > 0) {
+      if (!roomEligible(room)) return
+      await placeTray(room)
       return
     }
     if (selectedUnplaced) {
@@ -236,21 +285,88 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
     setOpenRoomId(room.roomId)
   }
 
-  async function attemptMove(assignmentId: string, roomId: string, roomNumber: string) {
-    setLoading(true)
+  // STEP 3 — placement: one statement, all N rows (atomic per R0.2), no
+  // intermediate unassigned state. Optimistic update with rollback on error.
+  const moveMutation = useMutation({
+    mutationFn: (vars: { assignmentIds: string[]; targetRoomId: string }) =>
+      moveGuestsToRoom(eventId, vars.assignmentIds, vars.targetRoomId),
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: ['rooms-grid', eventId] })
+      const prev = queryClient.getQueryData<RoomsGridData>(['rooms-grid', eventId])
+      // Optimistically move the selected occupants in the cache.
+      queryClient.setQueryData<RoomsGridData>(['rooms-grid', eventId], (old) => {
+        if (!old) return old
+        const moving = new Set(vars.assignmentIds)
+        const movedGuests = old.rooms
+          .flatMap((r) => r.occupants)
+          .filter((o) => moving.has(o.assignmentId))
+        const rooms = old.rooms.map((r) => {
+          if (r.roomId === vars.targetRoomId) {
+            return { ...r, occupants: [...r.occupants, ...movedGuests] }
+          }
+          return { ...r, occupants: r.occupants.filter((o) => !moving.has(o.assignmentId)) }
+        })
+        return { ...old, rooms }
+      })
+      return { prev }
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['rooms-grid', eventId], ctx.prev)
+      setActionError(err instanceof Error ? err.message : 'Could not move. Nothing changed.')
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['rooms-grid', eventId] })
+    },
+  })
+
+  async function placeTray(room: RoomGridRow) {
     setActionError(null)
-    const result = await moveGuestToRoom(assignmentId, roomId, null)
+    const assignmentIds = tray.map((o) => o.assignmentId)
+    // Source room of each selected occupant, for the UNDO. All selected must
+    // share one source room for a clean single-statement reversal; if they
+    // span rooms, we decline the undo rather than fake it.
+    const roomOf = new Map<string, string>()
+    for (const r of rooms) {
+      for (const o of r.occupants) roomOf.set(o.assignmentId, r.roomId)
+    }
+    const sourceRooms = new Set(assignmentIds.map((id) => roomOf.get(id)).filter(Boolean) as string[])
+    const singleSource = sourceRooms.size === 1 ? [...sourceRooms][0] : null
+    const prevTray = tray
+    clearSelection()
+
+    const result = await moveMutation.mutateAsync({
+      assignmentIds,
+      targetRoomId: room.roomId,
+    })
 
     if (result.ok) {
-      clearSelection()
-      await load()
-    } else if (result.code === 'capacity') {
-      setOverrideRoom({ roomId, roomNumber })
-      setOverrideReason('')
+      // 5s UNDO that reverses the same statement (only when the tray came
+      // from one source room — otherwise the reversal would need multiple
+      // statements and we decline rather than fake it).
+      if (singleSource && singleSource !== room.roomId) {
+        const undo = async () => {
+          setActionError(null)
+          await moveMutation.mutateAsync({
+            assignmentIds,
+            targetRoomId: singleSource,
+          })
+        }
+        setToast({ roomNumber: room.roomNumber, undo })
+        window.setTimeout(() => setToast(null), 5000)
+      } else {
+        setToast({ roomNumber: room.roomNumber, undo: () => {} })
+        window.setTimeout(() => setToast(null), 5000)
+      }
     } else {
-      setActionError(result.error)
+      // Nothing committed — restore the tray so the user can retry.
+      setTray(prevTray)
+      if (result.code === 'capacity') {
+        setOverrideRoom({ roomId: room.roomId, roomNumber: room.roomNumber })
+        setOverrideReason('')
+      } else {
+        setActionError(result.error)
+      }
     }
-    setLoading(false)
   }
 
   async function attemptAssign(guestId: string, roomId: string, roomNumber: string) {
@@ -296,22 +412,50 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
     setLoading(false)
   }
 
+  // STEP 4 — "+" on a family row: insert ONE member and immediately enter
+  // selection mode with that member. Name is optional (the placeholder
+  // "<head> (guest N)" is used; a real name is asked only at check-in or
+  // hamper handoff). The new member is UNPLACED — it has no assignment row
+  // yet — so it goes through the single-assign target path, not the move
+  // tray (a move needs an existing assignment to UPDATE).
+  async function handleAddMember(groupId: string) {
+    setLoading(true)
+    setActionError(null)
+    const result = await addGuestMember(eventId, groupId)
+    setLoading(false)
+    if (!result.ok) {
+      setActionError(result.error)
+      return
+    }
+    setTray([])
+    setSelectedUnplaced(result.guestId)
+    await load()
+  }
+
   async function handleOverride() {
     if (!overrideRoom || !overrideReason.trim()) return
 
     setLoading(true)
     setActionError(null)
 
-    const result = selectedGuest
-      ? await moveGuestToRoom(selectedGuest.assignmentId, overrideRoom.roomId, overrideReason.trim())
-      : selectedUnplaced
-        ? await assignGuestToRoom(
+    // The tray move with a written reason (the audit trail). If the tray is
+    // empty this was a single-unplaced capacity refusal — assign that one.
+    const result =
+      tray.length > 0
+        ? await moveGuestsToRoom(
             eventId,
-            selectedUnplaced,
+            tray.map((o) => o.assignmentId),
             overrideRoom.roomId,
             overrideReason.trim(),
           )
-        : null
+        : selectedUnplaced
+          ? await assignGuestToRoom(
+              eventId,
+              selectedUnplaced,
+              overrideRoom.roomId,
+              overrideReason.trim(),
+            )
+          : null
 
     if (result?.ok) {
       clearSelection()
@@ -483,10 +627,10 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
       {placing ? (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-brand/40 bg-brand-tint px-3.5 py-3">
           <p className="min-w-0 text-sm leading-snug text-ink">
-            {selectedGuest ? (
+            {tray.length > 0 ? (
               <>
-                Moving <span className="font-medium">{selectedGuest.guestName}</span> — tap a
-                room
+                {tray.length} selected — tap a room with {tray.length}{' '}
+                free bed{tray.length === 1 ? '' : 's'}
               </>
             ) : (
               'Tap a room to place this guest'
@@ -497,7 +641,7 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
             onClick={clearSelection}
             className="tap shrink-0 font-mono text-xs tracking-eyebrow text-brand uppercase"
           >
-            Cancel
+            Clear
           </button>
         </div>
       ) : null}
@@ -527,26 +671,38 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
               const head = family.head
               return (
                 <div key={family.groupId} className="flex flex-col gap-1.5">
-                  {/* Head — bold, the family anchor. */}
+                  {/* Head — bold, the family anchor. The "+" inserts one
+                      member (STEP 4) and immediately enters selection mode
+                      with it. */}
                   {head ? (
-                    <button
-                      key={head.guestId}
-                      type="button"
-                      onClick={() => {
-                        setSelectedUnplaced(selectedUnplaced === head.guestId ? null : head.guestId)
-                        setSelectedGuest(null)
-                        setActionError(null)
-                      }}
-                      aria-pressed={selectedUnplaced === head.guestId}
-                      className={cn(
-                        'tap min-h-12 rounded-xl border px-4 text-left text-sm font-semibold transition-colors duration-press ease-ledger',
-                        selectedUnplaced === head.guestId
-                          ? 'border-brand bg-brand-tint text-brand'
-                          : 'border-rule-strong bg-surface text-ink active:bg-surface-2',
-                      )}
-                    >
-                      {head.guestName}
-                    </button>
+                    <div key={head.guestId} className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedUnplaced(selectedUnplaced === head.guestId ? null : head.guestId)
+                          setTray([])
+                          setActionError(null)
+                        }}
+                        aria-pressed={selectedUnplaced === head.guestId}
+                        className={cn(
+                          'tap min-h-12 flex-1 rounded-xl border px-4 text-left text-sm font-semibold transition-colors duration-press ease-ledger',
+                          selectedUnplaced === head.guestId
+                            ? 'border-brand bg-brand-tint text-brand'
+                            : 'border-rule-strong bg-surface text-ink active:bg-surface-2',
+                        )}
+                      >
+                        {head.guestName}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddMember(head.groupId)}
+                        disabled={loading}
+                        aria-label={`Add a member to ${head.headName}`}
+                        className="tap flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-rule-strong bg-surface text-brand active:bg-surface-2"
+                      >
+                        <PlusIcon className="h-5 w-5" />
+                      </button>
+                    </div>
                   ) : null}
                   {/* Members — nested beneath the head, normal weight. */}
                   {family.members.length > 0 ? (
@@ -559,7 +715,7 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
                             type="button"
                             onClick={() => {
                               setSelectedUnplaced(on ? null : u.guestId)
-                              setSelectedGuest(null)
+                              setTray([])
                               setActionError(null)
                             }}
                             aria-pressed={on}
@@ -639,15 +795,22 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
       <ul className="grid grid-cols-4 gap-2" aria-label={`${activeHotel?.hotelName} rooms`}>
         {hotelRooms.map((room, i) => {
           const s = tileState(room)
+          const eligible = roomEligible(room)
+          // STEP 2 — while the tray is non-empty, show free beds instead of
+          // capacity; rooms that cannot fit the whole selection dim to 40%
+          // and are not tappable.
+          const freeBeds = room.isBlocked ? 0 : Math.max(0, room.capacity - room.occupants.length)
+          const selecting = tray.length > 0
           return (
             <li key={room.roomId}>
               <button
                 type="button"
                 onClick={() => handleTapRoom(room)}
-                disabled={loading}
+                disabled={loading || (selecting && !eligible)}
                 style={{
                   animationDelay: `${Math.min(i, 16) * 18}ms`,
                   backgroundImage: s === 'blocked' ? BLOCKED_HATCH : undefined,
+                  opacity: selecting && !eligible ? 0.4 : undefined,
                 }}
                 className={cn(
                   'list-fade tap relative flex min-h-16 w-full flex-col items-center justify-center gap-1.5 rounded-lg',
@@ -671,11 +834,12 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
                   aria-hidden
                   className={cn('text-[0.5rem] leading-none tracking-[2px]', DOT_TONES[s])}
                 >
-                  {occupancyDots(room)}
+                  {selecting ? `${freeBeds} free` : occupancyDots(room)}
                 </span>
                 <span className="sr-only">
-                  {TILE_LABELS[s]}, {room.occupants.length} of {room.capacity} beds,{' '}
-                  {HAMPER_LABEL[hamperState(room)]}
+                  {selecting
+                    ? `Room ${room.roomNumber}, ${freeBeds} free beds${eligible ? '' : ', cannot fit selection'}`
+                    : `${TILE_LABELS[s]}, ${room.occupants.length} of ${room.capacity} beds, ${HAMPER_LABEL[hamperState(room)]}`}
                 </span>
               </button>
             </li>
@@ -722,54 +886,75 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
                 <p className="mt-3 text-base text-muted">No active assignment.</p>
               ) : (
                 <ul className="mt-3 flex flex-col gap-2">
-                  {openRoom.occupants.map((occ) => (
-                    <li
-                      key={occ.assignmentId}
-                      className="flex items-center gap-2 rounded-lg bg-surface-2 p-1.5"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedGuest(occ)
-                          setSelectedUnplaced(null)
-                          setOpenRoomId(null)
-                        }}
-                        className="tap min-h-11 flex-1 rounded-md px-2.5 text-left text-base transition-colors duration-press ease-ledger active:bg-surface"
+                  {openRoom.occupants.map((occ) => {
+                    const inTray = tray.some((o) => o.assignmentId === occ.assignmentId)
+                    const groupInTray = openRoom.occupants
+                      .filter((o) => o.groupId === occ.groupId)
+                      .every((o) => tray.some((t) => t.assignmentId === o.assignmentId))
+                    return (
+                      <li
+                        key={occ.assignmentId}
+                        className="flex items-center gap-2 rounded-lg bg-surface-2 p-1.5"
                       >
-                        <span className="font-medium text-ink">{occ.guestName}</span>
-                        {occ.isHead ? <Badge className="ml-2">Head</Badge> : null}
-                        <span className="mt-0.5 block text-sm text-muted">{occ.headName}</span>
-                        {/* §5.3: mobile + hamper status on the room-tap panel. */}
-                        {occ.primaryMobile ? (
-                          <a
-                            href={`tel:${occ.primaryMobile}`}
-                            className="tap mt-0.5 inline-block font-mono text-sm text-brand active:opacity-70"
-                          >
-                            {occ.primaryMobile}
-                          </a>
-                        ) : null}
-                        <span
-                          className={
-                            occ.hamperDelivered
-                              ? 'mt-0.5 block text-sm text-ledger-green'
-                              : 'mt-0.5 block text-sm text-ledger-red'
-                          }
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (occ.isHead) {
+                              // Tap the head: lift head + all members of this
+                              // group. The occupants array carries the whole
+                              // room, so filter by group.
+                              const groupMembers = rooms
+                                .flatMap((r) => r.occupants)
+                                .filter((o) => o.groupId === occ.groupId)
+                              toggleTrayGroup(occ.groupId, groupMembers)
+                            } else {
+                              toggleTrayMember(occ)
+                            }
+                            setOpenRoomId(null)
+                          }}
+                          className={cn(
+                            'tap min-h-11 flex-1 rounded-md px-2.5 text-left text-base transition-colors duration-press ease-ledger active:bg-surface',
+                            inTray && 'bg-brand/10',
+                          )}
                         >
-                          {occ.hamperDelivered ? 'Hamper delivered' : 'Hamper not delivered'}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReleasingAssignment(occ.assignmentId)
-                          setReleaseReason('')
-                        }}
-                        className="tap min-h-11 shrink-0 rounded-md px-3 font-mono text-xs tracking-eyebrow text-muted uppercase active:text-ledger-red"
-                      >
-                        Release
-                      </button>
-                    </li>
-                  ))}
+                          <span className="font-medium text-ink">{occ.guestName}</span>
+                          {occ.isHead ? <Badge className="ml-2">Head</Badge> : null}
+                          {inTray ? (
+                            <Badge className="ml-2">{groupInTray ? 'Group' : 'Picked'}</Badge>
+                          ) : null}
+                          <span className="mt-0.5 block text-sm text-muted">{occ.headName}</span>
+                          {/* §5.3: mobile + hamper status on the room-tap panel. */}
+                          {occ.primaryMobile ? (
+                            <a
+                              href={`tel:${occ.primaryMobile}`}
+                              className="tap mt-0.5 inline-block font-mono text-sm text-brand active:opacity-70"
+                            >
+                              {occ.primaryMobile}
+                            </a>
+                          ) : null}
+                          <span
+                            className={
+                              occ.hamperDelivered
+                                ? 'mt-0.5 block text-sm text-ledger-green'
+                                : 'mt-0.5 block text-sm text-ledger-red'
+                            }
+                          >
+                            {occ.hamperDelivered ? 'Hamper delivered' : 'Hamper not delivered'}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReleasingAssignment(occ.assignmentId)
+                            setReleaseReason('')
+                          }}
+                          className="tap min-h-11 shrink-0 rounded-md px-3 font-mono text-xs tracking-eyebrow text-muted uppercase active:text-ledger-red"
+                        >
+                          Release
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </div>
@@ -881,6 +1066,52 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
           </Button>
         </div>
       </BottomSheet>
+
+      {/* STEP 1 — the persistent selection tray. Fixed to the viewport
+          bottom so it survives scroll (no drag/drop, no long-press — those
+          fight scroll inside the Capacitor WebView). */}
+      {tray.length > 0 ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-rule-strong bg-nav pb-safe">
+          <div className="mx-auto flex w-full max-w-[480px] items-center gap-3 px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-fg">
+                {tray.length} selected
+              </p>
+              <p className="truncate text-xs text-muted">
+                {tray.slice(0, 3).map((o) => o.guestName).join(', ')}
+                {tray.length > 3 ? ` +${tray.length - 3}` : ''} — tap a room to move
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="md"
+              onClick={clearSelection}
+              disabled={loading}
+            >
+              Clear
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* STEP 3 — placement toast with a 5s UNDO. */}
+      {toast ? (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-rule-strong bg-ink px-4 py-3 pb-safe">
+          <div className="mx-auto flex w-full max-w-[480px] items-center justify-between gap-3">
+            <p className="text-sm font-medium text-paper">Moved to {toast.roomNumber}</p>
+            <button
+              type="button"
+              onClick={() => {
+                toast.undo()
+                setToast(null)
+              }}
+              className="tap shrink-0 rounded-lg px-3 py-2 font-mono text-xs tracking-eyebrow text-brand uppercase"
+            >
+              Undo
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

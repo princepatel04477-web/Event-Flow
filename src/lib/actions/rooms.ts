@@ -751,42 +751,129 @@ export async function ensureMembersForGroups(
 }
 
 // ---------------------------------------------------------------------------
+// STEP 4 — add one member to a family (the "+" on a family row)
+// ---------------------------------------------------------------------------
+
+export type AddGuestMemberResult =
+  | { ok: true; guestId: string; guestName: string; groupId: string }
+  | { ok: false; error: string }
+
+/**
+ * Insert exactly ONE member row for a family, named "<head> (guest N)" —
+ * the same placeholder naming the UI uses. Refuses when the family is at or
+ * past its headcount. This is the on-demand "+" in the rooms grid: it adds a
+ * person the moment you need a bed for them, not a batch top-up to the full
+ * headcount (that is ensureGroupMembers, used by the allocation paths).
+ *
+ * The name is deliberately a placeholder — the design asks for a real name
+ * only at check-in or hamper handoff. The returned row immediately enters
+ * selection mode so the staff member can place it.
+ */
+export async function addGuestMember(
+  eventId: string,
+  groupId: string,
+): Promise<AddGuestMemberResult> {
+  const supabase = await createClient()
+
+  const { data: group, error: groupErr } = await supabase
+    .from('guest_groups')
+    .select('id, head_name, expected_pax, confirmed_pax')
+    .eq('id', groupId)
+    .eq('event_id', eventId)
+    .maybeSingle()
+  if (groupErr) return { ok: false, error: friendlyDbError(groupErr) }
+  if (!group) return { ok: false, error: 'That family is not on this event.' }
+
+  const { data: existing, error: guestsErr } = await supabase
+    .from('guests')
+    .select('id, is_head')
+    .eq('event_id', eventId)
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: true })
+  if (guestsErr) return { ok: false, error: friendlyDbError(guestsErr) }
+
+  const rows = existing ?? []
+  const pax = group.confirmed_pax ?? group.expected_pax ?? rows.length
+  if (rows.length >= pax) {
+    return { ok: false, error: 'This family already has a row for every guest.' }
+  }
+
+  const headName = (group.head_name ?? '').trim() || 'Family'
+  const { data: inserted, error: insErr } = await supabase
+    .from('guests')
+    .insert({
+      event_id: eventId,
+      group_id: groupId,
+      full_name: `${headName} (guest ${rows.length + 1})`,
+      is_head: false,
+    })
+    .select('id, full_name, group_id')
+    .single()
+  if (insErr) return { ok: false, error: friendlyDbError(insErr) }
+
+  return {
+    ok: true,
+    guestId: inserted.id,
+    guestName: inserted.full_name,
+    groupId: inserted.group_id,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Write: move a guest between rooms
 // ---------------------------------------------------------------------------
 
-export type MoveGuestResult =
-  | { ok: true }
-  | { ok: false; error: string; code: 'capacity' | 'other' }
-  | { ok: false; error: string; code: 'capacity'; roomId: string; roomNumber: string }
+export type MoveGuestsResult =
+  | { ok: true; count: number }
+  | { ok: false; error: string; code: 'capacity' | 'other'; roomId?: string; roomNumber?: string }
 
-export async function moveGuestToRoom(
-  assignmentId: string,
+/**
+ * Move several occupants to one room in a SINGLE statement.
+ *
+ * The merged room guard (20260816130000) is a BEFORE INSERT OR UPDATE FOR
+ * EACH ROW trigger that counts the target room's active rows, and — verified
+ * live — sees rows already updated by the same statement. So one
+ * `UPDATE ... WHERE id IN (...)` is atomic and capacity-aware: either every
+ * selected occupant lands in the target room, or none does (23514 aborts the
+ * whole statement, zero rows committed). No RPC required.
+ *
+ * This is the reassign path behind the select-then-place tray. A pure room
+ * change never touches guest_id, so room_assignments_one_active_per_guest
+ * (which indexes guest_id WHERE released_at is null) is never transiently
+ * violated.
+ */
+export async function moveGuestsToRoom(
+  eventId: string,
+  assignmentIds: string[],
   targetRoomId: string,
-  overrideReason: string | null,
-): Promise<MoveGuestResult> {
+  overrideReason: string | null = null,
+): Promise<MoveGuestsResult> {
   const supabase = await createClient()
+
+  if (assignmentIds.length === 0) {
+    return { ok: false, error: 'Nothing selected to move.', code: 'other' }
+  }
 
   const { error } = await supabase
     .from('room_assignments')
     .update({
       room_id: targetRoomId,
-      is_override: !!overrideReason,
+      is_override: Boolean(overrideReason),
       override_reason: overrideReason || null,
     })
-    .eq('id', assignmentId)
+    .eq('event_id', eventId)
+    .in('id', assignmentIds)
 
   if (error) {
     if (error.code === '23514' || error.message?.includes('capacity')) {
-      // Need the room number for the UI
       const { data: room } = await supabase
         .from('rooms')
         .select('room_number')
         .eq('id', targetRoomId)
         .maybeSingle()
-
       return {
         ok: false,
-        error: `Room ${room?.room_number ?? targetRoomId} is full. Add anyway?`,
+        error: `Room ${room?.room_number ?? targetRoomId} is at capacity. Nothing was moved.`,
         code: 'capacity',
         roomId: targetRoomId,
         roomNumber: room?.room_number ?? '',
@@ -795,7 +882,7 @@ export async function moveGuestToRoom(
     return { ok: false, error: friendlyDbError(error), code: 'other' }
   }
 
-  return { ok: true }
+  return { ok: true, count: assignmentIds.length }
 }
 
 // ---------------------------------------------------------------------------
@@ -831,7 +918,10 @@ export async function releaseGuestFromRoom(
 // Write: assign an unplaced guest to a room
 // ---------------------------------------------------------------------------
 
-export type AssignGuestResult = MoveGuestResult
+export type AssignGuestResult =
+  | { ok: true }
+  | { ok: false; error: string; code: 'capacity' | 'other' }
+  | { ok: false; error: string; code: 'capacity'; roomId: string; roomNumber: string }
 
 export async function assignGuestToRoom(
   eventId: string,
