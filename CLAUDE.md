@@ -1007,12 +1007,17 @@ no anchor outside itself; nothing was dropped in the move.
 - After feature freeze, the answer to every "can we also add…" is "after the event."
 
 **Current unverified commits (2026-08-16):**
-- `4cfbe0e` (room guard `FOR UPDATE`) — mechanism is sound and single-session-tested, but
-  the two-session concurrency test (B must BLOCK) has NOT run. Needs local Postgres
-  (`supabase db start`, fake event) or a device; never against production while SHARMA26
-  is live. The lock targets only the target room (`new.room_id`), and a move is one
-  statement to one room, so there is no lock cycle and no deadlock path; the reasoning
-  depends on READ COMMITTED's fresh-snapshot-per-statement.
+- `4cfbe0e` (room guard `FOR UPDATE`) — lock-before-count is confirmed in the trigger
+  (room row `FOR UPDATE` at the top, `count(*)` after), and the two-session concurrency
+  test (B must BLOCK) has NOT run. Needs local Postgres (`supabase db start`, fake event)
+  or a device; never against production while SHARMA26 is live.
+- **Known product gap, live in the select-then-place feature:** you cannot swap two full
+  rooms — not even sequentially. Moving a1,a2 → B while B holds b1,b2 counts 4 against
+  cap 2 and aborts 23514, because the intermediate state is always over capacity. The
+  operator must empty one room to unplaced first. The current UI responds to this 23514
+  by offering the capacity OVERRIDE sheet, which would force a mid-swap over-capacity
+  commit — wrong for swaps. Fix (product): on a swap 23514, say "empty one room first"
+  rather than offering override.
 - The §14 real-handset round has not run for the rooms grid or the TanStack-Query root
   layout change.
 
