@@ -173,7 +173,7 @@ export default async function EventDashboardPage({ params, searchParams }: PageP
           label="Guests roomed"
           value={stats.guestsRoomed}
           note="have an active room assignment"
-          href={`/${event.code}/rooms`}
+          href={`/${event.code}/hospitality/rooms`}
           style={{ animationDelay: '80ms' }}
         />
         <StatCard
