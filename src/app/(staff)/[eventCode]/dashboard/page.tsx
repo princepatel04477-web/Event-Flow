@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 
 import { AttentionPanel } from '@/components/dashboard/AttentionPanel'
 import { StatCard } from '@/components/dashboard/StatCard'
-import { ShieldAlertIcon } from '@/components/icons'
+import { ShieldAlertIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { readBoard } from '@/lib/actions/dashboard'
 import {
@@ -59,7 +59,7 @@ export default async function EventDashboardPage({ params, searchParams }: PageP
   // `app.is_staff()` — FALSE for a client. So the read returns ONE row of
   // zeros, not zero rows, and the `!stats` fallback below never fires. The
   // client would be told "Total groups 0" for a 238-family wedding.
-  await requireStaff(event.id, event.code)
+  const access = await requireStaff(event.id, event.code)
 
   // Both reads go through the 30s TTL cache in dashboard.ts, and the
   // request-scoped Supabase client is shared, so a revisit renders from
@@ -94,6 +94,67 @@ export default async function EventDashboardPage({ params, searchParams }: PageP
   const totalPax = count(stats.totalPax)
   const confirmed = count(stats.rsvpConfirmed)
   const pending = count(stats.rsvpPending)
+
+  // An event with no guest list renders a grid of zeros that reads as a broken
+  // page rather than an empty one. It is not broken — `v_event_board` selects
+  // FROM events with scalar subqueries, so every event gets a row and an event
+  // with no data gets a row of zeros. But "0 / 0 / 0 / 0 / 0 / 0" above a
+  // paragraph explaining that zero means nothing recorded yet is the app
+  // explaining in body copy what the screen should be saying outright, and it
+  // has already been read as "new events do not get a dashboard".
+  //
+  // Gate on totalGroups, not on the whole board: once one family exists the
+  // counters are meaningful even while every other number is still zero. Zero
+  // families is the only state where there is genuinely nothing to count.
+  if (totalGroups === 0) {
+    return (
+      <div className="flex flex-col gap-4">
+        {deniedNote ? (
+          <div className="flex items-start gap-2.5 rounded-xl border border-rule-strong bg-surface px-3.5 py-3">
+            <ShieldAlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-muted" />
+            <p className="text-sm leading-snug text-ink">{deniedNote}</p>
+          </div>
+        ) : null}
+
+        <EmptyState
+          icon={<UsersIcon className="h-7 w-7" />}
+          title="No guests on this event yet"
+          description="The board fills in as soon as there is a guest list to count. Import the calling sheet and every number on this screen starts working — families, RSVPs, rooms, arrivals and hampers."
+        />
+
+        {/*
+          The import CTA is admin-only because the import PAGE is: it calls
+          `requireAdmin(..., 'import')`, which bounces an event_team member
+          straight back to this dashboard with `?denied=import`. Offering the
+          button to everyone would send a team member round a loop — tap,
+          bounce, land back on the same empty board — and the denial note
+          would read as a bug rather than a rule. Staff get the honest version
+          instead: who to ask.
+        */}
+        <nav aria-label="Get started" className="grid grid-cols-1 gap-2.5">
+          {access === 'admin' ? (
+            <Link
+              href={`/${event.code}/guests/import`}
+              className="tap flex min-h-12 items-center justify-center rounded-xl border border-transparent bg-brand px-3 text-center text-base font-semibold text-brand-fg transition-colors duration-press ease-ledger"
+            >
+              Import the guest list
+            </Link>
+          ) : (
+            <p className="rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-sm leading-snug text-muted">
+              Importing the guest list is an admin job. Ask your event admin to
+              run the import — this board fills in by itself once they have.
+            </p>
+          )}
+          <Link
+            href={`/${event.code}/guests/list`}
+            className="tap flex min-h-12 items-center justify-center rounded-xl border border-rule-strong bg-surface px-3 text-center text-sm font-medium text-ink transition-colors duration-press ease-ledger active:bg-surface-2"
+          >
+            Go to the guest list
+          </Link>
+        </nav>
+      </div>
+    )
+  }
 
   // The split bar under the headline figure. Percentages of GROUPS, because
   // that is what confirmed/pending count — mixing a pax numerator with a
