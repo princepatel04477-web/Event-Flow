@@ -915,6 +915,8 @@ export async function assignGroupToRoom(
   groupId: string,
   roomId: string,
 ): Promise<AssignGroupResult> {
+  const supabase = await createClient()
+
   // Top up the family's member rows to its headcount FIRST. Without this the
   // import's single head row is the only assignable person, so "assign this
   // family to room 701" put one of six people in the room and reported
@@ -928,18 +930,41 @@ export async function assignGroupToRoom(
     return { ok: false, error: 'This family has no guests to assign.', code: 'other' }
   }
 
-  let assigned = 0
-  for (const guestId of ordered) {
-    const res = await assignGuestToRoom(eventId, guestId, roomId, null)
-    if (!res.ok) {
-      // Surface the first failure (capacity/overlap) — the family stays whole.
-      const extra = res.code === 'capacity' && 'roomId' in res
-        ? { code: res.code as 'capacity', roomId: res.roomId, roomNumber: res.roomNumber }
-        : { code: res.code }
-      return { ok: false, error: res.error, ...extra }
+  // ATOMIC: one multi-row INSERT, not a loop. supabase-js resolves with
+  // {data, error} rather than throwing, and each call is its own round trip,
+  // so a loop that stops on the first failure leaves the earlier rows
+  // committed — a family that "stays whole" was actually half-placed. A
+  // single INSERT of all rows is one statement: Postgres aborts the whole
+  // statement on the first guard violation (the merged room guard fires
+  // per-row), so either every member is placed or none is.
+  const rows = ordered.map((guestId) => ({
+    event_id: eventId,
+    room_id: roomId,
+    guest_id: guestId,
+    group_id: groupId,
+    is_override: false,
+  }))
+
+  const { error } = await supabase.from('room_assignments').insert(rows)
+
+  if (error) {
+    if (error.code === '23514' || error.message?.includes('capacity')) {
+      const { data: room } = await supabase
+        .from('rooms')
+        .select('room_number')
+        .eq('id', roomId)
+        .maybeSingle()
+
+      return {
+        ok: false,
+        error: `Room ${room?.room_number ?? roomId} is full. Add anyway?`,
+        code: 'capacity',
+        roomId,
+        roomNumber: room?.room_number ?? '',
+      }
     }
-    assigned++
+    return { ok: false, error: friendlyDbError(error), code: 'other' }
   }
 
-  return { ok: true, assigned }
+  return { ok: true, assigned: ordered.length }
 }
