@@ -369,8 +369,15 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
       // Nothing committed — restore the tray so the user can retry.
       setTray(prevTray)
       if (result.code === 'capacity') {
-        setOverrideRoom({ roomId: room.roomId, roomNumber: room.roomNumber })
-        setOverrideReason('')
+        // A MOVE into a full room is a swap situation: the intermediate state
+        // is always over capacity, and forcing it with an override can commit
+        // a genuinely over-full room if the vacating side doesn't complete.
+        // The right instruction is to empty the target room first (release to
+        // unplaced), then move — not to override. The override sheet stays for
+        // the single-unplaced assign path, where "add anyway" is legitimate.
+        setActionError(
+          `Room ${result.roomNumber ?? room.roomNumber} is full. To swap, release its current occupants to unplaced first, then move these ${assignmentIds.length} here.`,
+        )
       } else {
         setActionError(result.error)
       }
