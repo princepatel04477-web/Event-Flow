@@ -139,6 +139,7 @@ export interface DepartureManifestRow {
 
 export interface ExportData {
   groups: GuestGroupRow[]
+  guests: GuestExportRow[]
   legs: TravelLegRow[]
   deliverables: DeliverableRow[]
   proofs: DeliveryProofRow[]
@@ -151,6 +152,14 @@ export interface ExportData {
   profileNames: Record<string, string>
   /** staff members keyed by id -> name, for code-auth proof attribution. */
   staffNames: Record<string, string>
+}
+
+/** Minimal guest shape the export needs (member names per bed). */
+export interface GuestExportRow {
+  id: string
+  group_id: string
+  full_name: string
+  is_head: boolean
 }
 
 /** Sanitised event name for the filename (no path / illegal chars). */
@@ -281,6 +290,7 @@ export function buildRoomAllocationRows(data: ExportData): RoomAllocationRow[] {
   const roomById = new Map(data.rooms.map((r) => [r.id, r]))
   const hotelById = new Map(data.hotels.map((h) => [h.id, h]))
   const groupById = new Map(data.groups.map((g) => [g.id, g]))
+  const guestById = new Map(data.guests.map((g) => [g.id, g]))
 
   return data.assignments
     .filter((a) => a.released_at === null)
@@ -288,17 +298,34 @@ export function buildRoomAllocationRows(data: ExportData): RoomAllocationRow[] {
       const room = roomById.get(a.room_id)
       const hotel = room ? hotelById.get(room.hotel_id) : undefined
       const group = groupById.get(a.group_id)
+      // One row per guest per stay. The assignment's guest_id is the person
+      // in that bed — a six-pax family yields six rows and each must name the
+      // individual, not the group head. Placeholder names read the same here
+      // as in the UI ("Rajesh Sharma (guest 2)"). Fall back to the group head
+      // only if the guest row is missing entirely.
+      const guest = guestById.get(a.guest_id)
+      const guestName = guest?.full_name?.trim() || (group?.head_name ?? '')
       return {
         hotel: hotel?.name ?? '',
         roomNumber: room?.room_number ?? '',
         roomType: room?.room_type ?? '',
-        headName: group?.head_name ?? '',
+        headName: guestName,
         checkInDate: a.check_in_date ? parseDate(a.check_in_date) : null,
         checkInTime: a.check_in_time ?? null,
         checkOutDate: a.check_out_date ? parseDate(a.check_out_date) : null,
         checkOutTime: a.check_out_time ?? null,
         released: '',
       }
+    })
+    // Front-desk order: hotel, then room number (numeric-aware so "702" sorts
+    // before "710", and "1001" after "999" rather than lexically before it).
+    .sort((a, b) => {
+      const h = a.hotel.localeCompare(b.hotel)
+      if (h !== 0) return h
+      const na = Number(a.roomNumber)
+      const nb = Number(b.roomNumber)
+      if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb
+      return a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true })
     })
 }
 

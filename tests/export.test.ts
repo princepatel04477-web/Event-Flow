@@ -106,6 +106,7 @@ function makeData(): ExportData {
     deliverables: [],
     proofs: [],
     assignments: [],
+    guests: [],
     rooms: [],
     hotels: [],
     profileNames: {},

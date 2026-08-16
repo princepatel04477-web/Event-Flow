@@ -32,6 +32,7 @@ export async function readExportData(eventId: string): Promise<ExportDataResult>
   const [{ data: event }, ...rest] = await Promise.all([
     supabase.from('events').select('name').eq('id', eventId).maybeSingle(),
     supabase.from('guest_groups').select('*').eq('event_id', eventId),
+    supabase.from('guests').select('id, group_id, full_name, is_head').eq('event_id', eventId),
     supabase.from('travel_legs').select('*').eq('event_id', eventId),
     supabase.from('deliverables').select('*').eq('event_id', eventId),
     supabase.from('delivery_proofs').select('*').eq('event_id', eventId),
@@ -52,7 +53,7 @@ export async function readExportData(eventId: string): Promise<ExportDataResult>
     return { ok: false, message: `Could not read export data: ${failure.error.message}` }
   }
 
-  const [groups, legs, deliverables, proofs, assignments, rooms, hotels, profiles, staffMembers, callAttempts, extractions] = rest
+  const [groups, guests, legs, deliverables, proofs, assignments, rooms, hotels, profiles, staffMembers, callAttempts, extractions] = rest
 
   const profileNames: Record<string, string> = {}
   for (const p of profiles.data ?? []) {
@@ -71,6 +72,7 @@ export async function readExportData(eventId: string): Promise<ExportDataResult>
     eventName: event?.name ?? 'Event',
     data: {
       groups: groups.data ?? [],
+      guests: guests.data ?? [],
       legs: legs.data ?? [],
       deliverables: deliverables.data ?? [],
       proofs: proofs.data ?? [],
