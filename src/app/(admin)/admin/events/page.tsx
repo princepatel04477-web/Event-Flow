@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 
 import { CalendarIcon, ChevronLeftIcon } from '@/components/icons'
 import { Badge } from '@/components/ui/Badge'
-import { Card, CardBody } from '@/components/ui/Card'
+import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { friendlyDbError } from '@/lib/errors'
 import { createClient } from '@/lib/supabase/server'
@@ -18,11 +18,19 @@ export const metadata: Metadata = {
 
 type EventRow = Pick<
   Database['public']['Tables']['events']['Row'],
-  'id' | 'name' | 'code' | 'bride_name' | 'groom_name' | 'starts_on' | 'ends_on' | 'is_active'
+  | 'id'
+  | 'name'
+  | 'code'
+  | 'bride_name'
+  | 'groom_name'
+  | 'starts_on'
+  | 'ends_on'
+  | 'is_active'
+  | 'archived_at'
 >
 
 const EVENT_COLUMNS =
-  'id, name, code, bride_name, groom_name, starts_on, ends_on, is_active'
+  'id, name, code, bride_name, groom_name, starts_on, ends_on, is_active, archived_at'
 
 /**
  * /admin/events — every event, and the form that adds one.
@@ -40,15 +48,31 @@ const EVENT_COLUMNS =
  * see them". For anybody else that inference would be false, which is exactly
  * why the guard is in the layout and not in a client component.
  */
-export default async function AdminEventsPage() {
+type PageProps = {
+  // Next 15+ hands searchParams over as a Promise.
+  searchParams: Promise<{ archived?: string }>
+}
+
+export default async function AdminEventsPage({ searchParams }: PageProps) {
+  const { archived } = await searchParams
+  const showArchived = archived === '1'
+
   const supabase = await createClient()
 
+  // Always read both, and filter in TypeScript rather than with `.is()`. The
+  // count of hidden events is what makes the toggle discoverable — a filter
+  // applied in the query would leave the page unable to say "2 archived"
+  // without a second round trip.
   const { data, error } = await supabase
     .from('events')
     .select(EVENT_COLUMNS)
     .order('created_at', { ascending: false })
 
-  const events: EventRow[] = data ?? []
+  const allEvents: EventRow[] = data ?? []
+  const events: EventRow[] = showArchived
+    ? allEvents
+    : allEvents.filter((e) => e.archived_at === null)
+  const archivedCount = allEvents.filter((e) => e.archived_at !== null).length
 
   return (
     <div className="flex flex-col gap-8">
@@ -64,6 +88,20 @@ export default async function AdminEventsPage() {
           ) : null}
         </div>
 
+        {/* Only rendered when something is actually hidden. A permanent
+            "show archived" control on a database with nothing archived is a
+            question nobody asked. */}
+        {!error && archivedCount > 0 ? (
+          <Link
+            href={showArchived ? '/admin/events' : '/admin/events?archived=1'}
+            className="tap self-start text-sm font-medium text-brand underline"
+          >
+            {showArchived
+              ? 'Hide archived events'
+              : `Show ${archivedCount} archived event${archivedCount === 1 ? '' : 's'}`}
+          </Link>
+        ) : null}
+
         {error ? (
           // Say nothing about how many events exist — we did not find out.
           <p
@@ -73,10 +111,17 @@ export default async function AdminEventsPage() {
             Could not load the event list. {friendlyDbError(error)}
           </p>
         ) : events.length === 0 ? (
+          // Two genuinely different situations, and saying the wrong one is a
+          // lie about the database: an admin who has archived everything is
+          // told nothing exists, and goes looking for data that is still there.
           <EmptyState
             icon={<CalendarIcon className="h-7 w-7" />}
-            title="No events yet"
-            description="Nothing has been created on this database. Fill in the form below to make the first one — you will land on its dashboard, ready to import the calling list."
+            title={archivedCount > 0 ? 'Every event is archived' : 'No events yet'}
+            description={
+              archivedCount > 0
+                ? `All ${archivedCount} event${archivedCount === 1 ? '' : 's'} on this database ${archivedCount === 1 ? 'is' : 'are'} archived. Nothing has been deleted — use the link above to see them, or create a new one below.`
+                : 'Nothing has been created on this database. Fill in the form below to make the first one — you will land on its dashboard, ready to import the calling list.'
+            }
           />
         ) : (
           <ul className="flex flex-col gap-3">
@@ -89,49 +134,20 @@ export default async function AdminEventsPage() {
         )}
       </section>
 
-      {!error && events.length > 0 ? (
-        <section aria-labelledby="tools-heading" className="flex flex-col gap-3">
-          <h2 id="tools-heading" className="text-lg font-semibold text-fg">
-            Tools
-          </h2>
+      {/*
+        The "Tools" section that used to sit here linked /admin/hotels,
+        /admin/rooms and /admin/export. All three routes were deleted when
+        those screens moved to per-event paths, and the links were left
+        behind — every one of them returned a hard 404 in production, and the
+        RSC prefetch for the first logged an error on every visit to this page.
 
-          <Link href="/admin/hotels" className="block">
-            <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
-              <CardBody className="py-3">
-                <p className="font-semibold text-fg">Hotels and rooms</p>
-                <p className="mt-0.5 text-sm text-muted">
-                  Set up hotels, add rooms in bulk, and recover allocations from the imported
-                  sheet.
-                </p>
-              </CardBody>
-            </Card>
-          </Link>
-
-          <Link href="/admin/rooms" className="block">
-            <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
-              <CardBody className="py-3">
-                <p className="font-semibold text-fg">Room grid and allocation</p>
-                <p className="mt-0.5 text-sm text-muted">
-                  Propose an allocation, then move, place and release guests room by room.
-                </p>
-              </CardBody>
-            </Card>
-          </Link>
-
-          <Link href="/admin/export" className="block">
-            <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
-              <CardBody className="py-3">
-                <p className="font-semibold text-fg">Download to Excel</p>
-                <p className="mt-0.5 text-sm text-muted">
-                  Guests, families, arrivals and departures — one workbook, ready to hand to a
-                  desk.
-                </p>
-              </CardBody>
-            </Card>
-          </Link>
-        </section>
-      ) : null}
-
+        Repointing them was not possible: all three tools are scoped to one
+        event, and this page lists every event without selecting one. There is
+        no correct href from here. The working routes are reached from the
+        event you are actually working on —
+        /admin/events/{code}/hotels in the sidebar, and rooms and export from
+        the staff nav — so nothing is lost by removing the section.
+      */}
       <section aria-labelledby="create-heading" className="flex flex-col gap-4">
         <div>
           <h2 id="create-heading" className="text-lg font-semibold text-fg">
@@ -170,6 +186,7 @@ function EventRowCard({ event }: { event: EventRow }) {
 
           <span className="mt-1.5 flex flex-wrap items-center gap-2">
             <Badge tone="neutral">{event.code}</Badge>
+            {event.archived_at ? <Badge tone="neutral">Archived</Badge> : null}
             {event.is_active ? null : <Badge tone="warning">Inactive</Badge>}
             {dates ? (
               <span className="truncate text-sm text-muted">{dates}</span>

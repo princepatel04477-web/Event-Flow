@@ -259,3 +259,111 @@ export async function createEvent(
     },
   }
 }
+
+// ---------------------------------------------------------------------------
+// Archive / restore — the soft delete, and the only "remove" this app offers
+// ---------------------------------------------------------------------------
+
+/**
+ * Archiving an event, and why there is no delete beside it.
+ *
+ * `delivery_proofs.event_id` is `ON DELETE RESTRICT` and `delivery_proofs`
+ * carries an unconditional `block_mutation()` trigger on DELETE. An event
+ * that has ever recorded one proof therefore cannot be deleted by anybody —
+ * not an admin, not the service role — and the attempt surfaces as a raw
+ * `23503`. A delete button would work on a fresh event and fail opaquely on
+ * the event with an operational history behind it, which is the wrong way
+ * round. Archiving behaves identically on every event, so archiving is what
+ * the UI offers. See migration 20260816120000.
+ *
+ * No permission check in TypeScript. `events` is
+ * `update using (app.is_admin()) with check (app.is_admin())`, so a
+ * non-admin's write comes back `42501` and is reported as such.
+ */
+export type ArchiveEventResult = { ok: true } | { ok: false; error: string }
+
+/**
+ * Confirmation is by typing the event's own name, compared case-insensitively
+ * on trimmed values.
+ *
+ * The name and not the code: codes are four-to-ten characters and two of them
+ * differ by one digit (`E00000` / `E12345`), so typing one is no evidence you
+ * looked at the right row. A name is long enough that copying it out is a
+ * deliberate act — which is the entire point of the gesture.
+ */
+function nameMatches(typed: string, actual: string): boolean {
+  return typed.trim().toLowerCase() === actual.trim().toLowerCase()
+}
+
+export async function archiveEvent(
+  eventId: string,
+  typedName: string,
+): Promise<ArchiveEventResult> {
+  const supabase = await createClient()
+
+  // Read the name back from the database rather than trusting one passed
+  // through the form: the value being confirmed against must be the value
+  // stored, or the confirmation checks nothing.
+  const { data: event, error: readErr } = await supabase
+    .from('events')
+    .select('id, name, archived_at')
+    .eq('id', eventId)
+    .maybeSingle()
+
+  if (readErr) {
+    if (readErr.code === RLS_DENIED) {
+      return { ok: false, error: 'Only an admin can archive an event.' }
+    }
+    return { ok: false, error: `Could not read the event: ${friendlyDbError(readErr)}` }
+  }
+  if (!event) return { ok: false, error: 'That event no longer exists.' }
+  if (event.archived_at) return { ok: false, error: 'That event is already archived.' }
+
+  if (!nameMatches(typedName, event.name)) {
+    return {
+      ok: false,
+      error: `That does not match. Type the event name exactly: ${event.name}`,
+    }
+  }
+
+  const { error } = await supabase
+    .from('events')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', eventId)
+
+  if (error) {
+    if (error.code === RLS_DENIED) {
+      return { ok: false, error: 'Only an admin can archive an event.' }
+    }
+    return { ok: false, error: friendlyDbError(error) }
+  }
+
+  revalidatePath('/', 'layout')
+  return { ok: true }
+}
+
+/**
+ * Restore is deliberately asymmetric — no typed confirmation.
+ *
+ * Archiving hides data; restoring reveals it. Only one of those can be a
+ * mistake worth guarding against, and putting friction on the recovery path
+ * is how a reversible action stops feeling reversible.
+ */
+export async function unarchiveEvent(eventId: string): Promise<ArchiveEventResult> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('events')
+    .update({ archived_at: null })
+    .eq('id', eventId)
+
+  if (error) {
+    if (error.code === RLS_DENIED) {
+      return { ok: false, error: 'Only an admin can restore an event.' }
+    }
+    return { ok: false, error: friendlyDbError(error) }
+  }
+
+  revalidatePath('/', 'layout')
+  return { ok: true }
+}

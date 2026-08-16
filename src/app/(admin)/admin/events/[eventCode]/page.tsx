@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { resolveEventByCode } from '@/lib/supabase/queries'
 import { DashboardClient } from './DashboardClient'
+import { ArchiveEventCard } from './ArchiveEventCard'
 import { readHotelImportContext } from '@/lib/actions/import-hotels'
 import { BuildingIcon, UsersIcon } from '@/components/icons'
 
@@ -79,6 +80,16 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
           ) : null}
         </div>
       </Link>
+
+      {/* Last on the page, deliberately. Nothing routine lives below it, so
+          the archive control is never something a thumb passes over on the
+          way to a task. */}
+      <ArchiveEventCard
+        eventId={event.id}
+        eventName={event.name}
+        eventCode={event.code}
+        archivedAt={event.archived_at}
+      />
     </div>
   )
 }
