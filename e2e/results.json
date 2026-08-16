@@ -2,12 +2,12 @@
   "config": {
     "argv": [
       "C:\\Program Files\\nodejs\\node.exe",
-      "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\node_modules\\@playwright\\test\\cli.js",
+      "C:\\dev\\EventFlow\\node_modules\\@playwright\\test\\cli.js",
       "test",
-      "--project=phone"
+      "--project=smoke"
     ],
-    "configFile": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\playwright.config.ts",
-    "rootDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/e2e",
+    "configFile": "C:\\dev\\EventFlow\\playwright.config.ts",
+    "rootDir": "C:/dev/EventFlow/e2e",
     "failOnFlakyTests": false,
     "forbidOnly": false,
     "fullyParallel": false,
@@ -23,7 +23,7 @@
     "preserveOutput": "always",
     "projects": [
       {
-        "outputDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/test-results",
+        "outputDir": "C:/dev/EventFlow/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -31,7 +31,7 @@
         },
         "id": "phone",
         "name": "phone",
-        "testDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/e2e",
+        "testDir": "C:/dev/EventFlow/e2e",
         "testIgnore": [],
         "testMatch": [
           "/tier0\\.spec\\.ts|tier1\\.spec\\.ts|tier2\\.spec\\.ts|stress\\.spec\\.ts/"
@@ -39,7 +39,7 @@
         "timeout": 60000
       },
       {
-        "outputDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/test-results",
+        "outputDir": "C:/dev/EventFlow/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -47,7 +47,7 @@
         },
         "id": "desktop",
         "name": "desktop",
-        "testDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/e2e",
+        "testDir": "C:/dev/EventFlow/e2e",
         "testIgnore": [],
         "testMatch": [
           "/tier1\\.spec\\.ts/"
@@ -55,7 +55,7 @@
         "timeout": 60000
       },
       {
-        "outputDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/test-results",
+        "outputDir": "C:/dev/EventFlow/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -63,7 +63,7 @@
         },
         "id": "perf",
         "name": "perf",
-        "testDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/e2e",
+        "testDir": "C:/dev/EventFlow/e2e",
         "testIgnore": [],
         "testMatch": [
           "/perf\\.spec\\.ts/"
@@ -71,7 +71,7 @@
         "timeout": 60000
       },
       {
-        "outputDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/test-results",
+        "outputDir": "C:/dev/EventFlow/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -79,10 +79,42 @@
         },
         "id": "identity",
         "name": "identity",
-        "testDir": "C:/Users/rebel/OneDrive/Documents/Projects/EventFlow/e2e",
+        "testDir": "C:/dev/EventFlow/e2e",
         "testIgnore": [],
         "testMatch": [
           "/identity\\.spec\\.ts/"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/dev/EventFlow/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "smoke",
+        "name": "smoke",
+        "testDir": "C:/dev/EventFlow/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/smoke\\.spec\\.ts/"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "C:/dev/EventFlow/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "client",
+        "name": "client",
+        "testDir": "C:/dev/EventFlow/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/client-view\\.spec\\.ts/"
         ],
         "timeout": 60000
       }
@@ -120,82 +152,13 @@
   },
   "suites": [
     {
-      "title": "stress.spec.ts",
-      "file": "stress.spec.ts",
+      "title": "smoke.spec.ts",
+      "file": "smoke.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [
         {
-          "title": "S1 full load — guest list interactive time",
-          "ok": false,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": 0,
-                  "parallelIndex": 0,
-                  "status": "timedOut",
-                  "duration": 1,
-                  "error": {
-                    "message": "\u001b[31m\"beforeAll\" hook timeout of 60000ms exceeded.\u001b[39m",
-                    "stack": "\u001b[31m\"beforeAll\" hook timeout of 60000ms exceeded.\u001b[39m\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts:19:6",
-                    "location": {
-                      "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts",
-                      "column": 6,
-                      "line": 19
-                    },
-                    "snippet": "\u001b[0m \u001b[90m 17 |\u001b[39m \u001b[36mlet\u001b[39m stateA\u001b[33m:\u001b[39m string\n \u001b[90m 18 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 19 |\u001b[39m test\u001b[33m.\u001b[39mbeforeAll(\u001b[36masync\u001b[39m ({ browser }) \u001b[33m=>\u001b[39m {\n \u001b[90m    |\u001b[39m      \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 20 |\u001b[39m   \u001b[36mawait\u001b[39m resetTestData()\n \u001b[90m 21 |\u001b[39m   stateA \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m login(browser\u001b[33m,\u001b[39m \u001b[33mUSERS\u001b[39m\u001b[33m.\u001b[39ma)\n \u001b[90m 22 |\u001b[39m })\u001b[0m"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts",
-                        "column": 6,
-                        "line": 19
-                      },
-                      "message": "\u001b[31m\"beforeAll\" hook timeout of 60000ms exceeded.\u001b[39m\n\n  17 | let stateA: string\n  18 |\n> 19 | test.beforeAll(async ({ browser }) => {\n     |      ^\n  20 |   await resetTestData()\n  21 |   stateA = await login(browser, USERS.a)\n  22 | })\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts:19:6"
-                    }
-                  ],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T11:59:15.724Z",
-                  "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\stress-S1-full-load-—-guest-list-interactive-time-phone\\error-context.md"
-                    },
-                    {
-                      "name": "trace",
-                      "contentType": "application/zip",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\stress-S1-full-load-—-guest-list-interactive-time-phone\\trace.zip"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\stress.spec.ts",
-                    "column": 6,
-                    "line": 19
-                  }
-                }
-              ],
-              "status": "unexpected"
-            }
-          ],
-          "id": "496454548f4205703e07-484f88490a2e7e757aaa",
-          "file": "stress.spec.ts",
-          "line": 30,
-          "column": 5
-        },
-        {
-          "title": "S2 slow connection — walk the core loop",
+          "title": "S4.6 the deployed build is not pre-P1G",
           "ok": true,
           "tags": [],
           "tests": [
@@ -203,8 +166,8 @@
               "timeout": 60000,
               "annotations": [],
               "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
+              "projectId": "smoke",
+              "projectName": "smoke",
               "results": [
                 {
                   "workerIndex": -1,
@@ -215,7 +178,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T12:00:15.983Z",
+                  "startTime": "2026-08-16T11:23:17.836Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -223,13 +186,13 @@
               "status": "skipped"
             }
           ],
-          "id": "496454548f4205703e07-f83842d8aeffd312456e",
-          "file": "stress.spec.ts",
-          "line": 55,
+          "id": "4219922fea2e2bd3c691-93407edad56c1616c87a",
+          "file": "smoke.spec.ts",
+          "line": 255,
           "column": 5
         },
         {
-          "title": "S3 timed loop — import → room suggest → photo proof",
+          "title": "S5.1 delivery proofs are server-timestamped and immutable",
           "ok": true,
           "tags": [],
           "tests": [
@@ -237,8 +200,8 @@
               "timeout": 60000,
               "annotations": [],
               "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
+              "projectId": "smoke",
+              "projectName": "smoke",
               "results": [
                 {
                   "workerIndex": -1,
@@ -249,7 +212,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-08-10T12:00:15.983Z",
+                  "startTime": "2026-08-16T11:23:17.836Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -257,763 +220,474 @@
               "status": "skipped"
             }
           ],
-          "id": "496454548f4205703e07-30f7c941f87fc1ef708b",
-          "file": "stress.spec.ts",
-          "line": 59,
+          "id": "4219922fea2e2bd3c691-10840897b5631d4160b4",
+          "file": "smoke.spec.ts",
+          "line": 283,
           "column": 5
+        },
+        {
+          "title": "S6.1 the room grid loads and reflects the database",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-16T11:23:17.836Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-60f85300d9ab07300d43",
+          "file": "smoke.spec.ts",
+          "line": 334,
+          "column": 5
+        },
+        {
+          "title": "S6.2 the client view exposes no phone numbers, notes or recordings",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-16T11:23:17.836Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-4f0c8582f3863695ba8a",
+          "file": "smoke.spec.ts",
+          "line": 350,
+          "column": 5
+        },
+        {
+          "title": "S7 dashboard loads without a console error",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-16T11:23:17.836Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-dbf204cf1f91af0d9117",
+          "file": "smoke.spec.ts",
+          "line": 389,
+          "column": 7
+        },
+        {
+          "title": "S7 guests loads without a console error",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-16T11:23:17.836Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-ebe8fb4a2a14b8bff2bf",
+          "file": "smoke.spec.ts",
+          "line": 389,
+          "column": 7
+        },
+        {
+          "title": "S7 rsvp loads without a console error",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-16T11:23:17.836Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-ba69a2cddb1df647fc3d",
+          "file": "smoke.spec.ts",
+          "line": 389,
+          "column": 7
+        },
+        {
+          "title": "S7 logistics loads without a console error",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-16T11:23:17.836Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-fa2e03cdae753b38e7c9",
+          "file": "smoke.spec.ts",
+          "line": 389,
+          "column": 7
+        },
+        {
+          "title": "S7 hospitality loads without a console error",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "smoke",
+              "projectName": "smoke",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-08-16T11:23:17.836Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "4219922fea2e2bd3c691-0dd42c41a376964cf614",
+          "file": "smoke.spec.ts",
+          "line": 389,
+          "column": 7
         }
-      ]
-    },
-    {
-      "title": "tier0.spec.ts",
-      "file": "tier0.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [
+      ],
+      "suites": [
         {
-          "title": "T0.1 login persists across a fresh context",
-          "ok": true,
-          "tags": [],
-          "tests": [
+          "title": "4 critical path",
+          "file": "smoke.spec.ts",
+          "line": 105,
+          "column": 6,
+          "specs": [
             {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
+              "title": "S4.1 team access code signs in and reaches a staff identity",
+              "ok": false,
+              "tags": [],
+              "tests": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 17273,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:00:16.824Z",
+                  "timeout": 60000,
                   "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "expected"
-            }
-          ],
-          "id": "1528017bade7b92b1fe1-482a1ffd41c3f3dfe253",
-          "file": "tier0.spec.ts",
-          "line": 29,
-          "column": 5
-        },
-        {
-          "title": "T0.2 import lands correctly",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 7219,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:00:51.681Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "expected"
-            }
-          ],
-          "id": "1528017bade7b92b1fe1-7a2f4217a809d1b10f5d",
-          "file": "tier0.spec.ts",
-          "line": 42,
-          "column": 5
-        },
-        {
-          "title": "T0.3 import is idempotent",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 21696,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:00:58.916Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "expected"
-            }
-          ],
-          "id": "1528017bade7b92b1fe1-37caf493b9f4e1c5a054",
-          "file": "tier0.spec.ts",
-          "line": 81,
-          "column": 5
-        },
-        {
-          "title": "T0.4 guest list loads fast, windowed, and search finds any guest",
-          "ok": false,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": 1,
-                  "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 34622,
-                  "error": {
-                    "message": "Error: guest list first paint (real count) took 27704ms\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m5000\u001b[39m\nReceived:   \u001b[31m27704\u001b[39m",
-                    "stack": "Error: guest list first paint (real count) took 27704ms\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m5000\u001b[39m\nReceived:   \u001b[31m27704\u001b[39m\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier0.spec.ts:153:76",
-                    "location": {
-                      "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier0.spec.ts",
-                      "column": 76,
-                      "line": 153
-                    },
-                    "snippet": "\u001b[0m \u001b[90m 151 |\u001b[39m   \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[36mnew\u001b[39m \u001b[33mRegExp\u001b[39m(\u001b[32m`${expectedDisplayCount} guest`\u001b[39m)))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m15\u001b[39m_000 })\n \u001b[90m 152 |\u001b[39m   \u001b[36mconst\u001b[39m elapsed \u001b[33m=\u001b[39m \u001b[33mDate\u001b[39m\u001b[33m.\u001b[39mnow() \u001b[33m-\u001b[39m started\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 153 |\u001b[39m   expect(elapsed\u001b[33m,\u001b[39m \u001b[32m`guest list first paint (real count) took ${elapsed}ms`\u001b[39m)\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m5000\u001b[39m)\n \u001b[90m     |\u001b[39m                                                                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 154 |\u001b[39m\n \u001b[90m 155 |\u001b[39m   \u001b[90m// The list is WINDOWED: only a fraction of the rows are mounted, but the\u001b[39m\n \u001b[90m 156 |\u001b[39m   \u001b[90m// scroll container is the full list height — every row is reachable by\u001b[39m\u001b[0m"
-                  },
-                  "errors": [
+                  "expectedStatus": "passed",
+                  "projectId": "smoke",
+                  "projectName": "smoke",
+                  "results": [
                     {
-                      "location": {
-                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier0.spec.ts",
-                        "column": 76,
-                        "line": 153
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 0,
+                      "error": {
+                        "message": "Error: SMOKE_BASE_URL is not set — run this through `npm run smoke`\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: not \u001b[32m\"\"\u001b[39m",
+                        "stack": "Error: SMOKE_BASE_URL is not set — run this through `npm run smoke`\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: not \u001b[32m\"\"\u001b[39m\n    at C:\\dev\\EventFlow\\e2e\\smoke.spec.ts:93:88",
+                        "location": {
+                          "file": "C:\\dev\\EventFlow\\e2e\\smoke.spec.ts",
+                          "column": 88,
+                          "line": 93
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 91 |\u001b[39m\n \u001b[90m 92 |\u001b[39m test\u001b[33m.\u001b[39mbeforeAll(\u001b[36masync\u001b[39m () \u001b[33m=>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 93 |\u001b[39m   expect(\u001b[33mBASE_URL\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'SMOKE_BASE_URL is not set — run this through `npm run smoke`'\u001b[39m)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39mtoBe(\u001b[32m''\u001b[39m)\n \u001b[90m    |\u001b[39m                                                                                        \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 94 |\u001b[39m   expect(\u001b[33mTEAM_CODE\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'no team access code available (SMOKE_TEAM_CODE / E2E_TEAM_CODE)'\u001b[39m)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39mtoBe(\u001b[32m''\u001b[39m)\n \u001b[90m 95 |\u001b[39m\n \u001b[90m 96 |\u001b[39m   \u001b[36mconst\u001b[39m events \u001b[33m=\u001b[39m (\u001b[36mawait\u001b[39m rest(\u001b[32m`events?select=id,code&code=eq.${EVENT_CODE}`\u001b[39m)) \u001b[36mas\u001b[39m { id\u001b[33m:\u001b[39m string }[]\u001b[0m"
                       },
-                      "message": "Error: guest list first paint (real count) took 27704ms\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m5000\u001b[39m\nReceived:   \u001b[31m27704\u001b[39m\n\n  151 |   await expect(page.getByText(new RegExp(`${expectedDisplayCount} guest`))).toBeVisible({ timeout: 15_000 })\n  152 |   const elapsed = Date.now() - started\n> 153 |   expect(elapsed, `guest list first paint (real count) took ${elapsed}ms`).toBeLessThan(5000)\n      |                                                                            ^\n  154 |\n  155 |   // The list is WINDOWED: only a fraction of the rows are mounted, but the\n  156 |   // scroll container is the full list height — every row is reachable by\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier0.spec.ts:153:76"
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\dev\\EventFlow\\e2e\\smoke.spec.ts",
+                            "column": 88,
+                            "line": 93
+                          },
+                          "message": "Error: SMOKE_BASE_URL is not set — run this through `npm run smoke`\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: not \u001b[32m\"\"\u001b[39m\n\n  91 |\n  92 | test.beforeAll(async () => {\n> 93 |   expect(BASE_URL, 'SMOKE_BASE_URL is not set — run this through `npm run smoke`').not.toBe('')\n     |                                                                                        ^\n  94 |   expect(TEAM_CODE, 'no team access code available (SMOKE_TEAM_CODE / E2E_TEAM_CODE)').not.toBe('')\n  95 |\n  96 |   const events = (await rest(`events?select=id,code&code=eq.${EVENT_CODE}`)) as { id: string }[]\n    at C:\\dev\\EventFlow\\e2e\\smoke.spec.ts:93:88"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-16T11:23:17.746Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\dev\\EventFlow\\test-results\\smoke-4-critical-path-S4-1-cbac3-nd-reaches-a-staff-identity-smoke\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\dev\\EventFlow\\test-results\\smoke-4-critical-path-S4-1-cbac3-nd-reaches-a-staff-identity-smoke\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\dev\\EventFlow\\e2e\\smoke.spec.ts",
+                        "column": 88,
+                        "line": 93
+                      }
                     }
                   ],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:01:20.628Z",
+                  "status": "unexpected"
+                }
+              ],
+              "id": "4219922fea2e2bd3c691-32bae47b21028c79e125",
+              "file": "smoke.spec.ts",
+              "line": 108,
+              "column": 5
+            },
+            {
+              "title": "S4.2 the guest list loads real families",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
                   "annotations": [],
-                  "attachments": [
+                  "expectedStatus": "passed",
+                  "projectId": "smoke",
+                  "projectName": "smoke",
+                  "results": [
                     {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier0-T0-4-guest-list-load-ba2b0--and-search-finds-any-guest-phone\\test-failed-1.png"
-                    },
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier0-T0-4-guest-list-load-ba2b0--and-search-finds-any-guest-phone\\error-context.md"
-                    },
-                    {
-                      "name": "trace",
-                      "contentType": "application/zip",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier0-T0-4-guest-list-load-ba2b0--and-search-finds-any-guest-phone\\trace.zip"
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-16T11:23:17.835Z",
+                      "annotations": [],
+                      "attachments": []
                     }
                   ],
-                  "errorLocation": {
-                    "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier0.spec.ts",
-                    "column": 76,
-                    "line": 153
-                  }
+                  "status": "skipped"
                 }
               ],
-              "status": "unexpected"
-            }
-          ],
-          "id": "1528017bade7b92b1fe1-b380c6df26655a7fdf9b",
-          "file": "tier0.spec.ts",
-          "line": 110,
-          "column": 5
-        },
-        {
-          "title": "T0.5 RSVP logging persists",
-          "ok": true,
-          "tags": [],
-          "tests": [
+              "id": "4219922fea2e2bd3c691-d4f73274293fe9acb7b9",
+              "file": "smoke.spec.ts",
+              "line": 135,
+              "column": 5
+            },
             {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
+              "title": "S4.3 the call screen opens and offers a dial",
+              "ok": true,
+              "tags": [],
+              "tests": [
                 {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:01:55.596Z",
+                  "timeout": 60000,
                   "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "1528017bade7b92b1fe1-3382d477724fc974b6af",
-          "file": "tier0.spec.ts",
-          "line": 194,
-          "column": 5
-        },
-        {
-          "title": "T0.6 room double-booking rejected in the UI",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:01:55.596Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "1528017bade7b92b1fe1-8ddb2de62321b9cc5148",
-          "file": "tier0.spec.ts",
-          "line": 279,
-          "column": 5
-        },
-        {
-          "title": "T0.7 photo proof lands and is retrievable",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:01:55.596Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "1528017bade7b92b1fe1-147ece4e73ed4fc89fb3",
-          "file": "tier0.spec.ts",
-          "line": 399,
-          "column": 5
-        },
-        {
-          "title": "T0.8 tamper-evident — verification only",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:01:55.596Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "1528017bade7b92b1fe1-ebaa30be14606d8ff71d",
-          "file": "tier0.spec.ts",
-          "line": 451,
-          "column": 5
-        },
-        {
-          "title": "T0.9 server-stamped timestamps",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:01:55.596Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "1528017bade7b92b1fe1-f037fe4b554069d912eb",
-          "file": "tier0.spec.ts",
-          "line": 462,
-          "column": 5
-        },
-        {
-          "title": "T0.10 export round-trips",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:01:55.597Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "1528017bade7b92b1fe1-82bb7e57b526468bc611",
-          "file": "tier0.spec.ts",
-          "line": 493,
-          "column": 5
-        }
-      ]
-    },
-    {
-      "title": "tier1.spec.ts",
-      "file": "tier1.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [
-        {
-          "title": "T1.1 multi-user, no corruption — the caller lock is exclusive",
-          "ok": false,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": 2,
-                  "parallelIndex": 0,
-                  "status": "timedOut",
-                  "duration": 65020,
-                  "error": {
-                    "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
-                    "stack": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
-                  },
-                  "errors": [
+                  "expectedStatus": "passed",
+                  "projectId": "smoke",
+                  "projectName": "smoke",
+                  "results": [
                     {
-                      "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
-                    },
-                    {
-                      "location": {
-                        "file": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier1.spec.ts",
-                        "column": 15,
-                        "line": 71
-                      },
-                      "message": "Error: page.goto: Test ended.\nCall log:\n\u001b[2m  - navigating to \"https://nuvent-ppzhi25o0-rebelmaker1258-2015s-projects.vercel.app/SAMPLE2026/rsvp/1d3d858b-4347-4693-a0b3-6dbf3cc6adf0\", waiting until \"load\"\u001b[22m\n\n\n  69 |   // locked state — proving two callers cannot both edit one family.\n  70 |   const { context: ctxB, page: pageB } = await loggedInContext(browser, stateB)\n> 71 |   await pageB.goto(`/${code}/rsvp/${groupId}`)\n     |               ^\n  72 |   await expect(pageB.getByText(/Someone else is already logging this family/i)).toBeVisible({ timeout: 15_000 })\n  73 |\n  74 |   // A can still edit — its own lock is intact (re-entrant claim).\n    at C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\e2e\\tier1.spec.ts:71:15"
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-16T11:23:17.835Z",
+                      "annotations": [],
+                      "attachments": []
                     }
                   ],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:01:56.379Z",
+                  "status": "skipped"
+                }
+              ],
+              "id": "4219922fea2e2bd3c691-0489eba4f9e72004ce4f",
+              "file": "smoke.spec.ts",
+              "line": 157,
+              "column": 5
+            },
+            {
+              "title": "S4.4 logging an RSVP updates the family record",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
                   "annotations": [],
-                  "attachments": [
+                  "expectedStatus": "passed",
+                  "projectId": "smoke",
+                  "projectName": "smoke",
+                  "results": [
                     {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-1-multi-user-no-c-848a2-he-caller-lock-is-exclusive-phone\\test-failed-1.png"
-                    },
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-1-multi-user-no-c-848a2-he-caller-lock-is-exclusive-phone\\error-context.md"
-                    },
-                    {
-                      "name": "trace",
-                      "contentType": "application/zip",
-                      "path": "C:\\Users\\rebel\\OneDrive\\Documents\\Projects\\EventFlow\\test-results\\tier1-T1-1-multi-user-no-c-848a2-he-caller-lock-is-exclusive-phone\\trace.zip"
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-16T11:23:17.836Z",
+                      "annotations": [],
+                      "attachments": []
                     }
-                  ]
+                  ],
+                  "status": "skipped"
                 }
               ],
-              "status": "unexpected"
-            }
-          ],
-          "id": "2b11f1eba0624d9847f6-8ebe9fefe810a52a365a",
-          "file": "tier1.spec.ts",
-          "line": 58,
-          "column": 5
-        },
-        {
-          "title": "T1.2 duplicate delivery handled",
-          "ok": true,
-          "tags": [],
-          "tests": [
+              "id": "4219922fea2e2bd3c691-dec7f0758c7ccf505311",
+              "file": "smoke.spec.ts",
+              "line": 169,
+              "column": 5
+            },
             {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
+              "title": "S4.5 the call reaches the Excel export",
+              "ok": true,
+              "tags": [],
+              "tests": [
                 {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:03:45.627Z",
+                  "timeout": 60000,
                   "annotations": [],
-                  "attachments": []
+                  "expectedStatus": "passed",
+                  "projectId": "smoke",
+                  "projectName": "smoke",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-16T11:23:17.836Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
                 }
               ],
-              "status": "skipped"
+              "id": "4219922fea2e2bd3c691-67ef73c79f81d1654a3f",
+              "file": "smoke.spec.ts",
+              "line": 209,
+              "column": 5
             }
-          ],
-          "id": "2b11f1eba0624d9847f6-96bd21890f288286b740",
-          "file": "tier1.spec.ts",
-          "line": 81,
-          "column": 5
-        },
-        {
-          "title": "T1.3 check-in / check-out persists",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:03:45.627Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "2b11f1eba0624d9847f6-6e342b2694560129a833",
-          "file": "tier1.spec.ts",
-          "line": 118,
-          "column": 5
-        },
-        {
-          "title": "T1.4 calling — dial goes to the system, session survives a remount",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:03:45.627Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "2b11f1eba0624d9847f6-140b0cfb0e2a0f6ff8ee",
-          "file": "tier1.spec.ts",
-          "line": 206,
-          "column": 5
-        },
-        {
-          "title": "T1.5 arrivals list — mark arrived persists",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:03:45.627Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "2b11f1eba0624d9847f6-96141ac28e78d6112021",
-          "file": "tier1.spec.ts",
-          "line": 332,
-          "column": 5
-        },
-        {
-          "title": "T1.6 dashboard accuracy",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:03:45.627Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "2b11f1eba0624d9847f6-3b0931d008a8c2910e58",
-          "file": "tier1.spec.ts",
-          "line": 377,
-          "column": 5
-        },
-        {
-          "title": "T1.7 mobile viewport integrity",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": -1,
-                  "parallelIndex": -1,
-                  "status": "skipped",
-                  "duration": 0,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:03:45.627Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "2b11f1eba0624d9847f6-34b4703af4785798b784",
-          "file": "tier1.spec.ts",
-          "line": 416,
-          "column": 5
-        }
-      ]
-    },
-    {
-      "title": "tier2.spec.ts",
-      "file": "tier2.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [
-        {
-          "title": "T2.1 vehicle allocation — no split, luggage-adjusted capacity",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": 3,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 9720,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:03:46.507Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "expected"
-            }
-          ],
-          "id": "eaa73614df34142dcf75-db63d943a73d8e53d068",
-          "file": "tier2.spec.ts",
-          "line": 25,
-          "column": 5
-        },
-        {
-          "title": "T2.2 offline capture and sync",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 60000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "phone",
-              "projectName": "phone",
-              "results": [
-                {
-                  "workerIndex": 3,
-                  "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 11846,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-08-10T12:04:24.495Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "expected"
-            }
-          ],
-          "id": "eaa73614df34142dcf75-c02977fb82c0b9d2a7cf",
-          "file": "tier2.spec.ts",
-          "line": 71,
-          "column": 5
+          ]
         }
       ]
     }
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-08-10T11:59:14.714Z",
-    "duration": 321781.367,
-    "expected": 5,
-    "skipped": 14,
-    "unexpected": 3,
+    "startTime": "2026-08-16T11:23:17.012Z",
+    "duration": 858.597,
+    "expected": 0,
+    "skipped": 13,
+    "unexpected": 1,
     "flaky": 0
   }
 }
