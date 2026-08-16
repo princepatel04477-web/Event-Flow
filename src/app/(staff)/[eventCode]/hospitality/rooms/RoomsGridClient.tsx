@@ -12,7 +12,7 @@ import { PageTitle } from '@/components/ui/PageTitle'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { Textarea } from '@/components/ui/Textarea'
-import { BuildingIcon, PlusIcon, UploadIcon, ShieldAlertIcon } from '@/components/icons'
+import { BuildingIcon, PlusIcon, UploadIcon, ShieldAlertIcon, UsersIcon } from '@/components/icons'
 import {
   readRoomsGrid,
   moveGuestsToRoom,
@@ -577,6 +577,17 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <PageTitle right={`${placedCount} / ${bedCount}`}>Rooms</PageTitle>
+        {/* The grid is the day-of rooms screen, but allocation was only
+            reachable from check-in. Put the path here so staff can go from
+            "who is unplaced" to "assign them" without leaving the section. */}
+        <LinkButton
+          href={`/${eventCode}/hospitality/rooms/allocate`}
+          variant="secondary"
+          size="md"
+          leadingIcon={<UsersIcon className="h-5 w-5" />}
+        >
+          Allocate
+        </LinkButton>
         {/* Once rooms exist the empty state is gone, so without this there is
             no route to room creation from anywhere in the staff tree. */}
         <LinkButton
