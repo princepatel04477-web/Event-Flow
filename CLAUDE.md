@@ -1010,8 +1010,9 @@ no anchor outside itself; nothing was dropped in the move.
 - `4cfbe0e` (room guard `FOR UPDATE`) — mechanism is sound and single-session-tested, but
   the two-session concurrency test (B must BLOCK) has NOT run. Needs local Postgres
   (`supabase db start`, fake event) or a device; never against production while SHARMA26
-  is live. Known follow-ups: deadlock risk on room swaps (40P01 unhandled in the UI), and
-  the reasoning depends on READ COMMITTED's fresh-snapshot-per-statement.
+  is live. The lock targets only the target room (`new.room_id`), and a move is one
+  statement to one room, so there is no lock cycle and no deadlock path; the reasoning
+  depends on READ COMMITTED's fresh-snapshot-per-statement.
 - The §14 real-handset round has not run for the rooms grid or the TanStack-Query root
   layout change.
 
