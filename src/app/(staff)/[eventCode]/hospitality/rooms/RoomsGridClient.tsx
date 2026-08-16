@@ -346,10 +346,18 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
       if (singleSource && singleSource !== room.roomId) {
         const undo = async () => {
           setActionError(null)
-          await moveMutation.mutateAsync({
+          const undoResult = await moveMutation.mutateAsync({
             assignmentIds,
             targetRoomId: singleSource,
           })
+          if (!undoResult.ok) {
+            // The source room refilled inside the 5s window, or the guard
+            // refused — say so rather than silently dropping the reversal.
+            setActionError(
+              undoResult.error ??
+                'Could not undo — the source room no longer has room for everyone. Nothing was moved back.',
+            )
+          }
         }
         setToast({ roomNumber: room.roomNumber, undo })
         window.setTimeout(() => setToast(null), 5000)
