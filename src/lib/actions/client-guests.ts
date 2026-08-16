@@ -67,5 +67,28 @@ export async function listClientGuests(eventId: string): Promise<ClientGuestResu
     return { ok: false, message: friendlyDbError(error) }
   }
 
-  return { ok: true, rows: data ?? [] }
+  // Synthetic member rows (ensureGroupMembers / addGuestMember) are named
+  // "<head> (guest N)" — they represent real beds, not real names. The count
+  // must stay truthful (a 6-pax family IS six people), so keep every row, but
+  // mask the placeholder name to the family head so a client never reads
+  // "Sharma (guest 3)". A real (renamed) member never matches the pattern.
+  const rows = (data ?? []).map((row) =>
+    isPlaceholderName(row.guest_name, row.family_head)
+      ? { ...row, guest_name: row.family_head }
+      : row,
+  )
+
+  return { ok: true, rows }
+}
+
+/**
+ * True when a guest name is the synthetic "<head> (guest N)" placeholder —
+ * the exact shape both ensureGroupMembers and addGuestMember write. A real
+ * member whose name happens to contain "(guest 2)" is not matched, because
+ * the prefix must equal the family head's name.
+ */
+export function isPlaceholderName(guestName: string | null, familyHead: string | null): boolean {
+  if (!guestName || !familyHead) return false
+  if (!guestName.startsWith(familyHead)) return false
+  return /^\(guest \d+\)$/.test(guestName.slice(familyHead.length).trim())
 }
