@@ -16,6 +16,7 @@ import {
   moveGuestToRoom,
   releaseGuestFromRoom,
   assignGuestToRoom,
+  ensureGroupMembers,
   type RoomsGridData,
   type RoomGridRow,
   type RoomGridGuest,
@@ -231,6 +232,25 @@ export function RoomsGridClient({ eventId }: Props) {
     setLoading(false)
   }
 
+  // Give an under-bedded family the member rows it is missing, on demand.
+  // See the hospitality copy for the full rationale: readRoomsGrid is
+  // read-only, so a one-head-row family that is already placed contributes
+  // nothing to the unplaced list and its missing people have no clickable
+  // representation. This is the tap that creates them. It only materialises;
+  // placing stays the existing two-tap flow.
+  async function attemptTopUp(groupId: string) {
+    setLoading(true)
+    setActionError(null)
+    const result = await ensureGroupMembers(eventId, groupId)
+    if (result.ok) {
+      clearSelection()
+      await load()
+    } else {
+      setActionError(result.error)
+    }
+    setLoading(false)
+  }
+
   async function handleOverride() {
     if (!overrideRoom || !overrideReason.trim()) return
 
@@ -334,11 +354,22 @@ export function RoomsGridClient({ eventId }: Props) {
           </p>
           <ul className="flex flex-col gap-1">
             {data.underBedded.map((f) => (
-              <li key={f.groupId} className="flex items-center justify-between gap-2 text-sm text-ink">
-                <span className="min-w-0 truncate font-medium">{f.headName}</span>
-                <span className="shrink-0 text-muted">
-                  {f.placed} of {f.headcount} placed · {f.shortfall} bed{f.shortfall === 1 ? '' : 's'} short
-                </span>
+              <li key={f.groupId}>
+                <button
+                  type="button"
+                  disabled={loading || !f.needsTopUp}
+                  onClick={() => attemptTopUp(f.groupId)}
+                  className={cn(
+                    'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-ink',
+                    f.needsTopUp ? 'hover:bg-warning/10 active:bg-warning/20' : 'cursor-default',
+                  )}
+                >
+                  <span className="min-w-0 truncate font-medium">{f.headName}</span>
+                  <span className="shrink-0 text-muted">
+                    {f.placed} of {f.headcount} placed · {f.shortfall} bed{f.shortfall === 1 ? '' : 's'} short
+                    {f.needsTopUp ? ' · tap to add members' : ''}
+                  </span>
+                </button>
               </li>
             ))}
           </ul>

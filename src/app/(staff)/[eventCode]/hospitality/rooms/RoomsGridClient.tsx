@@ -17,6 +17,7 @@ import {
   moveGuestToRoom,
   releaseGuestFromRoom,
   assignGuestToRoom,
+  ensureGroupMembers,
   type RoomsGridData,
   type RoomGridRow,
   type RoomGridGuest,
@@ -269,6 +270,32 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
     setLoading(false)
   }
 
+  // Give an under-bedded family the member rows it is missing, on demand.
+  //
+  // readRoomsGrid is read-only (5412d97), so a family imported with one head
+  // row and confirmed_pax 6 has exactly one guest row — and if that row is
+  // already in a room, the family contributes NOTHING to the unplaced list.
+  // The warning said "1 of 6 placed · 5 beds short" and there was no way to
+  // act on it: the five missing people had no clickable representation
+  // anywhere on the screen. This is the tap that creates them.
+  //
+  // It only materialises. Placing stays the existing two-tap flow, because
+  // the missing members usually do NOT all fit one room — six people across
+  // three doubles is the normal case, and a "place whole family here" button
+  // would have to fail or overfill.
+  async function attemptTopUp(groupId: string) {
+    setLoading(true)
+    setActionError(null)
+    const result = await ensureGroupMembers(eventId, groupId)
+    if (result.ok) {
+      clearSelection()
+      await load()
+    } else {
+      setActionError(result.error)
+    }
+    setLoading(false)
+  }
+
   async function handleOverride() {
     if (!overrideRoom || !overrideReason.trim()) return
 
@@ -428,11 +455,22 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
           </p>
           <ul className="flex flex-col gap-1">
             {data.underBedded.map((f) => (
-              <li key={f.groupId} className="flex items-center justify-between gap-2 text-sm text-ink">
-                <span className="min-w-0 truncate font-medium">{f.headName}</span>
-                <span className="shrink-0 text-muted">
-                  {f.placed} of {f.headcount} placed · {f.shortfall} bed{f.shortfall === 1 ? '' : 's'} short
-                </span>
+              <li key={f.groupId}>
+                <button
+                  type="button"
+                  disabled={loading || !f.needsTopUp}
+                  onClick={() => attemptTopUp(f.groupId)}
+                  className={cn(
+                    'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-ink',
+                    f.needsTopUp ? 'hover:bg-warning/10 active:bg-warning/20' : 'cursor-default',
+                  )}
+                >
+                  <span className="min-w-0 truncate font-medium">{f.headName}</span>
+                  <span className="shrink-0 text-muted">
+                    {f.placed} of {f.headcount} placed · {f.shortfall} bed{f.shortfall === 1 ? '' : 's'} short
+                    {f.needsTopUp ? ' · tap to add members' : ''}
+                  </span>
+                </button>
               </li>
             ))}
           </ul>
