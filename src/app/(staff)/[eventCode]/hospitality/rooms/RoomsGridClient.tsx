@@ -834,7 +834,13 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
                   aria-hidden
                   className={cn('text-[0.5rem] leading-none tracking-[2px]', DOT_TONES[s])}
                 >
-                  {selecting ? `${freeBeds} free` : occupancyDots(room)}
+                  {selecting
+                    ? eligible
+                      ? `${freeBeds} free`
+                      : freeBeds === 0
+                        ? 'full'
+                        : `${freeBeds} bed${freeBeds === 1 ? '' : 's'}`
+                    : occupancyDots(room)}
                 </span>
                 <span className="sr-only">
                   {selecting
