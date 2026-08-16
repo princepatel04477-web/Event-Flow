@@ -1,7 +1,17 @@
 <?xml version='1.0' encoding='utf-8'?>
+<!--
+  `app_name` and `title_activity_main` are COPY — the launcher label and the
+  recents-screen caption. They follow the product name, which is EventFlow.
+
+  `package_name` and `custom_url_scheme` are IDENTIFIERS and are frozen at
+  com.nuvent.app. They are not leftovers to tidy up: applicationId is the
+  Android identity of the app, so changing it produces a different app with no
+  upgrade path — every handset would have to uninstall, reinstall and sign in
+  again, mid-event. See the frozen-identifier note in CLAUDE.md §12.
+-->
 <resources>
-    <string name="app_name">Nuvent</string>
-    <string name="title_activity_main">Nuvent</string>
+    <string name="app_name">EventFlow</string>
+    <string name="title_activity_main">EventFlow</string>
     <string name="package_name">com.nuvent.app</string>
     <string name="custom_url_scheme">com.nuvent.app</string>
 </resources>

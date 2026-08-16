@@ -2,22 +2,37 @@
 <!--
   Brand palette for the native shell.
 
-  Without this file the app inherited Capacitor's library defaults — Material
-  indigo (#3F51B5) — so the launch theme, recents-screen title bar and any
-  system-drawn chrome were stock-template blue while the app itself is dark
-  teal. Resources declared here override the library's by name.
+  Without this file the app inherited Capacitor's library defaults (Material
+  indigo #3F51B5), so the launch theme, recents-screen title bar and any
+  system-drawn chrome were stock-template blue. Resources declared here
+  override the library's by name.
 
-  Keep in sync with `themeColor` in src/app/layout.tsx and the StatusBar /
-  SplashScreen colours in capacitor.config.ts.
+  NOTE: the CSS custom properties this file mirrors are written below WITHOUT
+  their leading double hyphen, e.g. `ef-paper` for the token spelled with two
+  dashes in globals.css. That is not sloppiness: aapt rejects the sequence of
+  two hyphens anywhere inside an XML comment, and the build fails at
+  mergeReleaseResources with "The string is not permitted within comments".
+
+  These values used to be the dark-teal ground from an earlier design. The app
+  ground is now light paper: `ef-paper` in src/app/globals.css and `themeColor`
+  in src/app/layout.tsx are both #f8f9fa, and the accent is the gold
+  `ef-brand`. Leaving the dark values here meant the splash and the system
+  chrome disagreed with the app itself, which shows up as a dark flash swapping
+  to light one frame into every launch.
+
+  Keep in sync with globals.css, the StatusBar and SplashScreen colours in
+  capacitor.config.ts, and PAPER in scripts/brand-assets.mjs (which paints the
+  ground into the splash bitmaps themselves).
 -->
 <resources>
-    <!-- The app ground. Matches themeColor '#071a1d'. -->
-    <color name="colorPrimary">#071a1d</color>
-    <color name="colorPrimaryDark">#041214</color>
-    <!-- Cream, used for text and accents on the dark ground. -->
-    <color name="colorAccent">#f5ead8</color>
+    <!-- The app ground. Matches `ef-paper` / themeColor '#f8f9fa'. -->
+    <color name="colorPrimary">#f8f9fa</color>
+    <!-- The banded ground, `ef-paper-band`. -->
+    <color name="colorPrimaryDark">#f3f4f5</color>
+    <!-- Gold, `ef-brand`: the accent the app actually draws with. -->
+    <color name="colorAccent">#735c00</color>
 
     <!-- Splash background: identical to the app ground, so launch is a single
-         continuous colour rather than a pale flash that swaps to dark. -->
-    <color name="nuventSplashBackground">#071a1d</color>
+         continuous colour rather than a flash that swaps. -->
+    <color name="splashBackground">#f8f9fa</color>
 </resources>

@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The adaptive-icon ground.
+
+  White, not a brand colour. The EventFlow mark is a blue gradient drawn for a
+  white ground; on the previous #0E2523 dark teal its darker navy strokes
+  disappeared into the background and the calendar badge lost its outline.
+  Keep this in step with ICON_BG in scripts/brand-assets.mjs, which is what
+  paints the legacy (pre-adaptive) ic_launcher.png ground.
+-->
 <resources>
-    <color name="ic_launcher_background">#0E2523</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>

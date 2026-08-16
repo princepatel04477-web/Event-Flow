@@ -27,10 +27,18 @@
       `postSplashScreenTheme` is what the activity becomes after the splash;
       without it the launch theme stayed applied. AppTheme.NoActionBar was
       declared by the template and used by nothing until now.
+
+      `windowSplashScreenAnimatedIcon` puts the EventFlow mark on the launch
+      screen. It is the MARK ONLY, not the full lockup: the system masks this
+      drawable to a circle and scales it, so a wordmark placed here is cropped
+      away on the very first frame the user sees. The full lockup lives in
+      @drawable/splash, which is what the Capacitor plugin draws on the older
+      code path. Both come out of scripts/brand-assets.mjs.
     -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/nuventSplashBackground</item>
+        <item name="windowSplashScreenBackground">@color/splashBackground</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
-        <item name="android:background">@color/nuventSplashBackground</item>
+        <item name="android:background">@color/splashBackground</item>
     </style>
 </resources>

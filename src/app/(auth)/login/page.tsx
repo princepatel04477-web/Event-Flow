@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
@@ -36,7 +37,22 @@ export default async function LoginPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1 text-center">
+      <div className="flex flex-col items-center gap-1 text-center">
+        {/*
+          Decorative: the <h1> immediately below already says EventFlow, so alt
+          text here would make a screen reader announce the name twice on the
+          way into the form. `unoptimized` — a 72px PNG is not worth a round
+          trip to the image optimiser on venue Wi-Fi.
+        */}
+        <Image
+          src="/brand/eventflow-mark.png"
+          alt=""
+          width={72}
+          height={72}
+          priority
+          unoptimized
+          className="mb-1"
+        />
         <h1 className="font-display text-3xl tracking-tight text-fg">EventFlow</h1>
         <p className="text-base text-muted">Sign in with your access code.</p>
       </div>

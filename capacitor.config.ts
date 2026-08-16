@@ -68,8 +68,14 @@ if (
 }
 
 const config: CapacitorConfig = {
+  // appId is FROZEN. It is the Android identity of the app, not a brand
+  // string: a new appId is a different app with no upgrade path, so every
+  // handset would have to uninstall, reinstall and sign in again. The product
+  // is EventFlow and appName below carries that; this stays. (CLAUDE.md §12.)
   appId: 'com.nuvent.app',
-  appName: 'Nuvent',
+  // The launcher label. Mirrored in android/app/src/main/res/values/strings.xml
+  // — `cap sync` does NOT rewrite strings.xml, so both have to be changed.
+  appName: 'EventFlow',
   // Placeholder in remote-shell mode — the WebView loads server.url, so the
   // local web assets are unused. Must be an existing dir for `cap sync`.
   webDir: 'public',
@@ -114,19 +120,22 @@ const config: CapacitorConfig = {
   },
 
   plugins: {
-    // The app ground is dark teal (#071a1d — see `themeColor` in app/layout.tsx).
-    // These were cream (#f5ead8) with style 'LIGHT', which is doubly wrong:
-    // Capacitor's 'LIGHT' means DARK text (for a light background), so the
-    // status-bar icons were dark-on-dark, and the cream splash flashed a pale
-    // screen before a dark app. That flash-then-swap is the single most
-    // "this is a web page loading" moment in the product.
+    // The app ground is light paper (#f8f9fa — `themeColor` in app/layout.tsx
+    // and `--ef-paper` in globals.css), with dark ink on it.
+    //
+    // Capacitor's naming is inverted from what you expect and it has bitten
+    // this file twice: 'LIGHT' means DARK icons, for use ON a light
+    // background. A light ground therefore needs style 'LIGHT'. The previous
+    // value was 'DARK' over #071a1d, correct for the dark-teal design that
+    // the app has since moved off — left as-is it drew light icons on light
+    // paper, i.e. an invisible status bar.
     //
     // Note `backgroundColor` is a no-op on targetSdk 35+, where Android forces
     // edge-to-edge — the app itself paints under the bar via viewportFit:'cover'
     // plus the safe-area utilities. It is set anyway for older handsets.
     StatusBar: {
-      style: 'DARK',
-      backgroundColor: '#071a1d',
+      style: 'LIGHT',
+      backgroundColor: '#f8f9fa',
     },
     // The splash is dismissed PROGRAMMATICALLY, by WelcomeOverlay, one painted
     // frame after React mounts — not on a fixed timer. A timer is always
@@ -149,7 +158,8 @@ const config: CapacitorConfig = {
       launchAutoHide: true,
       launchShowDuration: 3000,
       launchFadeOutDuration: 200,
-      backgroundColor: '#071a1d',
+      // Must equal @color/splashBackground and `--ef-paper`. See colors.xml.
+      backgroundColor: '#f8f9fa',
       showSpinner: false,
     },
     // M11 OTA (@capgo/capacitor-updater) intentionally has NO config block.

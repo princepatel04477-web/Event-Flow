@@ -96,6 +96,28 @@ npm run lint         # eslint
 npm run test:run     # vitest run     — 133 tests, 11 files, ~6s
 ```
 
+### Brand assets
+
+```bash
+node scripts/brand-assets.mjs    # regenerates every launcher icon, splash,
+                                 # favicon and PWA icon from ONE source
+```
+
+Source of truth: `assets/brand/eventflow-logo.png`. **Do not hand-edit any of the
+33 files it writes** — five densities of `ic_launcher` / `_round` / `_foreground`,
+eleven `splash.png`, `drawable/splash_icon.png`, `src/app/{icon,apple-icon}.png`,
+`src/app/favicon.ico`, `public/brand/*`, and the inlined `data:` marks in
+`public/install.html` and `public/offline.html`. Editing one by hand means the next
+run silently reverts it, and editing a few by hand means the launcher icon and the
+splash disagree on the handsets nobody tested. Replace the source and re-run.
+
+If the source logo is ever swapped, re-measure the `BBOX` constants in that script —
+they are the ink bounds of the mark and the lockup in the current 1254×1254 file, and
+a differently-composed logo will crop wrong without erroring.
+
+Icons changed → **the APK must be rebuilt**. Icons and splash are native resources;
+OTA (§M11) ships JS/HTML/CSS only.
+
 **`npm run lint` exits 1 on a clean tree.** There are ~273 pre-existing errors and
 ~2,846 warnings, concentrated in `src/lib/allocate/allocator.ts`,
 `tests/extraction-eval.test.ts` and `src/lib/export/sheets.ts` — mostly `prefer-const`
@@ -778,19 +800,43 @@ Things that are *acceptable* but must not be discovered at 11pm on event eve.
 
 ## 11c. The event build, and the event-day checklist
 
-**The event build is the remote shell.** Verified 12 August 2026:
+**The event build is the remote shell.** Verified 16 August 2026:
 
 ```
 path      C:\android-builds\nuvent\debug\outputs\apk\release\app-release.apk
-copy      C:\android-builds\nuvent\nuvent-2.0-release.apk   (identical)
-size      6,551,504 bytes
-sha256    357586be5547f47aaae0296705feaf3dfe0ab5dd7f991b0d64b15112198d20b3
-version   versionCode 2 / versionName 2.0   (read from the APK, not the source)
+copy      C:\android-builds\nuvent\eventflow-final-06.apk   (identical, sha verified)
+size      6,668,655 bytes
+sha256    b89b7ce4f98711ea625cece442673fbcc27fe72bbe0662065741ebb3e08ca157
+version   versionCode 6 / versionName final-06  (read from the APK, not the source)
+label     EventFlow                            (aapt2 application-label)
+appId     com.nuvent.app                       (FROZEN — see §12; a change here
+                                                means uninstall+reinstall on every
+                                                handset, mid-event)
 signer    CN=Nuvent, O=Varunya Technologies   SHA-256 e865d4c1b3865da6…
+          same key as every previous build, so this INSTALLS AS AN UPGRADE
 baked url https://nuvent-five.vercel.app     (read from assets/capacitor.config.json
                                               INSIDE the apk; exact, 30 chars, no
                                               trailing space or slash)
 ```
+
+Verified on the merged manifest (`merged_manifest/release/…`) and on the APK
+itself, not on the sources: `usesCleartextTraffic` ABSENT · `debuggable` ABSENT ·
+`<queries>` PRESENT · `android:scheme="tel"` PRESENT.
+
+**final-06 is the EventFlow rebrand.** New launcher icon and splash (all generated
+by `node scripts/brand-assets.mjs` from `assets/brand/eventflow-logo.png` — never
+hand-export them), launcher label EventFlow, and the splash/status bar moved off the
+retired dark-teal palette onto the app's light paper ground. See DECISIONS.md,
+16 August 2026.
+
+**The web half of the rebrand needs a deploy to appear.** In remote-shell mode the
+APK is a shell over Vercel, so the favicon, the web manifest, the sign-in mark and the
+install page only change once the site is deployed. A staff member on final-06 with an
+undeployed site gets the new launcher icon and the old everything-else.
+
+Previous build, for rollback: `nuvent-2.0-release.apk`, versionCode 2 / versionName 2.0,
+sha256 `357586be5547f47aaae0296705feaf3dfe0ab5dd7f991b0d64b15112198d20b3`. A handset
+cannot downgrade to it without uninstalling first (Android refuses a lower versionCode).
 
 Note the path: `android/app/build.gradle` sets `buildDir = "C:/android-builds/nuvent/debug"`
 to escape OneDrive's file locks, so **nothing is ever written to

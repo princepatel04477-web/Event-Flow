@@ -5,9 +5,9 @@ import {
   IBM_Plex_Sans_Devanagari,
 } from 'next/font/google'
 import type { ReactNode } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { MotionProvider } from '@/components/motion/MotionProvider'
+import { QueryProvider } from '@/components/providers/QueryProvider'
 import { WelcomeOverlay } from '@/components/motion/WelcomeOverlay'
 import { NativeBridge } from '@/components/native/NativeBridge'
 import { SessionBridge } from '@/components/native/SessionBridge'
@@ -82,17 +82,6 @@ const fontVariables = [
   plexMono.variable,
 ].join(' ')
 
-/**
- * One client for the whole app. Module-scope so it is stable across renders
- * (a fresh QueryClient per render would drop cache and refetch everything).
- * The rooms grid uses TanStack Query for optimistic placement + rollback.
- */
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { staleTime: 30_000, retry: 1 },
-  },
-})
-
 export const metadata: Metadata = {
   title: {
     default: 'EventFlow',
@@ -151,7 +140,10 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
               re-establishing the context. */}
           <MotionProvider>
             <WelcomeOverlay />
-            <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+            {/* QueryProvider, not QueryClientProvider directly: this file is a
+                server component and a QueryClient cannot cross that boundary
+                as a prop. See the note in QueryProvider.tsx. */}
+            <QueryProvider>{children}</QueryProvider>
           </MotionProvider>
         </SentryErrorBoundary>
       </body>

@@ -1,6 +1,7 @@
 'use client'
 
 import * as m from 'motion/react-m'
+import Image from 'next/image'
 import { useCallback, useEffect, useState } from 'react'
 
 import { claimWelcome } from '@/lib/motion/cold-start'
@@ -225,6 +226,29 @@ export function WelcomeOverlay() {
         initial="hidden"
         animate="visible"
       >
+        {/*
+          The mark, above the wordmark — the same art the native splash draws
+          (@drawable/splash_icon), on the same paper ground, at a comparable
+          size. That is what makes the splash→overlay handoff read as one
+          screen rather than two: if this were text alone, the mark would
+          vanish at the seam and reappear nowhere.
+
+          Fixed width/height, not a fluid box: this element paints while the
+          native splash is still up, and a late-loading image that resizes its
+          own row would shove the wordmark around at the one moment the user is
+          looking straight at it. `priority` because it is the first paint of
+          the app, and `unoptimized` because a 96px PNG is smaller than the
+          round trip to the optimiser — which on venue Wi-Fi is the whole cost.
+        */}
+        <Image
+          src="/brand/eventflow-mark.png"
+          alt=""
+          width={96}
+          height={96}
+          priority
+          unoptimized
+          className="h-24 w-24"
+        />
         <span className="font-display text-4xl leading-none text-ink">EventFlow</span>
         <span className="font-sans text-xs tracking-eyebrow text-muted uppercase">
           Varunya Technologies

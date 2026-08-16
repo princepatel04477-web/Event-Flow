@@ -292,8 +292,12 @@ export function VoiceNoteRecorder({
             </p>
             <p className="mt-1 text-xs text-muted">
               {denied
-                ? 'Android will not ask again once it has been refused. Turn it back on in ' +
-                  'Settings → Apps → Nuvent → Permissions → Microphone, then come back and tap Record.'
+                ? // "EventFlow" here must match the launcher label the staff
+                  // member is actually looking at in Settings → Apps — that is
+                  // `app_name` in android/app/src/main/res/values/strings.xml,
+                  // NOT the appId (com.nuvent.app, frozen and never shown).
+                  'Android will not ask again once it has been refused. Turn it back on in ' +
+                  'Settings → Apps → EventFlow → Permissions → Microphone, then come back and tap Record.'
                 : capability?.reason ?? 'This device reports no way to record audio.'}
             </p>
             <p className="mt-2 text-xs text-subtle">

@@ -5,9 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EventFlow — Install</title>
 <style>
+  /* The app's own ground, not the cream of the retired dark/warm design.
+     `--ef-paper` / `--ef-ink` / `--ef-brand` in src/app/globals.css. A staff
+     member goes from this page straight into the app; a page in a different
+     palette from the thing it installs looks like it belongs to something
+     else, which is the one impression an install page cannot afford. */
   :root {
-    --bg:#f5ead8; --surface:#fbf7ec; --ink:#201e1d; --muted:#4a5568;
-    --brand:#c67139; --brandFg:#fff9f2; --rule:rgba(32,30,29,.18);
+    --bg:#f8f9fa; --surface:#ffffff; --ink:#191c1d; --muted:#4a5568;
+    --brand:#735c00; --brandFg:#ffffff; --rule:rgba(25,28,29,.16);
   }
   * { box-sizing:border-box; }
   body {
@@ -41,15 +46,28 @@
   .perm b { font-weight:600; }
   .perm span { color:var(--muted); text-align:right; }
   a.help { color:var(--brand); }
+  /* Inlined as a data: URI by scripts/brand-assets.mjs — see the note on the
+     <img> below for why this page cannot reference /brand/*.png. */
+  /* Left-aligned, not centred: the h1 and .sub beneath it are left-aligned,
+     and a centred mark over a left-aligned heading reads as a layout bug. */
+  .mark-img { width:96px; height:96px; display:block; margin:0 0 8px; }
 </style>
 </head>
 <body>
 <main>
+  <!-- The mark is an inlined data: URI, not /brand/eventflow-mark.png, for the
+       same reason the download href below is absolute: this file is opened
+       from three different origins — the deployed site, the storage bucket,
+       and a copy someone mailed to a phone — and a root-relative image path is
+       broken in two of them. A staff member's first impression of the app
+       should not be a broken-image icon. Written by scripts/brand-assets.mjs;
+       do not hand-edit the base64. -->
+  <img class="mark-img" data-brand-mark alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAMAAAD04JH5AAADAFBMVEVMaXH//un5+vj7+/pXvvr19fEBKns4VvTi/fUtMlL6+fq52PRpr/kCbvqgxvgsSYyPmshwm/Pq6/eS0fzK0/EgP4hNf/Wmq8s9V5qyvOJbjvcOXvLw9PxtmfZleKMrd/grcfdVhfgPMX2GouqPq/RtfbkOWu5EdPRrtvqGd79ElPtpebFQxvxflvguddswXsxKYZthiuZDXZtzo/g0evlQbsQjP4N0zvxBx/lAmfskivxtk+9Xpvufx/dOgfd5h71Nxv0shPwxT50jYvgeO3xlzfxSyv9Ie/kbPplAYL8yiu05n/k9b/hJqvwPLnRvwPpEuf0tUK6Lpuc3U5ROZZ+NlrolZ+4hT78lVMQgR7I5Y/k5bfcwZPolhPwWY/lNdN4nof0oUuFFsPwYWswXSbIiTsta0vo2qv5e0PsmZ+Yxrf4lYviFk7wEL5QBcv4PX/UWWfMDLZAGMpoTXPMKb/1Nxf4aWPYGd/4GMZcNY/cDNqEBKHUMS/YKNaILZ/kJM58Hc/0CPq8CRr4PP78TW/YKa/sVR9gCQ7kCOKYDNJ0Fev4/tf4CQbQVj/4CO6oBK4IYTOMjm/4NOrEQUPUgV/gTXvgSQ84SaPozqf4vpv4RQslGvf4Gff0aUOwpV/sTi/4SYvkCa/waTucbVPMzWv0SfP4XSt06sP4KNqcspP4fmf4RQcRKwf4CLIkLOKwSbfsaU+8blv4Yk/4Jhv4Hgv4CaPcrof4TRtMCT8UBJG8nnv4QPrsSkfNDuf4Sgf4OgOoEZNgCWeISd/0Scv0Shv4Fat0LeeYCU9gCVt0tufcOlf4DTc0bqP0CWM4CSsgSiewCSMMVnf42rf4bo/YDXtMCUNIRVvYCY/MTaP8MO7cKjP4CS8ACYe4LTf4PhvEEXeYCVMkQVv0PWfEis/sirPYVmfcCXeoNYP4Lc980wvUZm/IGcOMdV/4fPoQHYfUONogRVOkeYP0hcP5V1P88YP8QQqc80f8ZZOcrxP8uWesFcu4SUMMOS/AGS7gSXdcMReSMCkNWAAAAbXRSTlMABA4SAgn+AQEBFyRJ/jDiNWYgPzP0rFKlP3n8KEec7uSN/VtFcfy2VRqlh/Gc0c+gW8hx0KLBdP2474mMUp9T/N3P+vyn/sf5vNHO2Jz9j/XgH7K4hfD55PDpxfL75ZPx+cL9/f7A4eLj8dG0gJiD5wAAAAlwSFlzAAAD6AAAA+gBtXtSawAAFQ1JREFUeNq9mwlcVdX2x/edz70ECFxUBkVk8kEEIaiAYKCGpubfnKcym3vvMisXEEFBGUQxZVBCkURzCFGRjAafgWUo+SJT0RxCU54vDCVNzer91977nHPPRYZz0d5SL1c/wu+71157n73W2heh/6UxcrkcXi3GvvnIP6Z3hr9bajP2yV/efBTp3pNLNBbDx775yy/P/vp6L75bxWkrHB0tbJ54YghrT2CzIWYBZtapWdjYDJ889vU3nwV1sF8n92bs8KKxGDopcMIbCz7euGHjzp07N27csGHDt++///6qVZ999u67n61ater/OHvSyEAY27OLnnnmmUXPjvglxER5tVyFFGZDPd/Yt6uxsXHf/n379u3C9s4773z88Ycf7sQwGOdbMIwDPACE7QOwRWDPUFtE3o9409FE58PYrQKDVu8vLS1dvR/LswQ8wMaNxBsbCAAm4BE4AoGNMC0EGLkamY0MW1166MgRDLAaEPYbCDAAJdhACQwAPEEH/eu/Djdl+Coksw86cmjboUNAcKQDAQYwQvj2IYIOLnh2xPXrI2xMGL9KYhW2rXYbmDEBjQMKwBEYT8KqTglA/9fXFeLdj6wDa+vqamtrjQmoE7goIAQf7hTOgtAJHwgQQB/PgFzs8JGLU3xlpYHgiCAOeAIWgQ+Eb3kEIcEHxP/1APCkGWLE6tu3r6jEAHW1hlko5XywT0jA+qDztcASPHMd6/86FqlE6cuR1LuuqKioslLogw5rwZjAgPD+wwSLRtTXYwAIQVEzoELSvk1FRT0R7OuUQOgDuhgXLaqvJwDgAFH6DNbfsoUjqGMJOIDO4oAQfMgRGK2FD96t//FHAlAv0gEMUoS2bMHGu6BTgi5nwRCI8JAAdapff/2eyAiA+GvKKCgoMELgAQhBqWA1dliOGykA8cD73/548uRJluD6vREWohygQlYFGRhAQGDsAjIBVP4dIwfwu/IGeGKePPkfMF6/vl7kHiBHFvNOx/EExi4ABxy5ePGfX375b96+xPZPYv8ysk8/JfoE4Aro34NNkBETALK5zdGnMzIyMngC4gO8Dn774rsfvv/jj0yw5d9///1HH330ww9ff/0d2OHDh7/4guUhJESecwDWrxc9AfbN609TgAxMQNdCXd1vhz/6YxlYLi8O6lSeqBN96gw6ftYBmOAKENwTOwF2o9cDAEXIoD5oqkv8bvmarKw1y3Jz8eCX88MHgK8JwGEC8KUQ4D/8DFwBAJH6DJJ4XFhvIMCz0NR06aOs7KSsNWvw+LEDDB74WuCBDg64yjqggQDcG8uo1KImwKV5/XoBQUbLls8zk0A+iwDkCgEE+rwDBBNw9SrRb7hC9CUqRpQDNBMvCAEKWm5mZscmJT0E8LADfsIABv2rVwlAAwG4N1mcPjhgaPPvPMDp0y1xy2Njs5M6B+ig/9NPxAEX/3UR63/K6f/YAGsA5l8l7hkgAwcs4Qmat2fpssEIAKufS2PQAHBYAAAOuAjGOqCRAlx5A54A4g4BOAKoPLbm0+k6fSwFyOJCUOgAHkDoAKpPZ6Ch4WTDlfrJGrGHIKSCJfA7R9B8c40uFozqG9ZA5sMhaAC4aHBAI3HAlYU2jEqsPuwB+UuWsADN27N1sXpjAM4B33TuADoB3PgbGxsa3h5rIxHrfjIDzhABSwhD80GdTq/vBGD5QyHYyQQcOwbqGxcO10qQSnxCC8eQuSzAkgvFMTo9ILAAeBcCglzyEPjmmxPHj586dero0aNfffX5pUtf/PQbsZKSA1Xnzh0D8carCyZMGm4hxYkVIz4NgMdg/hKDvg67wBgAhv/glZmzZvn4+DwlsOdYmwC20HPSyMnDbaxlNKc2LQ1E9hdY/UKiTwiIPhAsW/bqlPEBwaP6aLWOGllHk4IpwCSG4cjFLf0Oa4Dqr9TpDACp2dlZa16dEuDWx1HE8xxXEuAPwyCTjUHWLxKAC//VCwGys+6Ee9lpsLZaDr/l+Md3ZY9S/ZGjAc3EAb+nkgmgsxCbMiXATorLBGo8LBX6K82ZzsC6GCweQxhSwt2sEaM2KZh77wESAngBxLAAseEuMjJ0NfoflPGQ5u8XcADgkcdgiNgpblKQVxsVDBhGZUpdziQHWIzGE7ADTwAmGOelgZBjVDwg1KpUqr9yBvq0CiZAP9UCqQ1RraKrGig0WpuQkAFCe6IzgxqewrSQhXQEZuD3WDoB49wUiHc+g8VhlbpaeXv4D3IaXUStCVsdTduMyigkbTq2wAzJTQOARXDhLJkAfbgdDJ/f0kBe5hocMagdBFuioqIcwH7Glpi4dOnSFSvM4+PTwBIScnJK4IFwoAoeCeeOTTJxzcpRaPOS/5Lxp/bX8MPH8lLX0Imjm1oKLjvwFkXksT4AxBOABApwgAXYZWMigArNvUAcEKP3knDOw/Jm9hNv3Wq+HO0Qx1oUMazPAlCCBEzAeaAUHGDqkwhWIV6CMP14y+Xm3sx53q3maGzG+omcPg9gcAEAVL1jYTKA4zzigHGjkJr6jpVfHM2akCDRCIAnoEFQVXXk2EgT9eG/a0evzyb69DEKJxmF/ZzW01sXL15sBBAV52BEYAxAXXBuggwxpgK4thbqdVifG77r3Fv5WJ4D4F0Q18McVB3Yb4NM3witmlN0KTD/rD5jP7p1cf5iAUBcNHVABwCqb/AAOAAmwOQtE45Deys4fSiSmnnA8PPzhQRxrAuiHDoBEG4E5yYxKsbkRxFyPh4TICHbD+z/rnNa83l5ngCbA/iAXwdLOxKAfsm5QInpDoB9JzTdT4qoPmM1j+hzDFwIEITL3FJ8OAoJwYFAGepVb8lntjWZALVKEly+eTMrLwCILmDLRsY7AavPbkY5pZ6m+58FoAEAJQpn0KcEW7lJAOWiu3f//PPrBw8efI9zE5IcHD9FUgPIDa6dP3/+THV1ddk2e0nvxo+kVlKqzwQTfdYHW7e2tt4afffPV/64cycpGx/SaY6EM6RvTpyABIVmJ5cA4Ex1mr8NkvfyzMBI2NUQfJvKb8YOAPW7r7x6R48PCfpYLkln86MTnAsuXQMXnDkT72Qv7bU+ojkkbAflm8uJPgCA+oM7uoqKGB2XI7L6y6n+KTJ+4oAzZXVO3mamZIJdncvmlJezHtg8+pU7MVidT5CyDAkqmyCS/PDamZ8rnQKHWqNHPjxDk2ZieTlLcP9BLFEnKSpfJMmlU08CEI/97t27M97y8B7iyKBHHj4OgL6c/v0H+jwiT3L07FSSoi/LfHWWT8BLwVZPs+bi4uJqodUwvchEuyhR3SYA5eWv6StiYvj8ODU1KSUpK3f2eC9Xx86cjLPBx5A6qEgAYP37d7jBg35qakpSSmrSuileWgnOD9XqjgkAQ9rLjNHG2hseFUMmAIavq+B8D/KpKSkpSXumuMmQiuSHTGfrTN2x49WrCHQhE0CHr9cJ9V8NICHeVfYLDVa3UVLBk+0Fr1G9SM2kEUQ/tkIvGD4ApO6Y0o8xHNM7Gz7j2zbYCx6ljBobkoUrx8DJzjRHyEkE3n5ZF2OYfAqwY7x1N5Uu0AR2y5rkadwpTI4cx9QM9iLRojLBAbKJRJ/UpgzDT0ndM767QiNOnKVSSbhSOU2qsFYwEgmjkDraJrd5IZlGgtSmHMlug75erxd6H2zP+O4e75BTe00dNmy6X3Ky78BhnE23TX7eq/+wYVNHKcSfTSUR5bfvk8okVU9hzcexe32/wUql8h9+NTW+0/LgXXKyMi/5H7Y1NV4wK3ltvlKRBHAovl1+P0UfKxw8ttnabvQh3nwrQDLZz+35MdMtiX4yvPr61lhOHwzvkge7iZwFyAzLy9fpOqjvSFln1d3xgkFmtkQ0uf90mAXyDiMMHjgdcPDbmmFIJIH1HNh+DeI7iEEASAQuhLMWbEMqUg6DL2o4PPd7ngwZNJ+vwe9YgrznufeWCpEAVrfvp3D6O3ibbSdwgLyTDQADwDipdXgDrwAgFQkQevuTFGPxHXt2rAsQfDdsdzINbzKZtaNGgfq1KZU3bowZMwZebhhszA38LzfGKJViASQRL8OMc8qs7YAIVAvKiBMHGSwszMnJaSQAVEzT9rPrY9enM7MLV1rKxOUIFvPWpewRimMDBwjPSoNayGGcLUnEpyVUTUZ2bW0Du9qloQk/tUYswNP3U4XK2Pbs+cSFn3f4YXNb3N3dcXEE5wMr0tJKSubbgQcwgFpCCtVqBK8yKezNuHAtkSOZX43YKfAu5nQNdtbHQC+XOLe4XwYjqfmK2pKchIQDgRADg5UAgKycBs2Y6ArXHuCrtwK5hjkNGjQAwS4lGsAjHYbMCdPXs7sDGG4Nwllp8U33yxghLrGythZnYTmlQxGsgpqB8DCIaIm63OzNuLa3RP38ogVyjgcfeSK1o5/oIPRJZ1UFttuKcwA0k2bcvHkTeyCxsq5yxdIVkIblBFnzAP4wPaedkUu7u0PUiy8g5yYHh5a+SK2ZmicWYNZZVv0T3s7OtGO/F/dyfr+JCaKKihKjEnEUQgzgMhTsAwAg87/s7t7ijELab7pjgNAWd4eWCLh9OFVpqRH3MJh9dp1AmwLM0vAPeOcCkHe/zBYGCEBCEN6kSAwgRd+CqKh2K6R1+jmq5e8yuAGypanOGanxKhAJMJOOPZ1Ip6fjr+nj2RmAGmo+Hn40Ts2jiAfi480PwVNCzQYhYxZs//QAuCTW5+mng0MkSDEgeLIVrALpVNFBOPMsq8zbJzgGVURfO+OmO60QONBlWFmZtg1XYXgAOXUUOTOCMHyR4ACW+YqOgZlG4sQKx0vofm89sZmzFmxNK1bUOllJVQYAJB1qb+8igXO9vX2wHZyeIUlR2PXrZ+c4appIgNdY1d0Cs7VjTwoefY3N0xPngfRhRD0QClVkiAELp/b2Jn8pPqf18RvX1mbra82IzJdmFXdQ3707Pc+LLVkpaEtOIWX/4OYcOaWyALAKTru7Nzsj13YHh8uwCtTIbZwuTwm/LPtI1CIBdmP94uJiVh6+5ll2WW1kD8kGgAKHuPXOChcA2AIAaNQ4ZR42INCKWwU+hbupPm+7i2MquKpdV905DkDq33wZdkJFSPvlxBYAUPhV5GGCtoFTOTf2lC6NP2gsD1YYm2er7T6CMABsRGrJ0BlOTv4WyNpjxiCnUCkyG1eRB2fVNl9F/7xwrvTZfTC8VMjJclZ8MFWZPE2hZkQAqCQarQavGYlUJoVJdxmXN3B6m9JX4tvGbYXwaJR2+zheWVxoEKcAKcnJbW7dlrzU9FmgJlsCvoFMlgbsjzeS/Rzd+mt82yoqwkl2okIvjO12T7R7jdU9WHiQWuHBdXC4tLXrbhIwAF6GxgZ1FtsapZ8GebUp8yr649QRSr9vTO52LAqflUReYCvTlRBIlt3mBfhYbunYYWTw7JqmHBzj59UGmUrbKLJR2rz9Rg8PhZfWHjSSB4BCspLDHbv2gQox/fOSLft3tH5ay4q2vLYK8ACkrJChDnm7oaebXAO2E9GDK3k7uFKPl1JMuLbr3Bj2acs8nBbk8VYBK9DSuk+4TlmjjGnzdVTAaXrkxoYJPZ0NpT4rH7J1SvzzKqbYdb2GoKvjazvGtoPdmKaQuvlZWvaH9odcEbKwoaHUqgcHqJH9Wk53OzH4WliB9WNiZ4/q+iqMCkmsX/ib0MjfFOSzELhsrJm8s/FkaYSkx/KA2cvbBfLE1qZiAJ0++06AI+rqLlwX5Sg17nzJGYnNwobGxnPtPbdwVOilTZz8WhbgvfQ8XKrUx+qTprgoupwHWHkqgeG/0boZkoQs3Nmwq/FqmnfPyYEKu4DKs4ZBYnC1UK+HOu2d8VosJfImAYNbjozFpAWNjbsadkWGiTmXYRew4hzD9rVnWQCok+bODLCT4H2ux4siVF0WMmkBeB8IzGuHiGkhgAve2rS2o2Xjeqk+m5SpM2cGuCoY/Fjp+rYKQz4QA4E5fAL+RArYfvNIb7HXma22rn2PyL5HDN5sKsYuiOW6FN888Am2kypoZRgguKqlipYN6K0JRmFmFbig8dgxcqdqf3WZv9gyDWI81mPd9wS2KQWKpjxAZuaJo6/4vORiLZXw5VEcd4afoNCE2AcGHeOssdS8zMlObA8HnhhzNgm0yct2vArwlVJyo5a0CY7++dZToVYhWmt4+iro2OCkhjTaEKuRE4JWHzuHbTUBKKk23zZEfA8J7jNuJsKbeHtvb3EMvtOIgyA3k+tTfPX5tUvQJngqom+otzcchL09PQOfCwsqPVJVBZ1rcn2A3GpLqK7eZlIXW47s8wXqoL9p09Z0XXYsC8DfpCONGmgT/VxdVhYfH4kNXx8gnXNev8rc3DzSU2FKFxtCKrSVSu/duxe/wu/FmTHZQoATtFP1laBZB0okX8aNY+4Gx7kE+OcET2RaFx2yKY9WVp+36FwdaRexMUAAjuJu4bVrpFcH3cKyssjINHKBggMoASjzHKggyE1tWsiAwEh+79bo3Fi+Wcj1qjoHyKEAVSWRWD8yUGp6ExMeX4RgK/zai78AQXT0Cdowy+SblbRheu0aB4CjgHdBDhaH8Xv2qokKs9AXCLYaDHeNT60RABynHuABiAMi09hLLAmR5vA388htI6W9a+LCB7ycy/MJAbzsjd5K+tY3c7OW5Qr7pQSgwxSAkRURmWYeGTREou5lFxHWgtWcVt4BtHmeEXccngZdAZgTF0Sy6pFQvwmzQb3vYsIp1iKiNZ/XxwRxGQXux3MzhQDCIDQnfqcUaWmR27xl6FG6qJBjSO3ntbIA2AVw0T5qS9Gl42QZdLYKWH0inxMWIlE9ahMXig0em1up/mLuow5FRe5H+ZY9F4RcFJZx8kEjNejRb2DCNChcI261cgDk7kQiICRe+uoUSyAAMOfl53tq8eP5cVwwhM+6uswd3Xo62gCQSD5xs/T8pc8/pwTnuXVYBuppOQfme1ow6LFdQMUIrh6jbzVnZMTxAGyt2ry6+jy2M/RZQNSrwkbCZfLH0MQWzAMc+7XBE2+1tBREsR+74q6s0GXPXh3KyTlwICjQyhqhx339llym1Lg6+8N9wqaWRDwBKyrj6+oIAL27Bft/1aEgz6FaxWNp4Xd2VxvfqLQYGurv1N4UD9JlZVAoxTGXk1ByIOdQUJjnSBtrCblNjtBf9cF9FS47avsM9e4b4R82fz5cIJ0/P8j/Oc9Jk5+AoxnD33o1zf4fehGzHUvIPBEAAAAASUVORK5CYII=">
   <h1>EventFlow</h1>
   <p class="sub">Install the staff app for the event.</p>
 
   <div class="card">
-    <span class="version">final-04 (build 4)</span>
+    <span class="version">final-06 (build 6)</span>
     <!-- ABSOLUTE, and pointing at the storage bucket rather than this host.
          It was a relative `nuvent-final-03.apk`, which resolved against
          whatever origin served this page — and the APK has never been in
@@ -65,7 +83,7 @@
          mailed to someone, and the stale copy `cap sync` bakes into the APK
          itself at assets/public/install.html. A relative href is wrong in
          two of those three. -->
-    <a class="download" href="https://xktxnkuzplhzxkevwrcj.supabase.co/storage/v1/object/public/app-releases/nuvent-final-04.apk" download>Download APK</a>
+    <a class="download" href="https://xktxnkuzplhzxkevwrcj.supabase.co/storage/v1/object/public/app-releases/eventflow-final-06.apk" download>Download APK</a>
     <p style="margin:0 0 10px;font-size:14px;color:var(--muted)">
       If the download is blocked or renamed, use a computer and a USB cable, or ask the event tech lead for the file.
     </p>
@@ -88,7 +106,7 @@
          WebView loads the deployed site), so it costing nothing is the whole
          reason this works. -->
     <p style="margin:0;font-size:12px;color:var(--muted)">
-      SHA-256 <code style="font-size:11px;word-break:break-all">823980ca108487ff1903c9bd491fc3299427f4348c2eda31810dc7196db51c6a</code>
+      SHA-256 <code style="font-size:11px;word-break:break-all">b89b7ce4f98711ea625cece442673fbcc27fe72bbe0662065741ebb3e08ca157</code>
     </p>
   </div>
 

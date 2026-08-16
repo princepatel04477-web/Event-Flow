@@ -33,7 +33,7 @@ export function ExportClient({ eventId }: ExportClientProps) {
       const wb = buildWorkbook(sheets)
 
       const eventPart = result.eventName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')
-      const filename = `Nuvent_${eventPart || 'Event'}_${stamp()}.xlsx`
+      const filename = `EventFlow_${eventPart || 'Event'}_${stamp()}.xlsx`
       XLSX.writeFile(wb, filename)
     } catch {
       setError('Could not build the workbook. Try again in a moment.')

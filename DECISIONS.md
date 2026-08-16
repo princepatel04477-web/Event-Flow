@@ -5,6 +5,111 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 16 August 2026 — EventFlow identity: logo, launcher label, final-06 build
+
+### The launcher label changed; the appId did not
+
+`app_name` in `res/values/strings.xml` and `appName` in `capacitor.config.ts`
+are now **EventFlow**. `applicationId` / `namespace` / `package_name` /
+`custom_url_scheme` stay **com.nuvent.app**.
+
+This is the same distinction CLAUDE.md §12 draws for the `nuvent_*` cookie and
+storage keys, and it is worth restating because a rebrand is exactly when it
+gets ignored. The label is copy — it is what a staff member reads under the
+icon and in Settings → Apps. The applicationId is Android's identity for the
+app: change it and the result is a *different* app with no upgrade path, so
+every handset uninstalls, reinstalls and re-enters its access code. There is no
+migration for it, and the cost lands mid-event.
+
+`cap sync` does **not** rewrite `strings.xml`, so the label lives in two files
+and both had to change. Changing only `capacitor.config.ts` looks like it
+worked (the config JSON inside the APK says EventFlow) and the launcher still
+says Nuvent.
+
+### Every brand raster is generated, not hand-exported
+
+`scripts/brand-assets.mjs` derives 33 files — five densities × three launcher
+icons, eleven splash bitmaps, the Android 12 splash icon, three web icon
+conventions, three PWA icons and the inlined marks in `install.html` /
+`offline.html` — from one source, `assets/brand/eventflow-logo.png`.
+
+Hand-exporting them means the next logo tweak updates the four you remember
+and leaves twenty-nine stale, which surfaces as a launcher icon disagreeing
+with the splash on the handsets nobody tested. Re-running the script is the
+only step.
+
+Three things in it are non-obvious and cost a cycle each:
+
+- **The white ground is cut out by distance-to-white, with a deadband.** The
+  source ground is 254-255, not a flat 255. Without `DEADBAND = 3` every ground
+  pixel came out at alpha 1/24 and — after un-premultiplying, which divides by
+  that alpha — pure white. Invisible against a white icon ground and glaring on
+  the splash, where the lockup sat inside a white rectangle on the paper. The
+  first splash render showed it plainly.
+- **`palette: true` everywhere except the favicon frames.** Palette encoding
+  takes the eleven splash bitmaps from ~4MB to ~950KB, which is real money in a
+  6.5MB APK. But Next's build-time ICO reader accepts RGBA frames only, so a
+  palettised `favicon.ico` fails `next build` with *"The PNG is not in RGBA
+  format!"* — which reads like a corrupt file, not a compression setting.
+- **The launcher art sits at 0.58 of the adaptive foreground canvas**, versus
+  0.74 for the legacy square. Only the central 66dp of the 108dp canvas is
+  guaranteed visible once a launcher applies its own mask, and the calendar
+  badge is the first thing a circular crop eats.
+
+### The splash and status bar were still the retired dark-teal design
+
+`colors.xml`, `styles.xml` and the Capacitor `StatusBar` / `SplashScreen`
+blocks all specified `#071a1d` with cream. The app ground has been light paper
+(`#f8f9fa`) for some time. Left alone, launch was a dark flash that swapped to
+light one frame in — and `StatusBar.style: 'DARK'`, which in Capacitor's
+inverted naming means *light icons*, drew a white-on-white status bar.
+
+`offline.html` was the same shape and mattered more: a dark screen appearing
+mid-session in a light app reads as some other app having taken over, at the
+exact moment staff are least able to reason about it.
+
+**aapt rejects `--` inside an XML comment.** Documenting the CSS custom
+properties this mirrors (`--ef-paper` and friends) by name failed the build at
+`mergeReleaseResources` with *"The string is not permitted within comments"*.
+The comments in `colors.xml` spell those tokens without their leading hyphens
+and say why.
+
+### `manifest.webmanifest` had to be excluded from the auth proxy
+
+`src/app/manifest.ts` is generated, so it does not look like a static file and
+was matched by `src/proxy.ts` — 307 to `/login?next=%2Fmanifest.webmanifest`,
+measured. The browser fetches the manifest on the **first** visit, before any
+session exists; gated, the fetch returns HTML, the manifest is discarded, and
+an "add to home screen" installs a shortcut named after the page title with a
+screenshot for an icon. Same reasoning that already excludes `install.html`.
+It holds a name, two colours and three icon paths — nothing private.
+
+### Found in passing: the root layout could not be built
+
+Not part of the rebrand, but it blocked producing a deployable build, so it is
+recorded here. Uncommitted work on this branch put
+`<QueryClientProvider client={queryClient}>` directly in `src/app/layout.tsx`,
+which is a **server** component. A `QueryClient` is a class instance and cannot
+cross the RSC boundary as a prop:
+
+> Only plain objects, and a few built-ins, can be passed to Client Components
+> from Server Components. Classes or null prototypes are not supported.
+
+It fails at prerender, not at compile, so `next dev` is perfectly happy and it
+only appears when someone runs `next build` — i.e. at deploy time. Moved to
+`src/components/providers/QueryProvider.tsx` (`'use client'`), with the client
+built in `useState(() => …)` rather than at module scope: a module-scope client
+is shared by every request the server process handles, so one user's cached
+guest data could be served into another user's render.
+
+### The build
+
+`versionCode 6` / `versionName "final-06"`, signed with the existing keystore
+(`SHA-256 e865d4c1…`), so it upgrades installed handsets in place rather than
+forcing an uninstall. Full record in CLAUDE.md §11c.
+
+---
+
 ## 15 August 2026 — Fleet module, reform runbook, consent gate
 
 ### Fleet tables follow the CURRENT RLS shape, not `apply_staff_policies()`
