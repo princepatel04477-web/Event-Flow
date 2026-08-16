@@ -436,32 +436,6 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
     groupRows.filter((g) => g.rsvp_status === 'confirmed').map((g) => g.id),
   )
 
-  // Materialize member rows to each confirmed family's headcount BEFORE the
-  // unplaced list is built. A family imported with one head row and
-  // confirmed_pax 6 would otherwise show one unplaced guest and one bed
-  // claimed; the headcount gap would be invisible. ensureMembersForGroups is
-  // idempotent and only inserts what is missing (never trims), so a read
-  // crossing into a write here is bounded and self-healing — this is the
-  // sanctioned way to make "unplaced" reflect headcount, not rows.
-  if (confirmedGroupIds.size > 0) {
-    const ensured = await ensureMembersForGroups(eventId, [...confirmedGroupIds])
-    if (!ensured.ok) {
-      // A failure to top up must not take the whole grid down — the rooms
-      // themselves are still readable. The assign path tops up again before
-      // any write, so the shortfall still resolves at assignment time.
-      console.error('[rooms] ensureMembersForGroups failed in readRoomsGrid', ensured.error)
-    }
-    // Re-read guests after materialization so the grid reflects the new rows.
-    const refreshed = await supabase
-      .from('guests')
-      .select('id, group_id, age_band, is_head')
-      .eq('event_id', eventId)
-    if (refreshed.data) {
-      guestsAll.length = 0
-      guestsAll.push(...(refreshed.data as typeof guestsAll))
-    }
-  }
-
   // Precompute lookup maps once, so the per-room assembly below is O(rooms +
   // assignments + guests) instead of O(rooms × assignments × guests). With
   // 238 groups and a room per family the nested form was a full re-scan on
