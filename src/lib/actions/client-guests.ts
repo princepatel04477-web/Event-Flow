@@ -87,7 +87,7 @@ export async function listClientGuests(eventId: string): Promise<ClientGuestResu
  * member whose name happens to contain "(guest 2)" is not matched, because
  * the prefix must equal the family head's name.
  */
-export function isPlaceholderName(guestName: string | null, familyHead: string | null): boolean {
+function isPlaceholderName(guestName: string | null, familyHead: string | null): boolean {
   if (!guestName || !familyHead) return false
   if (!guestName.startsWith(familyHead)) return false
   return /^\(guest \d+\)$/.test(guestName.slice(familyHead.length).trim())
