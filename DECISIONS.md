@@ -859,3 +859,13 @@ also disables the 30s dashboard TTL cache that predates it, so it measures
 baseline would mean reverting onto a working tree with heavy uncommitted work,
 which was attempted once via `git stash` and immediately rolled back after it
 reverted `middleware.ts` to a pre-code-auth commit.
+
+---
+
+## 15 September 2026 — Prompt 0: Establish UX Rules and Plain Language Glossary
+
+### Established docs/UX-RULES.md and docs/GLOSSARY.md
+Created the UX foundation for the "A 14-Year-Old Can Use It" overhaul:
+- `docs/UX-RULES.md` formalises the eight cardinal UX rules (One job per screen, Plain words only, Never a dead end, Every number is a door, Undo don't confirm, Tell the truth about failure, Thumb-sized and daylight-legible, It works when the Wi-Fi doesn't) with real good/bad examples drawn directly from this codebase.
+- `docs/GLOSSARY.md` maps internal/trade terminology (`pax`, `guest_group`, `deliverable`, `extraction`, `unmatched`, `harvest`, `travel leg`, `roomed`, `Board`, `Stay`, `Prep`, `access code`, etc.) to guest-friendly, plain words, documenting both where code identifiers must stay (DB schemas, Excel export headers) and the exact files where user-facing text is found.
+- Zero source code changes under `src/` were made in this prompt session to ensure a clean boundary before executing downstream refactors.
