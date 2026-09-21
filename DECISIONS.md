@@ -1280,3 +1280,38 @@ The trade is explicit and must be chosen per write: a deferred write that the ap
 before flushing is a write that never happened. For forward-only state (a check-in, a
 vehicle dispatch) that is a genuine risk on a phone that can die, so it is a decision to
 make deliberately, not a default to apply everywhere.
+
+---
+
+## 21 September 2026 — V3 wired to check-in/out: the first screen where no button waits
+
+`CheckInClient` is now the first screen converted end to end. Check in / check out changes
+the row on the tap, offers an UndoBar, and never disables the control. The confirmation
+dialog is gone (R5: undo, do not confirm).
+
+Getting there needed a design addition, because the correction above established that these
+two RPCs have no reverse. `stageOptimisticWrite` now splits the patch from the send, so a
+write can be held open while the undo window runs: patch now, and Undo reverts the cache
+and **sends nothing**. That makes Undo real rather than compensatory — there is nothing in
+the database to reverse because nothing was sent. This is the pattern V10 names for exactly
+this case.
+
+The trade is recorded where the decision is made: a check-in the app dies on before the
+window closes never reaches the server. Deferral is therefore opt-in per write
+(`deferUntilCommit`), never the default, and writes that DO have a reverse keep sending
+immediately so they are durable from the tap.
+
+Two smaller things worth keeping:
+
+- **`send()` is idempotent.** The undo window expiring and a displaced undo can both reach
+  it, and on a forward-only RPC a double send is two writes for one tap that nobody can take
+  back. Tested by calling it three times and asserting one action call.
+- **Reconciliation uses the server's own row**, including the SERVER's clock, so the
+  phone-clock timestamp exists only between the tap and the response rather than ageing into
+  a lie.
+
+Still unwired: guest room assignment (has a reverse — `releaseGuestFromRoom`), the RSVP
+outcome (has one for `guest_groups`, with the `call_attempts` freeze still to be stated on
+screen), and vehicle assignment (no reverse and no forward-only excuse — `commitTrips` takes
+a whole proposal, so deferring would just delay a dispatch; that one needs a decision, not a
+hook).

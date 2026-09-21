@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
@@ -8,10 +9,12 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Badge } from '@/components/ui/Badge'
 import { SearchIcon, CheckCircleIcon, AlertTriangleIcon } from '@/components/icons'
 import { LinkButton } from '@/components/ui/LinkButton'
+import { UndoBar } from '@/components/ui/UndoBar'
 import { createClient } from '@/lib/supabase/client'
 import { checkInRoom, checkOutRoom } from '@/lib/actions/event-day'
 import { traceFetch } from '@/lib/perf'
-import { useStableData } from '@/lib/use-stable-data'
+import { queryKeys } from '@/lib/query/keys'
+import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { cn, formatDateTime } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -36,12 +39,15 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
 
   const [search, setSearch] = useState('')
   const [onlyCheckedOut, setOnlyCheckedOut] = useState(false)
-  const [pending, setPending] = useState<string | null>(null)
-  const [confirmCheckout, setConfirmCheckout] = useState<string | null>(null)
 
-  const { data: rows, loading, error, reload } = useStableData<CheckInRow[] | null>(
-    `checkin:${eventId}`,
-    async () => {
+  const {
+    data: rows,
+    isPending: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: queryKeys.hospitality.checkIn(eventId),
+    queryFn: async () => {
       const result = await traceFetch('checkin :: load', () =>
         Promise.all([
           supabase.from('room_assignments').select('*').eq('event_id', eventId).is('released_at', null),
@@ -103,9 +109,93 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
           }
         })
     },
-  )
+  })
 
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
+
+  /**
+   * The check-in / check-out write, through V3's optimistic path.
+   *
+   * DEFERRED, not immediate, and the reason is in the database: neither
+   * `check_in_room` nor `check_out_room` has a reverse. Both only ever SET a
+   * timestamp and never clear one (20260806160000_event_day_state.sql:137 and
+   * :216), so "undo a check-in" cannot be done by calling check-out — that would
+   * leave the row reading "Out", a different wrong state, and the runner would
+   * watch their undo produce something they never asked for.
+   *
+   * Holding the write until the undo window closes makes Undo mean NOTHING WAS
+   * SENT, which is the only honest version. The accepted cost: a check-in the
+   * app dies on before the window closes never reaches the server and has to be
+   * tapped again. That is a better failure than a lying Undo.
+   */
+  type CheckVars = { groupId: string; assignmentId: string; headName: string }
+
+  const checkIn = useOptimisticAction<CheckInRow[], CheckVars, RoomAssignmentRow>({
+    queryKey: queryKeys.hospitality.checkIn(eventId),
+    callSite: 'checkInRoom',
+    deferUntilCommit: true,
+    message: (v) => `${v.headName} · Checked in`,
+    apply: (prev, v) =>
+      (prev ?? []).map((r) =>
+        r.assignment.id === v.assignmentId
+          ? {
+              ...r,
+              assignment: {
+                ...r.assignment,
+                checked_in_at: new Date().toISOString(),
+                checked_out_at: null,
+              },
+            }
+          : r,
+      ),
+    action: async (v) => {
+      const result = await checkInRoom(eventId, eventCode, v.groupId)
+      if (!result.ok) return { ok: false, message: result.message }
+      // `EventDayResult` is shared by all four event-day actions, so the ok
+      // branch is a union and `assignment` is not narrowed by `ok` alone.
+      if (!('assignment' in result)) {
+        return { ok: false, message: 'The server did not confirm that check-in.' }
+      }
+      return { ok: true, data: result.assignment }
+    },
+    // The RPC returns the real row, including the SERVER's clock — so the
+    // optimistic phone-clock timestamp is replaced rather than left to age into
+    // a lie. No round trip needed.
+    reconcile: (server, optimistic) =>
+      optimistic.map((r) => (r.assignment.id === server.id ? { ...r, assignment: server } : r)),
+    queue: { eventId, kind: 'room-check-in', what: 'check-ins' },
+  })
+
+  const checkOut = useOptimisticAction<CheckInRow[], CheckVars, RoomAssignmentRow>({
+    queryKey: queryKeys.hospitality.checkIn(eventId),
+    callSite: 'checkOutRoom',
+    deferUntilCommit: true,
+    message: (v) => `${v.headName} · Checked out`,
+    apply: (prev, v) =>
+      (prev ?? []).map((r) =>
+        r.assignment.id === v.assignmentId
+          ? {
+              ...r,
+              assignment: { ...r.assignment, checked_out_at: new Date().toISOString() },
+            }
+          : r,
+      ),
+    action: async (v) => {
+      const result = await checkOutRoom(eventId, eventCode, v.groupId)
+      if (!result.ok) return { ok: false, message: result.message }
+      if (!('assignment' in result)) {
+        return { ok: false, message: 'The server did not confirm that check-out.' }
+      }
+      return { ok: true, data: result.assignment }
+    },
+    reconcile: (server, optimistic) =>
+      optimistic.map((r) => (r.assignment.id === server.id ? { ...r, assignment: server } : r)),
+    queue: { eventId, kind: 'room-check-out', what: 'check-outs' },
+  })
+
+  // The first failed write wins the banner. Two errors at once is possible in
+  // principle; showing the newer one silently would hide the other.
+  const writeError = checkIn.lastError ?? checkOut.lastError
 
   const filtered = useMemo(() => {
     if (!rows) return []
@@ -119,30 +209,19 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
   }, [rows, onlyCheckedOut, search])
 
   async function handleCheckIn(row: CheckInRow) {
-    if (pending) return
-    setPending(row.assignment.id)
-    const result = await checkInRoom(eventId, eventCode, row.group.id)
-    setPending(null)
-    if (!result.ok) {
-       
-      console.error(result.message)
-      return
-    }
-    await reload()
+    checkIn.run({
+      groupId: row.group.id,
+      assignmentId: row.assignment.id,
+      headName: row.group.head_name,
+    })
   }
 
   async function handleCheckOut(row: CheckInRow) {
-    if (pending) return
-    setPending(row.assignment.id)
-    const result = await checkOutRoom(eventId, eventCode, row.group.id)
-    setPending(null)
-    if (!result.ok) {
-       
-      console.error(result.message)
-      return
-    }
-    setConfirmCheckout(null)
-    await reload()
+    checkOut.run({
+      groupId: row.group.id,
+      assignmentId: row.assignment.id,
+      headName: row.group.head_name,
+    })
   }
 
   if (loadError && !rows) {
@@ -150,7 +229,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
       <EmptyState
         title="Could not load check-ins"
         description={loadError}
-        action={<Button onClick={() => void reload()}>Try again</Button>}
+        action={<Button onClick={() => void refetch()}>Try again</Button>}
       />
     )
   }
@@ -227,6 +306,18 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
         </div>
       ) : null}
 
+      {writeError ? (
+        // The write was applied and then corrected. Say so, in the house voice —
+        // a silent revert reads as the app randomly undoing the user's work
+        // (docs/INTERACTION-CONTRACT.md T2, UX-RULES R6).
+        <p
+          role="alert"
+          className="rounded-xl border border-danger bg-tint-danger px-4 py-3 text-sm font-medium text-danger"
+        >
+          {writeError}
+        </p>
+      ) : null}
+
       {rows && rows.length === 0 ? (
         <EmptyState
           title="No room assignments"
@@ -244,7 +335,6 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
           {filtered.map((row) => {
             const isIn = row.assignment.checked_in_at !== null && row.assignment.checked_out_at === null
             const isOut = row.assignment.checked_out_at !== null
-            const confirmingThis = confirmCheckout === row.assignment.id
             return (
               <li key={row.assignment.id}>
                 <Card className={cn(isOut && 'opacity-70')}>
@@ -289,38 +379,25 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
                     ) : null}
 
                     {isOut ? null : isIn ? (
-                      confirmingThis ? (
-                        <div className="flex gap-2">
-                          <Button
-                            variant="danger"
-                            fullWidth
-                            loading={pending === row.assignment.id}
-                            onClick={() => handleCheckOut(row)}
-                          >
-                            Confirm check-out
-                          </Button>
-                          <Button variant="ghost" fullWidth onClick={() => setConfirmCheckout(null)}>
-                            Cancel
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          variant="secondary"
-                          size="lg"
-                          fullWidth
-                          onClick={() => setConfirmCheckout(row.assignment.id)}
-                          disabled={Boolean(row.occupiedByOther)}
-                        >
-                          Check out
-                        </Button>
-                      )
-                    ) : (
+                      // No confirmation dialog. R5: undo, do not confirm — and
+                      // now the undo is real, because the check-out is held
+                      // until the window closes. The old dialog asked "are you
+                      // sure?" on every single check-out, which trains people to
+                      // tap through it without reading.
+                      //
+                      // `occupiedByOther` still blocks it: that is not a "are
+                      // you sure", it is a state the write cannot succeed in.
                       <Button
+                        variant="secondary"
                         size="lg"
                         fullWidth
-                        loading={pending === row.assignment.id}
-                        onClick={() => handleCheckIn(row)}
+                        onClick={() => handleCheckOut(row)}
+                        disabled={Boolean(row.occupiedByOther)}
                       >
+                        Check out
+                      </Button>
+                    ) : (
+                      <Button size="lg" fullWidth onClick={() => handleCheckIn(row)}>
                         Check in
                       </Button>
                     )}
@@ -331,6 +408,10 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
           })}
         </ul>
       )}
+
+      {/* One bar, for whichever write was last made. It renders nothing until an
+          undo is actually offered, so mounting it is free. */}
+      <UndoBar />
     </div>
   )
 }

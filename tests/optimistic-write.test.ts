@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 
-import { runOptimisticWrite, type ActionResult } from '@/lib/mutate/optimistic'
+import { runOptimisticWrite, stageOptimisticWrite, type ActionResult } from '@/lib/mutate/optimistic'
 import {
   UNDO_WINDOW_MS,
   __resetUndoStoreForTests,
@@ -221,5 +221,79 @@ describe('undo store', () => {
     // useSyncExternalStore re-renders on identity change, so a fresh object here
     // would loop forever.
     expect(a).toBe(b)
+  })
+})
+
+/**
+ * The deferred mode: the write is held open until the undo window closes, so
+ * Undo means NOTHING WAS SENT.
+ *
+ * This is the honest undo for state with no reverse action — `check_in_room` and
+ * `check_out_room` only ever move forward (they set a timestamp, they never clear
+ * one), so a compensating "reverse" write would land the row on a DIFFERENT
+ * wrong state. Holding the write is the only way Undo can tell the truth.
+ */
+describe('stageOptimisticWrite (deferred)', () => {
+  it('changes the screen WITHOUT telling the server', async () => {
+    const { qc, key } = makeClient([{ id: 'a', status: 'not_started' }])
+    const action = vi.fn(async () => ok({ id: 'a', status: 'confirmed' }))
+
+    const staged = await stageOptimisticWrite<Row[], { id: string; status: string }, Row>({
+      queryClient: qc,
+      queryKey: key,
+      vars: { id: 'a', status: 'confirmed' },
+      apply: (prev, vars) => (prev ?? []).map((r) => (r.id === vars.id ? { ...r, status: vars.status } : r)),
+      action,
+      callSite: 'test',
+    })
+
+    expect(qc.getQueryData<Row[]>(key)?.[0].status).toBe('confirmed')
+    expect(action).not.toHaveBeenCalled()
+    expect(staged).toBeTruthy()
+  })
+
+  it('revert() restores the previous value and the action NEVER runs', async () => {
+    const before: Row[] = [{ id: 'a', status: 'not_started' }]
+    const { qc, key } = makeClient(before)
+    const action = vi.fn(async () => ok({ id: 'a', status: 'confirmed' }))
+
+    const staged = await stageOptimisticWrite<Row[], { id: string; status: string }, Row>({
+      queryClient: qc,
+      queryKey: key,
+      vars: { id: 'a', status: 'confirmed' },
+      apply: (prev, vars) => (prev ?? []).map((r) => (r.id === vars.id ? { ...r, status: vars.status } : r)),
+      action,
+      callSite: 'test',
+    })
+
+    staged.revert()
+
+    expect(qc.getQueryData<Row[]>(key)).toEqual(before)
+    // The point of deferring: Undo cancels a write that never happened, so
+    // there is nothing to compensate for and nothing the database has to undo.
+    expect(action).not.toHaveBeenCalled()
+  })
+
+  it('send() fires the action exactly ONCE, however many times it is called', async () => {
+    const { qc, key } = makeClient([{ id: 'a', status: 'not_started' }])
+    const action = vi.fn(async () => ok({ id: 'a', status: 'confirmed' }))
+
+    const staged = await stageOptimisticWrite<Row[], { id: string; status: string }, Row>({
+      queryClient: qc,
+      queryKey: key,
+      vars: { id: 'a', status: 'confirmed' },
+      apply: (prev, vars) => (prev ?? []).map((r) => (r.id === vars.id ? { ...r, status: vars.status } : r)),
+      action,
+      callSite: 'test',
+    })
+
+    // The undo window expiring AND a displaced undo can both reach send(). On a
+    // forward-only RPC a double send is two writes for one tap, and neither can
+    // be taken back.
+    await staged.send()
+    await staged.send()
+    await staged.send()
+
+    expect(action).toHaveBeenCalledTimes(1)
   })
 })

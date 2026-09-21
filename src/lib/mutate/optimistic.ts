@@ -3,14 +3,36 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { friendlyDbError } from '@/lib/errors'
 
 /**
- * The optimistic write, as a plain function.
+ * The optimistic write, as plain functions over a `QueryClient`.
  *
- * Deliberately NOT a hook. Everything that makes this correct — patch the cache,
- * fire the write, reconcile or roll back — is ordinary async logic over a
- * `QueryClient`, and keeping it out of React means it can be tested directly
- * with a real client and no DOM. The hook in `useOptimisticAction.ts` is a thin
- * React wrapper around this, so the part that decides whether a user's tap
- * survives is the part that is actually covered by tests.
+ * Deliberately NOT hooks. Everything that makes this correct — patch the cache,
+ * fire the write, reconcile or roll back — is ordinary async logic, and keeping
+ * it out of React means it can be tested directly with a real client and no DOM.
+ * The hook in `useOptimisticAction.ts` is a thin wrapper, so the part that
+ * decides whether a user's tap survives is the part actually covered by tests.
+ *
+ * TWO MODES, and which one a write uses is a real decision:
+ *
+ *   IMMEDIATE (`runOptimisticWrite`) — patch, send at once, undo by sending a
+ *   REVERSE write. Correct only where a reverse action genuinely exists. The
+ *   write is durable from the moment it is sent, which is what you want on a
+ *   phone that can die.
+ *
+ *   DEFERRED (`stageOptimisticWrite` + `send`/`revert`) — patch now, hold the
+ *   server write until the undo window closes. Undo restores the cache and
+ *   NOTHING IS SENT, so no reverse action is needed and the undo is real rather
+ *   than a compensating write that lands on a different wrong state.
+ *
+ * The second mode exists because most of this app's writes have no reverse:
+ * `check_in_room` and `check_out_room` only move forward and never clear a
+ * timestamp, and there is no vehicle-unassign action at all. V10 names this
+ * choice for exactly that case — "either the outcome commits on a delay with a
+ * real undo window before the write fires, or it commits immediately and the
+ * screen says it is final". Deferring is the first of those.
+ *
+ * THE COST OF DEFERRING, stated plainly: a write the app dies before flushing
+ * never happened. On a phone that can be closed mid-shift that is a real risk,
+ * so deferral is chosen per write and never applied by default.
  */
 
 /** What every action this runs is adapted to. */
@@ -43,34 +65,32 @@ export type WriteOutcome =
   | { status: 'ok' }
   | { status: 'rolled-back'; message: string }
 
+/** A staged write: the screen has already changed, the server has not been told. */
+export interface StagedWrite {
+  /** Send it and settle. Safe to call more than once; only the first sends. */
+  send: () => Promise<WriteOutcome>
+  /** Put the cache back to exactly what it held before the patch. */
+  revert: () => void
+}
+
 /**
- * Apply locally, then reconcile. Returns once the SCREEN has changed, not once
- * the server has answered — the caller shows the result immediately and handles
- * the outcome when it arrives.
+ * Fire the action and settle the cache against what comes back.
  *
  * On failure the cache is restored to exactly what it held before AND the real
  * reason is returned. Both halves matter: a revert with no explanation reads as
  * the app randomly undoing the user's work, which is worse than an honest error
- * the user can act on (docs/INTERACTION-CONTRACT.md T2, T7; UX-RULES R6).
+ * they can act on (docs/INTERACTION-CONTRACT.md T2, T7; UX-RULES R6).
  */
-export async function runOptimisticWrite<TData, TVars, TResult>(
+async function settle<TData, TVars, TResult>(
   opts: OptimisticWriteOptions<TData, TVars, TResult>,
+  previous: TData | undefined,
 ): Promise<WriteOutcome> {
-  const { queryClient, queryKey, vars, apply, action, reconcile } = opts
-
-  // A read already in flight could land AFTER the optimistic patch and clobber
-  // it with pre-tap data. Cancel first, then snapshot, then patch.
-  await queryClient.cancelQueries({ queryKey })
-  const previous = queryClient.getQueryData<TData>(queryKey)
-
-  queryClient.setQueryData<TData>(queryKey, (old) => apply(old as TData | undefined, vars))
+  const { queryClient, queryKey, vars, action, reconcile } = opts
 
   try {
     const result = await action(vars)
 
     if (!result.ok) {
-      // The server said no. Put back exactly what was there — not a guess at
-      // what it should be — and tell the truth about why.
       queryClient.setQueryData<TData>(queryKey, previous)
       return { status: 'rolled-back', message: result.message }
     }
@@ -91,11 +111,61 @@ export async function runOptimisticWrite<TData, TVars, TResult>(
     // A thrown action (transport failure, an unhandled rejection inside it) is
     // the path that used to leave a spinner up forever. It rolls back too.
     queryClient.setQueryData<TData>(queryKey, previous)
-    const message = friendlyDbError(
-      { message: e instanceof Error ? e.message : String(e) },
-      undefined,
-      opts.callSite,
-    )
-    return { status: 'rolled-back', message }
+    return {
+      status: 'rolled-back',
+      message: friendlyDbError(
+        { message: e instanceof Error ? e.message : String(e) },
+        undefined,
+        opts.callSite,
+      ),
+    }
   }
+}
+
+/**
+ * Patch the cache now and hand back the two things a caller can do with it.
+ *
+ * Split from `send` so a caller can hold the write open while an undo window
+ * runs. Everything before this point is synchronous from the screen's point of
+ * view once the returned promise settles — the tap has already taken effect.
+ */
+export async function stageOptimisticWrite<TData, TVars, TResult>(
+  opts: OptimisticWriteOptions<TData, TVars, TResult>,
+): Promise<StagedWrite> {
+  const { queryClient, queryKey, vars, apply } = opts
+
+  // A read already in flight could land AFTER the optimistic patch and clobber
+  // it with pre-tap data. Cancel first, then snapshot, then patch.
+  await queryClient.cancelQueries({ queryKey })
+  const previous = queryClient.getQueryData<TData>(queryKey)
+
+  queryClient.setQueryData<TData>(queryKey, (old) => apply(old as TData | undefined, vars))
+
+  let sent = false
+
+  return {
+    revert: () => {
+      queryClient.setQueryData<TData>(queryKey, previous)
+    },
+    send: async () => {
+      // Sent twice would be two server writes for one tap on a forward-only
+      // RPC. The undo window expiring and a displaced undo can both fire.
+      if (sent) return { status: 'ok' }
+      sent = true
+      return settle(opts, previous)
+    },
+  }
+}
+
+/**
+ * Patch, send at once, and expect a REVERSE write if the user presses Undo.
+ *
+ * Use this only where a genuine reverse exists. For forward-only state use
+ * `stageOptimisticWrite` and hold the send until the undo window closes.
+ */
+export async function runOptimisticWrite<TData, TVars, TResult>(
+  opts: OptimisticWriteOptions<TData, TVars, TResult>,
+): Promise<WriteOutcome> {
+  const staged = await stageOptimisticWrite(opts)
+  return staged.send()
 }

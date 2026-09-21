@@ -5,7 +5,7 @@ import { useQueryClient, type QueryKey } from '@tanstack/react-query'
 
 import { useOnline } from '@/lib/useOnline'
 import { offerUndo } from './undo-store'
-import { runOptimisticWrite, type ActionResult } from './optimistic'
+import { stageOptimisticWrite, type ActionResult, type WriteOutcome } from './optimistic'
 import { queuedWriteCount, queueWrite } from './write-queue'
 
 /**
@@ -22,9 +22,19 @@ import { queuedWriteCount, queueWrite } from './write-queue'
  *   T3  nothing is disabled while the write is in flight
  *   T7  a write is reported as saved, waiting, or failed — never ambiguously
  *
- * WHAT IT RETURNS. `syncState` is the SyncChip vocabulary applied to a single
- * write: `sending` / `saved` / `queued` / `failed`. `queuedCount` is how many
- * writes are waiting, which is what `SyncChip` renders.
+ * TWO WAYS TO BE UNDOABLE, and the choice is per write:
+ *
+ *   `undo` given          — the write is sent immediately and Undo sends the
+ *                           reverse. Only correct where a reverse genuinely
+ *                           exists (see the DECISIONS entry for the audit).
+ *   `deferUntilCommit`    — the write is held until the undo window closes, so
+ *                           Undo means NOTHING WAS SENT. This is the honest undo
+ *                           for forward-only state, where the "reverse" would
+ *                           land on a different wrong state.
+ *
+ * Give neither and the write is simply optimistic-with-rollback, with no Undo
+ * offered — which is the right answer for a write that is genuinely one-way and
+ * where holding it open would be worse than committing it.
  *
  * NOT FOR IRREVERSIBLE WRITES. Sealing a delivery proof must NOT go through
  * this: `delivery_proofs` is insert-only with `app.block_mutation()` triggers, so
@@ -48,10 +58,19 @@ export interface UseOptimisticActionOptions<TData, TVars, TResult> {
   /** What the UndoBar says: "Sharma family · Confirmed". */
   message: (vars: TVars) => string
   /**
-   * The reverse write. OMIT IF NO REVERSE EXISTS — an Undo that cannot undo is
-   * worse than no Undo, because the user believes their mistake is recoverable.
+   * The reverse write, for state that genuinely has one. OMIT IF IT DOES NOT —
+   * an Undo that cannot undo is worse than no Undo, because the user believes
+   * their mistake is recoverable.
    */
   undo?: (vars: TVars) => Promise<ActionResult<unknown>>
+  /**
+   * Hold the server write until the undo window closes, so Undo cancels it
+   * entirely. Use instead of `undo` for forward-only state.
+   *
+   * The cost is real and belongs to the write, not to this hook: a write the app
+   * dies before flushing never happened.
+   */
+  deferUntilCommit?: boolean
   /** Offline queue metadata. Omit to fail rather than queue when offline. */
   queue?: { eventId: string; kind: string; what: string }
 }
@@ -89,6 +108,14 @@ export function useOptimisticAction<TData, TVars, TResult>(
     opts.current = options
   })
 
+  // The undo window can outlive this render by seven seconds, so a callback that
+  // captured `online` would decide whether to queue based on a stale value. Read
+  // it live instead.
+  const onlineRef = useRef(online)
+  useEffect(() => {
+    onlineRef.current = online
+  })
+
   useEffect(() => {
     if (!options.queue) return
     let alive = true
@@ -106,23 +133,20 @@ export function useOptimisticAction<TData, TVars, TResult>(
       setLastError(null)
       setSyncState('sending')
 
-      if (!online) {
-        if (!o.queue) {
+      const meta = o.queue
+
+      const queueInstead = () => {
+        if (!meta) {
           setSyncState('failed')
           setLastError('You are offline. Try again when you have signal.')
           return
         }
-        // The screen still changes: that is the promise T7 makes. What it must
-        // NOT do is call this saved — SyncChip reports it as waiting instead.
-        queryClient.setQueryData(o.queryKey, (old) =>
-          o.apply(old as TData | undefined, vars),
-        )
         setSyncState('queued')
         void queueWrite({
-          eventId: o.queue.eventId,
-          kind: o.queue.kind,
+          eventId: meta.eventId,
+          kind: meta.kind,
           payload: vars,
-          what: o.queue.what,
+          what: meta.what,
         })
           .then(() => queuedWriteCount())
           .then(setQueuedCount)
@@ -136,12 +160,20 @@ export function useOptimisticAction<TData, TVars, TResult>(
                 : 'Could not save that on this phone.',
             )
           })
-        return
       }
 
-      const { queryKey, apply, action, reconcile, callSite, message, undo } = o
+      const report = (outcome: WriteOutcome) => {
+        if (outcome.status === 'ok') {
+          setSyncState('saved')
+        } else {
+          setSyncState('failed')
+          setLastError(outcome.message)
+        }
+      }
 
-      void runOptimisticWrite<TData, TVars, TResult>({
+      const { queryKey, apply, action, reconcile, callSite, message, undo, deferUntilCommit } = o
+
+      void stageOptimisticWrite<TData, TVars, TResult>({
         queryClient,
         queryKey,
         vars,
@@ -149,10 +181,38 @@ export function useOptimisticAction<TData, TVars, TResult>(
         action,
         reconcile,
         callSite,
-      }).then((outcome) => {
-        if (outcome.status === 'ok') {
-          setSyncState('saved')
-          if (undo) {
+      }).then((staged) => {
+        if (!onlineRef.current) {
+          // The screen has changed; the server has not heard. Keep it that way
+          // and let the queue carry it — `queued` is never reported as saved.
+          if (deferUntilCommit) staged.revert()
+          queueInstead()
+          return
+        }
+
+        if (deferUntilCommit) {
+          // Nothing is sent yet, so Undo is real: it cancels a write that never
+          // happened, rather than compensating for one that did.
+          offerUndo({
+            message: message(vars),
+            commit: () => {
+              if (!onlineRef.current) {
+                queueInstead()
+                return
+              }
+              void staged.send().then(report)
+            },
+            undo: () => {
+              staged.revert()
+              setSyncState('idle')
+            },
+          })
+          return
+        }
+
+        void staged.send().then((outcome) => {
+          report(outcome)
+          if (outcome.status === 'ok' && undo) {
             offerUndo({
               message: message(vars),
               // The write already stands, so "keep" has nothing to do — the
@@ -173,13 +233,10 @@ export function useOptimisticAction<TData, TVars, TResult>(
               },
             })
           }
-        } else {
-          setSyncState('failed')
-          setLastError(outcome.message)
-        }
+        })
       })
     },
-    [online, queryClient],
+    [queryClient],
   )
 
   return { run, syncState, lastError, queuedCount }

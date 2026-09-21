@@ -1,4 +1,4 @@
-﻿import type { Database } from '@/lib/supabase/database.types'
+import type { Database } from '@/lib/supabase/database.types'
 
 /**
  * One factory for every cache key in the app.
@@ -84,6 +84,11 @@ export const queryKeys = {
 
   logistics: {
     arrivals: (eventId: string) => eventKey(eventId, 'logistics', 'arrivals'),
+  },
+
+  hospitality: {
+    /** The check-in / check-out board. */
+    checkIn: (eventId: string) => eventKey(eventId, 'hospitality', 'checkin'),
   },
 
   rooms: {
