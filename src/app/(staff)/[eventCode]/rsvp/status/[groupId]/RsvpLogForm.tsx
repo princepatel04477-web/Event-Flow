@@ -200,20 +200,34 @@ export function RsvpLogForm({
     const holdsLock =
       group.locked_by === viewerId ||
       (group.locked_by_staff !== null && group.locked_by_staff === viewerId)
-    if (holdsLock) {
-      const release = await releaseGroupAfterCall(eventId, group.id, eventCode)
-      if (!release.ok) {
-        console.error('[rsvp-status] release_group after save failed', {
-          groupId: group.id,
-          message: release.message,
-        })
-        setError(release.message ?? 'The family record was saved, but the caller lock could not be released.')
-        return
-      }
-    }
-
-    // The entry is written and the lock released. Drop the draft so the next
-    // visit starts clean.
+    // THE SCREEN RESPONDS ON THE FIRST HOP; the second one only delays the
+    // navigation, and it has to be awaited. Two findings decide that, and the
+    // first is why an earlier version of this change was wrong.
+    //
+    // 1. THE RELEASE CANNOT BE UN AWAITED. `release_group` matches on caller
+    //    IDENTITY and not on any claim generation (20260813000000:66-69), so an
+    //    in-flight release racing a LATER claim by the same caller wipes that
+    //    caller's own fresh lock. It is reachable: an outcome logged without
+    //    dialling writes no `call_attempts` row, so the family stays at
+    //    attempt_count = 0, and `/rsvp/next` sorts that column ascending — it can
+    //    send the caller straight back to the family they just saved, whose page
+    //    then re-claims it. The migration header for 20260813000000 names this
+    //    exact hazard and says ordering at the call site is the only fix, which
+    //    is why this is sequenced before `router.push` rather than fired off.
+    //
+    // 2. THE RELEASE IS STILL NECESSARY, and still only by the holder. The lock's
+    //    BLOCKING effect ended when the outcome committed — `save_rsvp_log` nulls
+    //    `locked_until` in the same transaction (20260807000502:194-195) and
+    //    claim_group / v_rsvp_queue.is_locked both require it to be non-null and
+    //    in the future — but `save_rsvp_log` never touches `locked_by_staff`,
+    //    because it predates that column (added in 20260808100000). What the
+    //    release clears is that residue: a dangling `ON DELETE RESTRICT` reference
+    //    to staff_members. Cleanup, but real cleanup, and deleting this call would
+    //    leave one behind on every family a team session logs.
+    //
+    // So the win here is ORDERING, not elimination: `setSaved(true)` now happens
+    // immediately after the save, so the runner sees the outcome after one round
+    // trip instead of two. Only the navigation waits for the lock cleanup.
     try {
       window.sessionStorage.removeItem(DRAFT_KEY)
     } catch {
@@ -221,6 +235,21 @@ export function RsvpLogForm({
     }
     setSaved(true)
 
+    if (holdsLock) {
+      const release = await releaseGroupAfterCall(eventId, group.id, eventCode)
+      if (!release.ok) {
+        // The outcome IS saved. Say what actually failed rather than implying the
+        // RSVP did not land — and do not navigate away from an unreleased lock of
+        // ours, because the next claim of this family could then be wiped by it.
+        setError(
+          release.message ??
+            'Saved, but the caller lock could not be released. Try again in a moment.',
+        )
+        return
+      }
+    }
+
+    // The screen moves once the lock is genuinely clear.
     if (hasQueueNext) {
       router.push(`/${eventCode}/rsvp/next`)
       return
