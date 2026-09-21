@@ -88,15 +88,18 @@ On venue Wi-Fi, network failure is a constant operational condition, not an exce
 
 In V1, timing instrumentation is recorded through `traceFetch` in `src/lib/perf.ts`, which wraps fetch operations with `performance.now()` and logs formatted wall-clock timings as `[perf] <label>: <ms>ms` to `console.log` (visible in `adb logcat` on handset WebViews and captured by Playwright probes). In V12, these budgets will be enforced as hard pass/fail thresholds in automated tests.
 
-The proposed budgets below are derived from EventFlow's design tokens in `src/app/globals.css` and live production network realities documented in `CLAUDE.md §3`:
+The budgets below were set on 2026-09-21 from the first real measurement of this app, taken
+at commit `23dacc2`. The numbers, the throttle profiles, what could be measured and what
+could not are all in `docs/FEEL-BASELINE.md`; each budget says in one line which of those
+numbers it came from, and which it deliberately did not:
 
 | Metric | Target Budget | Measurement Method / Anchor | Rationale |
 |---|---|---|---|
-| `tap-to-visual-feedback` | **≤ 100ms** [PROPOSED] | Local CSS active state; `--ef-duration-press` in `src/app/globals.css` | Touch registration must occur before the user's finger leaves the glass. Pure client-side execution with 0ms network dependency. |
-| `tap-to-destination-frame` | **≤ 100ms** [PROPOSED] | Route change layout paint; Playwright `page.on('console')` | The destination container (header, title, navigation shelf, tabs) must paint instantaneously from client memory. |
-| `tap-to-content` (cached list) | **≤ 150ms** [PROPOSED] | TanStack Query cache read + paint; `--ef-duration-fade` in `src/app/globals.css` | Cached list items must render within a single frame budget plus fade duration without layout reflow. |
-| `tap-to-content` (uncached list) | **≤ 1500ms** [PROPOSED] | `traceFetch` in `src/lib/perf.ts`; initial query fetch | Initial query fetch across Mumbai edge (`bom1`) to Seoul (`icn1` / `ap-northeast-2`). S1 unoptimized measured 7.4s / 9.9s against a 5s budget (`CLAUDE.md §3`); V12 target is ≤ 1.5s with skeleton loading. |
-| One action's total server time | **≤ 500ms** [PROPOSED] | Server Action / Supabase RPC execution time logged via `traceFetch` | Limits server compute and database query time for a single write mutation, preventing chained or unindexed database operations. |
+| `tap-to-visual-feedback` | **≤ 100ms** | MutationObserver armed before the click; see `docs/FEEL-BASELINE.md` | SET FROM T1, NOT FROM THE MEASUREMENT. Measured 2026-09-21 at `23dacc2`: **2258–3172ms** on a real family-row tap. The measurement shows the size of the gap, not a softer target. |
+| `tap-to-destination-frame` | **≤ 300ms** | Not yet measured — see the gap list in `docs/FEEL-BASELINE.md` | Unmeasured, so set from the nearest evidence: `arrivals` already loads in 1323ms and a cached frame should be a fraction of a full load. 300ms is where a tap stops reading as "nothing happened". |
+| `tap-to-content` (cached list) | **≤ 150ms** | TanStack Query cache read + paint; `--ef-duration-fade` in `src/app/globals.css` | A cached list should paint in roughly one frame budget plus a fade. Nothing measured meets it yet — no route was visited twice inside the 30s stale window during the run — so this remains the assertion that V2 works. |
+| `tap-to-content` (uncached list) | **≤ 2000ms** | `traceFetch` in `src/lib/perf.ts`; initial query fetch | Measured 2026-09-21 at `23dacc2`: `arrivals` 1323ms, `rsvp-queue` 1814ms, `guest-list` 3299ms, `rooms` **6303ms**. 2000ms is met by two of the four and is a real target for the rest. Deliberately NOT set at `rooms`' 6303ms — that route needs work, not a budget that ratifies it. |
+| One action's total server time | **≤ 500ms** | Server Action / Supabase RPC execution time logged via `traceFetch` | Unchanged. Not measured yet — it needs server-side timing, which `traceFetch` already emits. |
 
 ---
 
