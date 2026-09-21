@@ -223,6 +223,10 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
   // as the app undoing the user's work at random (docs/INTERACTION-CONTRACT.md
   // T2, UX-RULES R6).
   const writeError = arrive.lastError
+  // T7 / R8: an arrival that could not reach the server is saved on this phone,
+  // and is never reported as saved. The hook returned `syncState` from the start
+  // and nothing rendered it, so an offline tap said nothing at all.
+  const queuedOnPhone = arrive.syncState === 'queued'
 
   const today = new Date()
   const todayKey = toDateKey(today)
@@ -392,6 +396,16 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
           className="rounded-xl border border-danger bg-tint-danger px-4 py-3 text-sm font-medium text-danger"
         >
           {writeError}
+        </p>
+      ) : null}
+
+      {queuedOnPhone ? (
+        <p
+          role="status"
+          className="rounded-xl border border-rule-strong bg-tint-warning px-4 py-3 text-sm font-medium text-warning"
+        >
+          Saved on this phone — it will send when there is signal.
+          {arrive.queuedCount > 1 ? ` (${arrive.queuedCount} waiting)` : ''}
         </p>
       ) : null}
     </div>

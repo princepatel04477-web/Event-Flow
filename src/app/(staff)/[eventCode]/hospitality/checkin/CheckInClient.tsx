@@ -196,6 +196,36 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
   // principle; showing the newer one silently would hide the other.
   const writeError = checkIn.lastError ?? checkOut.lastError
 
+  // T7 / R8: a write that could not reach the server is "saved on this phone" —
+  // never silently dropped, and never called saved. The hook returned
+  // `syncState` from the start and NOTHING rendered it, so an offline tap
+  // reported nothing at all: the row changed and no one said whether it had
+  // reached anyone.
+  const queuedOnPhone = checkIn.syncState === 'queued' || checkOut.syncState === 'queued'
+  const queuedCount = checkIn.queuedCount + checkOut.queuedCount
+
+  /**
+   * Is the row being written right now?
+   *
+   * WHY THIS EXISTS. This row renders ONE tap target that flips from "Check in"
+   * to "Check out" the instant the state changes — and with an optimistic write
+   * that state changes on the tap, not after the round trip. A fast double-tap on
+   * the same spot would therefore commit a check-in and then a check-out, leaving
+   * the family checked in and straight back out (room reads free) while the first
+   * write may still be in flight.
+   *
+   * The pre-optimistic screen absorbed that double-tap with its `loading` flag,
+   * which also disabled the button. This keeps the safety without the spinner.
+   *
+   * DERIVED, not stored. The condition also requires the hook to still be busy,
+   * so it clears itself the moment the write settles — the previous version
+   * cleared a state variable from an effect, which is both a cascading render
+   * (`react-hooks/set-state-in-effect`) and a way to get stuck disabled.
+   */
+  const [pendingRowId, setPendingRowId] = useState<string | null>(null)
+  const anyWriteInFlight = checkIn.syncState === 'sending' || checkOut.syncState === 'sending'
+  const rowBusy = (assignmentId: string) => anyWriteInFlight && pendingRowId === assignmentId
+
   const filtered = useMemo(() => {
     if (!rows) return []
     let list = rows
@@ -208,6 +238,9 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
   }, [rows, onlyCheckedOut, search])
 
   async function handleCheckIn(row: CheckInRow) {
+    // Remember which row this write belongs to, so the button cannot change
+    // meaning underneath a second tap. See `writePending` below.
+    setPendingRowId(row.assignment.id)
     checkIn.run({
       groupId: row.group.id,
       assignmentId: row.assignment.id,
@@ -216,6 +249,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
   }
 
   async function handleCheckOut(row: CheckInRow) {
+    setPendingRowId(row.assignment.id)
     checkOut.run({
       groupId: row.group.id,
       assignmentId: row.assignment.id,
@@ -317,6 +351,16 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
         </p>
       ) : null}
 
+      {queuedOnPhone ? (
+        <p
+          role="status"
+          className="rounded-xl border border-rule-strong bg-tint-warning px-4 py-3 text-sm font-medium text-warning"
+        >
+          Saved on this phone — it will send when there is signal.
+          {queuedCount > 1 ? ` (${queuedCount} waiting)` : ''}
+        </p>
+      ) : null}
+
       {rows && rows.length === 0 ? (
         <EmptyState
           title="No room assignments"
@@ -391,12 +435,17 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
                         size="lg"
                         fullWidth
                         onClick={() => handleCheckOut(row)}
-                        disabled={Boolean(row.occupiedByOther)}
+                        disabled={Boolean(row.occupiedByOther) || rowBusy(row.assignment.id)}
                       >
                         Check out
                       </Button>
                     ) : (
-                      <Button size="lg" fullWidth onClick={() => handleCheckIn(row)}>
+                      <Button
+                        size="lg"
+                        fullWidth
+                        onClick={() => handleCheckIn(row)}
+                        disabled={rowBusy(row.assignment.id)}
+                      >
                         Check in
                       </Button>
                     )}

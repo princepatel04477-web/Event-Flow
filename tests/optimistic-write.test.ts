@@ -98,6 +98,9 @@ describe('runOptimisticWrite', () => {
     expect(outcome).toEqual({
       status: 'rolled-back',
       message: 'Someone else is holding this record right now.',
+      // A server decision, not a transport failure — so it must NOT be queued.
+      // Replaying it would fail identically.
+      network: false,
     })
     // Restored to the previous value, not to some guess at it.
     expect(qc.getQueryData<Row[]>(key)).toEqual(before)
@@ -143,6 +146,70 @@ describe('runOptimisticWrite', () => {
     // The failure mode this guards: an optimistic patch that outlives the
     // rejection, so the screen confidently shows something the database refused.
     expect(qc.getQueryData<Row[]>(key)?.[0].status).toBe('confirmed')
+  })
+
+  it('MARKS a transport failure as network, so the caller can queue it', async () => {
+    const { qc, key } = makeClient([{ id: 'a', status: 'confirmed' }])
+
+    const outcome = await runOptimisticWrite<Row[], { id: string }, never>({
+      queryClient: qc,
+      queryKey: key,
+      vars: { id: 'a' },
+      apply: (prev) => (prev ?? []).map((r) => ({ ...r, status: 'declined' })),
+      action: async () => {
+        throw new Error('fetch failed')
+      },
+      callSite: 'test',
+    })
+
+    // The distinction is the whole point: this is the venue's failure mode —
+    // Wi-Fi associated and carrying nothing — and it is worth retrying later,
+    // whereas a server decision is not.
+    expect(outcome.status).toBe('rolled-back')
+    if (outcome.status === 'rolled-back') {
+      expect(outcome.network).toBe(true)
+    }
+  })
+
+  it('a NETWORK failure can HOLD the patch, so a queued write does not flash back', async () => {
+    const { qc, key } = makeClient([{ id: 'a', status: 'confirmed' }])
+
+    const outcome = await runOptimisticWrite<Row[], { id: string }, never>({
+      queryClient: qc,
+      queryKey: key,
+      vars: { id: 'a' },
+      apply: (prev) => (prev ?? []).map((r) => ({ ...r, status: 'declined' })),
+      action: async () => {
+        throw new Error('fetch failed')
+      },
+      callSite: 'test',
+      holdOnNetworkFailure: true,
+    })
+
+    expect(outcome.status).toBe('rolled-back')
+    // The row keeps what the user set, because the hook is about to queue this
+    // and report it as saved-on-this-phone. Rolling it back here and re-applying
+    // it from the queue made the row jump backwards and forwards.
+    expect(qc.getQueryData<Row[]>(key)?.[0].status).toBe('declined')
+  })
+
+  it('a SERVER failure rolls back even when holding is allowed', async () => {
+    const before: Row[] = [{ id: 'a', status: 'confirmed' }]
+    const { qc, key } = makeClient(before)
+
+    await runOptimisticWrite<Row[], { id: string }, never>({
+      queryClient: qc,
+      queryKey: key,
+      vars: { id: 'a' },
+      apply: (prev) => (prev ?? []).map((r) => ({ ...r, status: 'declined' })),
+      action: async () => ({ ok: false, message: 'Not permitted.' }),
+      callSite: 'test',
+      holdOnNetworkFailure: true,
+    })
+
+    // `holdOnNetworkFailure` must not become a way to keep a patch the database
+    // refused — that would leave the screen asserting something untrue.
+    expect(qc.getQueryData<Row[]>(key)).toEqual(before)
   })
 })
 

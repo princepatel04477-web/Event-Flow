@@ -117,7 +117,12 @@ export function useOptimisticAction<TData, TVars, TResult>(
   })
 
   useEffect(() => {
-    if (!options.queue) return
+    // Depends on the KIND (a string), not the options object: callers pass an
+    // inline literal, so an object dependency re-runs this after EVERY render and
+    // issues an IndexedDB count per render per hook — on the check-in screen that
+    // is twice per keystroke in its search box, for a number nothing was even
+    // rendering.
+    if (!options.queue?.kind) return
     let alive = true
     void queuedWriteCount().then((n) => {
       if (alive) setQueuedCount(n)
@@ -125,7 +130,7 @@ export function useOptimisticAction<TData, TVars, TResult>(
     return () => {
       alive = false
     }
-  }, [options.queue])
+  }, [options.queue?.kind])
 
   const queueKind = options.queue?.kind
 
@@ -201,10 +206,23 @@ export function useOptimisticAction<TData, TVars, TResult>(
       const report = (outcome: WriteOutcome) => {
         if (outcome.status === 'ok') {
           setSyncState('saved')
-        } else {
-          setSyncState('failed')
-          setLastError(outcome.message)
+          return
         }
+        // A TRANSPORT failure is the venue's actual failure mode, and it does not
+        // look like being offline: the Wi-Fi is associated and carrying nothing,
+        // so `navigator.onLine` is true and the request fails anyway. Queue it
+        // rather than throwing the write away — CLAUDE.md §11b says the venue link
+        // will do exactly this, and `holdOnNetworkFailure` has already left the
+        // row showing what the user set.
+        //
+        // A failure the SERVER returned is a decision, not a hiccup: replaying it
+        // would fail identically, so it must not enter the queue.
+        if (outcome.network && meta) {
+          queueInstead()
+          return
+        }
+        setSyncState('failed')
+        setLastError(outcome.message)
       }
 
       const { queryKey, apply, action, reconcile, callSite, message, undo, deferUntilCommit } = o
@@ -217,11 +235,18 @@ export function useOptimisticAction<TData, TVars, TResult>(
         action,
         reconcile,
         callSite,
+        // The caller can queue, so a network failure should leave the row as the
+        // user set it rather than flashing it back and then forward again.
+        holdOnNetworkFailure: Boolean(meta),
       }).then((staged) => {
         if (!onlineRef.current) {
-          // The screen has changed; the server has not heard. Keep it that way
-          // and let the queue carry it — `queued` is never reported as saved.
-          if (deferUntilCommit) staged.revert()
+          // KEEP the patch. The screen changes on the tap (T1) and the write is
+          // reported as waiting, never as saved (T7/R8).
+          //
+          // This branch used to call `staged.revert()` first, which made an
+          // offline tap a silent no-op: the row snapped straight back, nothing
+          // said why, and the runner tapped again — queueing a second copy of a
+          // write that was already queued.
           queueInstead()
           return
         }

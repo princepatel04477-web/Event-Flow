@@ -1,6 +1,6 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query'
 
-import { friendlyDbError } from '@/lib/errors'
+import { friendlyDbError, isNetworkError } from '@/lib/errors'
 
 /**
  * The optimistic write, as plain functions over a `QueryClient`.
@@ -59,11 +59,31 @@ export interface OptimisticWriteOptions<TData, TVars, TResult> {
   reconcile?: (server: TResult, optimistic: TData, vars: TVars) => TData
   /** Call-site label for diagnostics. */
   callSite: string
+  /**
+   * Leave the optimistic patch in place when the failure was the NETWORK, so a
+   * caller that queues the write does not first flash the row back to its old
+   * value and then forward again.
+   *
+   * Only the transport path honours this. A failure the server actually returned
+   * (`{ok: false}`) is a decision, not a hiccup — retrying it would fail
+   * identically, so it always rolls back.
+   */
+  holdOnNetworkFailure?: boolean
 }
 
 export type WriteOutcome =
   | { status: 'ok' }
-  | { status: 'rolled-back'; message: string }
+  | {
+      status: 'rolled-back'
+      message: string
+      /**
+       * True when the failure was the transport, not the database. The caller
+       * uses this to decide whether the write is worth queueing: a logical
+       * refusal (permission, constraint) would fail identically on replay, so
+       * queueing it would just produce a permanently stuck row.
+       */
+      network: boolean
+    }
 
 /** A staged write: the screen has already changed, the server has not been told. */
 export interface StagedWrite {
@@ -91,8 +111,12 @@ async function settle<TData, TVars, TResult>(
     const result = await action(vars)
 
     if (!result.ok) {
+      // The server said no. Put back exactly what was there — not a guess at
+      // what it should be — and tell the truth about why. `network: false`
+      // because a server decision is not worth queueing.
       queryClient.setQueryData<TData>(queryKey, previous)
-      return { status: 'rolled-back', message: result.message }
+      void queryClient.invalidateQueries({ queryKey })
+      return { status: 'rolled-back', message: result.message, network: false }
     }
 
     if (reconcile) {
@@ -100,24 +124,41 @@ async function settle<TData, TVars, TResult>(
       queryClient.setQueryData<TData>(queryKey, (old) =>
         reconcile(result.data, (optimistic ?? old) as TData, vars),
       )
-    } else {
-      // No reconciler: the server's shape is not the cache's shape, so the only
-      // safe thing is to re-read it.
-      await queryClient.invalidateQueries({ queryKey })
     }
+
+    // ALWAYS re-read, even when a reconciler produced a good guess. The guess
+    // can only patch the rows the caller knows about, and several of these
+    // writes touch more than that: `check_in_room` picks a family's OLDEST
+    // unrealised assignment rather than the row that was tapped, and
+    // `check_out_room` clears ALL of them, while `mark_arrived` updates every
+    // arrival leg. A reconciler keyed on one id therefore leaves sibling rows
+    // asserting phone-clock state the database never accepted — and on the
+    // check-in board that same stale row feeds `occupiedByOther`, so the room
+    // shows as taken and the double-booking guard stops protecting it.
+    //
+    // This is the round trip the pre-V3 code always paid (`await reload()`).
+    // The screen has already changed, so it is a BACKGROUND re-read, not a wait.
+    await queryClient.invalidateQueries({ queryKey })
 
     return { status: 'ok' }
   } catch (e) {
     // A thrown action (transport failure, an unhandled rejection inside it) is
-    // the path that used to leave a spinner up forever. It rolls back too.
-    queryClient.setQueryData<TData>(queryKey, previous)
+    // the path that used to leave a spinner up forever.
+    const message = e instanceof Error ? e.message : String(e)
+    const network = isNetworkError({ message })
+
+    if (!(network && opts.holdOnNetworkFailure)) {
+      queryClient.setQueryData<TData>(queryKey, previous)
+    }
+    // Re-read either way. A snapshot restore is a guess that also clobbers any
+    // OTHER optimistic patch made since — a second tap on a different row. The
+    // refetch is what actually makes the screen agree with the server.
+    void queryClient.invalidateQueries({ queryKey })
+
     return {
       status: 'rolled-back',
-      message: friendlyDbError(
-        { message: e instanceof Error ? e.message : String(e) },
-        undefined,
-        opts.callSite,
-      ),
+      message: friendlyDbError({ message }, undefined, opts.callSite),
+      network,
     }
   }
 }
