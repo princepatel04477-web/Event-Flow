@@ -36,7 +36,11 @@ export function SectionTabs({ eventCode, access, department = null }: SectionTab
   const sectionId = segments[1] as SectionId | undefined
   const section = sectionId ? SECTIONS[sectionId] : undefined
 
-  if (!section || section.featureFlag !== undefined) return null
+  if (!section) return null
+  if (section.featureFlag === 'production' && access !== 'admin' && department !== 'management' && department !== 'production') {
+    return null
+  }
+  if (section.featureFlag && section.featureFlag !== 'production') return null
 
   const deptOk =
     access === 'admin'

@@ -9,7 +9,11 @@ import { setCodeAuthStaffToken } from '@/lib/auth/session'
 import { persistClaims, readStoredClaims } from '@/lib/native/session-keeper'
 import { cn } from '@/lib/utils'
 
-import { DEPARTMENT_LABELS, type StaffDepartment } from '@/lib/departments'
+import {
+  DEPARTMENT_LABELS,
+  departmentHomePath,
+  type StaffDepartment,
+} from '@/lib/departments'
 
 interface StaffMember {
   id: string
@@ -35,6 +39,7 @@ export function StaffPicker({ members, eventCode }: { members: StaffMember[]; ev
 
   async function pick(id: string) {
     if (pending) return
+    const member = members.find((m) => m.id === id)
     setPending(id)
     setError(null)
     try {
@@ -74,7 +79,8 @@ export function StaffPicker({ members, eventCode }: { members: StaffMember[]; ev
 
       // 4. Enter the event. A full navigation (not client router.push) so the
       // fresh httpOnly cookie is sent on the request.
-      router.replace(`/${eventCode}`)
+      const dept = member?.department ?? 'management'
+      router.replace(departmentHomePath(eventCode, dept))
       router.refresh()
     } catch {
       setError('Could not reach the server. Check your connection and try again.')
@@ -85,10 +91,9 @@ export function StaffPicker({ members, eventCode }: { members: StaffMember[]; ev
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-xl font-semibold text-fg">Who are you?</h2>
+        <h2 className="text-xl font-semibold text-fg">Tap your name</h2>
         <p className="mt-0.5 text-sm text-muted">
-          So your deliveries, calls and check-ins are recorded against you. One tap — no
-          password.
+          One tap. No password. This opens the screens for your team.
         </p>
       </div>
 

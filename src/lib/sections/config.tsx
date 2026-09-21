@@ -48,7 +48,7 @@ const ALL_DEPTS: StaffDepartment[] = [
 
 export const SECTIONS: Record<SectionId, SectionDef> = {
   dashboard: {
-    id: 'dashboard', label: 'Dashboard', tabLabel: 'Board',
+    id: 'dashboard', label: 'Home', tabLabel: 'Home',
     icon: <GridIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team', 'client'],
     departments: ALL_DEPTS,
@@ -71,16 +71,14 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     ],
   },
   rsvp: {
-    id: 'rsvp', label: 'RSVP', tabLabel: 'RSVP',
+    id: 'rsvp', label: 'RSVP calls', tabLabel: 'Calls',
     icon: <PhoneIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
     departments: ['management'],
     children: [
-      { segment: 'campaigns', label: 'Campaigns', roles: ['admin','event_team'], isDefault: true },
-      { segment: 'queue', label: 'Call queue', roles: ['admin','event_team'] },
-      { segment: 'status', label: 'RSVP status', roles: ['admin','event_team'] },
-      { segment: 'review', label: 'Review', roles: ['admin','event_team'] },
-      { segment: 'unmatched', label: 'Unmatched', roles: ['admin','event_team'] },
+      { segment: 'campaigns', label: 'Auto-call', roles: ['admin','event_team'], isDefault: true },
+      { segment: 'queue', label: 'Call list', roles: ['admin','event_team'] },
+      { segment: 'review', label: 'Call notes', roles: ['admin','event_team'] },
     ],
   },
   logistics: {
@@ -124,7 +122,7 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     roles: ['admin', 'event_team'],
     departments: ['management', 'hospitality'],
     children: [
-      { segment: 'rooms', label: 'Stay', roles: ['admin','event_team'], isDefault: true },
+      { segment: 'rooms', label: 'Rooms', roles: ['admin','event_team'], isDefault: true },
       { segment: 'checkin', label: 'Check-in / out', roles: ['admin','event_team'] },
     ],
   },
@@ -137,11 +135,12 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     children: [],
   },
   production: {
-    id: 'production', label: 'Production', tabLabel: 'Prep',
+    id: 'production', label: 'Setup', tabLabel: 'Setup',
     icon: <ClipboardCheckIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
     departments: ['management', 'production'],
     children: [],
+    featureFlag: 'production',
   },
 } as const
 

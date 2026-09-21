@@ -64,11 +64,7 @@ export default async function EventDashboardPage({ params, searchParams }: PageP
   // client would be told "Total groups 0" for a 238-family wedding.
   const staffCtx = await requireStaff(event.id, event.code)
   const viewerCtx = await getStaffViewerContext(event.id)
-  if (
-    viewerCtx?.department &&
-    viewerCtx.department !== 'management' &&
-    staffCtx === 'event_team'
-  ) {
+  if (staffCtx === 'event_team' && viewerCtx?.department) {
     redirect(departmentHomePath(event.code, viewerCtx.department))
   }
 

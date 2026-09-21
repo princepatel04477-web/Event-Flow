@@ -1,14 +1,15 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
+import Link from 'next/link'
 
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 
-const RSVP_INSTRUCTIONS = `You are a polite wedding RSVP assistant calling on behalf of the Sharma family wedding team.
-Speak simple Hindi and English. Ask: Are they coming? How many guests? Arrival date, time, and mode (flight, train, or car)?
-Never guess flight numbers — if unclear, leave blank and say you will note it for follow-up.
-When you have the facts, call save_rsvp_draft with the structured data. If they want a human, call request_human.`
+const RSVP_INSTRUCTIONS = `You are a polite wedding RSVP assistant calling on behalf of the wedding team.
+Speak simple Hindi and English. Ask: Are they coming? How many guests? Arrival date, time, and how they travel (flight, train, or car)?
+Never guess flight numbers — if unclear, leave blank.
+When you have the facts, call save_rsvp_draft. If they want a human, call request_human.`
 
 type SessionState = 'idle' | 'connecting' | 'live' | 'ended' | 'error'
 
@@ -26,7 +27,7 @@ export function GrokTestCall({
   const wsRef = useRef<WebSocket | null>(null)
 
   const appendLog = useCallback((line: string) => {
-    setLog((prev) => [...prev.slice(-8), line])
+    setLog((prev) => [...prev.slice(-6), line])
   }, [])
 
   async function saveDraft(parsed: Record<string, unknown>) {
@@ -37,10 +38,10 @@ export function GrokTestCall({
     })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) {
-      appendLog(`Save failed: ${body.error ?? res.status}`)
+      appendLog('Could not save — try again or use Call by hand.')
       return
     }
-    appendLog(`Draft saved — review in Call notes`)
+    appendLog('Saved. Open Call notes to check and confirm.')
   }
 
   async function startTest() {
@@ -53,7 +54,7 @@ export function GrokTestCall({
       const tokenBody = await tokenRes.json()
       if (!tokenRes.ok) {
         setState('error')
-        appendLog(tokenBody.error ?? 'Could not start voice session')
+        appendLog('Voice test is not set up on this server yet. Use Call by hand for now.')
         return
       }
 
@@ -66,7 +67,7 @@ export function GrokTestCall({
 
       ws.onopen = () => {
         setState('live')
-        appendLog('Connected — speak into your microphone')
+        appendLog('Listening — speak as if you are the guest.')
         ws.send(JSON.stringify({
           type: 'session.update',
           session: {
@@ -77,7 +78,7 @@ export function GrokTestCall({
               {
                 type: 'function',
                 name: 'save_rsvp_draft',
-                description: 'Save structured RSVP facts from the conversation',
+                description: 'Save RSVP facts from the conversation',
                 parameters: {
                   type: 'object',
                   properties: {
@@ -118,26 +119,26 @@ export function GrokTestCall({
             })
           }
           if (msg.type === 'response.function_call_arguments.done' && msg.name === 'request_human') {
-            appendLog('Guest requested a human — use Manual calls')
+            appendLog('Guest wants a person — use Call by hand.')
           }
         } catch {
-          // ignore parse errors on ancillary events
+          // ignore
         }
       }
 
       ws.onerror = () => {
         setState('error')
-        appendLog('WebSocket error — check API key and network')
+        appendLog('Connection failed. Check Wi‑Fi and try again.')
       }
 
       ws.onclose = () => {
         setState('ended')
-        appendLog('Session ended')
+        appendLog('Ended.')
         wsRef.current = null
       }
-    } catch (err) {
+    } catch {
       setState('error')
-      appendLog(err instanceof Error ? err.message : 'Failed to connect')
+      appendLog('Could not start. Check Wi‑Fi and try again.')
     }
   }
 
@@ -150,36 +151,35 @@ export function GrokTestCall({
   return (
     <Card>
       <CardBody className="flex flex-col gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-ink">Test the voice agent</h2>
-          <p className="text-xs text-muted">
-            Try a browser call before dialing guests. Uses Grok Voice — no phone bill.
-            Saved notes appear under{' '}
-            <a href={`/${eventCode}/rsvp/review`} className="text-brand underline">Call notes</a>.
-          </p>
-        </div>
+        <p className="text-sm text-muted">
+          Practice before calling real guests. What you save appears under{' '}
+          <Link href={`/${eventCode}/rsvp/review`} className="text-brand underline">
+            Call notes
+          </Link>
+          .
+        </p>
         {!configured ? (
-          <p className="text-sm text-warning">
-            Set <code className="text-xs">XAI_API_KEY</code> on the server to enable voice tests.
+          <p className="text-sm text-muted">
+            Auto-calling from the server is not turned on yet. You can still call families by hand.
           </p>
         ) : null}
         <div className="flex gap-2">
           <Button
-            size="md"
+            size="lg"
             onClick={startTest}
             disabled={!configured || state === 'connecting' || state === 'live'}
             loading={state === 'connecting'}
           >
-            {state === 'live' ? 'Live…' : 'Start test call'}
+            {state === 'live' ? 'Listening…' : 'Start practice call'}
           </Button>
           {state === 'live' ? (
-            <Button size="md" variant="secondary" onClick={stopTest}>
-              End
+            <Button size="lg" variant="secondary" onClick={stopTest}>
+              Stop
             </Button>
           ) : null}
         </div>
         {log.length ? (
-          <ul className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted">
+          <ul className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-muted">
             {log.map((line, i) => (
               <li key={i}>{line}</li>
             ))}

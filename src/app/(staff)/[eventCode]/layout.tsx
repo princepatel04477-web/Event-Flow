@@ -5,6 +5,7 @@ import { SignOutButton } from '@/components/auth/SignOutButton'
 import { AdminLink } from '@/components/nav/AdminLink'
 import { BottomTabs } from '@/components/nav/BottomTabs'
 import { SectionTabs } from '@/components/nav/SectionTabs'
+import { StaffWelcomeBanner } from '@/components/nav/StaffWelcomeBanner'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { StickyHeader } from '@/components/ui/StickyHeader'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
@@ -121,6 +122,13 @@ export default async function EventLayout({ children, params }: LayoutProps) {
               fewer than two reachable children, so most screens are unchanged
               — see SectionTabs. */}
           <SectionTabs eventCode={event.code} access={access} department={department} />
+          {access === 'event_team' ? (
+            <StaffWelcomeBanner
+              eventCode={event.code}
+              department={department}
+              staffMemberId={codeClaims?.staffMemberId ?? null}
+            />
+          ) : null}
           {children}
         </div>
       </main>

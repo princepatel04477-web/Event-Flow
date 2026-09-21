@@ -45,8 +45,17 @@ export function BottomTabs({ eventCode, access, department = null }: BottomTabsP
     return s.departments.includes(department)
   }
 
+  const flagOk = (s: (typeof SECTIONS)[SectionId]) => {
+    if (!s.featureFlag) return true
+    // Setup tab: only for admin, event leads, and the setup team.
+    if (s.featureFlag === 'production') {
+      return access === 'admin' || department === 'management' || department === 'production'
+    }
+    return false
+  }
+
   const visibleSections = Object.values(SECTIONS).filter(
-    (s) => s.featureFlag === undefined && roleOk(s) && deptOk(s),
+    (s) => flagOk(s) && roleOk(s) && deptOk(s),
   )
 
   if (visibleSections.length === 0) return null

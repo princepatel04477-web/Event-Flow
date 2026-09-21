@@ -47,9 +47,9 @@ type JobDbRow = {
 }
 
 const WAVE_DEFAULTS: { wave: CampaignWave; label: string; daysBefore: number }[] = [
-  { wave: 'wave_1', label: 'Wave 1 — one month before', daysBefore: 30 },
-  { wave: 'wave_2', label: 'Wave 2 — ten days before', daysBefore: 10 },
-  { wave: 'wave_3', label: 'Wave 3 — two days before', daysBefore: 2 },
+  { wave: 'wave_1', label: 'Round 1 — about one month before', daysBefore: 30 },
+  { wave: 'wave_2', label: 'Round 2 — about ten days before', daysBefore: 10 },
+  { wave: 'wave_3', label: 'Round 3 — about two days before', daysBefore: 2 },
 ]
 
 export type CampaignActionResult =
