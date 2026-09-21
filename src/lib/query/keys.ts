@@ -77,6 +77,19 @@ export const queryKeys = {
   guests: {
     list: (eventId: string) => eventKey(eventId, 'guests', 'list'),
     search: (eventId: string, term: string) => eventKey(eventId, 'guests', 'search', term),
+    /**
+     * The `/find` screen's search, ONE entry per term.
+     *
+     * A SECOND key beside `guests.search` rather than a reuse of it, and the
+     * reason is the row shape, not the tidiness. `guests.search` is
+     * `search_guest_profiles`, whose rows carry `phone`, `pax`, `departure_*`
+     * and the hamper flags but have NO `rsvp_status` and no room match —
+     * `find` needs the former on every row and the latter in the query itself,
+     * so it reads `client_guest_profiles` (the row shape the result row
+     * renders). Two different shapes under one key is the exact failure this
+     * file's header warns about: the second screen paints the first one's rows.
+     */
+    find: (eventId: string, term: string) => eventKey(eventId, 'guests', 'find', term),
   },
 
   families: {

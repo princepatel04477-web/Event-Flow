@@ -67,6 +67,27 @@ const REPLACED_BY_V7 = {
 } as const
 
 /**
+ * v2 routes that are GENUINELY NEW — no legacy screen at the same path, because
+ * no legacy screen does this job at all.
+ *
+ * A THIRD list rather than an entry in `REPLACED_BY_V7.page`, and the two are
+ * not interchangeable. `REPLACED_BY_V7.page` answers "is this route a HAND-BUILT
+ * replacement for a legacy screen?"; this one answers "is this route NEW?".
+ * V7's five are both — they took over the legacy paths. `find` is only the
+ * second: there is no `(staff)/[eventCode]/find` and never was, so the parity
+ * checks that look for a legacy counterpart have nothing to find and would
+ * report a working route as an orphan.
+ *
+ * Adding a name here does NOT silence the missing-page assertion above; a route
+ * has to be on disk for that one, and this list is only consulted by the two
+ * checks that compare a v2 route against the legacy tree. So this stays a real
+ * allowlist rather than a place to park a typo.
+ */
+const NEW_IN_V8 = new Set([
+  'find', // one box that finds anyone — no legacy screen does this
+])
+
+/**
  * The one legacy section layout with no v2 shim, and it is deliberate.
  *
  * `hospitality/layout.tsx` guards with `requireSection(..., 'hospitality')`,
@@ -263,6 +284,11 @@ describe('every v2 route is real', () => {
       // V6's new home is a v2-native screen: there is no legacy page at the
       // event root to mirror (the legacy root page is the v1 dashboard).
       .filter((route) => route !== '')
+      // V8's `find` is the other kind of new route — a job no legacy screen
+      // does, so there is no path for it to map onto. Named in `NEW_IN_V8`
+      // rather than excused inline, so the set of genuinely-new screens is one
+      // list a reader can see whole.
+      .filter((route) => !NEW_IN_V8.has(route))
       .filter((route) => !fs.existsSync(path.join(LEGACY_ROOT, route.split('/').join(path.sep), 'page.tsx')))
 
     expect(
@@ -271,6 +297,18 @@ describe('every v2 route is real', () => {
         `path segment — the route builds, then 404s in the field:\n` +
         orphans.map((r) => `  /{event}/${r}`).join('\n'),
     ).toEqual([])
+  })
+
+  it('keeps the genuinely-new allowlist honest', () => {
+    // An entry here silences the orphan check above, so a stale one would be a
+    // licence to add a path that has no page. Assert every name is a real
+    // route AND every name is still hand-written: if `find` ever became a shim
+    // of a legacy screen, this list would be describing a screen that no
+    // longer exists in the shape it was excused in.
+    const present = new Set(v2PageRoutes())
+    for (const route of NEW_IN_V8) {
+      expect(present, `${route} is on NEW_IN_V8 but no page.tsx exists`).toContain(route)
+    }
   })
 })
 

@@ -2046,3 +2046,120 @@ pick): 6 destinations, 0 x 404, 0 x throwing. With `--pick "Test Caller A"` it f
 five-tab bar with Calls → `/rsvp/queue` and 28 destinations, 0 x 404, and exits 1 on the two
 destinations that land on the campaigns crash above. **No handset** — nothing here is
 claimed as tested on a phone.
+
+
+## 22 September 2026 — V8: one box that finds anyone (`/find`)
+
+### What changed
+
+`src/app/(app)/v2/[eventCode]/find/` is new: `page.tsx` (the server branch on role),
+`FindStaff.tsx`, `FindClient.tsx`, `_components/FindParts.tsx` (the one input and the one row
+component both roles render). `_components/AppHeader.tsx` gets its search button back.
+`src/lib/query/keys.ts` gains `guests.find`, `src/lib/query/reads.ts` gains `findGuests` and
+the `FindResult`/`GuestProfileRow` types. `tests/v2-route-parity.test.ts` gains a third list.
+
+One route, two components, chosen in `page.tsx` from `getEventAccess` — NOT a `requireStaff`
+gate, because a client must be able to search their own list and bouncing them would be the
+bug. The two components share no data path, so a client cannot be handed a staff read by a
+prop default. The fence underneath is RLS, as always; the split is honesty, not security.
+
+### The row, and why it needs TWO reads
+
+The brief asks for four match kinds and a row of five fields, and no single existing read can
+do it:
+
+| | matches | returns | `rsvp_status` | `room_number` | `group_id` | `phone` |
+|---|---|---|---|---|---|---|
+| `search_guest_profiles` (RPC) | name, head, mobile | staff | no | no | yes | yes |
+| `client_guest_profiles` (view) | none — it is a plain read | members | yes | yes | no | no |
+
+So `findGuests` runs BOTH, in parallel, each `limit`-capped at 50:
+
+- the **RPC** leg supplies the mobile match (the trgm index in migration 1800 exists for
+  exactly this) and the `group_id` the row needs to open a family;
+- the **view** leg supplies the room match — the RPC's `where` cannot reach `room_number`,
+  which lives on `rooms` via `room_assignments` — and the `rsvp_status` the pill renders.
+
+WHERE A ROW HAS NO `group_id`, IT DOES NOT LINK. A room match found only through the view
+cannot open the family record, so `FindResultRow` renders a `div`, not an `a`. Linking to
+`/rsvp/status/` with an empty segment would be a 404 dressed as a result.
+
+### Typing never blanks the results (T4) — including across the debounce
+
+`keepPreviousData` alone is not enough, and this is the trap in the existing
+`GuestsClient`: TanStack drops placeholder data when the query is DISABLED, and a query keyed
+on a term that has just dropped below the minimum is disabled — so the list blanks on the
+first keystroke of every new term, which is the blink T4 is written about.
+
+Two changes close it. `enabled` is keyed on the DEBOUNCED term, so the key keeps naming the
+previous search while a new one is being typed; and the key is cleared only when the BOX is
+emptied, never on dropping under two characters. The result is derived, not held: `rows` is
+always the current key's answer, there is no second copy of the results to fall out of step
+with the cache, and `debounced !== query` is the staleness signal for the whole debounce
+window. Dimmed, `aria-busy`, "Searching…".
+
+### Failure modes that were designed rather than discovered
+
+- **The mobile leg is staff-only, from the server's own answer.** `search_guest_profiles` has
+  no `security definer`, so a client gets zero rows from it — but the REQUEST is not even
+  made for a client (`withMobile={false}`), passed down from `page.tsx`. A client who could
+  search by mobile would learn a number from the fact that something matched.
+- **No phone number is rendered.** The RPC returns one; `asProfileRow` deliberately does not
+  copy it. The brief's row is name, family, room, status, arrival.
+- **The result link does not prefetch, and that is load-bearing.** `rsvp/status/[groupId]`
+  claims the 15-minute caller lock on RENDER, so an armed link under a thumb would lock
+  families nobody opened — and a lock has no manual release (CLAUDE.md §11b). Same warning as
+  `GuestsClient`, copied rather than rediscovered.
+- **Offline says so.** Staff: the query is disabled and the screen offers the last-loaded
+  guest list instead of a spinner that can never resolve (a disabled TanStack query is
+  `pending` forever, so a pending-based skeleton is exactly the indefinite spinner T7
+  forbids). Client: their list is filtered from the `useStableData` module cache under the
+  same key `ClientGuestList` writes, so a client who has opened the guest list once can
+  search it with no network at all.
+- **An emptied box is not a search.** A term of nothing but punctuation is refused rather
+  than escaping to `ilike '%%'`, which would return the first 50 guests as "the answer".
+
+### Deliberate deviations
+
+- **The brief's file list said `src/app/(app)/[eventCode]/find/**`.** The route is at
+  `(app)/v2/[eventCode]/find/**`, per AMENDMENTS §1 — without the `/v2` segment Next fails
+  the build with E28. Recorded because the two paths look like a typo apart.
+- **`search_guest_profiles` is not the whole answer, so `findGuests` reads the view as well.**
+  The brief anticipated this ("if last-4-digit matching is not possible with the existing RPC,
+  STOP and report what is missing") — but last-4-digit matching IS possible with the existing
+  RPC, and the two things that are NOT possible through it (room matching, `rsvp_status`) are
+  reachable through a view the app already reads. Nothing was weakened to make this work: no
+  migration, no new SQL, no client-side filter of the guest list, no new dependency.
+- **`tests/v2-route-parity.test.ts` gained a named allowlist (`NEW_IN_V8`) rather than an
+  entry in `REPLACED_BY_V7.page`.** The two answer different questions — "a hand-built
+  replacement for a legacy screen" versus "genuinely new" — and only the second is true of
+  `find`. The allowlist is asserted to name real routes, so it cannot rot into a licence for
+  a path with no page.
+- **`scripts/tabs-reach.mjs` was NOT edited.** It collects `nav[aria-label="Sections"]` and
+  `main a[href]`; the header's search button is in neither, so `/find` is not covered by the
+  live walk. Adding a third collection block is a change to a script that signs in and drives
+  a real browser, and this session has no server to run it against — so it is reported rather
+  than guessed at. See "still owed".
+
+### What is still owed
+
+- **The live check of `/find`.** `npx tsc`/`eslint`/`vitest` all pass, and the route is on
+  disk where the proxy will rewrite `/{event}/find` onto it, but nothing here has been
+  rendered in a browser or on a handset. `npm run build` (the parent's) is the first thing
+  that proves the route graph, and `scripts/tabs-reach.mjs` does not yet visit it.
+- **One RPC would replace two reads.** `search_guest_profiles` returning `room_number` and
+  `rsvp_status` — and matching room as well as name/head/mobile — would collapse `findGuests`
+  to a single call and let every result link. That is SQL, which this session may not write.
+  Recorded as the shape of the fix, not as a workaround taken.
+- **`rsvp/status/[groupId]` as the destination is questionable.** It is what `GuestsClient`
+  uses, so it is consistent — but it claims the caller lock on open, which a search result is
+  not an intent to call. `rsvp/call/[groupId]` does not claim. Changing it is a product
+  decision about whether finding a family should reserve it, and it is not taken here.
+
+### Verification
+
+`npx tsc --noEmit` exit 0 · `npx eslint` exit 0 on all eight changed files (0 errors, 0
+warnings) · `npx vitest run` 19 files / 241 tests, all pass (240 before + 1 new case).
+`npm run build` NOT run (the parent runs it). `scripts/tabs-reach.mjs` NOT run. **No handset**
+— nothing here is claimed as tested on a phone, with a camera, or against a measured tap
+budget, and `/find` is the one screen in this session whose live behaviour is unverified.

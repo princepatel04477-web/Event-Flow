@@ -222,6 +222,13 @@ async function collectHrefs(page) {
     const nav = document.querySelector('nav[aria-label="Sections"]')
     if (nav) for (const a of nav.querySelectorAll('a[href]')) add('tab', a)
 
+    // The header's own controls. V8 restored the search button here, and it is
+    // the one destination in the new UI that is neither a bar tab nor inside
+    // `main` — so without this block a dead search button is invisible to this
+    // script, which is exactly the control that was dead for two sessions.
+    const header = document.querySelector('nav[aria-label="Header actions"]')
+    if (header) for (const a of header.querySelectorAll('a[href]')) add('header', a)
+
     // The job cards and Today row are the home screen's own links; they are the
     // other half of "the new UI can navigate somewhere".
     for (const a of document.querySelectorAll('main a[href]')) {

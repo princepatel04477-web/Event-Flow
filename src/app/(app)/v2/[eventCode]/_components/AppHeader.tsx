@@ -1,8 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import { SignOutButton } from '@/components/auth/SignOutButton'
+import { SearchIcon } from '@/components/icons'
 import { AdminLink } from '@/components/nav/AdminLink'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { StickyHeader } from '@/components/ui/StickyHeader'
@@ -41,6 +43,15 @@ interface AppHeaderProps {
  * dead control in the app. A link to a 404 is worse than an absent link, so the
  * control is gone until V8 builds the destination. Restore the button WITH the
  * route, not before it.
+ *
+ * V8 built it, so the button is back. Same 44x44 target and same
+ * `aria-label="Search"` it had, and the href is BARE — `/{event}/find`, no
+ * `/v2`, no route group (AMENDMENTS §2): the internal prefix is the server's
+ * business and a link carrying it 404s. It sits FIRST in the row because it is
+ * the only control here about this event's people; the three to its right are
+ * about the session. A client gets it too, and that is deliberate — `/find`
+ * serves them their own list (see `find/page.tsx`), so it is not a staff door
+ * in the header of a client's screen.
  */
 export function AppHeader({ event, viewer }: AppHeaderProps) {
   const pathname = usePathname()
@@ -74,6 +85,13 @@ export function AppHeader({ event, viewer }: AppHeaderProps) {
       backLabel={backLabel}
       right={
         <nav className="flex items-center gap-1.5" aria-label="Header actions">
+          <Link
+            href={`/${event.code}/find`}
+            aria-label="Search"
+            className="tap -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted transition-colors duration-press ease-ledger hover:bg-surface-2 active:bg-surface-2"
+          >
+            <SearchIcon className="h-5 w-5" />
+          </Link>
           {viewer.memberships.length > 1 ? (
             <EventSwitcher
               events={viewer.memberships}
