@@ -1513,3 +1513,52 @@ has no countdown or extension (WCAG 2.2.1); `revert()` is unguarded after `send(
 219 unit tests and a clean production build all passed straight through. Verification that
 only exercises code in isolation cannot see a screen that never stops loading, and cannot see
 mojibake. Independent review is not a formality on this codebase.
+
+---
+
+## 21 September 2026 — V1 is UNBLOCKED and DONE. The earlier "blocked" verdict was half wrong.
+
+**This supersedes the V1 entries above.** V1 was recorded three times as blocked because the
+Playwright test runner cannot execute in this environment. That part is true and still true:
+`--project=feel`, a trivial canary spec, and the repo's own pre-existing `phone` suite all
+hang identically, before any spec module is evaluated.
+
+**What was wrong was the conclusion.** The runner was the blocked component, not the
+measurement. A standalone `chromium.launch()` succeeds in ~430 ms, renders a page, and drives
+the real `/login` → `/pick-staff` flow — I had verified that and still treated it as evidence
+the environment was unusable rather than as the way around. `scripts/feel-baseline.mjs` now
+drives the browser API directly.
+
+**The baseline, measured at `23dacc2` against SAMPLE2026 seeded to 543 guests:**
+
+    route load, venue-wifi (300ms / 1.5Mbps), median of 3:
+      arrivals 1323ms · rsvp-queue 1814ms · guest-list 3299ms · home 4917ms · ROOMS 6303ms
+    route load, 4g: rooms is still 5090ms
+    family row -> family record: M1 3172ms / M3 8301ms (worst 30289ms) on venue-wifi
+
+**M1 — the first visual response to a tap — is 3.2 seconds against a contract that says
+100 ms.** Thirty-two times over. That is the complaint this entire series exists to answer,
+and it now has a number.
+
+The Budgets table in `docs/INTERACTION-CONTRACT.md` carries real numbers instead of
+`[PROPOSED]` markers. Two are deliberately set from the RULE rather than the measurement:
+100 ms for tap-to-visual-feedback, and 2000 ms for uncached content — which most routes do
+not yet meet, but which is NOT set at `rooms`' 6303 ms, because that route needs work rather
+than a budget that ratifies it.
+
+**Two environment findings came out of doing this rather than reading about it:**
+
+1. **`E2E_EVENT_ID` and `E2E_TEAM_CODE` name different events.** `E2E_EVENT_ID` is `E12345`
+   ("Nuvent Event"); the team code signs into `SAMPLE2026`. The acceptance harness seeds the
+   former and signs in to the latter. Both hold 543 `SEED-543` guests, which is why it has
+   gone unnoticed. My first harness attempt measured `E12345` and got a page with one link on
+   it — it was reading an event the session cannot see.
+2. **`event_access_codes` is empty and `staff_members` has zero rows**, yet the picker offers
+   "Test Caller A" and login succeeds. CLAUDE.md §9 describes a roster model these tables do
+   not reflect.
+
+**The lesson, which is the same shape as the encoding mistake.** Both times I treated a past
+observation as settled and stopped probing: the mojibake I dismissed as console rendering, and
+the runner hang I recorded as "the environment cannot measure". The browser launch was already
+in my own notes as proof the environment worked. Re-reading a conclusion is not the same as
+re-testing it.
