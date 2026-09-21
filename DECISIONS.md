@@ -1086,3 +1086,37 @@ Following the Royal Ivory & Gold redesign (DESIGN.md), colour tokens had re-skin
 3. **Terminology Consistency in `src/app/globals.css`:**
    - Aligned the comment at line 233 from `/* Brass — the accent. */` to `/* Gold — the accent. */` in accordance with the "Royal Ivory & Gold" design system.
    - Noted that `src/components/ui/Chip.tsx`, `src/components/ui/StatusPill.tsx`, and `src/app/(staff)/[eventCode]/logistics/fleet/FleetClient.tsx` also contain legacy references to "brass", left untouched because they fall outside the allowed file modification list for this session.
+
+---
+
+## 21 September 2026 — V1 (feel baseline) BLOCKED: the Playwright runner cannot start here
+
+V1 was meant to measure what a runner actually waits for and replace the PROPOSED budgets in
+`docs/INTERACTION-CONTRACT.md` with real numbers. **It produced no measurements.** The harness
+is committed; the baseline is not.
+
+**Built:** a `feel` Playwright project (its own project, not folded into `phone`, for the same
+reason `perf` has one), `npm run test:feel`, and `e2e/feel.spec.ts` implementing M1–M5 across
+the five named routes with CDP throttling at venue-Wi-Fi and 4G, 5 iterations each. The test
+event is seeded to 543 guests at full family scale.
+
+**Blocker:** the Playwright test runner hangs before it evaluates any spec module. Confirmed
+three ways, and the third is the one that decides it — the repo's OWN pre-existing `phone`
+suite (`e2e/tier0.spec.ts`) hangs identically. This is not a defect in the new harness; the
+runner cannot run in this environment for any project.
+
+**Ruled out, each tested directly:** the browser (standalone Chromium launch succeeded in
+434 ms and rendered a page); missing browser revisions (all present, executablePath resolves);
+stdio pipes (execSync and spawn both round-trip); named-pipe IPC, which is how the runner
+reaches its workers on Windows (child_process.fork round-trips a message); orphaned workers
+(none survived the killed runs); test discovery (`--list` lists the test correctly, so config
+and spec load fine in-process — only worker spawn hangs).
+
+**Consequences.** The Budgets table keeps its `[PROPOSED]` markers; they are unvalidated. V12
+depends on the same runner and is blocked for the same reason. V2–V11 do not need a browser
+and are unaffected. `docs/FEEL-BASELINE.md` records the evidence and the exact steps to
+produce the real baseline elsewhere.
+
+**Honesty note.** `e2e/feel.spec.ts` has never executed successfully. It is committed so the
+work is not lost, NOT because it is known good — the first real run should be treated as a
+smoke test of the spec, and selectors will likely need fixing before any number is trusted.

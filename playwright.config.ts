@@ -104,5 +104,16 @@ export default defineConfig({
       },
       testMatch: /client-view\.spec\.ts/,
     },
+    {
+      // Latency and perceived responsiveness harness ("feel").
+      // Measures M1-M5 under network throttling (venue Wi-Fi, 4G).
+      // Separate project so it does not fold into scored acceptance runs.
+      name: 'feel',
+      use: {
+        ...devices['Pixel 5'],
+        viewport: { width: 360, height: 800 },
+      },
+      testMatch: /feel\.spec\.ts/,
+    },
   ],
 })
