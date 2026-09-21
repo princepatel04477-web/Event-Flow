@@ -1315,3 +1315,37 @@ outcome (has one for `guest_groups`, with the `call_attempts` freeze still to be
 screen), and vehicle assignment (no reverse and no forward-only excuse — `commitTrips` takes
 a whole proposal, so deferring would just delay a dispatch; that one needs a decision, not a
 hook).
+
+---
+
+## 21 September 2026 — V3 wiring handoff: 1 of 4 done, and a key-factory drift found
+
+Check-in/out is wired (`8413946`). The other three V3 writes are NOT, and this records
+exactly why so the next session does not re-derive it.
+
+**`RoomsGridClient.tsx` is 1149 lines with FOUR separate write paths** — `moveMutation`
+(:290), `assignGuestToRoom` (:390), a second `moveGuestsToRoom`/`assignGuestToRoom` pair
+(:460, :467) and `releaseGuestFromRoom` (:491). Converting it is a session's work on its
+own, and it also carries the capacity/overlap `23514` handling that V10 exists to fix. It
+was left alone deliberately rather than half-converted.
+
+**A drift V2 did not catch, because `rooms` was not one of its three screens.**
+`RoomsGridClient` builds its cache key by hand:
+
+    queryKey: ['rooms-grid', eventId]     (RoomsGridClient.tsx:294, :318)
+
+while `src/lib/query/keys.ts` defines the same entry as
+
+    queryKeys.rooms.grid(eventId)  ->  ['event', eventId, 'rooms', 'grid']
+
+They are two different keys for one dataset. Nothing is broken today — the grid is the only
+reader of its own key — but the whole point of the factory is that this cannot happen, and
+`tests/query-keys.test.ts` cannot catch it because it only guards keys built THROUGH the
+factory. When the rooms screen is converted, that raw key must go, not be preserved.
+
+**Verification done on everything above:** `npm run build` passes (exit 0), which matters
+more than it looks — `QueryProvider`'s own comment records that a server/client boundary
+mistake is invisible in `next dev` and only surfaces at build time, and this session added a
+dehydrate/HydrationBoundary and a module that mixes server-action and browser reads. The
+build is the check that says those boundaries are legal. typecheck, eslint on every changed
+file, and 212/212 unit tests also pass.
