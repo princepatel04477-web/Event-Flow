@@ -188,10 +188,23 @@ async function createFamily(eventId, headName, { headcount = 2, mobile, confirme
 }
 
 async function deleteSeed() {
+  // MATCHED BY EXACT NAME, NOT BY PREFIX, AND THAT IS A BUG FIX.
+  //
+  // This read `ilike('head_name', 'V12-%')` while `FAMILIES.call` is
+  // deliberately named `0 V12-Call Next` — the leading `0 ` is what makes that
+  // family sort to the head of the calling queue (see FAMILIES above). A prefix
+  // match therefore never matched the one fixture the calling tasks create, so
+  // every run left its predecessor behind: a live count on SAMPLE2026 found 35
+  // such groups and 70 guests accumulated in the real event, and a client's own
+  // guest list was showing them.
+  //
+  // An exact-name match can only ever delete families this module defines, which
+  // is the strongest form of the promise this function makes. It also sweeps up
+  // the rows the prefix pattern missed, on the next run of seed() or unseed().
   const { data: groups, error } = await db
     .from('guest_groups')
     .select('id')
-    .ilike('head_name', `${V12_PREFIX}%`)
+    .in('head_name', Object.values(FAMILIES))
   if (error) throw new Error(`read previous V12 seed: ${error.message}`)
   const ids = (groups ?? []).map((g) => g.id)
 
