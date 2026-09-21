@@ -986,3 +986,39 @@ Created the UX foundation for the "A 14-Year-Old Can Use It" overhaul:
 - `docs/UX-RULES.md` formalises the eight cardinal UX rules (One job per screen, Plain words only, Never a dead end, Every number is a door, Undo don't confirm, Tell the truth about failure, Thumb-sized and daylight-legible, It works when the Wi-Fi doesn't) with real good/bad examples drawn directly from this codebase.
 - `docs/GLOSSARY.md` maps internal/trade terminology (`pax`, `guest_group`, `deliverable`, `extraction`, `unmatched`, `harvest`, `travel leg`, `roomed`, `Board`, `Stay`, `Prep`, `access code`, etc.) to guest-friendly, plain words, documenting both where code identifiers must stay (DB schemas, Excel export headers) and the exact files where user-facing text is found.
 - Zero source code changes under `src/` were made in this prompt session to ensure a clean boundary before executing downstream refactors.
+
+---
+
+## 21 September 2026 — Created docs/INTERACTION-CONTRACT.md (Timing & Interaction Contract)
+
+### Formalised the Interaction and Latency Contract
+Created `docs/INTERACTION-CONTRACT.md` to define strict, checkable latency and interaction rules for EventFlow, completing the counterpart to `docs/UX-RULES.md`:
+- Defined seven core time and responsiveness rules (T1–T7):
+  - **T1: The tap owns the first 100ms** (instant local visual feedback; no control's first visual response behind an `await`).
+  - **T2: A write shows its result before the server confirms it** (optimistic UI updates for all reversible writes with rollback on failure; only irreversible commits like insert-only proof sealing wait).
+  - **T3: A disabled button is a bug unless the input is invalid** (ban on `<Button loading>` with spinners for reversible writes, preserving user agency on high-latency networks).
+  - **T4: Navigation is instant or it is not navigation** (destination shell and cached rows paint within 100ms; no full-screen loading spinners for known client state).
+  - **T5: One tap is one round trip, at most** (prohibition of sequential awaited network calls in a single action; combine into atomic RPCs, run in parallel, or defer cleanup).
+  - **T6: Motion is confirmation, never transition** (motion reserved for irreversible physical confirmation like proof sealing or queued state; press path locked to 100ms; eliminating layout jumps).
+  - **T7: Offline is a state, not an error** (three honest write outcomes: saved, saved on this phone, or not saved; no silent successes or hanging spinners).
+- Each rule provides a clear operational rationale for cheap Android handsets operating on poor venue Wi-Fi connected to Seoul (`icn1` / `ap-northeast-2`), a concrete pass condition, and real Right/Wrong code examples citing existing repo files (such as `RsvpLogForm.tsx`, `Button.tsx`, `DeliveryDetail.tsx`, and `globals.css`).
+- Added proposed latency budgets table for V1 instrumentation (`src/lib/perf.ts` `traceFetch`) and V12 enforcement: tap-to-visual-feedback (≤ 100ms), tap-to-destination-frame (≤ 100ms), tap-to-content cached (≤ 150ms), tap-to-content uncached (≤ 1500ms), and one action's total server time (≤ 500ms).
+- Audited the six mandatory screen states against existing UI components, explicitly identifying that **Content-plus-pending write** currently has NO component in the codebase.
+- Zero source code changes under `src/` were made in this session.
+
+---
+
+## 21 September 2026 — Correction pass on docs/INTERACTION-CONTRACT.md
+
+### Corrected 11 citation defects from independent audit
+An independent review checked every citation in `docs/INTERACTION-CONTRACT.md` against the repository and database migrations. All 11 defects were resolved while preserving the seven-rule structure, latency budgets, and six-states framework:
+- **T1:** Replaced false headline claiming `RsvpLogForm.tsx` violated T1's first-response rule (since `setSaving(true)` runs synchronously before `await` and `Button` provides instant CSS touch feedback). Cited `src/app/(staff)/[eventCode]/rsvp/unmatched/UnmatchedTrayClient.tsx` lines 64–96, 188–195 ("Retry auto-match" triggers `matchRecording` without setting any loading/pending indicator) as a genuine failure of T1, while retaining the true narrower finding that `RsvpLogForm`'s layout change (`SavedState`) is gated behind sequential awaits.
+- **T2:** Corrected the citation of `UndoBar` to reflect that it is not yet built under `src/` (aligning with §The Six States). Corrected description of `src/app/(staff)/[eventCode]/hospitality/deliveries/[deliverableId]/DeliveryDetail.tsx`: replaced the invented confirmation modal with what the code actually does (a plain `<Button loading={phase.name === 'uploading'}>Confirm delivery</Button>` at line 365, with no dialog, where line 397 confirms "What follows it is a stub, not a confirmation dialog", and line 392's "can never be undone" is an internal source comment rather than UI copy). Tightened `Phase` union line citation to lines 71–79.
+- **T3:** Fixed description of `Button.tsx` behavior under `loading={true}` (lines 93–105): `loading` sets `disabled`, replaces `leadingIcon` with `<Spinner>`, and suppresses `trailingIcon`, while `{children}` (action label) continues to render unconditionally. Qualified `DeliveryDetail.tsx` as an example: while it uses `loading` on the irreversible proof commit at line 365, it also sets `loading` on the camera-capture button at line 331, which is not an irreversible commit. Tightened `RsvpLogForm.tsx` button citation to lines 374–382 (line 377 is `loading={saving}`).
+- **T4:** Replaced non-existent route `rsvp/status/[groupId]/loading.tsx` with real loading component `src/app/(staff)/[eventCode]/rsvp/call/[groupId]/loading.tsx`.
+- **T5 (Right):** Replaced non-existent `src/lib/actions/extraction.ts` and non-RPC caller `rsvp/review/[extractionId]/page.tsx` with `src/lib/actions/review.ts:24` (and `src/lib/actions/review-audit.ts:70`), which directly invoke `apply_rsvp_extraction()`.
+- **T5 (Wrong — Central finding corrected):** Corrected false claim that `save_rsvp_log` makes the second `releaseGroupAfterCall` round trip "completely redundant". Verified against database migrations: `save_rsvp_log` (`20260807000502_code_auth_attribution.sql:133`, lines 194–195) nulls `locked_by` and `locked_until`, but does not clear `locked_by_staff` (which was introduced later in `20260808100000_attribution_split.sql`). In field/team sessions, `claim_group` sets `locked_by_staff = <staff id>` (`20260814140000_remove_staff_identity_gate.sql:121–124`). Nulling `locked_until` ends the lock's blocking effect, but the second call to `release_group` (`:154–155`) is necessary to clear `locked_by_staff`, which is an `ON DELETE RESTRICT` foreign key reference to `staff_members` (CLAUDE.md §5.9). Noted that code comments at `RsvpLogForm.tsx:189–191` and `src/lib/actions/rsvp.ts:26–27` ("belt to that braces") are themselves imprecise, and the second call cannot simply be deleted without updating the database RPC.
+- **T7:** Corrected overstatements in `RsvpLogForm.tsx`: line 182 calls `setSaving(false)` unconditionally and errors are sanitized through `friendlyDbError()` (`src/lib/actions/rsvp.ts:99`). Clarified that the real defect is the lack of a `try/catch` around lines 176–181, which would leave `saving` permanently true on unhandled promise rejections, alongside the absence of an offline outbox queue.
+- Verified all 22 cited file paths exist on disk via `test-results/ui2/check-paths.mjs`.
+
+
