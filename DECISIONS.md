@@ -1458,3 +1458,58 @@ both client redirects at it, delete the other, and update the stale doc comment 
 `guests/list/page.tsx` which still claims a client is redirected to *this* page. Deleting a
 route is a product decision and the last fork deletion in this repo was recorded as a
 deliberate one, so it is left to a human rather than taken unilaterally by this session.
+
+---
+
+## 21 September 2026 — adversarial review of V2 and V3: what it found, what it changed
+
+Claude Code was rate-limited for the whole of these sessions, so independent review was run
+with fresh-context review agents instead. Both reviews were worth the cost, and both found
+things I had got wrong and would not have caught by re-reading my own work.
+
+**V2 review (fixed in `fe8e444`).** Four defects, two of them user-visible regressions I had
+introduced:
+  - offline showed a skeleton FOREVER. With TanStack's default `networkMode: 'online'` a
+    fetch issued offline is PAUSED, not failed, so `isPending` stays true and no error is
+    ever set. Worse than the TTL cache it replaced, which caught the failure and rendered an
+    ErrorState. Fixed with `networkMode: 'always'`, and pinned by
+    `tests/query-offline.test.ts` so the reasoning is executable rather than a comment.
+  - the realtime channel was torn down and rebuilt on every render (the key was a fresh
+    array and a subscription-effect dependency, so lock updates could be missed).
+  - `keepPreviousData` was dead code, and the commit message claimed otherwise. Fixed on the
+    code side, because T4 is the requirement and it is right.
+  - queue filter keys were not fully normalised (`undefined` vs `null`, duplicate statuses).
+
+**V3 review (fixed in `3ab8eb5` and `689d30a`).** The review returned FAIL, correctly. Four
+HIGH defects:
+  - **My PowerShell edits corrupted the UTF-8** of both wired screens in `3ffa11d` — the
+    UndoBar literally read "Ravi Sharma Â· Checked in" — plus `keys.ts` and
+    `tests/query-keys.test.ts` from the same mistake in the V2 session. 40 sites repaired.
+    I had SEEN this in console output earlier and dismissed it as console rendering. It was
+    not. **Never use PowerShell `Set-Content` / `Add-Content` on source files here**; use the
+    edit tool, and run `C:\dev\EventFlow-ui2\encoding-audit.mjs` afterwards if in doubt.
+  - an offline tap was a SILENT NO-OP: the patch was reverted before queueing, and
+    `syncState`/`queuedCount` were returned by the hook and rendered by nobody. Fixed.
+  - a connected-but-unreachable link (venue Wi-Fi, associated and carrying nothing) lost the
+    write instead of queueing it. `WriteOutcome` now distinguishes a transport failure from a
+    server decision.
+  - the per-row reconciler could leave a row asserting state the database never accepted,
+    because `check_in_room` acts on the family's OLDEST assignment rather than the tapped row
+    and `check_out_room` clears all of them. On a per-GUEST table that meant a stale
+    `occupiedByOther` and a room guard that stopped protecting it. Fixed by always re-reading
+    after a settle — the same round trip the pre-V3 `await reload()` always paid.
+
+**Recorded, NOT fixed, and carried forward deliberately.** The V3 review also found real
+issues that are narrower or need a decision, and they are listed in the `689d30a` commit
+message rather than left to be rediscovered: the queue drains only on an `online` transition
+(so a row that fails while the phone stays online is never retried); the replay ignores the
+row's own `eventId`, so a queued write replays into whichever event is open — a tenancy bug
+in waiting; `stuckWrites`/`listQueuedWrites` have no surface; the UndoBar's `aria-live`
+region is inserted with its content rather than changing in place, and its 7-second window
+has no countdown or extension (WCAG 2.2.1); `revert()` is unguarded after `send()`; and
+`disabled={suggesting}` on the arrivals "Suggest vehicle" button is a T3 dead control.
+
+**The lesson worth keeping.** Both reviews found user-visible defects that typecheck, eslint,
+219 unit tests and a clean production build all passed straight through. Verification that
+only exercises code in isolation cannot see a screen that never stops loading, and cannot see
+mojibake. Independent review is not a formality on this codebase.
