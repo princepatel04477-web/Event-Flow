@@ -1370,3 +1370,39 @@ that difference rather than claiming the shell fixed a data-loss bug it did not.
 Two per-screen mounts were removed at the same time, not left in place: they render at the
 same `fixed inset-x-0 bottom-nav` position, so both would have drawn and the text would have
 doubled into a blur.
+
+---
+
+## 21 September 2026 — V3 depends on V2 per screen: why the last two writes are blocked
+
+The remaining V3-named writes are not blocked on the hook. They are blocked on their
+SCREENS, and the reason is worth writing down because it reorders the series.
+
+**V3 cannot be applied to a screen V2 has not converted.** An optimistic write works by
+patching a cache entry, so the screen has to be reading through `useQuery` with a key from
+`src/lib/query/keys.ts` before there is anything to patch. Check-in worked because its read
+was converted in the same pass; mark-arrived worked because V2 had already converted the
+arrivals board.
+
+Checked, not assumed:
+
+- **RSVP outcome** (`RsvpLogForm.tsx`) — the screen takes its data as SERVER-RENDERED PROPS
+  (`RsvpLogFormProps`, and `page.tsx` awaits `claimGroupForCall` and passes the result down).
+  There is no query cache entry to patch, so there is nothing for V3 to make optimistic
+  until that screen is converted to a query read.
+- **Vehicle assignment** (`LogisticsClient.tsx:96, :100`) — still on `useStableData`, the
+  hand-rolled TTL cache V2 exists to replace. Same sequencing problem, and this one also has
+  no reverse action at all (`commitTrips` takes a whole proposal), so it additionally needs
+  a decision about what Undo should even mean before a hook is involved.
+
+So the order for the next session is: **V2 the screen, then V3 the write.** Trying V3 first
+produces a hook with nothing to attach to.
+
+That also means V3's "and no others this session" is better read as a ceiling than a
+checklist: the number of writes that can be made optimistic is bounded by how many screens
+have a query read, and after this session that is three list screens, the check-in board and
+the arrivals board.
+
+Noted separately and still true: about 40 `loading={...}` controls remain app-wide, most on
+screens outside V0-V3's scope (fleet, departures, deliveries, import, admin). They are the
+backlog, not a regression introduced here.
