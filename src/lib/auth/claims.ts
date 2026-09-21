@@ -23,6 +23,8 @@ export interface CodeAuthClaims {
   accessCodeId: string
   /** The selected staff member, set after the "Who are you?" picker. */
   staffMemberId: string | null
+  /** Field team department — set when staff_member_id is bound. */
+  department: 'management' | 'logistics' | 'hospitality' | 'hamper' | 'production' | null
 }
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? process.env.APP_JWT_SECRET ?? '')
@@ -45,16 +47,25 @@ export async function verifyCodeAuthToken(token: string | undefined | null): Pro
     const eventId = payload.event_id
     const accessCodeId = payload.access_code_id
     const staffMemberId = payload.staff_member_id ?? null
+    const departmentRaw = payload.department ?? null
 
     if (appRole !== 'team' && appRole !== 'client') return null
     if (typeof eventId !== 'string' || !eventId) return null
     if (typeof accessCodeId !== 'string' || !accessCodeId) return null
+
+    const departments = ['management', 'logistics', 'hospitality', 'hamper', 'production'] as const
+    const department: CodeAuthClaims['department'] =
+      typeof departmentRaw === 'string' &&
+      (departments as readonly string[]).includes(departmentRaw)
+        ? (departmentRaw as CodeAuthClaims['department'])
+        : null
 
     return {
       appRole,
       eventId,
       accessCodeId,
       staffMemberId: typeof staffMemberId === 'string' ? staffMemberId : null,
+      department,
     }
   } catch {
     // Signature invalid, expired, or malformed — treat as not signed in.

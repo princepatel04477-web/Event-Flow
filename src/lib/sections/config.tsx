@@ -8,6 +8,10 @@ import {
   GiftIcon,
   ClipboardCheckIcon,
 } from '@/components/icons'
+import {
+  DEPARTMENT_SECTIONS,
+  type StaffDepartment,
+} from '@/lib/departments'
 
 export type SectionId = 'dashboard' | 'guests' | 'rsvp' | 'logistics' | 'hospitality' | 'hamper' | 'production'
 
@@ -26,23 +30,35 @@ export interface SectionDef {
   tabLabel: string
   icon: ReactNode
   roles: TabAccess[]
+  /** Departments that may see this section (management always sees all). */
+  departments: StaffDepartment[]
   children: SectionChild[]
   /** Set when the section is defined but gated behind this feature flag. Flag-off means
    *  the section renders nowhere — no tab, no sidebar entry, no placeholder route. */
   featureFlag?: 'production'
 }
 
+const ALL_DEPTS: StaffDepartment[] = [
+  'management',
+  'logistics',
+  'hospitality',
+  'hamper',
+  'production',
+]
+
 export const SECTIONS: Record<SectionId, SectionDef> = {
   dashboard: {
     id: 'dashboard', label: 'Dashboard', tabLabel: 'Board',
     icon: <GridIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team', 'client'],
+    departments: ALL_DEPTS,
     children: [],
   },
   guests: {
     id: 'guests', label: 'Guests', tabLabel: 'Guests',
     icon: <UsersIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
+    departments: ['management'],
     children: [
       { segment: 'list', label: 'Guest list', roles: ['admin','event_team','client'], isDefault: true },
       // Import is event_team too, not admin-only. It was admin-only, which is
@@ -58,8 +74,10 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     id: 'rsvp', label: 'RSVP', tabLabel: 'RSVP',
     icon: <PhoneIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
+    departments: ['management'],
     children: [
-      { segment: 'queue', label: 'Call queue', roles: ['admin','event_team'], isDefault: true },
+      { segment: 'campaigns', label: 'Campaigns', roles: ['admin','event_team'], isDefault: true },
+      { segment: 'queue', label: 'Call queue', roles: ['admin','event_team'] },
       { segment: 'status', label: 'RSVP status', roles: ['admin','event_team'] },
       { segment: 'review', label: 'Review', roles: ['admin','event_team'] },
       { segment: 'unmatched', label: 'Unmatched', roles: ['admin','event_team'] },
@@ -69,6 +87,7 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     id: 'logistics', label: 'Logistics', tabLabel: 'Travel',
     icon: <CarIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
+    departments: ['management', 'logistics'],
     children: [
       { segment: 'arrivals', label: 'Arrivals', roles: ['admin','event_team'], isDefault: true },
       { segment: 'departures', label: 'Departures', roles: ['admin','event_team'] },
@@ -103,6 +122,7 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     id: 'hospitality', label: 'Hotel', tabLabel: 'Hotel',
     icon: <BuildingIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
+    departments: ['management', 'hospitality'],
     children: [
       { segment: 'rooms', label: 'Stay', roles: ['admin','event_team'], isDefault: true },
       { segment: 'checkin', label: 'Check-in / out', roles: ['admin','event_team'] },
@@ -112,6 +132,7 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     id: 'hamper', label: 'Hamper', tabLabel: 'Hamper',
     icon: <GiftIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
+    departments: ['management', 'hamper'],
     // No children: the section IS the screen, at /{eventCode}/hamper.
     children: [],
   },
@@ -119,8 +140,8 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     id: 'production', label: 'Production', tabLabel: 'Prep',
     icon: <ClipboardCheckIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
+    departments: ['management', 'production'],
     children: [],
-    featureFlag: 'production',
   },
 } as const
 

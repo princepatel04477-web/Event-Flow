@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { type ReactNode } from 'react'
 
+import { sectionAllowedForDepartment, type StaffDepartment } from '@/lib/departments'
 import { cn } from '@/lib/utils'
 import { SECTIONS, type SectionId, type TabAccess } from '@/lib/sections/config'
 
@@ -13,6 +14,8 @@ export { SECTIONS }
 export interface BottomTabsProps {
   eventCode: string
   access: TabAccess
+  /** Field team department from JWT; null = dashboard only until name is picked. */
+  department?: StaffDepartment | null
 }
 
 /**
@@ -23,18 +26,27 @@ export interface BottomTabsProps {
  * Icons are from the section config — one source of truth shared with the
  * sidebar, breadcrumbs, and section headers.
  */
-export function BottomTabs({ eventCode, access }: BottomTabsProps) {
+export function BottomTabs({ eventCode, access, department = null }: BottomTabsProps) {
   const pathname = usePathname()
   const segments = pathname.split('/').filter(Boolean)
   // segments = [eventCode, section, ...children]
   const currentSection = segments.length >= 2 ? segments[1] : ''
 
-  // Operational sections that staff and admin can reach, with feature flags respected.
+  const roleOk = (s: (typeof SECTIONS)[SectionId]) =>
+    (access === 'admin' && s.roles.includes('admin'))
+    || (access === 'event_team' && s.roles.includes('event_team'))
+    || (access === 'client' && s.roles.includes('client'))
+
+  const deptOk = (s: (typeof SECTIONS)[SectionId]) => {
+    if (access === 'admin') return true
+    if (access === 'client') return true
+    if (!department) return s.id === 'dashboard'
+    if (department === 'management') return true
+    return s.departments.includes(department)
+  }
+
   const visibleSections = Object.values(SECTIONS).filter(
-    (s) => s.featureFlag === undefined &&
-      ((access === 'admin' && s.roles.includes('admin'))
-        || (access === 'event_team' && s.roles.includes('event_team'))
-        || (access === 'client' && s.roles.includes('client')))
+    (s) => s.featureFlag === undefined && roleOk(s) && deptOk(s),
   )
 
   if (visibleSections.length === 0) return null

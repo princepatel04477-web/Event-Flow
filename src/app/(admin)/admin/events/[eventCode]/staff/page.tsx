@@ -30,7 +30,7 @@ export default async function StaffPage({ params }: PageProps) {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('staff_members')
-    .select('id, full_name, is_active, created_at')
+    .select('id, full_name, is_active, department, created_at')
     // Same ordering as /pick-staff, so the admin sees the list in the order
     // the caller will see it. Active first: a long deactivated tail must not
     // push the people who are actually working below the fold.
@@ -42,6 +42,7 @@ export default async function StaffPage({ params }: PageProps) {
     id: r.id,
     fullName: r.full_name,
     isActive: r.is_active,
+    department: r.department ?? 'management',
   }))
 
   return (

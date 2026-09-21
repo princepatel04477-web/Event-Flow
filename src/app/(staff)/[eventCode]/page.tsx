@@ -1,12 +1,14 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 
 import { AttentionPanel } from '@/components/dashboard/AttentionPanel'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { ShieldAlertIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { readBoard } from '@/lib/actions/dashboard'
+import { getStaffViewerContext } from '@/lib/auth/section-guard'
+import { departmentHomePath } from '@/lib/departments'
 import {
   requireStaff,
   resolveEventByCode,
@@ -27,15 +29,16 @@ export const metadata: Metadata = {
  * key — the sentence itself is ours, so a crafted URL cannot put words in
  * the app's mouth.
  */
-const DENIED_MESSAGES: Record<DeniedReason, string> = {
+const DENIED_MESSAGES: Record<DeniedReason | 'section', string> = {
   import:
     'Importing the guest list is an admin job, so we brought you back here. Ask your event admin to run the import.',
   admin: 'That screen is admin-only, so we brought you back here.',
+  section: 'That screen is for another team. Use the tabs at the bottom for your department.',
 }
 
 function deniedMessage(value: string | undefined): string | null {
   if (!value) return null
-  return DENIED_MESSAGES[value as DeniedReason] ?? null
+  return DENIED_MESSAGES[value as DeniedReason | 'section'] ?? null
 }
 
 type PageProps = {
@@ -59,7 +62,15 @@ export default async function EventDashboardPage({ params, searchParams }: PageP
   // `app.is_staff()` — FALSE for a client. So the read returns ONE row of
   // zeros, not zero rows, and the `!stats` fallback below never fires. The
   // client would be told "Total groups 0" for a 238-family wedding.
-  await requireStaff(event.id, event.code)
+  const staffCtx = await requireStaff(event.id, event.code)
+  const viewerCtx = await getStaffViewerContext(event.id)
+  if (
+    viewerCtx?.department &&
+    viewerCtx.department !== 'management' &&
+    staffCtx === 'event_team'
+  ) {
+    redirect(departmentHomePath(event.code, viewerCtx.department))
+  }
 
   // Both reads go through the 30s TTL cache in dashboard.ts, and the
   // request-scoped Supabase client is shared, so a revisit renders from

@@ -92,6 +92,24 @@ export type Database = {
         | "confirmed"
         | "declined"
         | "unreachable"
+      rsvp_campaign_status: "draft" | "scheduled" | "running" | "paused" | "completed"
+      rsvp_campaign_wave: "wave_1" | "wave_2" | "wave_3"
+      rsvp_job_status:
+        | "pending"
+        | "ringing"
+        | "completed"
+        | "no_answer"
+        | "declined"
+        | "failed"
+        | "dnd"
+        | "skipped"
+        | "callback"
+      staff_department:
+        | "management"
+        | "logistics"
+        | "hospitality"
+        | "hamper"
+        | "production"
       side: "bride" | "groom" | "both" | "other"
       travel_direction: "arrival" | "departure"
       travel_mode: "air" | "train" | "bus" | "cab" | "self_drive"
@@ -2064,6 +2082,99 @@ export type Database = {
           },
         ]
       }
+      rsvp_campaign_jobs: {
+        Row: {
+          agent_notes: string | null
+          call_attempt_id: string | null
+          call_recording_id: string | null
+          campaign_id: string
+          completed_at: string | null
+          created_at: string
+          dial_attempts: number
+          error_text: string | null
+          event_id: string
+          extraction_id: string | null
+          group_id: string
+          id: string
+          last_dialed_at: string | null
+          status: Database['app']['Enums']['rsvp_job_status']
+          updated_at: string
+        }
+        Insert: {
+          agent_notes?: string | null
+          call_attempt_id?: string | null
+          call_recording_id?: string | null
+          campaign_id: string
+          completed_at?: string | null
+          created_at?: string
+          dial_attempts?: number
+          error_text?: string | null
+          event_id: string
+          extraction_id?: string | null
+          group_id: string
+          id?: string
+          last_dialed_at?: string | null
+          status?: Database['app']['Enums']['rsvp_job_status']
+          updated_at?: string
+        }
+        Update: {
+          agent_notes?: string | null
+          call_attempt_id?: string | null
+          call_recording_id?: string | null
+          campaign_id?: string
+          completed_at?: string | null
+          created_at?: string
+          dial_attempts?: number
+          error_text?: string | null
+          event_id?: string
+          extraction_id?: string | null
+          group_id?: string
+          id?: string
+          last_dialed_at?: string | null
+          status?: Database['app']['Enums']['rsvp_job_status']
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rsvp_campaigns: {
+        Row: {
+          created_at: string
+          days_before: number
+          event_id: string
+          id: string
+          label: string
+          max_concurrent: number
+          scheduled_for: string | null
+          status: Database['app']['Enums']['rsvp_campaign_status']
+          updated_at: string
+          wave: Database['app']['Enums']['rsvp_campaign_wave']
+        }
+        Insert: {
+          created_at?: string
+          days_before: number
+          event_id: string
+          id?: string
+          label: string
+          max_concurrent?: number
+          scheduled_for?: string | null
+          status?: Database['app']['Enums']['rsvp_campaign_status']
+          updated_at?: string
+          wave: Database['app']['Enums']['rsvp_campaign_wave']
+        }
+        Update: {
+          created_at?: string
+          days_before?: number
+          event_id?: string
+          id?: string
+          label?: string
+          max_concurrent?: number
+          scheduled_for?: string | null
+          status?: Database['app']['Enums']['rsvp_campaign_status']
+          updated_at?: string
+          wave?: Database['app']['Enums']['rsvp_campaign_wave']
+        }
+        Relationships: []
+      }
       rsvp_extractions: {
         Row: {
           applied_at: string | null
@@ -2202,6 +2313,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          department: Database['app']['Enums']['staff_department']
           event_id: string
           full_name: string
           id: string
@@ -2211,6 +2323,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          department?: Database['app']['Enums']['staff_department']
           event_id: string
           full_name: string
           id?: string
@@ -2220,6 +2333,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          department?: Database['app']['Enums']['staff_department']
           event_id?: string
           full_name?: string
           id?: string
@@ -3802,6 +3916,25 @@ export const Constants = {
       group_type: ["family", "couple", "friends", "single"],
       message_status: ["queued", "sent", "delivered", "read", "failed"],
       recording_source: ["harvested", "voice_note"],
+      rsvp_campaign_status: [
+        "draft",
+        "scheduled",
+        "running",
+        "paused",
+        "completed",
+      ],
+      rsvp_campaign_wave: ["wave_1", "wave_2", "wave_3"],
+      rsvp_job_status: [
+        "pending",
+        "ringing",
+        "completed",
+        "no_answer",
+        "declined",
+        "failed",
+        "dnd",
+        "skipped",
+        "callback",
+      ],
       rsvp_status: [
         "not_started",
         "attempted",
@@ -3810,6 +3943,13 @@ export const Constants = {
         "confirmed",
         "declined",
         "unreachable",
+      ],
+      staff_department: [
+        "management",
+        "logistics",
+        "hospitality",
+        "hamper",
+        "production",
       ],
       side: ["bride", "groom", "both", "other"],
       travel_direction: ["arrival", "departure"],

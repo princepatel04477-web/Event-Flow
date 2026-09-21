@@ -56,6 +56,7 @@ async function mintJwt(opts: {
   appRole: 'team' | 'client'
   accessCodeId: string
   staffMemberId: string
+  department: string
   expirySec: number
 }): Promise<string> {
   const key = await getSignKey()
@@ -65,6 +66,7 @@ async function mintJwt(opts: {
     event_id: opts.eventId,
     access_code_id: opts.accessCodeId,
     staff_member_id: opts.staffMemberId,
+    department: opts.department,
   })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setSubject(opts.accessCodeId)
@@ -126,7 +128,7 @@ Deno.serve(async (req) => {
   // 2. The staff member must belong to the JWT's event and be active.
   const { data: staff, error } = await db
     .from('staff_members')
-    .select('id, event_id, is_active')
+    .select('id, event_id, is_active, department')
     .eq('id', staffMemberId)
     .maybeSingle()
 
@@ -149,11 +151,17 @@ Deno.serve(async (req) => {
     ? Math.max(60, claims.exp - Math.floor(Date.now() / 1000))
     : 60 * 60 * 24 * 7
 
+  const department =
+    typeof staff.department === 'string' && staff.department
+      ? staff.department
+      : 'management'
+
   const newToken = await mintJwt({
     eventId,
     appRole,
     accessCodeId,
     staffMemberId,
+    department,
     expirySec,
   })
 

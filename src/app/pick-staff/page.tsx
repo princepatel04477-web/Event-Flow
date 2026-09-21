@@ -41,7 +41,7 @@ export default async function PickStaffPage() {
   const [{ data: members, error }, viewer] = await Promise.all([
     supabase
       .from('staff_members')
-      .select('id, full_name, is_active')
+      .select('id, full_name, is_active, department')
       .eq('event_id', claims.eventId)
       .eq('is_active', true)
       .order('full_name', { ascending: true }),

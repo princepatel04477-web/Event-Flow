@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
+import { STAFF_DEPARTMENTS, type StaffDepartment } from '@/lib/departments'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -58,14 +59,22 @@ const nameSchema = z
  * pickable — which is the point: the admin is usually adding it because
  * somebody is standing there unable to log a call.
  */
+const departmentSchema = z.enum(STAFF_DEPARTMENTS)
+
 export async function createStaffMember(
   eventId: string,
   eventCode: string,
   rawName: string,
+  rawDepartment: string = 'management',
 ): Promise<StaffActionResult> {
   const parsed = nameSchema.safeParse(rawName)
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Enter a name.' }
+  }
+
+  const deptParsed = departmentSchema.safeParse(rawDepartment)
+  if (!deptParsed.success) {
+    return { ok: false, error: 'Pick a department.' }
   }
 
   const supabase = await createClient()
@@ -81,6 +90,7 @@ export async function createStaffMember(
   const { error } = await supabase.from('staff_members').insert({
     event_id: eventId,
     full_name: parsed.data,
+    department: deptParsed.data,
     created_by: user.id,
   })
 
@@ -108,6 +118,33 @@ export async function createStaffMember(
  * and rightly: "who logged this call" must stay answerable after they go
  * home. Deactivating removes them from /pick-staff without touching history.
  */
+export async function setStaffMemberDepartment(
+  staffId: string,
+  eventCode: string,
+  rawDepartment: string,
+): Promise<StaffActionResult> {
+  const deptParsed = departmentSchema.safeParse(rawDepartment)
+  if (!deptParsed.success) {
+    return { ok: false, error: 'Pick a department.' }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('staff_members')
+    .update({ department: deptParsed.data })
+    .eq('id', staffId)
+
+  if (error) {
+    if (error.code === RLS_DENIED) {
+      return { ok: false, error: 'Only an admin can change departments.' }
+    }
+    return { ok: false, error: error.message }
+  }
+
+  revalidateStaff(eventCode)
+  return { ok: true }
+}
+
 export async function setStaffMemberActive(
   staffId: string,
   eventCode: string,

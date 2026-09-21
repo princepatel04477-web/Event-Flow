@@ -9,9 +9,12 @@ import { setCodeAuthStaffToken } from '@/lib/auth/session'
 import { persistClaims, readStoredClaims } from '@/lib/native/session-keeper'
 import { cn } from '@/lib/utils'
 
+import { DEPARTMENT_LABELS, type StaffDepartment } from '@/lib/departments'
+
 interface StaffMember {
   id: string
   full_name: string
+  department?: StaffDepartment | null
 }
 
 /**
@@ -107,7 +110,12 @@ export function StaffPicker({ members, eventCode }: { members: StaffMember[]; ev
               )}
             >
               <UserIcon className="h-5 w-5 shrink-0 text-muted" />
-              <span className="min-w-0 flex-1 truncate font-semibold text-fg">{m.full_name}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold text-fg">{m.full_name}</span>
+                {m.department ? (
+                  <span className="text-xs text-muted">{DEPARTMENT_LABELS[m.department]}</span>
+                ) : null}
+              </span>
               {pending === m.id ? (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-rule-strong border-t-brand" aria-hidden />
               ) : null}

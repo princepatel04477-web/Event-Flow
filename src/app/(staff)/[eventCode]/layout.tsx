@@ -7,6 +7,7 @@ import { BottomTabs } from '@/components/nav/BottomTabs'
 import { SectionTabs } from '@/components/nav/SectionTabs'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { StickyHeader } from '@/components/ui/StickyHeader'
+import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
 import { getEventAccess, getViewer, resolveEventByCode } from '@/lib/supabase/queries'
 import { cn, formatDateRange } from '@/lib/utils'
@@ -55,6 +56,10 @@ export default async function EventLayout({ children, params }: LayoutProps) {
   // cannot see the pathname and sniffing headers() to fake it would opt this
   // whole subtree out of static rendering.
   const access = await getEventAccess(event.id)
+  const staffCtx = access === 'admin' || access === 'event_team'
+    ? await getStaffViewerContext(event.id)
+    : null
+  const department = staffCtx?.department ?? null
 
   // Belt and braces: getEventByCode already returned null for a non-member,
   // so this cannot fire. It documents the invariant rather than assuming it.
@@ -115,12 +120,12 @@ export default async function EventLayout({ children, params }: LayoutProps) {
           {/* The second navigation level. Renders nothing for a section with
               fewer than two reachable children, so most screens are unchanged
               — see SectionTabs. */}
-          <SectionTabs eventCode={event.code} access={access} />
+          <SectionTabs eventCode={event.code} access={access} department={department} />
           {children}
         </div>
       </main>
 
-      <BottomTabs eventCode={event.code} access={access} />
+      <BottomTabs eventCode={event.code} access={access} department={department} />
     </div>
   )
 }

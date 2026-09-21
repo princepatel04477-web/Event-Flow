@@ -3,12 +3,14 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import type { StaffDepartment } from '@/lib/departments'
 import { SECTIONS, type SectionId, type TabAccess } from '@/lib/sections/config'
 import { cn } from '@/lib/utils'
 
 interface SectionTabsProps {
   eventCode: string
   access: TabAccess
+  department?: StaffDepartment | null
 }
 
 /**
@@ -27,7 +29,7 @@ interface SectionTabsProps {
  * Dashboard and Hamper (no children) and a client's Guests (one permitted
  * child) get no strip rather than a strip with one useless tab in it.
  */
-export function SectionTabs({ eventCode, access }: SectionTabsProps) {
+export function SectionTabs({ eventCode, access, department = null }: SectionTabsProps) {
   const pathname = usePathname()
   // segments = [eventCode, section, child, ...rest]
   const segments = pathname.split('/').filter(Boolean)
@@ -36,7 +38,16 @@ export function SectionTabs({ eventCode, access }: SectionTabsProps) {
 
   if (!section || section.featureFlag !== undefined) return null
 
-  const visible = section.children.filter((c) => c.roles.includes(access))
+  const deptOk =
+    access === 'admin'
+    || access === 'client'
+    || !department
+    || department === 'management'
+    || section.departments.includes(department)
+
+  const visible = section.children.filter(
+    (c) => c.roles.includes(access) && deptOk,
+  )
   if (visible.length < 2) return null
 
   // On a section root (`/EVENT/rsvp`) the default child is what actually
