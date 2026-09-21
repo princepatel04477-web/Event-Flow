@@ -1765,3 +1765,176 @@ an alias, not a hole. The alternative, deleting `(staff)` up front, would have e
 "old app keeps working while the new one is half-built" property the whole screen-by-screen
 plan rests on.
 
+---
+
+## 22 September 2026 — V7: the four jobs, as four screens in the `v2` group
+
+The new group now holds the four things staff actually do, at the URLs the app already uses:
+
+| job | path |
+|---|---|
+| Call the next family | `(app)/v2/[eventCode]/rsvp/queue` |
+| Give a family a room | `(app)/v2/[eventCode]/hospitality/rooms` |
+| Deliver a hamper | `(app)/v2/[eventCode]/hospitality/deliveries` (+ `[deliverableId]`) |
+| Meet an arrival | `(app)/v2/[eventCode]/logistics/arrivals` |
+
+Every link inside them is bare (`/${eventCode}/...`), per the rewrite's contract: a link that
+carries the internal `/v2` prefix or a route-group segment is not the public URL and 404s.
+
+### The guards had to be copied, because a route group's layouts do not cross groups
+
+A v2 page does NOT sit under `(staff)/[eventCode]/<section>/layout.tsx`, so nothing in
+`(app)/v2/` inherits `requireSection`. Each page therefore runs it itself:
+`requireSection(event.id, event.code, 'rsvp' | 'hospitality' | 'logistics')`. Without that,
+the only gate left would be the shell's `requireStaff` — a wider door than v1 on the same
+data (a hospitality runner could open the calling list).
+
+The two hamper routes are the exception and it is deliberate: in v1 that SAME screen is
+reached through two section layouts with two different gates (`hospitality/layout.tsx` and
+`hamper/layout.tsx`), and a hamper runner is not a member of `hospitality` — which is why
+`hamper/[deliverableId]/page.tsx` has to pass `backTo="hamper"`. v2 has one route for both
+audiences, so `hospitality/deliveries/_guard.ts` allows the UNION of the two departments and
+still turns travel/production/clients away with the same `?denied=section` redirect.
+
+### Job 1 — the card is the head of the list, spread per phone
+
+The screen shows ONE family: the head of `v_rsvp_queue` in the order who-is-next already
+uses (`attempt_count`, `last_attempt_at`, `priority`, `head_name` — `rsvp/next/page.tsx`'s
+sort, not the v1 board's). After a save the family is filtered out of the cache and the key
+is re-read, so the next family is already there with no navigation.
+
+Two consequences that are not obvious:
+
+- **The default filter is `not_started` + `attempted`.** With every status in view (the v1
+  board's default) the family that was just logged comes straight back to the top of the
+  re-read list, which reads as the save having failed.
+- **A per-phone offset spreads the team.** Ten callers all working "the next family" would
+  all be shown the same head of one shared ordering and would ring the same uncle at once.
+  `sessionStorage['eventflow:queue:offset']` — the same key and the same 0-11 range the v1
+  board uses — decides which family is on screen. v1 used it to choose where a register
+  starts scrolling; here it is load-bearing.
+
+### Job 1 — what the five taps write, and why two of them open a sheet
+
+The order of events is `call_attempts` BEFORE `tel:` and never after (CLAUDE.md §12: `tel:`
+backgrounds the WebView and Android may discard page state, so the dial button's tap is the
+only guaranteed moment). Logging an outcome then writes TWO records in ONE round trip, in
+parallel: `save_rsvp_log` (the RSVP outcome, the thing the calling shift exists for) and
+`submitCallOutcome` (closes the frozen `call_attempts` row, so the queue's attempt count and
+last outcome are real). Sequentially that would be the "three round trips" V5 removed.
+
+Two of the five outcomes cannot commit on the tap, and defaulting them would be inventing
+data: `rsvpLogSchema` refuses a `confirmed`/`tentative` log with no head count, and a
+`callback` with no time. So "Coming" and "Maybe" open a pre-filled counter (from the family's
+own `adults_confirmed`/`expected_pax`) and "Call back" opens a time. "Not coming" and "No
+answer" are one tap, as the brief asks.
+
+The labels and the mapping onto `app.rsvp_status` are the v1 outcome form's
+(`unreachable` is "No answer" in `RsvpLogForm`'s own `STATUS_LABELS`). There is no
+`wrong_number` in `app.rsvp_status`, so a wrong number lands where the v1 form puts it.
+
+**No Undo, and not deferred.** The RSVP outcome is forward-only and `call_attempts` freezes
+permanently the moment an outcome is written, so there is no reverse to send and no window in
+which "nothing was sent" is still true. Offering the bar would be the lie
+`useOptimisticAction`'s header warns about.
+
+**`save_rsvp_log` overwrites four columns unconditionally** (`adults_confirmed`,
+`children_confirmed`, `needs_pickup`, `special_requirements`), and `v_rsvp_queue` carries
+none of them. A one-tap outcome sent from the queue row alone would blank a family's head
+counts and clear a pickup flag on its way past. The screen therefore reads the family's own
+record under `queryKeys.families.detail` and hands those four values straight back. It is a
+background read — the card paints from the queue row.
+
+### Job 2 — families first, the room grid second
+
+`readRoomsGrid` (same action, same `queryKeys.rooms.grid` entry the v1 grid will move to) and
+its `underBedded` list is the population this job is for: confirmed families placed below
+their headcount. `placed === 0` is "nowhere to sleep" and gets the write —
+`assignGroupToRoom`, the only action that tops the family's `guests` rows up to its headcount
+FIRST and then inserts every member in one statement, so the room guard fits them all or
+rejects the lot. The room list is the second step, sorted so rooms with headroom come first.
+
+It is `deferUntilCommit`, which is a real Undo (nothing was sent). A reverse exists in
+principle — `releaseGuestFromRoom` — but it is per ASSIGNMENT and this write's ids do not
+exist until the server answers, so an `undo` callback could not name what to release. The
+cost is stated in the code: for seven seconds the bed is not really taken, and if a second
+coordinator claims it the deferred write fails the guard and says so.
+
+`23514` from the merged room guard is folded by the action into one code for two causes
+(capacity and dates), so the screen says both and gives the one action that works.
+
+A family that already has a room but not enough beds is REPORTED, not offered a write that
+cannot work: `assignGroupToRoom` assigns all member rows, so re-running it on a partly-placed
+family would trip `room_assignments_one_active_per_guest`.
+
+### Job 3 — the list, and the proof flow left alone
+
+`readDeliveryRun` (shared `queryKeys.deliveries.list`, `staleTime: 0` so returning from the
+proof screen re-reads rather than offering a hamper sealed seconds ago), pending rows only,
+in walking order. The row opens the existing `DeliveryDetail` — IMPORTED across route groups,
+which is what `hamper/[deliverableId]/page.tsx` already does — with its `backTo` pointed at
+this tree. R1's screen is untouched: a hamper is delivered because a photo exists.
+
+The v1 list's admin "Generate" control is kept (moved to the foot of the screen, admin only)
+because this screen replaces the only place that creates `deliverables` rows; without it an
+event with no hampers could never have any under the flag.
+
+### Job 4 — who lands next
+
+Same five-table read and the same `queryKeys.logistics.arrivals` entry as the v1 board, in the
+same shape (the two screens share one cache entry, so the shapes have to stay in step). The
+first family not yet marked is the hero card; the rest follow in time order; `markArrived`
+goes through `useOptimisticAction` with `deferUntilCommit` (the RPC has no reverse), and a
+marked row leaves the list, so the next arrival is already there. The v1 board's three
+counters, search box, three toggles and five-chip mode strip are all behind one control.
+
+### Small things worth keeping
+
+- **The one filter control sits in the TITLE row**, not as a strip above the content. The
+  brief forbids "more than one row of filter controls, and never before content"; a single
+  control on the heading line satisfies both readings and puts the first family immediately
+  under it.
+- **The five outcome buttons are plain markup with tokens, not `Chip`/`Button`.** `cn()`
+  concatenates and does NOT resolve Tailwind conflicts (its own doc says so), so a
+  `bg-green-tint` passed through `className` sits BESIDE the component's `bg-surface` and
+  which one paints is decided by stylesheet order. The five have to read differently at a
+  glance, so the colour is written rather than fought for.
+- **`SyncChip` carries no `onPress`** — the only existing usage in the app (the
+  design-system page) is the same. It is a status readout; the queue drains itself on
+  reconnect and on returning to the foreground, so a tap that silently re-tried would be a
+  control with nothing behind it.
+
+### Known gaps, recorded rather than papered over
+
+- **Reachability.** The bottom bar does not point at these four paths: Calls →
+  `rsvp/campaigns` and Guests → `guests/list` are section DEFAULTS with no v2 route, and
+  `(app)/v2/[eventCode]/page.tsx` redirects a department runner to `departmentHomePath()`
+  (`management` → `rsvp/campaigns`, `hamper` → `hamper`, `production` → `production`), none
+  of which exist under v2. Reported to the parent session; not fixed here, because
+  `sections/config.tsx` is shared with v1 and a `campaigns` page of ours would shadow the
+  real auto-call screen.
+- **The caller lock is not claimed.** v1's status screen claims the 15-minute lock on open;
+  this screen claims nothing, so two callers CAN log the same family and the later write
+  wins, and `locked_by_staff` residue is not cleaned up. The per-phone offset makes a
+  collision much less likely, but it is not a guard. The fix, when it is wanted, is a claim
+  inside the outcome write — deliberately NOT taken here, because per CLAUDE.md §11b a held
+  lock has no manual release and this session was not asked to add a new way to take one.
+- **A call row that fails to close stays open.** If `save_rsvp_log` lands and
+  `submitCallOutcome` does not, the RSVP is saved and reported saved; the attempt stays
+  unfrozen with a diagnostic sent to Sentry, and the next outcome logged for that family
+  closes it. Reporting the failure instead would tell the runner their outcome was lost when
+  it was not.
+- **No realtime on the calling list.** The v1 board subscribes to `guest_groups` and
+  `call_attempts`; this screen does not, so another caller's lock or outcome shows up on the
+  next read rather than live.
+- **Job 1 lost the server-side count that separated "empty event" from "refused read".** A
+  PostgREST read that RLS refuses returns zero rows with no error, so the empty state says
+  the list is empty and gives the two things that resolve it, instead of claiming the guest
+  list was never imported.
+
+### Verification
+
+`npx tsc --noEmit` clean · `npx eslint` clean on all ten changed files · `npx vitest run`
+228/228 pass. No `npm run build` (the parent session runs it) and **no handset**: nothing
+here is claimed as tested on a phone, with a camera, or against a real tap budget.
+
