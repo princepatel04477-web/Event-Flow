@@ -6,7 +6,7 @@ import { useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { useOnline } from '@/lib/useOnline'
 import { offerUndo } from './undo-store'
 import { stageOptimisticWrite, type ActionResult, type WriteOutcome } from './optimistic'
-import { queuedWriteCount, queueWrite } from './write-queue'
+import { queuedWriteCount, flushWriteQueue, queueWrite, registerWriteReplay } from './write-queue'
 
 /**
  * The one hook every reversible write goes through.
@@ -126,6 +126,42 @@ export function useOptimisticAction<TData, TVars, TResult>(
       alive = false
     }
   }, [options.queue])
+
+  const queueKind = options.queue?.kind
+
+  // Teach the queue how to replay this kind. Without a registered replay a
+  // queued write is never sent — it just sits in IndexedDB while the SyncChip
+  // says "waiting to upload", which is the silent loss the queue exists to
+  // prevent. Keyed on the kind, not the options object, so it does not re-run
+  // on every render.
+  useEffect(() => {
+    if (!queueKind) return
+    registerWriteReplay(queueKind, async (_eventId, payload) => {
+      const result = await opts.current.action(payload as TVars)
+      return result.ok ? { ok: true } : { ok: false, message: result.message }
+    })
+  }, [queueKind])
+
+  // Drain on reconnect. Self-contained rather than hung off OfflineBanner: the
+  // screens that can queue a write are exactly the screens that use this hook,
+  // so wherever a queued write could have come from is also somewhere this runs.
+  useEffect(() => {
+    if (!online) return
+    let alive = true
+    void flushWriteQueue()
+      .then(() => queuedWriteCount())
+      .then((n) => {
+        if (alive) setQueuedCount(n)
+      })
+      .catch(() => {
+        // A failed drain is not worth surfacing: the rows are still queued and
+        // the next reconnect tries again. Saying "could not send" on every
+        // reconnect would train the user to ignore it.
+      })
+    return () => {
+      alive = false
+    }
+  }, [online])
 
   const run = useCallback(
     (vars: TVars) => {

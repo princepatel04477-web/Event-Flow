@@ -98,6 +98,88 @@ export function backoffMs(retries: number): number {
   return Math.min(60_000, Math.pow(2, retries) * 2_000)
 }
 
+/** How many attempts before a write is surfaced as needing attention. */
+export const STUCK_AFTER_RETRIES = 5
+
+/**
+ * How to replay a queued write, by `kind`.
+ *
+ * A paid-for lesson from the shape of this queue: a queue with no replay path is
+ * not a queue, it is a place writes go to die. The first version of this file had
+ * `queueWrite` and no `flush`, so the hook reported a write as "queued" and
+ * nothing ever sent it — the exact silent loss the whole feature exists to
+ * prevent.
+ *
+ * A registry rather than a switch statement, so this module stays generic and
+ * does not have to import every action that might be queued. Each screen
+ * registers its own kind when it mounts.
+ */
+export type WriteReplay = (
+  eventId: string,
+  payload: unknown,
+) => Promise<{ ok: true } | { ok: false; message: string }>
+
+const replays = new Map<string, WriteReplay>()
+
+/** Register how to replay one kind of queued write. Idempotent per kind. */
+export function registerWriteReplay(kind: string, replay: WriteReplay): void {
+  replays.set(kind, replay)
+}
+
+/** Test-only: forget every registered replay. */
+export function __clearWriteReplaysForTests(): void {
+  replays.clear()
+}
+
+/**
+ * Attempt every queued write, oldest first, once each.
+ *
+ * Per-entry independence, exactly as `flushProofQueue` does: one poison row must
+ * not starve the entries behind it. A row with no registered replay is left
+ * alone rather than dropped — dropping it would discard the only record that the
+ * user's write happened.
+ */
+export async function flushWriteQueue(): Promise<number> {
+  const entries = await db.writes.orderBy('createdAt').toArray()
+  let sent = 0
+
+  for (const entry of entries) {
+    const replay = replays.get(entry.kind)
+    if (!replay) continue
+
+    // Respect the backoff: without this, every reconnect event re-attempts every
+    // row at once against a link that has just proved it cannot carry them.
+    if (entry.retries > 0) {
+      const dueAt = entry.createdAt + backoffMs(entry.retries - 1)
+      if (Date.now() < dueAt) continue
+    }
+
+    try {
+      const result = await replay(entry.eventId, JSON.parse(entry.payload))
+      if (result.ok) {
+        await db.writes.delete(entry.localId)
+        sent++
+      } else {
+        await markWriteFailed(entry.localId, result.message)
+      }
+    } catch (e) {
+      await markWriteFailed(
+        entry.localId,
+        e instanceof Error ? e.message : 'Could not send that.',
+      )
+    }
+  }
+
+  return sent
+}
+
+/** Rows that have failed repeatedly, for a "needs attention" surface. */
+export async function stuckWrites(
+  minRetries = STUCK_AFTER_RETRIES,
+): Promise<QueuedWrite[]> {
+  return db.writes.filter((w) => w.retries >= minRetries).toArray()
+}
+
 /** Test-only: empty the queue. IndexedDB persists between vitest cases. */
 export async function __clearWriteQueueForTests(): Promise<void> {
   await db.writes.clear()
