@@ -8,7 +8,7 @@ import { queryKeys } from '@/lib/query/keys'
  *
  * `src/lib/query/keys.ts` deliberately uses TanStack's own key vocabulary, so
  * two call sites that mean the same thing share a cache entry. That is a
- * feature right up until someone adds a factory that forgets the event prefix â€”
+ * feature right up until someone adds a factory that forgets the event prefix —
  * at which point the same browser holding two events (`EventSwitcher`) can paint
  * one event's rows under another event's header, and nothing throws.
  *
@@ -50,7 +50,7 @@ function isEventScoped(key: unknown, eventId: string): boolean {
 
 /**
  * A probe argument per factory. The second parameter's TYPE differs by factory
- * â€” a search factory takes a string, the queue factory takes a filter object â€”
+ * — a search factory takes a string, the queue factory takes a filter object —
  * so one generic value cannot serve them all.
  *
  * If a factory is added and is not listed here, the test FAILS with a message
@@ -82,7 +82,7 @@ const factories = collectFactories(queryKeys)
 describe('query keys are event-scoped', () => {
   it('walks the whole factory tree', () => {
     // If this number drops, a factory was deleted or the tree was restructured
-    // in a way the walk no longer reaches â€” both worth failing on, because
+    // in a way the walk no longer reaches — both worth failing on, because
     // every other test in this file is `it.each` over this list and would
     // otherwise pass vacuously over an EMPTY list.
     expect(factories.length).toBeGreaterThanOrEqual(9)

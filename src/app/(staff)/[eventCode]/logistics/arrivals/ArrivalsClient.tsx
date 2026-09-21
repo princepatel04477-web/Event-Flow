@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -27,7 +27,7 @@ type GuestGroupRow = Database['public']['Tables']['guest_groups']['Row']
  * Only the columns this screen actually paints.
  *
  * Derived with `Pick` from the generated row types rather than hand-written,
- * so a column rename still fails the build here â€” the narrowing is a
+ * so a column rename still fails the build here — the narrowing is a
  * payload optimisation, not an escape from the schema. Keep these in step
  * with the `select()` lists below.
  */
@@ -88,7 +88,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
   // Read once into the shared cache, keyed by event. Returning to this tab, or
   // arriving from anywhere else that warmed the same key, paints from memory
   // instead of re-querying venue Wi-Fi (docs/INTERACTION-CONTRACT.md T4). The
-  // processing below is pure and cheap â€” it re-runs on every render over the
+  // processing below is pure and cheap — it re-runs on every render over the
   // cached rows.
   const {
     data: raw,
@@ -101,7 +101,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
       // Columns are listed explicitly rather than `select('*')`. This screen
       // needs 8 of guest_groups' 27 columns; pulling the rest ships remarks,
       // hashes and lock state for every family down a venue 3G link for
-      // nothing. Released assignments are filtered SERVER-side â€” sending
+      // nothing. Released assignments are filtered SERVER-side — sending
       // them just to `continue` past them is payload we pay for twice.
       const result = await traceFetch('arrivals :: load', () =>
         Promise.all([
@@ -139,7 +139,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
 
       // Index once, then look up in constant time. The previous version ran
       // `rooms.find()` and `hotels.find()` INSIDE the loop over assignments,
-      // which is O(assignments Ã— rooms) â€” on a 677-family event with a few
+      // which is O(assignments Ã— rooms) — on a 677-family event with a few
       // hundred rooms that is hundreds of thousands of comparisons on the
       // main thread of a cheap Android phone, every single visit.
       const roomById = new Map((rooms ?? []).map((r) => [r.id, r]))
@@ -170,7 +170,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
   /**
    * Marking an arrival, through V3's optimistic path.
    *
-   * DEFERRED, because `mark_arrived` has no reverse â€” the same forward-only
+   * DEFERRED, because `mark_arrived` has no reverse — the same forward-only
    * shape as check-in: the RPC sets `arrived_at` and nothing clears it, so a
    * compensating write could not restore the row. Holding the write until the
    * undo window closes makes Undo mean NOTHING WAS SENT, which is the only
@@ -184,7 +184,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
     queryKey: queryKeys.logistics.arrivals(eventId),
     callSite: 'markArrived',
     deferUntilCommit: true,
-    message: (v) => `${v.headName} Â· Arrived`,
+    message: (v) => `${v.headName} · Arrived`,
     // Every leg this group has on the arrivals board is marked, not just the
     // one row that was tapped: the board filters by group, and leaving a second
     // row showing "expected" for a family that has arrived is a contradiction
@@ -219,7 +219,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
   }
 
   // The first failed write wins. Previously a failure here was `console.error`
-  // and nothing else â€” the row simply reverted with no explanation, which reads
+  // and nothing else — the row simply reverted with no explanation, which reads
   // as the app undoing the user's work at random (docs/INTERACTION-CONTRACT.md
   // T2, UX-RULES R6).
   const writeError = arrive.lastError
@@ -339,7 +339,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
         </div>
         {/* `min-w-0` is the load-bearing class, not `overflow-x-auto`. A flex
             item defaults to min-width:auto, which resolves to its min-content
-            width â€” six nowrap chips â€” so without this the scroller reports a
+            width — six nowrap chips — so without this the scroller reports a
             width wider than the screen, the column stretches to match, and
             EVERY sibling on the page (the section rules, their counts) gets
             pushed past the right edge with it. The overflow then belongs to
@@ -361,7 +361,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
       {rows && rows.length === 0 ? (
         <EmptyState title="No expected arrivals" description="No arrival travel legs are on file for this event yet." />
       ) : filtered.length === 0 ? (
-        <EmptyState title="Nothing matches" description="No arrivals match these filters â€” try clearing one." />
+        <EmptyState title="Nothing matches" description="No arrivals match these filters — try clearing one." />
       ) : (
         <div className="flex flex-col gap-4">
           {todayRows.length > 0 ? (
@@ -385,7 +385,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
 
       {writeError ? (
         // The row was marked and then corrected. Say so, rather than letting it
-        // silently flip back â€” a revert with no explanation reads as the app
+        // silently flip back — a revert with no explanation reads as the app
         // undoing the user's work at random (T2, UX-RULES R6).
         <p
           role="alert"
@@ -430,7 +430,7 @@ function DayBlock({
 /**
  * One expected arrival.
  *
- * The time is the identifier here, not the family â€” this screen is read by
+ * The time is the identifier here, not the family — this screen is read by
  * someone standing at a hotel door working out what lands next, so the
  * clock gets its own column in tabular mono and everything else hangs off
  * it. A row without a room is the one thing on the screen that needs
@@ -453,7 +453,7 @@ function ArrivalRowCard({
   const children = row.group.children_confirmed ?? 0
   const mode = row.leg.mode ? (MODE_LABELS[row.leg.mode] ?? row.leg.mode) : null
 
-  // Â§4.2 â€” vehicle suggestion by PAX. Proposes only; a human commits.
+  // Â§4.2 — vehicle suggestion by PAX. Proposes only; a human commits.
   const [showSuggest, setShowSuggest] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
   const [suggestion, setSuggestion] = useState<PaxSuggestionResult | null>(null)
@@ -502,7 +502,7 @@ function ArrivalRowCard({
               arrived ? 'text-ledger-green' : 'text-ink',
             )}
           >
-            {formatTime(row.leg.travel_time) || 'â€”'}
+            {formatTime(row.leg.travel_time) || '—'}
           </div>
           <div className="mt-1.5 text-xs text-muted">{formatDate(row.leg.travel_date)}</div>
           {mode ? <Badge className="mt-1.5">{mode}</Badge> : null}
@@ -519,7 +519,7 @@ function ArrivalRowCard({
             {adults + children > 0
               ? `${adults + children} pax`
               : `${row.group.expected_pax} expected pax`}
-            {row.leg.point ? ` Â· ${row.leg.point}` : ''}
+            {row.leg.point ? ` · ${row.leg.point}` : ''}
           </p>
           {row.roomLabel ? (
             <p className="mt-1 font-mono text-sm text-muted">Room {row.roomLabel}</p>
@@ -538,7 +538,7 @@ function ArrivalRowCard({
             {row.group.primary_mobile ? (
               <WhatsAppButton mobile={row.group.primary_mobile} name={row.group.head_name} />
             ) : null}
-            {/* Â§4.2 â€” vehicle suggestion by PAX. Proposes only; the pack
+            {/* Â§4.2 — vehicle suggestion by PAX. Proposes only; the pack
                 board is where a human commits. */}
             {!arrived ? (
               <button
@@ -547,12 +547,12 @@ function ArrivalRowCard({
                 disabled={suggesting}
                 className="tap inline-flex min-h-11 items-center gap-1 rounded-lg px-2 font-medium text-brand active:opacity-70 disabled:opacity-55"
               >
-                {suggesting ? 'â€¦' : 'Suggest vehicle'}
+                {suggesting ? '…' : 'Suggest vehicle'}
               </button>
             ) : null}
           </div>
 
-          {/* Â§4.2 â€” the suggestion panel. Read-only proposal; a human
+          {/* Â§4.2 — the suggestion panel. Read-only proposal; a human
               commits on the trip board. */}
           {showSuggest ? (
             <div className="mt-2.5 rounded-lg border border-rule bg-surface-2 p-3">
@@ -561,7 +561,7 @@ function ArrivalRowCard({
               ) : suggestion ? (
                 <>
                   <p className="text-xs font-semibold tracking-eyebrow text-muted uppercase">
-                    {suggestion.pax} people Â· {suggestion.suggestions.length} option{suggestion.suggestions.length === 1 ? '' : 's'}
+                    {suggestion.pax} people · {suggestion.suggestions.length} option{suggestion.suggestions.length === 1 ? '' : 's'}
                   </p>
                   {suggestion.tooLarge ? (
                     <p className="mt-1.5 text-sm text-ledger-red">{suggestion.tooLargeReason}</p>
@@ -570,13 +570,13 @@ function ArrivalRowCard({
                       {suggestion.suggestions.map((s) => (
                         <li key={s.vehicleId} className="text-sm text-ink">
                           <span className="font-medium">{s.vehicleLabel ?? 'Unnamed'}</span>
-                          <span className="text-muted"> Â· {s.reason}</span>
+                          <span className="text-muted"> · {s.reason}</span>
                         </li>
                       ))}
                     </ul>
                   )}
                   <p className="mt-2 text-xs text-muted">
-                    Proposal only â€” commit it on the trip planning screen.
+                    Proposal only — commit it on the trip planning screen.
                   </p>
                 </>
               ) : null}
@@ -588,7 +588,7 @@ function ArrivalRowCard({
       {noRoom ? (
         <p className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-red-tint px-2.5 py-2 text-xs font-medium text-ledger-red">
           <AlertTriangleIcon className="h-4 w-4 shrink-0" />
-          No room allocated yet â€” sort this before they walk in.
+          No room allocated yet — sort this before they walk in.
         </p>
       ) : null}
 

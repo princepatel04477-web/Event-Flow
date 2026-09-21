@@ -36,7 +36,7 @@ type KeyPart =
   | readonly KeyPart[]
   | { readonly [key: string]: KeyPart }
 
-/** `['event', <eventId>, ...]` â€” the shape every key in this app must have. */
+/** `['event', <eventId>, ...]` — the shape every key in this app must have. */
 export type EventQueryKey = readonly ['event', string, ...ReadonlyArray<KeyPart>]
 
 function eventKey<T extends ReadonlyArray<KeyPart>>(
@@ -49,8 +49,8 @@ function eventKey<T extends ReadonlyArray<KeyPart>>(
 /**
  * The filter object is normalised before it enters the key, so two filter sets
  * that mean the same thing produce the same cache entry. Without this, a
- * `statuses: []` and a `statuses: undefined` â€” or the same chips selected in a
- * different order â€” would be different keys for identical rows, and the cache
+ * `statuses: []` and a `statuses: undefined` — or the same chips selected in a
+ * different order — would be different keys for identical rows, and the cache
  * would miss every time the URL round-tripped.
  */
 function normalizeQueueFilters(filters: QueueFiltersKey): KeyPart {
@@ -80,7 +80,7 @@ export const queryKeys = {
   },
 
   families: {
-    /** One family's RSVP record â€” the screen the caller logs an outcome on. */
+    /** One family's RSVP record — the screen the caller logs an outcome on. */
     detail: (eventId: string, groupId: string) => eventKey(eventId, 'family', groupId),
   },
 
