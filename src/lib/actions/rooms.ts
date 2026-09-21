@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import {
   friendlyDbError,
   roomGuardCause,
-  roomGuardMessage,
   type RoomGuardCause,
 } from '@/lib/errors'
 import { suggestRooms } from '@/lib/allocate/suggest'
@@ -890,17 +889,21 @@ export async function moveGuestsToRoom(
         .select('room_number')
         .eq('id', targetRoomId)
         .maybeSingle()
-      // WHICH 23514, read off the trigger's own message. `capacity` keeps this
-      // path's message and its `code` verbatim — the override sheet keys on
-      // that — while an overlapping stay and a reversed date range get their
-      // own sentence, because neither is forceable and telling a runner the
-      // room is "at capacity" for a date collision sends them to the wrong fix.
+      // WHICH 23514, read off the trigger's own message, reported additively
+      // as `cause` for the new UI to render its own sentence from.
+      //
+      // THE MESSAGE AND THE `code` BELOW ARE UNCHANGED, DELIBERATELY. This
+      // action is shared with the live v1 app, whose override sheet keys on
+      // `code: 'capacity'` and prints this sentence. Substituting the per-cause
+      // copy here looked like an improvement and was one of the two ways this
+      // change could quietly rewrite v1's screen — v1 has no `cause`-aware
+      // rendering, so for an overlap it would have read "there is no way to
+      // force this one through" above a button offering to force it. v1 keeps
+      // its words; the new UI reads `cause` and says the truer thing.
       const cause = roomGuardCause(error)
       return {
         ok: false,
-        error:
-          roomGuardMessage(cause, { roomNumber: room?.room_number }) ??
-          `Room ${room?.room_number ?? targetRoomId} is at capacity. Nothing was moved.`,
+        error: `Room ${room?.room_number ?? targetRoomId} is at capacity. Nothing was moved.`,
         code: 'capacity',
         roomId: targetRoomId,
         roomNumber: room?.room_number ?? '',
