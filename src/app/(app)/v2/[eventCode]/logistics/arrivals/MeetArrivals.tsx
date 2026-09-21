@@ -450,7 +450,7 @@ function NextArrival({ row, onArrive }: { row: ArrivalRow; onArrive: () => void 
       </div>
 
       <p className="text-sm text-muted">
-        {row.roomLabel ? `Room ${row.roomLabel}` : 'No room allocated yet'}
+        {row.roomLabel ? `Room ${row.roomLabel}` : 'No room yet'}
       </p>
 
       {noRoom ? (

@@ -174,12 +174,7 @@ export function GiveRoom({ eventId }: GiveRoomProps) {
     <div className="flex flex-col gap-4">
       {/* One title row and nothing else above the first name: no grid, no
           legend, no capacity footnote. */}
-      <PageTitle
-        className="min-w-0"
-        note="Pick the family, then pick a room. The database still checks the beds and the dates."
-      >
-        Give a family a room
-      </PageTitle>
+      <PageTitle className="min-w-0">Give a family a room</PageTitle>
 
       {stale ? (
         <p role="status" className="-mt-1 text-xs text-muted">
@@ -204,7 +199,7 @@ export function GiveRoom({ eventId }: GiveRoomProps) {
         <EmptyState
           icon={<BuildingIcon className="h-7 w-7" />}
           title="No rooms on this event yet"
-          description="Rooms are added to the event before families can be given one. Ask your event lead to set the hotel and its rooms up."
+          description="Ask your event lead to set the hotel and its rooms up."
         />
       ) : needing.length === 0 ? (
         <EmptyState
@@ -253,10 +248,8 @@ export function GiveRoom({ eventId }: GiveRoomProps) {
       {partlyPlaced.length > 0 ? (
         <p className="rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-sm leading-snug text-muted">
           {partlyPlaced.length === 1
-            ? '1 family already has a room but not enough beds for everyone.'
-            : `${partlyPlaced.length} families already have a room but not enough beds for everyone.`}{' '}
-          Moving people between rooms is not in this build yet — tell your event lead which family
-          it is.
+            ? '1 family already has a room but not enough beds for everyone. Tell your event lead which family it is.'
+            : `${partlyPlaced.length} families already have a room but not enough beds for everyone. Tell your event lead which family it is.`}
         </p>
       ) : null}
 
@@ -280,7 +273,7 @@ export function GiveRoom({ eventId }: GiveRoomProps) {
             </h2>
             <p className="text-sm leading-snug text-muted">
               {pickerFor
-                ? `${pickerFor.shortfall === 1 ? '1 guest' : `${pickerFor.shortfall} guests`} to place. Beds and dates are checked when you tap.`
+                ? `${pickerFor.shortfall === 1 ? '1 guest' : `${pickerFor.shortfall} guests`} to place.`
                 : ''}
             </p>
           </div>

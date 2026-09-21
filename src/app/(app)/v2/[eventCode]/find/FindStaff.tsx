@@ -168,7 +168,7 @@ export function FindStaff({ eventId, eventCode }: FindStaffProps) {
         <EmptyState
           icon={<UsersIcon className="h-7 w-7" />}
           title="Search needs a signal"
-          description="The phone is offline, so nothing can be looked up right now. The last list that loaded is still on this phone — open the guest list to read it. Anything already saved will send itself when the signal comes back."
+          description="The phone is offline, so nothing can be looked up right now. Open the guest list to read the last list that loaded. Anything already saved will send itself when the signal comes back."
           action={
             <LinkButton href={`/${eventCode}/guests/list`} variant="secondary" fullWidth>
               Open the guest list

@@ -37,6 +37,7 @@ import { dialTarget, placeCall } from '@/lib/native-call'
 import { traceFetch } from '@/lib/perf'
 import { formatMobile } from '@/lib/phone'
 import { queryKeys, type QueueFiltersKey } from '@/lib/query/keys'
+import { SIDE_LABELS } from '@/lib/review/payload'
 import { rsvpStatusLabel } from '@/lib/rsvp'
 import {
   EMPTY_LEG,
@@ -268,7 +269,7 @@ const PRESETS: Preset[] = [
     label: 'Call backs due',
     statuses: [],
     callbackScheduled: true,
-    hint: 'Families who asked to be called later, soonest first.',
+    hint: 'Families who asked to be called later.',
   },
   {
     id: 'noanswer',
@@ -804,9 +805,6 @@ export function CallNext({ eventId, eventCode }: CallNextProps) {
             >
               Skip families another caller has open
             </Chip>
-            <p className="text-sm leading-snug text-muted">
-              A family another caller has open cannot be logged until their lock clears.
-            </p>
           </div>
 
           <Button size="lg" fullWidth onClick={() => setOpenSheet(null)}>
@@ -827,7 +825,7 @@ export function CallNext({ eventId, eventCode }: CallNextProps) {
               : 'How many guests are coming?'}
           </h2>
           <p className="-mt-2 text-sm leading-snug text-muted">
-            {displayNameOf(current)} · counted on the phone, not guessed from the sheet.
+            {displayNameOf(current)}
           </p>
 
           <Stepper label="Adults" value={adults} onChange={setAdults} />
@@ -941,7 +939,13 @@ function FamilyCard({
         <span className="figure text-ink">
           {guests} {guests === 1 ? 'guest' : 'guests'}
         </span>
-        {row.side ? <Badge>{row.side}</Badge> : null}
+        {/* `SIDE_LABELS`, not the raw value: `row.side` is the database enum —
+            "bride", "groom", "both", "other" — and this badge is read by a
+            runner, not by a developer. The `?? row.side` keeps a value the
+            label map has never heard of visible rather than blank. V9 left this
+            as a Pass-1 miss because the value arrives typed as a plain string;
+            it is a rendered literal either way, which is what the pass is for. */}
+        {row.side ? <Badge>{SIDE_LABELS[row.side as Side] ?? row.side}</Badge> : null}
         <span className="figure text-muted">
           · {attempts} {attempts === 1 ? 'attempt' : 'attempts'}
         </span>
@@ -956,7 +960,7 @@ function FamilyCard({
 
       {locked ? (
         <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-muted">
-          Another caller has this family open. Logging it may be refused until their lock clears.
+          Another caller has this family open.
         </p>
       ) : null}
 

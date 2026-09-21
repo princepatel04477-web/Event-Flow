@@ -179,7 +179,11 @@ export function HamperRun({ eventId, eventCode, canGenerate }: HamperRunProps) {
         <EmptyState
           icon={<GiftIcon className="h-7 w-7" />}
           title="Nothing left to deliver"
-          description="Every hamper in this view has a photo proof on file. Clear the hotel filter to see the rest of the run."
+          description={
+            hotel !== null || kind !== null
+              ? 'Every hamper in this view has been delivered. Clear the filter to see the rest.'
+              : 'Every hamper on this event has been delivered.'
+          }
           action={
             hotel !== null || kind !== null ? (
               <Button
@@ -210,7 +214,7 @@ export function HamperRun({ eventId, eventCode, canGenerate }: HamperRunProps) {
           <h3 className="eyebrow">Event admin</h3>
           <p className="text-sm leading-snug text-muted">
             Adds a hamper for every family with a room, and a return gift for every family marked
-            for one. Running it again changes nothing.
+            for one.
           </p>
           <Button variant="secondary" fullWidth onClick={() => void handleGenerate()}>
             {generating ? 'Creating…' : 'Create what is missing'}

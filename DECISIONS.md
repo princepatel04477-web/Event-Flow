@@ -5,6 +5,104 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 22 September 2026 — V9: plain words, and the explanations deleted
+
+### What changed
+
+Copy only. Six files under `src/app/(app)/v2/[eventCode]/`: the home (`page.tsx`),
+`rsvp/queue/CallNext.tsx`, `hospitality/rooms/GiveRoom.tsx`,
+`hospitality/deliveries/HamperRun.tsx`, `logistics/arrivals/MeetArrivals.tsx`,
+`find/FindStaff.tsx`. ~22 user-visible strings. **No identifier, prop, file or CSS class was
+renamed** — `git diff` on the new group is strings and deletions only, which is the brief's
+own gate on this pass.
+
+### Pass 1 (words) had almost nothing left to do, and that is the finding
+
+The trade-term hunt (`pax`, `deliverable`, `extraction`, `unmatched`, `harvest`, `leg`,
+`roomed`) over the whole new group returns **no rendered survivor**. Every hit is a code
+identifier (`board.totalPax`, `row.leg`, `generateDeliverables`), a class token
+(`ease-ledger`, `bg-ledger-green`), a route segment (`/logistics/fleet`), or a comment. The
+~40 shim routes (`export * from '@/app/(staff)/...'`) render no copy of their own and were
+left untouched. V7 and V8 had already done the vocabulary.
+
+### Pass 2 (density) is where the work was
+
+Deleted, because each is a release note rather than a screen:
+
+- GiveRoom's `PageTitle` note — *"Pick the family, then pick a room. The database still
+  checks the beds and the dates."* The first half is R1 (the title row is not the place for
+  instructions); the second half explains the database to a coordinator standing in a lobby.
+- GiveRoom, under the room picker: *"Beds and dates are checked when you tap."*
+- GiveRoom, for a partly-placed family: *"Moving people between rooms is not in this build
+  yet"*. A note about what the software does not do yet is the definition of a release note.
+- GiveRoom's empty state opened with *"Rooms are added to the event before families can be
+  given one"* — a passive explanation. The one actionable sentence ("Ask your event lead…")
+  remains.
+- CallNext, the count sheet: *"counted on the phone, not guessed from the sheet"*, and the
+  locked-family line's *"Logging it may be refused until their lock clears"*.
+- CallNext, the filter: the sentence explaining that a family another caller has open cannot
+  be logged, and *"soonest first"* on the callbacks hint.
+- HamperRun, admin: *"Running it again changes nothing"* — idempotence is `generateDeliverables`'
+  business, and it was the only place the screen mentioned a second run.
+- FindStaff offline: *"The last list that loaded is still on this phone"* (the screen says
+  "Offline" in its own line already).
+
+Two strings were **tightened rather than deleted**, each keeping the fact and dropping the
+duplication:
+
+- Home: `across / {N} families` became `guests in {N} families`. The eyebrow above the figure
+  already reads "Guests expected", so "across" was the third saying of one fact.
+- Home: the headline comment block above the figure was deleted with it.
+- MeetArrivals: `'No room allocated yet'` became `'No room yet'` — the same words this exact
+  path already renders two lines below as `' · No room yet'`, so the red warning and the room
+  line now say one thing.
+- HamperRun's "Nothing left to deliver" empty state: *"Every hamper in this view has a photo
+  proof on file"* is how the app works. It now states the state and, only when a filter is
+  actually set, offers the one action ("Clear the filter to see the rest"), which removes a
+  "clear the filter" instruction from the screen where there is no filter to clear.
+
+### Deliberately NOT changed
+
+- **Both error strings that contain the word "database"** — the home's load failure and
+  FindStaff's *"The database did not answer this search"*. The brief says "no screen in the
+  new group contains a sentence about the database", but it also says the error voice is
+  honest and is to be kept, and `docs/UX-RULES.md` R6 quotes the home's sentence verbatim as
+  its "Right" example. R6 is the more specific instruction and the quoted text is a contract
+  with that rule, so it stays; changing it would make the rule's own citation wrong. Flagged
+  here rather than quietly resolved.
+- **`GiveRoom.tsx`'s "Every family has a room" empty state** keeps *"This fills in as the
+  calling team confirms families."* It is an explanation, but it is also the only thing that
+  tells the coordinator why the list they expected is empty (R3).
+- **The `{row.side}` badge in CallNext** still renders the raw value (`bride`, `groom`,
+  `both`, `other`), lowercase, straight out of the database enum. `SIDES` carries proper
+  labels but `FamilyCard` does not use them. Renaming or re-labelling it is a Pass-1 fix, but
+  the value arrives as a status string and the brief's rule is to leave anything that might be
+  compared rather than displayed. Reported, not touched.
+- `docs/GLOSSARY.md` gained no row: every trade term the new group renders — group → family,
+  deliverable → hamper/return gift, leg → arrival, roomed → has a room, Board/Stay/Prep →
+  Home/Rooms/Setup — is already in the table.
+
+### What is still owed
+
+- **Nothing here is verified on a handset, and no screen was rendered in a browser.** This
+  session changed strings; the gates below prove the code still compiles, tests and lints,
+  not that any sentence reads well on a 360px screen next to a real number.
+- **The home's job-card singular/plural was left exactly as it was**, including
+  *"1 confirmed guest has no room assigned"* versus the rooms screen's *"1 guest, no room
+  yet"*. Both are true to the number they print, and both are defensible ("assigned" says
+  what the button does: assign a room), so they were not harmonised into one phrasing —
+  collapsing them would lose that distinction, which the brief calls out by name.
+- **`DECISIONS.md` and `docs/GLOSSARY.md` are the only non-`.tsx` files touched.** No test was
+  added: the changed lines are literals that no test asserts on.
+
+### Verification
+
+`npx tsc --noEmit` exit 0 · `npx eslint` exit 0 on all six changed files · `npx vitest run`
+19 files / 241 tests, all pass. `npm run build` NOT run (the parent runs it, per AMENDMENTS
+§5). No handset, no browser.
+
+---
+
 ## 21 September 2026 — One route per screen, and a bottom bar that fits
 
 ### Every field screen existed twice, and the copies had drifted

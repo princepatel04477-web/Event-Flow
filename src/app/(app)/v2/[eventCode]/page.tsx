@@ -293,8 +293,6 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
           </div>
         </section>
 
-        {/* 3. The headline guests figure and its split bar, moved to the bottom.
-            Reused directly from (staff)/[eventCode]/page.tsx without redesign. */}
         <section className="list-fade rounded-2xl border border-brand/25 bg-surface bg-[linear-gradient(158deg,var(--ef-brand-tint),transparent_62%)] p-4 shadow-e2">
           <h2 className="eyebrow text-brand">Guests expected</h2>
 
@@ -303,9 +301,7 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
               {formatCount(totalGuests)}
             </span>
             <span className="pb-2 text-sm leading-snug text-muted">
-              across
-              <br />
-              {formatCount(totalGroups)} families
+              guests in {formatCount(totalGroups)} families
             </span>
           </div>
 
