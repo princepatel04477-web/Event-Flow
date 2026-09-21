@@ -1,9 +1,83 @@
-import { type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 import { updateSession } from '@/lib/supabase/middleware'
 
+import { getUiVersion } from '@/lib/ui-version'
+
+/**
+ * Paths that are NOT an event-scoped screen. A rewrite is only ever applied to
+ * the rest.
+ *
+ * `/v2` is the load-bearing entry and it is the one that is easy to miss: it is
+ * the internal prefix the new UI actually lives at (see INTERNAL_PREFIX below),
+ * so without it a rewritten request would be rewritten again, forever.
+ */
+const NON_EVENT_PREFIXES = [
+  '/login',
+  '/admin',
+  '/auth',
+  '/pick-staff',
+  '/api',
+  '/debug',
+  '/design-system',
+  '/v2',
+  '/_next',
+]
+
+/**
+ * Where the new UI lives.
+ *
+ * NOT a route group. The V-series plan called for `src/app/(app)/[eventCode]`
+ * beside `src/app/(staff)/[eventCode]`, selected by this rewrite. Next rejects
+ * it: a route group does not appear in the URL, so those two pages resolve to
+ * the same path `/[eventCode]` and the build dies with E28, "You cannot have
+ * two parallel pages that resolve to the same path". That failure is in the
+ * route graph, before any of our code runs.
+ *
+ * So the new screens sit under a real segment nothing links to, and the rewrite
+ * below is what maps the URL a phone actually uses onto them. The runner's
+ * address bar is unchanged — `/{event}/rsvp/queue` — and `(staff)` keeps
+ * serving v1 untouched.
+ */
+const INTERNAL_PREFIX = '/v2'
+
+function isEventScopedPath(pathname: string): boolean {
+  if (!pathname || pathname === '/') return false
+  return !NON_EVENT_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+}
+
 export async function proxy(request: NextRequest) {
-  return await updateSession(request)
+  const sessionResponse = await updateSession(request)
+
+  // If updateSession redirected (e.g. to /login), honour it immediately.
+  if (sessionResponse.headers.has('location')) {
+    return sessionResponse
+  }
+
+  const { pathname } = request.nextUrl
+
+  // v1 is the untouched app: `(staff)` already owns these paths, so the correct
+  // action is no action at all. Rewriting v1 to `/(staff)/...` would have been
+  // a change to the thing that must not change.
+  if (getUiVersion() !== 'v2' || !isEventScopedPath(pathname)) {
+    return sessionResponse
+  }
+
+  // The search string is carried across by hand. `nextUrl.pathname` excludes it,
+  // and dropping it would silently break `?denied=` on the bounced-admin note
+  // plus every filtered list the new screens link to.
+  const response = NextResponse.rewrite(
+    new URL(`${INTERNAL_PREFIX}${pathname}${request.nextUrl.search}`, request.url),
+  )
+
+  // updateSession may have refreshed the session cookie. A rewrite is a new
+  // response object, so those Set-Cookie headers have to be carried over by
+  // hand or every refresh is silently dropped.
+  for (const cookie of sessionResponse.cookies.getAll()) {
+    response.cookies.set(cookie)
+  }
+
+  return response
 }
 
 export const config = {

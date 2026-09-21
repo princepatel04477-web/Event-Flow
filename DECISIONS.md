@@ -1698,3 +1698,70 @@ not run.
   session's file list. `guests/list` is unaffected — its route prefetch already carries the
   dehydrated query data.
 - `useBoundedPrefetch` has no test. `tests/` was outside the file list.
+
+---
+
+## 22 September 2026 — V6: New Route Group `(app)` and Task-First Home Screen
+
+### The flag and proxy routing (`ui-version.ts`, `proxy.ts`)
+
+`NEXT_PUBLIC_UI` ('v1' default, 'v2' new) is wrapped in `src/lib/ui-version.ts` with a typed `getUiVersion(): UiVersion` helper.
+In `src/proxy.ts`, an additive rewrite rule intercepts event-scoped paths (excluding `/login`, `/admin`, `/auth`, `/pick-staff`, `/api`, `/debug`, `/design-system`, and static files) and routes to `/(app)/...` or `/(staff)/...` based on `getUiVersion()`, preserving `updateSession()` cookies and redirects. No edge runtime was added (CLAUDE.md §3).
+
+### Shell differences: one navigation row and task-first header (`(app)/[eventCode]/layout.tsx`)
+
+The new shell preserves the exact guard logic from `(staff)/[eventCode]/layout.tsx`:
+1. Parallel retrieval of `getViewer()`, `resolveEventByCode(eventCode)`, and `getSessionClaims()`.
+2. Code-auth session fallback resolving claims into `effectiveViewer` so team members are not bounced to login.
+3. Strict 404 when `event` is missing or access is `'none'`.
+4. Staff viewer context and department resolution.
+
+Key differences from the old shell:
+- **One navigation row, not two**: `SectionTabs` is omitted from the shell layout. Second-level navigation lives in individual screens that require it, leaving only `BottomTabs` fixed at the bottom. On a 360px phone, content begins immediately below the header rather than under two stacked bars.
+- **Task-first header**: `AppHeader` renders the screen's plain name (e.g. "Home", "Arrivals", "Rooms") and a back control (`/EVENT`), not the wedding name. The wedding name belongs on the home screen; staff three levels deep need to know where they are.
+- **Search control on every screen**: A 44×44px button with `SearchIcon` in the header links to `/(app)/{event}/find` (landing in V8; currently 404s).
+- **No shell welcome banner**: `StaffWelcomeBanner` removed from the shell layout; mounted contextually on Home for field team sessions.
+- **Global UndoBar retained**: Kept in the shell layout so the 7-second undo window survives cross-screen navigation.
+
+### The new home screen answers: what do I do next (`(app)/[eventCode]/page.tsx`)
+
+Organised strictly top-to-bottom:
+1. **Event identity**: Wedding name and date/city displayed at the top of the home screen, alongside the staff welcome banner for event team members.
+2. **"Right now" (worst first)**: Up to three job cards derived from non-zero attention numbers in `readBoard()` (`confirmedNoRoom`, `arrivalsNoVehicle`, `noDeparture`, `hampersPending`), sorted descending by count. Each card contains one plain-language sentence naming the job and count, and ONE 56px (`size="lg"`) button going directly to the job screen. If all attention numbers are zero, renders a calm "Nothing needs you right now." line with no empty cards.
+3. **"Today"**: Three figures on a single row (arriving today, leaving today, hampers left), each linking directly to its filtered list (R4: every number is a door).
+4. **Guests expected**: The headline figure and split percentage bar moved to the bottom, reusing the exact markup from the existing board.
+5. **No database prose**: The closing paragraph explaining how counters are loaded from the database was deleted.
+6. **Zero-guests empty state**: Kept verbatim as cited in UX-RULES R3.
+7. **Zero new queries**: Every figure is read from the existing `readBoard()` payload.
+8. **Hydration and prefetch**: Server pre-warms the TanStack Query cache (`queryKeys.dashboard.board`) via `HydrationBoundary`.
+
+### Next.js E28 — the new group cannot sit at the same path, so it sits at an internal one
+
+The plan in `docs/UI2-PROMPTS.md` §2 was `src/app/(app)/[eventCode]/...` beside
+`src/app/(staff)/[eventCode]/...`, chosen by a rewrite on `NEXT_PUBLIC_UI`. Next refuses it,
+and not for a reason a flag can work around: a route group does not appear in the URL, so
+both `page.tsx` files resolve to `/[eventCode]`. `npm run build` dies with E28 — "You cannot
+have two parallel pages that resolve to the same path". It fails while compiling the route
+graph, before any of our code runs, and `tsc`, `eslint` and the whole vitest suite stay
+green through it, so nothing except a real build catches it. It is also not new: the same
+constraint is recorded in this file from 31 July 2026.
+
+**What was done about it, and why this and not a cutover.** The new screens moved to
+`src/app/(app)/v2/[eventCode]/...` — the group plus a real segment that no link ever points
+at. `src/proxy.ts` rewrites an event-scoped URL to that prefix when, and only when,
+`NEXT_PUBLIC_UI=v2`. Three properties this buys, all of which were requirements:
+
+- The runner's URL is unchanged. `/{event}/rsvp/queue` is still what the phone asks for and
+  still what the address bar shows; only the server's internal resolution differs.
+- v1 is untouched *by construction*: when the flag is not `v2` the proxy returns
+  `updateSession`'s response unmodified. It does not rewrite the legacy app to its own
+  location, because "unchanged" that depends on a rewrite staying correct is not unchanged.
+- `/v2` is in `NON_EVENT_PREFIXES`. Without that entry the rewrite would match its own
+  output and loop.
+
+The cost is honest and small: `/v2/{event}/...` is a reachable URL that renders the new UI.
+It sits behind the same layout guards as everything else in the group, so it grants nothing —
+an alias, not a hole. The alternative, deleting `(staff)` up front, would have ended the
+"old app keeps working while the new one is half-built" property the whole screen-by-screen
+plan rests on.
+
