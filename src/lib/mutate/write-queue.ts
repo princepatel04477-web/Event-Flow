@@ -117,7 +117,27 @@ export const STUCK_AFTER_RETRIES = 5
 export type WriteReplay = (
   eventId: string,
   payload: unknown,
-) => Promise<{ ok: true } | { ok: false; message: string }>
+) => Promise<
+  | { ok: true }
+  | {
+      ok: false
+      message: string
+      /**
+       * "Not now, leave it queued" — as opposed to "this failed".
+       *
+       * ONE ROW MUST NOT BE REPLAYED INTO THE WRONG EVENT. A replay closes over
+       * the action of whichever screen is currently mounted, and that action is
+       * bound to that screen's event. So a row queued for event A while event B
+       * is open would be written into B — a cross-tenant write, and the same
+       * class of bug the event-scoped cache keys exist to prevent.
+       *
+       * A deferred row is SKIPPED, not failed: it is still perfectly valid, it is
+       * simply waiting for its own event to be open. Counting a retry against it
+       * would eventually push it into the "stuck" list for no reason.
+       */
+      defer?: boolean
+    }
+>
 
 const replays = new Map<string, WriteReplay>()
 
@@ -159,6 +179,10 @@ export async function flushWriteQueue(): Promise<number> {
       if (result.ok) {
         await db.writes.delete(entry.localId)
         sent++
+      } else if (result.defer) {
+        // Not this event's turn. Leave the row exactly as it is — no retry
+        // counted, because nothing failed.
+        continue
       } else {
         await markWriteFailed(entry.localId, result.message)
       }

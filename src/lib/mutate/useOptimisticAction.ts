@@ -141,7 +141,18 @@ export function useOptimisticAction<TData, TVars, TResult>(
   // on every render.
   useEffect(() => {
     if (!queueKind) return
-    registerWriteReplay(queueKind, async (_eventId, payload) => {
+    registerWriteReplay(queueKind, async (eventId, payload) => {
+      // The action closes over the MOUNTED screen's event, so replaying a row
+      // from a different event would write it into whichever event happens to be
+      // open — a cross-tenant write, and the same class of bug the event-scoped
+      // cache keys exist to prevent. Leave it queued instead; it replays when its
+      // own event is open again.
+      //
+      // `defer`, not a failure: the row is valid, it is just not this event's
+      // turn. Counting a retry would push it toward the stuck list for nothing.
+      if (opts.current.queue?.eventId !== eventId) {
+        return { ok: false, message: 'queued for another event', defer: true }
+      }
       const result = await opts.current.action(payload as TVars)
       return result.ok ? { ok: true } : { ok: false, message: result.message }
     })
@@ -151,20 +162,42 @@ export function useOptimisticAction<TData, TVars, TResult>(
   // screens that can queue a write are exactly the screens that use this hook,
   // so wherever a queued write could have come from is also somewhere this runs.
   useEffect(() => {
-    if (!online) return
     let alive = true
-    void flushWriteQueue()
-      .then(() => queuedWriteCount())
-      .then((n) => {
-        if (alive) setQueuedCount(n)
-      })
-      .catch(() => {
-        // A failed drain is not worth surfacing: the rows are still queued and
-        // the next reconnect tries again. Saying "could not send" on every
-        // reconnect would train the user to ignore it.
-      })
+
+    const drain = () => {
+      void flushWriteQueue()
+        .then(() => queuedWriteCount())
+        .then((n) => {
+          if (alive) setQueuedCount(n)
+        })
+        .catch(() => {
+          // A failed drain is not worth surfacing: the rows are still queued and
+          // the next attempt tries again. Saying "could not send" every time
+          // would train the user to ignore it.
+        })
+    }
+
+    if (online) drain()
+
+    // Also drain when the app comes back to the foreground.
+    //
+    // Draining only on an `online` TRANSITION leaves a real hole: venue Wi-Fi is
+    // routinely associated-but-dead, so a write can fail while `navigator.onLine`
+    // stays true forever. `online` never changes, so nothing ever retries it.
+    // Returning from a dial is the most likely moment for a link that had failed
+    // to work again — `tel:` backgrounds the WebView on every call, so this fires
+    // constantly during a calling shift, which is exactly when it is wanted.
+    // (This is deliberately NOT `refetchOnWindowFocus`, which stays off so
+    // queries do not re-fetch after every dial.) The flush respects each row's
+    // own backoff, so a frequent trigger is cheap.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && onlineRef.current) drain()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
     return () => {
       alive = false
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [online])
 
