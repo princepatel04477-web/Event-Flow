@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -9,7 +9,6 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Badge } from '@/components/ui/Badge'
 import { SearchIcon, CheckCircleIcon, AlertTriangleIcon } from '@/components/icons'
 import { LinkButton } from '@/components/ui/LinkButton'
-import { UndoBar } from '@/components/ui/UndoBar'
 import { createClient } from '@/lib/supabase/client'
 import { checkInRoom, checkOutRoom } from '@/lib/actions/event-day'
 import { traceFetch } from '@/lib/perf'
@@ -77,7 +76,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
       }
 
       // Who is currently occupying each room (checked in, not out, and not
-      // soft-released — a released assignment is the explicit "done with the
+      // soft-released â€” a released assignment is the explicit "done with the
       // room" signal and must not block a fresh check-in).
       const occupantByRoom = new Map<string, { assignmentId: string; headName: string }>()
       for (const a of assignments ?? []) {
@@ -119,7 +118,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
    * DEFERRED, not immediate, and the reason is in the database: neither
    * `check_in_room` nor `check_out_room` has a reverse. Both only ever SET a
    * timestamp and never clear one (20260806160000_event_day_state.sql:137 and
-   * :216), so "undo a check-in" cannot be done by calling check-out — that would
+   * :216), so "undo a check-in" cannot be done by calling check-out â€” that would
    * leave the row reading "Out", a different wrong state, and the runner would
    * watch their undo produce something they never asked for.
    *
@@ -134,7 +133,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
     queryKey: queryKeys.hospitality.checkIn(eventId),
     callSite: 'checkInRoom',
     deferUntilCommit: true,
-    message: (v) => `${v.headName} · Checked in`,
+    message: (v) => `${v.headName} Â· Checked in`,
     apply: (prev, v) =>
       (prev ?? []).map((r) =>
         r.assignment.id === v.assignmentId
@@ -158,7 +157,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
       }
       return { ok: true, data: result.assignment }
     },
-    // The RPC returns the real row, including the SERVER's clock — so the
+    // The RPC returns the real row, including the SERVER's clock â€” so the
     // optimistic phone-clock timestamp is replaced rather than left to age into
     // a lie. No round trip needed.
     reconcile: (server, optimistic) =>
@@ -170,7 +169,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
     queryKey: queryKeys.hospitality.checkIn(eventId),
     callSite: 'checkOutRoom',
     deferUntilCommit: true,
-    message: (v) => `${v.headName} · Checked out`,
+    message: (v) => `${v.headName} Â· Checked out`,
     apply: (prev, v) =>
       (prev ?? []).map((r) =>
         r.assignment.id === v.assignmentId
@@ -307,7 +306,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
       ) : null}
 
       {writeError ? (
-        // The write was applied and then corrected. Say so, in the house voice —
+        // The write was applied and then corrected. Say so, in the house voice â€”
         // a silent revert reads as the app randomly undoing the user's work
         // (docs/INTERACTION-CONTRACT.md T2, UX-RULES R6).
         <p
@@ -321,7 +320,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
       {rows && rows.length === 0 ? (
         <EmptyState
           title="No room assignments"
-          description="No families are allocated to rooms yet — allocate rooms before check-in."
+          description="No families are allocated to rooms yet â€” allocate rooms before check-in."
           action={
             <LinkButton fullWidth href={`/${eventCode}/hospitality/rooms/allocate`}>
               Go to room allocation
@@ -329,7 +328,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
           }
         />
       ) : filtered.length === 0 ? (
-        <EmptyState title="Nothing matches" description="No families match — try clearing the search." />
+        <EmptyState title="Nothing matches" description="No families match â€” try clearing the search." />
       ) : (
         <ul className="flex flex-col gap-2">
           {filtered.map((row) => {
@@ -367,7 +366,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
                     {row.occupiedByOther ? (
                       <p className="flex items-center gap-1.5 rounded-lg bg-tint-danger px-2.5 py-1.5 text-xs font-medium text-danger">
                         <AlertTriangleIcon className="h-4 w-4 shrink-0" />
-                        Room occupied by {row.occupiedByOther} — check them out first.
+                        Room occupied by {row.occupiedByOther} â€” check them out first.
                       </p>
                     ) : null}
 
@@ -379,7 +378,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
                     ) : null}
 
                     {isOut ? null : isIn ? (
-                      // No confirmation dialog. R5: undo, do not confirm — and
+                      // No confirmation dialog. R5: undo, do not confirm â€” and
                       // now the undo is real, because the check-out is held
                       // until the window closes. The old dialog asked "are you
                       // sure?" on every single check-out, which trains people to
@@ -408,10 +407,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
           })}
         </ul>
       )}
-
-      {/* One bar, for whichever write was last made. It renders nothing until an
-          undo is actually offered, so mounting it is free. */}
-      <UndoBar />
     </div>
   )
 }
+

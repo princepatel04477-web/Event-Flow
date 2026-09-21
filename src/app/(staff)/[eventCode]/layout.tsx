@@ -8,6 +8,7 @@ import { SectionTabs } from '@/components/nav/SectionTabs'
 import { StaffWelcomeBanner } from '@/components/nav/StaffWelcomeBanner'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { StickyHeader } from '@/components/ui/StickyHeader'
+import { UndoBar } from '@/components/ui/UndoBar'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
 import { bottomTabsFor } from '@/lib/sections/config'
@@ -138,6 +139,22 @@ export default async function EventLayout({ children, params }: LayoutProps) {
       </main>
 
       <BottomTabs eventCode={event.code} access={access} department={department} />
+
+      {/* The undo bar lives in the SHELL, not in each screen, and that is the
+          whole point of mounting it here. A write's undo window is 7 seconds,
+          and a runner can navigate inside those 7 seconds — the RSVP save even
+          navigates BY DESIGN, straight to the next family to call. A bar owned
+          by the screen would unmount with it and the user would lose the undo
+          they were just offered.
+
+          The pending undo itself is held in a module store
+          (src/lib/mutate/undo-store.ts), so the write still commits on schedule
+          whether or not this is on screen; what living here buys is that the
+          user can always SEE the offer and act on it.
+
+          It renders nothing until an undo is pending, so it costs a component
+          that returns null on every screen with no writes in flight. */}
+      <UndoBar />
     </div>
   )
 }

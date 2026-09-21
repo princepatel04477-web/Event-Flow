@@ -1349,3 +1349,24 @@ mistake is invisible in `next dev` and only surfaces at build time, and this ses
 dehydrate/HydrationBoundary and a module that mixes server-action and browser reads. The
 build is the check that says those boundaries are legal. typecheck, eslint on every changed
 file, and 212/212 unit tests also pass.
+
+---
+
+## 21 September 2026 — the UndoBar moves into the shell, so an undo survives navigation
+
+`UndoBar` is now mounted ONCE, in `(staff)/[eventCode]/layout.tsx`, next to `BottomTabs`
+and outside `main`. It was mounted by each converted screen; it is not any more.
+
+The reason is a hole in the per-screen version that the RSVP flow walks straight into. The
+undo window is 7 seconds and a runner can navigate inside it — and the RSVP save navigates
+BY DESIGN, straight to the next family to call. A bar owned by the screen unmounts with it,
+so the user loses the undo they were just offered. Mounting it in the shell means the offer
+is always visible and always actionable.
+
+The pending undo was already held in a module store, so the write committed on schedule
+either way; what the move buys is that the user can SEE the offer. Worth being precise about
+that difference rather than claiming the shell fixed a data-loss bug it did not.
+
+Two per-screen mounts were removed at the same time, not left in place: they render at the
+same `fixed inset-x-0 bottom-nav` position, so both would have drawn and the text would have
+doubled into a blur.
