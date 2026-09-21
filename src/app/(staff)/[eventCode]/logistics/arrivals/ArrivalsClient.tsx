@@ -15,6 +15,8 @@ import { markArrived } from '@/lib/actions/event-day'
 import { suggestVehiclesForArrival, type PaxSuggestionResult } from '@/lib/actions/logistics'
 import { traceFetch } from '@/lib/perf'
 import { queryKeys } from '@/lib/query/keys'
+import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
+import { UndoBar } from '@/components/ui/UndoBar'
 import { cn, formatDate } from '@/lib/utils'
 import { formatMobile } from '@/lib/phone'
 import type { Database } from '@/lib/supabase/database.types'
@@ -83,7 +85,6 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
   const [pickupOnly, setPickupOnly] = useState(false)
   const [notArrivedOnly, setNotArrivedOnly] = useState(false)
   const [modeFilter, setModeFilter] = useState('')
-  const [pendingGroup, setPendingGroup] = useState<string | null>(null)
 
   // Read once into the shared cache, keyed by event. Returning to this tab, or
   // arriving from anywhere else that warmed the same key, paints from memory
@@ -167,24 +168,62 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
   const rows = raw ?? null
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
 
+  /**
+   * Marking an arrival, through V3's optimistic path.
+   *
+   * DEFERRED, because `mark_arrived` has no reverse — the same forward-only
+   * shape as check-in: the RPC sets `arrived_at` and nothing clears it, so a
+   * compensating write could not restore the row. Holding the write until the
+   * undo window closes makes Undo mean NOTHING WAS SENT, which is the only
+   * honest version.
+   *
+   * The accepted cost, same as check-in: an arrival the app dies on before the
+   * window closes never reaches the server, and the runner taps again. Better
+   * than an Undo that lies.
+   */
+  const arrive = useOptimisticAction<ArrivalRow[], { groupId: string; headName: string }, TravelLegRow>({
+    queryKey: queryKeys.logistics.arrivals(eventId),
+    callSite: 'markArrived',
+    deferUntilCommit: true,
+    message: (v) => `${v.headName} · Arrived`,
+    // Every leg this group has on the arrivals board is marked, not just the
+    // one row that was tapped: the board filters by group, and leaving a second
+    // row showing "expected" for a family that has arrived is a contradiction
+    // the user would see immediately.
+    apply: (prev, v) =>
+      (prev ?? []).map((r) =>
+        r.group.id === v.groupId
+          ? { ...r, leg: { ...r.leg, arrived_at: new Date().toISOString() } }
+          : r,
+      ),
+    action: async (v) => {
+      const result = await markArrived(eventId, eventCode, v.groupId)
+      if (!result.ok) return { ok: false, message: result.message }
+      // `EventDayResult` is shared by all four event-day actions, so the ok
+      // branch is a union and `leg` is not narrowed by `ok` alone.
+      if (!('leg' in result)) {
+        return { ok: false, message: 'The server did not confirm that arrival.' }
+      }
+      return { ok: true, data: result.leg }
+    },
+    // The RPC returns the committed leg, including the SERVER's clock, so the
+    // phone-clock timestamp is replaced rather than left to age into a lie.
+    reconcile: (server, optimistic) =>
+      optimistic.map((r) =>
+        r.leg.id === server.id ? { ...r, leg: { ...r.leg, arrived_at: server.arrived_at } } : r,
+      ),
+    queue: { eventId, kind: 'mark-arrived', what: 'arrivals' },
+  })
+
   async function handleArrive(row: ArrivalRow) {
-    if (pendingGroup) return
-    setPendingGroup(row.group.id)
-    const result = await markArrived(eventId, eventCode, row.group.id)
-    setPendingGroup(null)
-    if (!result.ok) {
-      setErrorState(result.message)
-      return
-    }
-    await refetch()
+    arrive.run({ groupId: row.group.id, headName: row.group.head_name })
   }
 
-  function setErrorState(message: string) {
-    // The cached rows stay visible; a failed mutation surfaces as a toast
-    // rather than wiping the screen.
-     
-    console.error(message)
-  }
+  // The first failed write wins. Previously a failure here was `console.error`
+  // and nothing else — the row simply reverted with no explanation, which reads
+  // as the app undoing the user's work at random (docs/INTERACTION-CONTRACT.md
+  // T2, UX-RULES R6).
+  const writeError = arrive.lastError
 
   const today = new Date()
   const todayKey = toDateKey(today)
@@ -330,7 +369,6 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
             <DayBlock
               title="Today"
               rows={todayRows}
-              pendingGroup={pendingGroup}
               eventId={eventId}
               onArrive={handleArrive}
             />
@@ -339,13 +377,28 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
             <DayBlock
               title="Later"
               rows={laterRows}
-              pendingGroup={pendingGroup}
               eventId={eventId}
               onArrive={handleArrive}
             />
           ) : null}
         </div>
       )}
+
+      {writeError ? (
+        // The row was marked and then corrected. Say so, rather than letting it
+        // silently flip back — a revert with no explanation reads as the app
+        // undoing the user's work at random (T2, UX-RULES R6).
+        <p
+          role="alert"
+          className="rounded-xl border border-danger bg-tint-danger px-4 py-3 text-sm font-medium text-danger"
+        >
+          {writeError}
+        </p>
+      ) : null}
+
+      {/* One bar, shared by every optimistic write on this screen. Inert until
+          an undo is actually offered. */}
+      <UndoBar />
     </div>
   )
 }
@@ -353,13 +406,11 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
 function DayBlock({
   title,
   rows,
-  pendingGroup,
   eventId,
   onArrive,
 }: {
   title: string
   rows: ArrivalRow[]
-  pendingGroup: string | null
   eventId: string
   onArrive: (row: ArrivalRow) => void
 }) {
@@ -373,7 +424,6 @@ function DayBlock({
             row={row}
             index={i}
             eventId={eventId}
-            pending={pendingGroup === row.group.id}
             onArrive={() => onArrive(row)}
           />
         ))}
@@ -395,13 +445,11 @@ function ArrivalRowCard({
   row,
   index,
   eventId,
-  pending,
   onArrive,
 }: {
   row: ArrivalRow
   index: number
   eventId: string
-  pending: boolean
   onArrive: () => void
 }) {
   const arrived = row.leg.arrived_at !== null
@@ -562,7 +610,6 @@ function ArrivalRowCard({
           size="lg"
           fullWidth
           variant="secondary"
-          loading={pending}
           onClick={onArrive}
           className="mt-2.5 border-ledger-green/40 bg-green-tint text-ledger-green"
         >
