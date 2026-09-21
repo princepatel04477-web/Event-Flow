@@ -1209,3 +1209,36 @@ commit message for this session. The three that matter beyond this screen set:
 the "one request, not two" claim to be measured in the network panel. The Playwright runner
 cannot start here (V1 entry), so that measurement has not been made. The reasoning is in
 the commit; the proof is not.
+
+---
+
+## 21 September 2026 — V3 core landed: the optimistic write path exists and is tested. Four screens are NOT wired.
+
+`src/lib/mutate/optimistic.ts` (the contract, as a plain function so it is testable without
+a browser), `undo-store.ts` (the single pending undo, module-level so navigating away
+COMMITS on schedule rather than cancelling the write), `useOptimisticAction.ts` (the one
+hook), `write-queue.ts` (offline queue, same shape as proof-queue.ts), and
+`src/components/ui/UndoBar.tsx`. `Button`'s `loading` prop now carries a comment saying it
+is for IRREVERSIBLE commits only and naming DeliveryDetail.tsx as the one screen allowed to
+use it.
+
+**This changes nothing a runner can see yet.** None of the four screens are wired. That was
+a deliberate stop: the environment cannot verify the result (the Playwright runner does not
+start — V1 entry), and a half-converted screen is worse than an unconverted one.
+
+Reverse availability, checked because the spec requires a write with no reverse to be listed
+rather than given a fake Undo:
+
+- check in / out — `checkInRoom` / `checkOutRoom`, mutual reverses. WIREABLE.
+- guest room assignment — `assignGuestToRoom` / `moveGuestsToRoom` / `releaseGuestFromRoom`.
+  WIREABLE.
+- RSVP outcome — `saveRsvpLog` can restore a prior snapshot, so the `guest_groups` effect is
+  reversible. WIREABLE, with a caveat the screen must state out loud: the `call_attempts`
+  row is NOT reversible — it freezes the moment `outcome` is set (CLAUDE.md §5.4), which is
+  the decision V10 asks for.
+- **vehicle assignment — NO REVERSE EXISTS.** There is no unassign helper in
+  `actions/logistics.ts`; `commitTrips` commits a whole `LogisticsProposal` and removing a
+  trip would need a NEW action. Listed, not faked.
+
+The next session starts at the wiring, not at the design: `useOptimisticAction` is written,
+tested, and documented in the commit message for this session.

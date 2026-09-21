@@ -10,6 +10,25 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
   /** `md` is 48px tall, `lg` is 56px. Never go below `md` — thumbs, gloves, rain. */
   size?: ButtonSize
+  /**
+   * FOR IRREVERSIBLE COMMITS ONLY.
+   *
+   * `loading` swaps the leading icon for a spinner AND sets `disabled`, so the
+   * control goes dead for the length of the round trip. On venue Wi-Fi that is
+   * the worst possible trade for anything the user could reasonably change their
+   * mind about — docs/INTERACTION-CONTRACT.md T3 calls a disabled button a bug
+   * unless the input is invalid.
+   *
+   * Reversible writes must NOT use this. They go through
+   * `src/lib/mutate/useOptimisticAction.ts`, which changes the screen on the tap
+   * and offers an UndoBar instead.
+   *
+   * The one screen that may use it: the delivery-proof seal in
+   * `(staff)/[eventCode]/hospitality/deliveries/[deliverableId]/DeliveryDetail.tsx`.
+   * `delivery_proofs` is insert-only with `app.block_mutation()` triggers
+   * (CLAUDE.md §5.2) — not even the service role can delete a row — so there is
+   * nothing to undo, and blocking the double-tap is the honest behaviour.
+   */
   loading?: boolean
   fullWidth?: boolean
   leadingIcon?: ReactNode
