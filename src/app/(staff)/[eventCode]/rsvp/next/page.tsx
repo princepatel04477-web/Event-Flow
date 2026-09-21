@@ -43,5 +43,5 @@ export default async function RsvpNextPage({ params }: PageProps) {
     redirect(`/${eventCode}/rsvp/status`)
   }
 
-  redirect(`/${eventCode}/rsvp/${rows.group_id}`)
+  redirect(`/${eventCode}/rsvp/status/${rows.group_id}`)
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
-import { BackRow } from './BackRow'
+import { BackRow } from '@/components/ui/BackRow'
 import { Card, CardBody } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ShieldAlertIcon, ClockIcon } from '@/components/icons'
@@ -55,7 +55,7 @@ export default async function RsvpLogPage({ params, searchParams }: PageProps) {
   if (claim.ok === false && claim.reason === 'error') {
     return (
       <div className="flex flex-col gap-4">
-        <BackRow href={`/${event.code}/queue`} title="Could not open" />
+        <BackRow href={`/${event.code}/rsvp/queue`} title="Could not open" backLabel="the call list" />
         <EmptyState
           icon={<ShieldAlertIcon className="h-7 w-7" />}
           title="Could not open this family"
@@ -74,7 +74,8 @@ export default async function RsvpLogPage({ params, searchParams }: PageProps) {
     return (
       <div className="flex flex-col gap-4">
         <BackRow
-          href={`/${event.code}/queue`}
+          href={`/${event.code}/rsvp/queue`}
+          backLabel="the call list"
           title={group?.head_name ?? 'Locked'}
           subtitle={group ? formatMobile(group.primary_mobile) : undefined}
         />

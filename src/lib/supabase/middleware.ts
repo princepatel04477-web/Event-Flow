@@ -80,15 +80,17 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  // getUser() revalidates the token against Supabase. Do not swap this for
-  // getSession(), which trusts whatever is in the cookie.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // getClaims() verifies the JWT signature against the project's ES256 JWKS
+  // (fetched once, then cached in-process), and refreshes an expired session
+  // through getSession() internally. getUser() did the same check with a
+  // round trip to GoTrue in Seoul on EVERY admin click — the single biggest
+  // reason admin navigation was ~3x slower than team. Never swap this for
+  // getSession(), which trusts whatever is in the cookie unverified.
+  const { data: authData } = await supabase.auth.getClaims()
 
   // codeClaims was already resolved above and returned early when present,
   // so reaching here means there is no valid code session.
-  const hasSession = Boolean(user)
+  const hasSession = Boolean(authData?.claims?.sub)
 
   if (!hasSession && !isPublic) {
     const url = request.nextUrl.clone()

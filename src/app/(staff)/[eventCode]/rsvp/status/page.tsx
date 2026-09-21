@@ -69,7 +69,7 @@ export default async function RsvpIndexPage({ params }: PageProps) {
         <ul className="flex flex-col gap-3">
           {rows.map((row) => (
             <li key={row.group_id}>
-              <Link href={`/${event.code}/rsvp/${row.group_id}`} className="block">
+              <Link href={`/${event.code}/rsvp/status/${row.group_id}`} className="block">
                 <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
                   <CardBody className="flex items-center justify-between gap-3">
                     <div className="min-w-0">

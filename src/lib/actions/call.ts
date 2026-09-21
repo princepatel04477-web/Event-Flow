@@ -294,9 +294,9 @@ export async function submitCallOutcome(
   // while `/[eventCode]/queue` still resolves. Revalidating only one leaves
   // whichever the staff member is actually on showing a stale attempt count.
   revalidatePath(`/${payload.eventCode}/rsvp/queue`)
-  revalidatePath(`/${payload.eventCode}/queue`)
+  revalidatePath(`/${payload.eventCode}/rsvp/queue`)
   revalidatePath(`/${payload.eventCode}/rsvp/status/${payload.groupId}`)
-  revalidatePath(`/${payload.eventCode}/dashboard`)
+  revalidatePath(`/${payload.eventCode}`)
 
   return { ok: true }
 }
@@ -339,7 +339,7 @@ export async function releaseGroupAfterCall(
   // `/rsvp/queue` path left a caller sitting on `/queue` looking at a lock
   // this call had just released, on the highest-traffic screen in the app.
   revalidatePath(`/${eventCode}/rsvp/queue`)
-  revalidatePath(`/${eventCode}/queue`)
+  revalidatePath(`/${eventCode}/rsvp/queue`)
 
   const stillLocked = Boolean(
     (data?.locked_by || data?.locked_by_staff) &&

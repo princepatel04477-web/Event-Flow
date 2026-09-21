@@ -119,7 +119,7 @@ function FamilyRow({ family }: { family: ParsedFamily }) {
         <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
           <Detail label="Sheet rows" value={describeRows(family.sheetRowNumbers)} />
           <Detail
-            label="Pax on the sheet"
+            label="Guests on the sheet"
             value={
               family.expectedPax === null
                 ? 'not given'

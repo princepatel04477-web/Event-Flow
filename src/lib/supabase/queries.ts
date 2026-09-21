@@ -80,6 +80,31 @@ async function sessionScope(): Promise<string> {
   return (h >>> 0).toString(36)
 }
 
+/**
+ * The signed-in GoTrue user, verified WITHOUT a network round trip.
+ *
+ * `getClaims()` checks the access token's signature against the project's
+ * asymmetric (ES256) JWKS, which supabase-js fetches once and caches. That is
+ * the same guarantee `getUser()` gave for identity — a forged or expired
+ * cookie is rejected — minus a ~150-600ms trip to GoTrue in Seoul that the
+ * admin path was paying up to three times per click (middleware, getViewer,
+ * getEventAccess).
+ *
+ * What it does NOT see is a server-side sign-out before the token expires.
+ * That was never the fence: PostgREST authorises on the same JWT, and the
+ * offboarding switch (`profiles.is_active`) is still read from the database
+ * on every request below, so a deactivated admin loses the shell immediately.
+ * Never replace this with getSession(), which does no verification at all.
+ */
+async function verifiedUser(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<{ id: string; email: string | null } | null> {
+  const { data } = await supabase.auth.getClaims()
+  const claims = data?.claims
+  if (!claims?.sub) return null
+  return { id: claims.sub, email: typeof claims.email === 'string' ? claims.email : null }
+}
+
 /** Per-phase timing for the route's session/guard reads (instrument-first). */
 function phaseTiming(label: string) {
   const marks: Record<string, number> = {}
@@ -168,13 +193,16 @@ async function getViewerUncached(): Promise<Viewer | null> {
   const supabase = await createClient()
   timing.mark('client-create')
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  timing.mark('getUser')
+  // Signature-verified locally against the ES256 JWKS — see verifiedUser().
+  const user = await verifiedUser(supabase)
+  timing.mark('getClaims')
   if (!user) return null
 
-  const [{ data: profile }, { data: members }] = await Promise.all([
+  // The events list is fetched alongside, not after, the profile. It was a
+  // second sequential round trip (~240ms measured) on every admin click, only
+  // to be used once `isAdmin` was known. For a non-admin RLS narrows it to
+  // their own events and the result is simply discarded below.
+  const [{ data: profile }, { data: members }, { data: allEvents }] = await Promise.all([
     supabase
       .from('profiles')
       .select('full_name, global_role, is_active')
@@ -184,6 +212,10 @@ async function getViewerUncached(): Promise<Viewer | null> {
       .from('event_members')
       .select('event_id, role, events(name, code)')
       .order('created_at', { ascending: true }),
+    supabase
+      .from('events')
+      .select('id, name, code')
+      .order('created_at', { ascending: false }),
   ])
   timing.mark('profile+memberships')
 
@@ -213,11 +245,6 @@ async function getViewerUncached(): Promise<Viewer | null> {
   })
 
   if (isAdmin) {
-    const { data: allEvents } = await supabase
-      .from('events')
-      .select('id, name, code')
-      .order('created_at', { ascending: false })
-
     memberships = (allEvents ?? []).map((e) => ({
       eventId: e.id,
       eventName: e.name,
@@ -325,10 +352,8 @@ async function getEventAccessUncached(eventId: string): Promise<EventAccess> {
   const supabase = await createClient()
   timing.mark('client-create')
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  timing.mark('getUser')
+  const user = await verifiedUser(supabase)
+  timing.mark('getClaims')
   if (!user) return 'none'
 
   const [{ data: profile }, { data: member }] = await Promise.all([

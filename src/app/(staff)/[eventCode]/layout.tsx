@@ -10,6 +10,7 @@ import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { StickyHeader } from '@/components/ui/StickyHeader'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
+import { bottomTabsFor } from '@/lib/sections/config'
 import { getEventAccess, getViewer, resolveEventByCode } from '@/lib/supabase/queries'
 import { cn, formatDateRange } from '@/lib/utils'
 
@@ -66,9 +67,12 @@ export default async function EventLayout({ children, params }: LayoutProps) {
   // so this cannot fire. It documents the invariant rather than assuming it.
   if (access === 'none') notFound()
 
-  // A client gets no tab bar (see BottomTabs), so nothing needs clearing at
-  // the bottom of the page — just the gesture bar.
-  const showTabs = access !== 'client'
+  // Ask the same function the bar itself asks. A client gets no bar, and
+  // neither does a runner whose department is a single screen (Hampers,
+  // Setup) — so `pb-nav` would reserve 56px of clearance under a page with
+  // nothing beneath it. This used to be `access !== 'client'`, which was the
+  // bar's rule before runners could have no bar.
+  const showTabs = bottomTabsFor(event.code, access, department).length > 0
 
   const subtitle =
     formatDateRange(event.starts_on, event.ends_on) ?? event.venue_city ?? event.code
@@ -114,7 +118,7 @@ export default async function EventLayout({ children, params }: LayoutProps) {
       <main className={cn('flex flex-1 flex-col px-safe', !showTabs && 'pb-safe')}>
         <div
           className={cn(
-            'mx-auto flex w-full max-w-[480px] flex-1 flex-col px-4 pt-4',
+            'mx-auto flex w-full min-w-0 max-w-[480px] flex-1 flex-col overflow-x-hidden px-4 pt-4',
             showTabs ? 'pb-nav' : 'pb-8',
           )}
         >

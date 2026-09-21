@@ -169,7 +169,7 @@ export function ReviewForm({
       return
     }
 
-    router.push(`/${eventCode}/review?done=accepted`)
+    router.push(`/${eventCode}/rsvp/review?done=accepted`)
   }
 
   async function handleReject() {
@@ -185,7 +185,7 @@ export function ReviewForm({
       return
     }
 
-    router.push(`/${eventCode}/review?done=rejected`)
+    router.push(`/${eventCode}/rsvp/review?done=rejected`)
   }
 
   return (

@@ -87,7 +87,7 @@ export function DashboardClient({ eventId, eventCode }: Props) {
         <h2 className="eyebrow mb-3">RSVP</h2>
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Total groups" value={dash.totalGroups} note="families on the list" />
-          <StatCard label="Total pax" value={dash.totalPax} note="confirmed, else expected" />
+          <StatCard label="Guests expected" value={dash.totalPax} note="confirmed where known, otherwise expected" />
           <StatCard label="Confirmed" value={dash.rsvpConfirmed} tone="success" />
           <StatCard label="Pending" value={dash.rsvpPending} tone="warning" />
         </div>

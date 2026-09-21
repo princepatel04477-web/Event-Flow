@@ -26,9 +26,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const BASE =
   'tap inline-flex items-center justify-center gap-2 rounded-xl border font-semibold ' +
   'leading-none whitespace-nowrap select-none ' +
-  'transition-[background-color,border-color,color,transform] duration-press ease-ledger ' +
-  'active:scale-[0.988] ' +
-  'disabled:cursor-not-allowed disabled:opacity-55 disabled:active:scale-100 ' +
+  'transition-[background-color,border-color,color] duration-press ease-ledger ' +
+  'disabled:cursor-not-allowed disabled:opacity-55 ' +
   'aria-disabled:opacity-55'
 
 const VARIANTS: Record<ButtonVariant, string> = {

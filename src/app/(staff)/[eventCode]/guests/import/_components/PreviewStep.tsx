@@ -116,7 +116,7 @@ export function PreviewStep({
           </p>
           <p className="mt-1 text-sm leading-relaxed text-fg">
             The full calling-list columns were not found, so{' '}
-            <span className="font-semibold">Pax and every travel column will be
+            <span className="font-semibold">Guest counts and every travel column will be
             ignored</span>{' '}
             — arrival and departure dates, times, modes, pickup and drop. Names
             and phone numbers still import correctly.

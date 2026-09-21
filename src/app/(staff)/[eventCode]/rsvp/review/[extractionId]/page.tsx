@@ -329,7 +329,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   return (
     <div className="flex flex-col gap-4">
       <Link
-        href={`/${event.code}/review`}
+        href={`/${event.code}/rsvp/review`}
         className="tap -ml-2 inline-flex w-fit items-center gap-1 rounded-xl px-2 py-1.5 text-sm font-medium text-muted hover:bg-surface-2 hover:text-fg"
       >
         <ChevronLeftIcon className="h-5 w-5" />

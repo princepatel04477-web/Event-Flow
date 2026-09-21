@@ -282,8 +282,8 @@ export default function EvidencePage() {
         <div className="flex flex-col gap-2 rounded-2xl border border-rule bg-surface px-3.5 py-3.5">
           <FieldRow label="Room" mono value="205" />
           <FieldRow label="Room" mono value="211" />
-          <FieldRow label="PAX confirmed" mono value="6" />
-          <FieldRow label="PAX expected" mono value="6" />
+          <FieldRow label="Guests confirmed" mono value="6" />
+          <FieldRow label="Guests expected" mono value="6" />
           <FieldRow label="Callback" mono value={null} />
           <FieldRow label="Arrival flight" mono value={null} />
           <FieldRow label="Balance" mono attention value="−2" />

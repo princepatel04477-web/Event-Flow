@@ -9,6 +9,7 @@ import type { ReactNode } from 'react'
 import { MotionProvider } from '@/components/motion/MotionProvider'
 import { QueryProvider } from '@/components/providers/QueryProvider'
 import { WelcomeOverlay } from '@/components/motion/WelcomeOverlay'
+import { MobileViewport } from '@/components/native/MobileViewport'
 import { NativeBridge } from '@/components/native/NativeBridge'
 import { SessionBridge } from '@/components/native/SessionBridge'
 import { OfflineBanner } from '@/components/native/OfflineBanner'
@@ -107,9 +108,15 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   // The APK draws under the notch and the gesture bar; the `*-safe`
   // utilities in globals.css depend on this.
   viewportFit: 'cover',
+  // Android Chrome shrinks the layout viewport when the keyboard opens unless
+  // told otherwise — that reads as the whole page zooming on every tap into a
+  // field. Staff forms are the whole app; keep the shell stable.
+  interactiveWidget: 'resizes-content',
   // One colour, both media: the staff app does not follow the OS, so the
   // system chrome must not either. A white status bar over the teal
   // ground is the tell that the two disagree.
@@ -126,6 +133,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       <body className="min-h-dvh bg-paper font-sans text-base text-ink antialiased">
         <SentryErrorBoundary>
           <SessionBridge />
+          <MobileViewport />
           <NativeBridge />
           {/* OtaUpdater temporarily removed — @capgo/capacitor-updater's
               native init calls Capacitor core's notifyListeners(..., true),

@@ -203,7 +203,7 @@ export default async function ReviewListPage({ params, searchParams }: PageProps
             if (item.kind === 'manual') {
               const g = item.group_id ? groupById.get(item.group_id) : null
               const href = item.group_id
-                ? `/${event.code}/rsvp/${item.group_id}?recording=${item.recording_id}&from=review`
+                ? `/${event.code}/rsvp/status/${item.group_id}?recording=${item.recording_id}&from=review`
                 : null
 
               const card = (
@@ -267,7 +267,7 @@ export default async function ReviewListPage({ params, searchParams }: PageProps
 
             return (
               <li key={ex.id}>
-                <Link href={`/${event.code}/review/${ex.id}`} className="block">
+                <Link href={`/${event.code}/rsvp/review/${ex.id}`} className="block">
                   <Card className="transition-colors hover:bg-surface-2 active:bg-surface-2">
                     <CardBody className="flex items-start justify-between gap-3">
                       <div className="min-w-0">

@@ -20,7 +20,7 @@ import {
 import { cn, formatDateTime, formatDuration } from '@/lib/utils'
 import { rsvpStatusLabel, rsvpStatusTone } from '@/lib/rsvp'
 
-import { BackRow } from './BackRow'
+import { BackRow } from '@/components/ui/BackRow'
 import { startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
 import { dialTarget, formatMobile, type DialTarget } from '@/lib/phone'
 import { placeCall } from '@/lib/native-call'
@@ -408,6 +408,7 @@ export function CallScreen({
     <div className="flex flex-col gap-4">
       <BackRow
         href={`/${eventCode}/rsvp/queue`}
+        backLabel="the call list"
         title={group.head_name}
         subtitle={[formatMobile(group.primary_mobile), group.city].filter(Boolean).join(' · ')}
       />

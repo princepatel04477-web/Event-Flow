@@ -5,6 +5,123 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 21 September 2026 — One route per screen, and a bottom bar that fits
+
+### Every field screen existed twice, and the copies had drifted
+
+The section move (`logistics/`, `hospitality/`, `rsvp/`, `guests/`) copied
+screens into their sections and **left the flat originals in place**. Thirteen
+folders, ~5,600 lines, and by the time they were found the two copies were no
+longer the same file:
+
+| screen | flat copy | section copy |
+|---|---|---|
+| Arrivals | 540 | **627** |
+| Departures | 433 | **821** |
+| Fleet | 33 | **305** |
+| Deliveries | 882 | **896** |
+| Call list | 697 | **712** |
+
+The section copy was ahead in every case. The board linked to the flat ones, so
+tapping "Arrivals today" opened the older Arrivals while the tab bar opened the
+newer one — the same screen, two versions, decided by which control you touched.
+The flat copies are deleted.
+
+**The flat URLs are 308 redirects in `next.config.ts`, not deleted outright.**
+Staff have these paths in browser history and pinned in WhatsApp threads, and
+in remote-shell mode the APK is a WebView over the deployed site, so a dead URL
+is a dead screen on a handset mid-event. Permanent, so the handset caches the
+hop instead of paying for it on venue Wi-Fi.
+
+**`/:eventCode/rsvp/:groupId` is constrained to a UUID.** Redirects run before
+filesystem routing, so a bare `:groupId` would also match `/EVENT/rsvp/queue`
+and swallow the entire RSVP section. Verified against a running production
+build: all six named RSVP children still resolve, and a real UUID redirects to
+`/rsvp/status/<id>`.
+
+### Two RSVP detail screens, and the writes revalidated the one nobody opened
+
+`rsvp/[groupId]` and `rsvp/status/[groupId]` were both live. Guest lists, the
+review screen and `rsvp/next` linked to the bare one; `CallScreen` used the
+`status` one — and **both server actions called
+`revalidatePath('/EVENT/rsvp/status/<id>')`**. So logging an RSVP invalidated a
+path the user was not on, and the screen they were looking at kept serving the
+pre-write cache. Canonicalised on `rsvp/status/[groupId]` (the fork that was
+ahead, and the one the actions already named) and repointed every link.
+
+Ten more links pointed at deleted routes, including three more `revalidatePath`
+targets. **A `revalidatePath` on a path with no page behind it fails silently** —
+it is not an error, it simply revalidates nothing, which is why this class of
+bug survives a clean build and a green test run.
+
+### Five tabs, because that is what the bar can lay out
+
+An event lead had seven. The `truncate` on the tab label was already documented
+as load-bearing at five. Hampers and Setup are now *borrowed children* of Rooms:
+they keep their own routes (`/{event}/hamper`, `/{event}/production`) and appear
+in the second-level strip, so nothing became unreachable and no URL churned.
+
+That is only safe because `SectionTabs` exists. Before it, a non-default child
+rendered nowhere and promoting Hamper to a section was the only way to reach it
+— the workaround this removes. `SECTIONS.hamper.inTabBar = false` records that
+it is still a real section, just not one holding a slot.
+
+`resolveActive()` is what makes a borrowed child work: `/EVENT/hamper` starts
+with a real section id, so without it the Rooms tab went dark and the strip that
+leads back out rendered nothing — a screen you can reach and not leave.
+
+### A runner's bottom bar is their own screens, not Home plus a dead tab
+
+Four of five departments got `[Home] [Travel]`, and the board **redirects any
+non-management staff to their department home** — so Home bounced straight back
+off itself. A two-tab bar with one working tab, while their four real screens
+sat one level down.
+
+A single-department runner now gets their section's screens *as* the bar:
+Arrivals · Departures · Fleet · Trips. A department whose section is one screen
+(Hampers, Setup) gets **no bar at all** — one screen does not need navigation.
+
+Two consequences worth stating, because both were bugs waiting:
+
+- The layout asks `bottomTabsFor(...).length > 0` for its bottom clearance. It
+  used to ask `access !== 'client'`, which was the bar's own rule before a
+  runner could have no bar — so `pb-nav` would have reserved 56px under a page
+  with nothing beneath it.
+- Borrowed children carry their own `departments` list. A Rooms runner is not a
+  member of the `hamper` section, so a Hampers tab would render a control that
+  bounces them to `?denied=section`.
+
+`tests/nav-model.test.ts` asserts all of this. The bar is the only navigation
+most of these users have and every rule in it is about *who someone is* rather
+than where they are — that combination has already shipped two bugs.
+
+### DeliveryDetail's way out was hardcoded to a section its users cannot open
+
+`hamper/[deliverableId]` renders the hospitality `DeliveryDetail`, whose four
+exits all pointed at `/{event}/hospitality/deliveries`. A hamper runner is not
+in that section, so every way off the screen bounced them with a telling-off.
+It now takes `backTo` / `backLabel`, the way `DeliveryList` already took
+`detailBase` for the same reason in the other direction.
+
+`BackRow` existed as byte-identical copies under `components/call/` and
+`rsvp/status/[groupId]/`, both hardcoding `aria-label="Back to queue"`
+regardless of destination. One copy in `components/ui/`, `backLabel` required.
+
+### The empty board was on the copy nobody could reach
+
+`docs/UX-RULES.md` cites the zero-guests empty state as the model for R3 — and
+cites it at `dashboard/page.tsx`, which was a *third* fork of the board that the
+tab bar never sent anyone to. The live board at `[eventCode]/page.tsx` did not
+have it, so a real new event got a grid of zeros above a paragraph explaining
+that zero means nothing recorded yet. Ported into the live board; the fork is
+deleted.
+
+The board now leads with "Needs eyes on it" instead of carrying it fourth, below
+six counters. That panel renders nothing when nothing is wrong, so a calm day
+still opens on the headline.
+
+---
+
 ## 16 August 2026 — EventFlow identity: logo, launcher label, final-06 build
 
 ### The launcher label changed; the appId did not

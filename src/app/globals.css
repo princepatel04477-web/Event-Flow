@@ -298,6 +298,7 @@
     font-size: 16px;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    overflow-x: clip;
     /* The ground, so overscroll on the APK reveals teal and not white. */
     background-color: var(--ef-paper);
   }
@@ -307,7 +308,10 @@
     color: var(--ef-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
+    max-width: 100%;
     overscroll-behavior-y: none;
+    overscroll-behavior-x: none;
   }
 
   /* Anything under 16px makes iOS Safari zoom the whole page on focus,
@@ -349,7 +353,9 @@
 
 /* Bottom padding that clears the fixed tab bar plus the gesture bar. */
 @utility pb-nav {
-  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(
+    5.5rem + env(safe-area-inset-bottom, 0px) + var(--keyboard-offset, 0px)
+  );
 }
 
 /* Sticky offset that clears the fixed tab bar plus the gesture bar.
@@ -360,7 +366,7 @@
    solves it for sticky children. Pair with `md:bottom-0`, since the tab bar
    is `md:hidden`. */
 @utility bottom-nav {
-  bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(4rem + env(safe-area-inset-bottom, 0px) + var(--keyboard-offset, 0px));
 }
 
 /* Kill the 300ms grey flash on Android taps. */
@@ -535,5 +541,17 @@
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
+  }
+}
+
+/* Phones: skip entrance animations that shift layout on every navigation.
+   The dashboard was re-animating six tiles on every tab switch, which read
+   as the screen zooming or jumping. */
+@media (pointer: coarse) {
+  .list-fade,
+  .grow-x,
+  .push-in,
+  .sheet-in {
+    animation: none;
   }
 }

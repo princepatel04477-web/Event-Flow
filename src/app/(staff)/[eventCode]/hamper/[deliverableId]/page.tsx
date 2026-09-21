@@ -30,7 +30,16 @@ export default async function HamperDetailPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <DeliveryDetail eventId={event.id} eventCode={event.code} deliverableId={deliverableId} />
+      {/* Back to the Hamper list, not the hospitality one. A hamper runner is
+          not a member of the `hospitality` section, so the default back link
+          would bounce them to `?denied=section` from their own screen. */}
+      <DeliveryDetail
+        eventId={event.id}
+        eventCode={event.code}
+        deliverableId={deliverableId}
+        backTo="hamper"
+        backLabel="hampers"
+      />
     </div>
   )
 }

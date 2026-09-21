@@ -130,7 +130,7 @@ export function UnmatchedTrayClient({
 
   return (
     <div className="flex flex-col gap-4 pb-4">
-      <h2 className="text-lg font-semibold text-fg">Unmatched recordings</h2>
+      <h2 className="text-lg font-semibold text-fg">Recordings with no family</h2>
       <p className="text-sm text-muted">
         These recordings were detected but could not be automatically matched to a call.
         Attach each one to the correct family or try re-matching.
@@ -145,7 +145,7 @@ export function UnmatchedTrayClient({
       ) : entries.length === 0 ? (
         <EmptyState
           icon={<MicIcon className="h-7 w-7" />}
-          title="Nothing unmatched"
+          title="Every recording has a family"
           description="Every detected recording was matched automatically."
         />
       ) : (
@@ -160,7 +160,7 @@ export function UnmatchedTrayClient({
                       <span className="truncate font-mono text-sm text-fg">{entry.name}</span>
                     </div>
                   </CardTitle>
-                  <Badge tone="warning" size="sm">Unmatched</Badge>
+                  <Badge tone="warning" size="sm">No family yet</Badge>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-2">
                   <p className="text-xs text-subtle truncate">{entry.path}</p>

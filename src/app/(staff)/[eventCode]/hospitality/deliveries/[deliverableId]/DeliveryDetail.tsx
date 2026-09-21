@@ -52,6 +52,20 @@ export interface DeliveryDetailProps {
   eventId: string
   eventCode: string
   deliverableId: string
+  /**
+   * The list this screen was opened from, relative to the event.
+   *
+   * This screen is rendered by two routes — `hospitality/deliveries/[id]` and
+   * `hamper/[id]` — and every way out of it used to be hardcoded to the
+   * hospitality list. A hamper runner is NOT a member of the `hospitality`
+   * section, so `requireSection` bounced them to `?denied=section`: a back
+   * button that threw them out of their own screen and gave them a telling-off
+   * for it (R3). `DeliveryList` already took `detailBase` for the same reason
+   * in the other direction.
+   */
+  backTo?: string
+  /** What the back control calls its destination. */
+  backLabel?: string
 }
 
 type Phase =
@@ -97,7 +111,14 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function DeliveryDetail({ eventId, eventCode, deliverableId }: DeliveryDetailProps) {
+export function DeliveryDetail({
+  eventId,
+  eventCode,
+  deliverableId,
+  backTo = 'hospitality/deliveries',
+  backLabel = 'all deliveries',
+}: DeliveryDetailProps) {
+  const backHref = `/${eventCode}/${backTo}`
   const online = useOnline()
 
   const [detail, setDetail] = useState<DeliveryDetailData | null>(null)
@@ -187,13 +208,13 @@ export function DeliveryDetail({ eventId, eventCode, deliverableId }: DeliveryDe
           replaced.
         </p>
         <LinkButton
-          href={`/${eventCode}/hospitality/deliveries`}
+          href={backHref}
           variant="secondary"
           size="lg"
           fullWidth
           className="mt-5"
         >
-          Back to run
+          Back to {backLabel}
         </LinkButton>
       </section>
     )
@@ -269,8 +290,8 @@ export function DeliveryDetail({ eventId, eventCode, deliverableId }: DeliveryDe
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link href={`/${eventCode}/hospitality/deliveries`} className="text-sm font-semibold text-ink underline">
-          ← Deliveries
+        <Link href={backHref} className="text-sm font-semibold text-ink underline">
+          ← Back to {backLabel}
         </Link>
       </div>
 
@@ -359,8 +380,8 @@ export function DeliveryDetail({ eventId, eventCode, deliverableId }: DeliveryDe
               the network returns. This is NOT marked delivered yet.
             </p>
             <p className="text-xs text-subtle">{queuedCount} proof{queuedCount === 1 ? '' : 's'} waiting to sync</p>
-            <Link href={`/${eventCode}/hospitality/deliveries`} className="text-sm font-semibold text-ink underline">
-              Back to deliveries
+            <Link href={backHref} className="text-sm font-semibold text-ink underline">
+              Back to {backLabel}
             </Link>
           </CardBody>
         </Card>
@@ -427,12 +448,12 @@ export function DeliveryDetail({ eventId, eventCode, deliverableId }: DeliveryDe
           </div>
 
           <LinkButton
-            href={`/${eventCode}/hospitality/deliveries`}
+            href={backHref}
             size="lg"
             fullWidth
             className="mt-5"
           >
-            Back to run
+            Back to {backLabel}
           </LinkButton>
         </section>
       ) : null}

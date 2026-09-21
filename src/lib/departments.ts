@@ -64,27 +64,25 @@ export function sectionAllowedForDepartment(
   return DEPARTMENT_SECTIONS[department].includes(sectionId)
 }
 
-/** Map URL segment to section id (handles legacy aliases). */
+/**
+ * Map the first URL segment under the event code to the section that guards it.
+ *
+ * Only real routes appear here. This used to also carry aliases for the flat
+ * copies of these screens — `arrivals`, `queue`, `checkin`, `deliveries`,
+ * `import`, `export` and the rest — which were deleted along with the routes
+ * themselves. `next.config.ts` redirects those paths to their section route
+ * before filesystem routing runs, so nothing reaches this function holding
+ * one, and leaving them here would suggest a screen still lives there.
+ */
 export function pathSegmentToSection(segment: string): SectionId | null {
   const map: Record<string, SectionId> = {
     dashboard: 'dashboard',
     guests: 'guests',
     rsvp: 'rsvp',
-    queue: 'rsvp',
-    call: 'rsvp',
     logistics: 'logistics',
-    arrivals: 'logistics',
-    departures: 'logistics',
-    fleet: 'logistics',
-    trips: 'logistics',
     hospitality: 'hospitality',
-    rooms: 'hospitality',
-    checkin: 'hospitality',
     hamper: 'hamper',
-    deliveries: 'hamper',
     production: 'production',
-    export: 'guests',
-    import: 'guests',
   }
   return map[segment] ?? null
 }

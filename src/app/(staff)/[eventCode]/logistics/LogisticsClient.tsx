@@ -359,7 +359,7 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
           </Button>
         )}
         {committed && (
-          <LinkButton fullWidth variant="secondary" href={`/${eventId}/fleet`}>
+          <LinkButton fullWidth variant="secondary" href={`/${eventId}/logistics/fleet`}>
             Back to fleet
           </LinkButton>
         )}

@@ -255,7 +255,7 @@ export function ReviewPanel({
       return
     }
 
-    router.push(`/${eventCode}/review?done=accepted`)
+    router.push(`/${eventCode}/rsvp/review?done=accepted`)
   }
 
   // --- Render -----------------------------------------------------------

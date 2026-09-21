@@ -16,15 +16,15 @@ A screen must name the single job it exists for in its title, and its primary ac
 Every noun and label displayed on screen must be a word a wedding guest or first-day runner understands. Trade terms, internal jargon, and developer vocabulary are banned from the user interface; they survive only in database schemas and Excel export column headers where third-party sheets require them.
 
 - **Right:** Showing "guests" for people counts, "family" for groups, "hamper" / "return gift" for items, and "Home" / "Rooms" / "Setup" for navigation tabs.
-- **Wrong:** Displaying `"Total pax on the list"` in `src/app/(staff)/[eventCode]/dashboard/page.tsx:177`, labelling tabs `"Board"` / `"Stay"` / `"Prep"` in `src/lib/sections/config.tsx`, or displaying `"Unmatched"` and `"Deliverable"` on staff cards.
+- **Wrong:** `"Total pax on the list"`, `"PAX on this leg"`, tabs labelled `"Board"` / `"Stay"` / `"Prep"`, or a badge reading `"Unmatched"`. All of these shipped; all now read `"Guests expected"`, `"Guests travelling"`, `"Home"` / `"Rooms"` / `"Calls"`, and `"No family yet"`. The board that carried the first one was `dashboard/page.tsx`, a second copy of `src/app/(staff)/[eventCode]/page.tsx` that the tab bar never opened — see DECISIONS.md, 21 September 2026.
 
 ---
 
 ### R3. Never a dead end
 Every screen must provide a clear, visible way back and an obvious next step. Detail screens must provide an explicit back button in the header naming where it leads, and empty states must direct the user to what to do next rather than simply reporting that nothing is there.
 
-- **Right:** `src/app/(staff)/[eventCode]/dashboard/page.tsx:121` where an empty board explains: *"The board fills in as soon as there is a guest list to count. Import the calling sheet and every number on this screen starts working"* with a direct button to `Import the guest list`.
-- **Wrong:** Screens like `src/app/(staff)/[eventCode]/rsvp/status/[groupId]` or `src/app/(staff)/[eventCode]/hamper/[id]` that lack a back button in `StickyHeader` and render no `SectionTabs`, stranding the user unless they know to swipe or use their hardware back gesture.
+- **Right:** `src/app/(staff)/[eventCode]/page.tsx` where an event with no guest list explains: *"This screen fills in as soon as there is a guest list to count. Import the calling sheet and every number here starts working"* with a direct button to `Import the guest list`. Worth knowing how this rule nearly lost its own example: the empty state existed only on `dashboard/page.tsx`, a fork the tab bar never sent anyone to, so the board people actually opened showed a grid of zeros. It was ported into the live board and the fork deleted.
+- **Wrong:** A back control that names the wrong destination, or one that leads somewhere the user is not allowed. `hamper/[deliverableId]` renders the hospitality `DeliveryDetail`, whose four exits were hardcoded to `/{event}/hospitality/deliveries` — a section the hamper team is not in, so every way off the screen bounced them to `?denied=section`. `BackRow` likewise hardcoded `aria-label="Back to queue"` on every screen that used it. Both now take an explicit destination label.
 
 ---
 
@@ -47,7 +47,7 @@ Reversible operations must take effect immediately and offer a temporary, non-bl
 ### R6. Tell the truth about failure
 Error messages must plainly explain three things in one or two short sentences: what happened, what to do right now, and who to contact if it persists. Never display raw Postgres codes, HTTP numbers, or cryptic exceptions.
 
-- **Right:** `src/app/(staff)/[eventCode]/dashboard/page.tsx:85` stating: *"Could not load the numbers. The dashboard counters did not come back from the database this time. This is a load failure, not an empty event — reload the page, and tell your admin if it keeps happening."*
+- **Right:** `src/app/(staff)/[eventCode]/page.tsx` stating: *"Could not load the numbers. The counters did not come back from the database this time. This is a load failure, not an empty event — reload the page, and tell your admin if it keeps happening."*
 - **Wrong:** Displaying unhandled runtime alerts like `"Postgres error 23514: check constraint violation"` or `"PGRST205 relation does not exist"` with no recovery action.
 
 ---

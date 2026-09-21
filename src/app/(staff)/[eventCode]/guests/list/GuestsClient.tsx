@@ -284,7 +284,7 @@ function GuestListRow({ row, eventCode }: { row: GuestSearchRow; eventCode: stri
     typeof row.pax === 'number' ? `Family of ${row.pax}` : null,
   ].filter(Boolean)
 
-  const href = groupId ? `/${eventCode}/rsvp/${groupId}` : null
+  const href = groupId ? `/${eventCode}/rsvp/status/${groupId}` : null
 
   const inner = (
     <div className="flex h-full items-center gap-3 px-4">

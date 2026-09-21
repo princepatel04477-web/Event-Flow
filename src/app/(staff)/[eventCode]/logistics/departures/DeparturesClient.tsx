@@ -287,7 +287,7 @@ export function DeparturesClient({ eventId, eventCode }: Props) {
               </label>
 
               <label>
-                <span className="block text-sm font-medium text-fg">PAX on this leg</span>
+                <span className="block text-sm font-medium text-fg">Guests travelling</span>
                 <input
                   type="number"
                   value={pax}

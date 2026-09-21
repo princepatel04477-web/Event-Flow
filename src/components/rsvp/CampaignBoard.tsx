@@ -94,7 +94,7 @@ export function CampaignBoard({
 
       <Card className="border-brand/25 bg-[linear-gradient(158deg,var(--ef-brand-tint),transparent_62%)]">
         <CardBody className="flex flex-col gap-3">
-          <p className="text-3xl font-medium tabular-nums text-ink">
+          <p className="text-2xl font-medium tabular-nums text-ink sm:text-3xl">
             {formatCount(totalFamilies)}
             <span className="ml-2 text-base font-normal text-muted">families to call</span>
           </p>
