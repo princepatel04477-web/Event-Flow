@@ -1178,3 +1178,34 @@ outside the repo entirely.
 **Where the next session should start.** V2, from its prompt, on a machine where
 `npx playwright test --project=phone` completes — that single check also unblocks V1's real
 baseline and, later, V12.
+
+---
+
+## 21 September 2026 — V2 landed: the three highest-traffic lists are behind the shared cache
+
+Visits to guests/list, rsvp/queue and logistics/arrivals now paint from one shared,
+event-scoped cache instead of re-fetching Supabase in Seoul. Built by hand after all
+three CLI agents were exhausted (see the handoff entry above) — Codex's partial attempt
+was reverted first because it left 4 typecheck errors and had converted 1 of 3 screens.
+
+Key decisions, the reasoning for each, and the limits of what was verified are in the
+commit message for this session. The three that matter beyond this screen set:
+
+1. **One key factory, and the event id is the first element of every key.**
+   `src/lib/query/keys.ts`. Enforced by `tests/query-keys.test.ts`, which walks the whole
+   factory tree rather than a hand-written list — so a factory added later is covered
+   immediately. Verified by injecting a deliberately unscoped factory: 2 failures, green
+   again on removal. An unscoped key is a tenancy bug with no symptom.
+
+2. **`refetchOnWindowFocus: false` is not a tuning preference.** `tel:` backgrounds the
+   WebView on every call (CLAUDE.md §12), so the app refocuses dozens of times an hour.
+   Leaving focus-refetch on would re-fetch the whole screen after every dial.
+
+3. **Only guests/list gets a server prefetch.** Queue and arrivals read under the
+   BROWSER's own RLS session; prefetching those server-side would change the identity path
+   or duplicate the query. They fetch once, client-side, into the same cache.
+
+**Not verified, and it should be the first check on a working machine:** the task asked for
+the "one request, not two" claim to be measured in the network panel. The Playwright runner
+cannot start here (V1 entry), so that measurement has not been made. The reasoning is in
+the commit; the proof is not.

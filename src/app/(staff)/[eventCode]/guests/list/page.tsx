@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query'
 
 import { getEventAccess, resolveEventByCode } from '@/lib/supabase/queries'
+import { queryKeys } from '@/lib/query/keys'
+import { readGuestsList } from '@/lib/query/reads'
 
 import { GuestsClient } from './GuestsClient'
 import { ClientGuestList } from './_components/ClientGuestList'
@@ -53,5 +56,28 @@ export default async function GuestsPage({ params }: PageProps) {
     return <ClientGuestList eventId={event.id} />
   }
 
-  return <GuestsClient eventId={event.id} eventCode={event.code} />
+  // Warm the cache on the SERVER so the first paint already has rows and the
+  // client does not turn round and ask for the same list again. Without this a
+  // dehydrate/hydrate pair fires the read twice on first load — once here and
+  // once on mount — which is worse than not prefetching at all.
+  //
+  // This is safe to do here and NOT on the queue or arrivals screens: those two
+  // read `v_rsvp_queue` / `travel_legs` under the browser's own RLS session, so
+  // a server prefetch would either use a different identity path or need a
+  // second copy of the query on the server. They fetch once, on the client, into
+  // the same shared cache — one request, so nothing is doubled.
+  //
+  // A `QueryClient` per request, never module scope: a shared one would leak one
+  // staff member's hydrated rows into another's render.
+  const queryClient = new QueryClient()
+  await queryClient.prefetchQuery({
+    queryKey: queryKeys.guests.list(event.id),
+    queryFn: () => readGuestsList(event.id),
+  })
+
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <GuestsClient eventId={event.id} eventCode={event.code} />
+    </HydrationBoundary>
+  )
 }

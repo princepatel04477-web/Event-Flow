@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 
 import { ChevronRightIcon, SearchIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
-import { listGuests, searchGuests, type GuestSearchRow } from '@/lib/actions/search-guests'
+import type { GuestSearchRow } from '@/lib/actions/search-guests'
 import { traceFetch } from '@/lib/perf'
-import { useStableData } from '@/lib/use-stable-data'
+import { queryKeys } from '@/lib/query/keys'
+import { readGuestSearch, readGuestsList } from '@/lib/query/reads'
 import { cn } from '@/lib/utils'
 import { formatMobile } from '@/lib/phone'
 import { describeRoom, groupTypeLabel, sideLabel } from './_components/format'
@@ -67,62 +69,80 @@ export interface GuestsClientProps {
 
 export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
   const [search, setSearch] = useState('')
-  const [searchRows, setSearchRows] = useState<GuestSearchRow[] | null>(null)
-  const [searching, setSearching] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
+  // The term the server actually searched for. Separate from `search` so the
+  // input stays instant while the request is debounced, and so the query key
+  // only changes when a request is genuinely due.
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [scrollTop, setScrollTop] = useState(0)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load the full ordered row set once, cached for tab switches (the
-  // module-level TTL survives unmounting — same pattern as every board).
+  // Load the full ordered row set once, then serve it from the shared cache on
+  // every later visit — tab switches, back-taps, and the detail screens all
+  // read the same entry under the same event-scoped key. See
+  // docs/INTERACTION-CONTRACT.md T4.
+  //
   // The list goes through the SAME staff-facing RPC as search (not the
   // client_guest_profiles view) so every row carries `group_id` — each
   // row links to its family's RSVP record.
-  const { data: rows, loading, error, reload } = useStableData<GuestSearchRow[] | null>(
-    `guests:${eventId}`,
-    async () => {
-      const result = await traceFetch('guests :: load', () => listGuests(eventId))
-      if (!result.ok) {
-        throw new Error(result.message || 'Could not load the guest list. Check your connection and try again.')
-      }
-      return result.rows
-    },
-  )
+  const {
+    data: rows,
+    isPending: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: queryKeys.guests.list(eventId),
+    queryFn: () => traceFetch('guests :: load', () => readGuestsList(eventId)),
+  })
 
   // Debounced server-side search. The effect owns the timer: typing keeps
-  // resetting it, and only a 300ms pause fires the RPC. The "cleared"
-  // state is handled in onChange below (an effect must not setState
-  // synchronously).
+  // resetting it, and only a 300ms pause promotes the term into the key. The
+  // "cleared" state is handled in onChange below (an effect must not
+  // setState synchronously).
   const q = search.trim()
   const searchActive = q.length >= 2
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
+    // Dropping below the minimum is handled in onChange below, not here: an
+    // effect must not setState synchronously (react-hooks/set-state-in-effect),
+    // and the only thing that can shorten the term is the user typing.
     if (!searchActive) return
 
-    debounceRef.current = setTimeout(async () => {
-      const result = await searchGuests(eventId, q)
-      if (result.ok) {
-        setSearchRows(result.rows)
-        setSearchError(null)
-      } else {
-        setSearchRows(null)
-        setSearchError(result.message)
-      }
-      setSearching(false)
-    }, SEARCH_DEBOUNCE_MS)
+    debounceRef.current = setTimeout(() => setDebouncedSearch(q), SEARCH_DEBOUNCE_MS)
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [search, searchActive, q, eventId])
+  }, [searchActive, q])
+
+  const {
+    data: searchRows,
+    isFetching: searchFetching,
+    error: searchError,
+  } = useQuery({
+    queryKey: queryKeys.guests.search(eventId, debouncedSearch),
+    queryFn: () => traceFetch('guests :: search', () => readGuestSearch(eventId, debouncedSearch)),
+    enabled: debouncedSearch.length >= 2,
+    // T4: while a NEW search is in flight the PREVIOUS results stay on screen
+    // and only dim. Replacing them with a skeleton on every keystroke is the
+    // screen "blinking", and it makes a 300ms debounce feel like a stall.
+    placeholderData: keepPreviousData,
+  })
+
+  // Only trust results that belong to the term currently in the box. Between a
+  // keystroke and the debounce firing, `searchRows` is still the previous
+  // term's data — showing it under the new query would be a lie.
+  const activeSearchRows = searchActive && debouncedSearch === q ? searchRows : undefined
 
   // A non-empty search with no results yet and no error is "in flight".
-  const isSearching = searching || (searchActive && searchRows === null && !searchError)
+  const isSearching = searchFetching || (searchActive && !activeSearchRows && !searchError)
 
   // The windowed slice: which rows are near the viewport right now.
-  const list = useMemo(() => (searchActive ? searchRows ?? [] : rows ?? []), [searchActive, searchRows, rows])
+  const list = useMemo(
+    () => (searchActive ? activeSearchRows ?? [] : rows ?? []),
+    [searchActive, activeSearchRows, rows],
+  )
   const total = rows?.length ?? 0
-  const shownTotal = searchRows ? searchRows.length : total
+  const shownTotal = activeSearchRows ? activeSearchRows.length : total
 
   const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
   const visibleCount = Math.ceil(typeof window === 'undefined' ? 12 : window.innerHeight / ROW_HEIGHT) + OVERSCAN * 2
@@ -130,17 +150,18 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
   const windowRows = useMemo(() => list.slice(startIndex, endIndex), [list, startIndex, endIndex])
 
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
+  const searchErrorMessage = searchError instanceof Error ? searchError.message : null
 
   // Pull-to-refresh on a pointer/touch drag is the board pattern; here a
   // refresh button in the error state is the recovery action, and the
-  // list itself re-fetches on tab re-entry via the TTL cache.
+  // list itself is served from the shared cache on tab re-entry.
   if (loadError && !rows) {
     return (
       <EmptyState
         icon={<UsersIcon className="h-7 w-7" />}
         title="Could not load the guest list"
         description={loadError}
-        action={<Button onClick={() => void reload()}>Try again</Button>}
+        action={<Button onClick={() => void refetch()}>Try again</Button>}
       />
     )
   }
@@ -168,9 +189,7 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
             // resetting here (in the event handler, not an effect) avoids a
             // synchronous setState inside the debounce effect.
             if (next.trim().length < 2) {
-              setSearchRows(null)
-              setSearchError(null)
-              setSearching(false)
+              setDebouncedSearch('')
             }
           }}
           placeholder="Search by name or mobile"
@@ -182,9 +201,9 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
         ) : null}
       </div>
 
-      {searchError ? (
+      {searchErrorMessage ? (
         <p className="rounded-xl border border-border-strong bg-tint-warning px-3 py-2 text-sm font-medium text-warning">
-          {searchError}
+          {searchErrorMessage}
         </p>
       ) : null}
 

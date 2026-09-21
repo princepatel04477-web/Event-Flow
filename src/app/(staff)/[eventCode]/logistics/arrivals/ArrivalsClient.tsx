@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
@@ -13,7 +14,7 @@ import { createClient } from '@/lib/supabase/client'
 import { markArrived } from '@/lib/actions/event-day'
 import { suggestVehiclesForArrival, type PaxSuggestionResult } from '@/lib/actions/logistics'
 import { traceFetch } from '@/lib/perf'
-import { useStableData } from '@/lib/use-stable-data'
+import { queryKeys } from '@/lib/query/keys'
 import { cn, formatDate } from '@/lib/utils'
 import { formatMobile } from '@/lib/phone'
 import type { Database } from '@/lib/supabase/database.types'
@@ -84,12 +85,19 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
   const [modeFilter, setModeFilter] = useState('')
   const [pendingGroup, setPendingGroup] = useState<string | null>(null)
 
-  // Cache the raw fetch so the second visit to this tab renders from cache
-  // (the module-level TTL survives tab switches). The processing below is
-  // pure and cheap — it re-runs on every render over the cached rows.
-  const { data: raw, loading, error, reload } = useStableData<ArrivalRow[] | null>(
-    `arrivals:${eventId}`,
-    async () => {
+  // Read once into the shared cache, keyed by event. Returning to this tab, or
+  // arriving from anywhere else that warmed the same key, paints from memory
+  // instead of re-querying venue Wi-Fi (docs/INTERACTION-CONTRACT.md T4). The
+  // processing below is pure and cheap — it re-runs on every render over the
+  // cached rows.
+  const {
+    data: raw,
+    isPending: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: queryKeys.logistics.arrivals(eventId),
+    queryFn: async () => {
       // Columns are listed explicitly rather than `select('*')`. This screen
       // needs 8 of guest_groups' 27 columns; pulling the rest ships remarks,
       // hashes and lock state for every family down a venue 3G link for
@@ -154,9 +162,9 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
           roomLabel: roomByGroup.get(leg.group_id) ?? '',
         }))
     },
-  )
+  })
 
-  const rows = raw
+  const rows = raw ?? null
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
 
   async function handleArrive(row: ArrivalRow) {
@@ -168,7 +176,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
       setErrorState(result.message)
       return
     }
-    await reload()
+    await refetch()
   }
 
   function setErrorState(message: string) {
@@ -207,7 +215,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
       <EmptyState
         title="Could not load arrivals"
         description={loadError}
-        action={<Button onClick={() => void reload()}>Try again</Button>}
+        action={<Button onClick={() => void refetch()}>Try again</Button>}
       />
     )
   }

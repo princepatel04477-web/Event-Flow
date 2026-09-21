@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { UploadIcon, InboxIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
@@ -12,6 +13,7 @@ import { LoadingRows } from '@/components/ui/LoadingRows'
 import { PageTitle } from '@/components/ui/PageTitle'
 import { createClient } from '@/lib/supabase/client'
 import { traceFetch } from '@/lib/perf'
+import { queryKeys } from '@/lib/query/keys'
 import { QueueFilters } from './QueueFilters'
 import { QueueRow, type QueueGroupRow } from './QueueRow'
 import {
@@ -59,10 +61,56 @@ export interface QueueBoardProps {
   knownGroupCount: number
 }
 
-type LoadState =
-  | { phase: 'loading' }
-  | { phase: 'ready'; rows: QueueGroupRow[] }
-  | { phase: 'error'; message: string; rows: QueueGroupRow[] | null }
+/**
+ * One read of `v_rsvp_queue`, under the viewer's own RLS.
+ *
+ * A plain function rather than a `queryFn` closed over the component, because
+ * the query key already encodes the filters — so the cache, not the component,
+ * decides when this runs. Rows are read as-is; `attempt_count`,
+ * `next_callback_at` and friends are computed by the view, which is why a
+ * realtime change invalidates rather than patching a row in place.
+ */
+async function fetchQueue(
+  supabase: ReturnType<typeof createClient>,
+  eventId: string,
+  filters: QueueFilterState,
+): Promise<QueueGroupRow[]> {
+  let query = supabase.from('v_rsvp_queue').select('*').eq('event_id', eventId)
+
+  if (filters.statuses.length > 0) {
+    query = query.in('rsvp_status', filters.statuses)
+  }
+  if (filters.side) {
+    query = query.eq('side', filters.side)
+  }
+  if (filters.callbackScheduled) {
+    // `next_callback_at` is computed by the view as
+    // `min(callback_at) filter (where callback_at > now())` — evaluated
+    // against the SERVER clock, and already guaranteed to be in the
+    // future. So the only correct client-side test is "is there one",
+    // never a comparison against the phone's clock (which used to make
+    // this filter return nothing at all, since every value it can hold
+    // is already later than any honest `now`).
+    query = query.not('next_callback_at', 'is', null)
+  }
+  if (filters.hideLocked) {
+    query = query.eq('is_locked', false)
+  }
+
+  if (filters.callbackScheduled) {
+    query = query.order('next_callback_at', { ascending: true })
+  }
+
+  const { data, error } = await traceFetch('queue :: v_rsvp_queue', () =>
+    query.order('priority', { ascending: false }).order('head_name', { ascending: true }),
+  )
+
+  if (error) {
+    throw new Error('Could not load the calling queue. Check your connection and try again.')
+  }
+
+  return (data ?? []) as QueueGroupRow[]
+}
 
 /**
  * Client-side board: reads filters from the URL, fetches `v_rsvp_queue`
@@ -100,83 +148,40 @@ export function QueueBoard({
   const filters = useMemo(() => parseFilters(searchParams), [searchParams])
 
   const supabase = useMemo(() => createClient(), [])
+  const queryClient = useQueryClient()
 
-  const [state, setState] = useState<LoadState>({ phase: 'loading' })
-  // Bumped by the Retry button to re-run the effect below.
-  const [reloadToken, setReloadToken] = useState(0)
+  // The filters are already normalised by `queryKeys.rsvp.queue`, so two filter
+  // sets that mean the same thing are one cache entry.
+  const queueKey = queryKeys.rsvp.queue(eventId, filters)
 
-  const retry = useCallback(() => {
-    setState({ phase: 'loading' })
-    setReloadToken((n) => n + 1)
-  }, [])
+  const {
+    data,
+    isPending,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: queueKey,
+    queryFn: () => fetchQueue(supabase, eventId, filters),
+  })
 
-  // One effect owns both the initial/filter-change fetch and the realtime
-  // subscriptions that re-trigger it. Kept together, with the fetch itself
-  // local to the effect, so there is a single place that decides when a
-  // fresh read of `v_rsvp_queue` is needed.
+  const rows = data ?? null
+  const loadError = error instanceof Error ? error.message : error ? String(error) : null
+  const retry = () => void refetch()
+
+  // Realtime: every phone on the team shares this data, so a lock taken (or an
+  // outcome logged) on another device shows up here without a pull to refresh.
+  //
+  // This effect now only INVALIDATES. It used to own its own fetch loop, which
+  // meant the board had two independent notions of "current" — the cache and
+  // the effect — and they could disagree. Invalidation routes the change back
+  // through the one cache entry this screen reads.
+  //
+  // BOTH tables matter. `attempt_count`, `last_outcome` and `next_callback_at`
+  // come entirely from `call_attempts`, and logging an outcome writes nothing to
+  // `guest_groups` (see migration 0200: "Nothing in this chain writes to
+  // guest_groups on its own"). Listening only to `guest_groups` left those three
+  // columns stale team-wide.
   useEffect(() => {
-    let cancelled = false
-
-    async function load() {
-      let query = supabase.from('v_rsvp_queue').select('*').eq('event_id', eventId)
-
-      if (filters.statuses.length > 0) {
-        query = query.in('rsvp_status', filters.statuses)
-      }
-      if (filters.side) {
-        query = query.eq('side', filters.side)
-      }
-      if (filters.callbackScheduled) {
-        // `next_callback_at` is computed by the view as
-        // `min(callback_at) filter (where callback_at > now())` — evaluated
-        // against the SERVER clock, and already guaranteed to be in the
-        // future. So the only correct client-side test is "is there one",
-        // never a comparison against the phone's clock (which used to make
-        // this filter return nothing at all, since every value it can hold
-        // is already later than any honest `now`).
-        query = query.not('next_callback_at', 'is', null)
-      }
-      if (filters.hideLocked) {
-        query = query.eq('is_locked', false)
-      }
-
-      if (filters.callbackScheduled) {
-        query = query.order('next_callback_at', { ascending: true })
-      }
-
-      const { data, error } = await traceFetch('queue :: v_rsvp_queue', () =>
-        query
-          .order('priority', { ascending: false })
-          .order('head_name', { ascending: true }),
-      )
-
-      if (cancelled) return
-
-      if (error) {
-        // Never leave the board on a spinner that can never resolve: an
-        // error is a terminal state with a way out, not "still loading".
-        setState((prev) => ({
-          phase: 'error',
-          message: 'Could not load the calling queue. Check your connection and try again.',
-          rows: prev.phase === 'ready' ? prev.rows : prev.phase === 'error' ? prev.rows : null,
-        }))
-        return
-      }
-
-      setState({ phase: 'ready', rows: data ?? [] })
-    }
-
-    void load()
-
-    // Realtime: every phone on the team shares this data, so a lock taken
-    // (or an outcome logged) on another device shows up here without a pull
-    // to refresh.
-    //
-    // BOTH tables matter. `attempt_count`, `last_outcome` and
-    // `next_callback_at` come entirely from `call_attempts`, and logging an
-    // outcome writes nothing to `guest_groups` (see migration 0200: "Nothing
-    // in this chain writes to guest_groups on its own"). Listening only to
-    // `guest_groups` left those three columns stale team-wide.
     const channel = supabase
       .channel(`queue-${eventId}`)
       .on(
@@ -188,7 +193,7 @@ export function QueueBoard({
           filter: `event_id=eq.${eventId}`,
         },
         () => {
-          void load()
+          void queryClient.invalidateQueries({ queryKey: queueKey })
         },
       )
       .on(
@@ -200,16 +205,15 @@ export function QueueBoard({
           filter: `event_id=eq.${eventId}`,
         },
         () => {
-          void load()
+          void queryClient.invalidateQueries({ queryKey: queueKey })
         },
       )
       .subscribe()
 
     return () => {
-      cancelled = true
       void supabase.removeChannel(channel)
     }
-  }, [supabase, eventId, filters, reloadToken])
+  }, [supabase, eventId, queueKey, queryClient])
 
   function handleFilterChange(next: QueueFilterState) {
     const params = filtersToSearchParams(next)
@@ -218,7 +222,6 @@ export function QueueBoard({
   }
 
   const filtersActive = hasActiveFilters(filters)
-  const rows = state.phase === 'ready' ? state.rows : state.phase === 'error' ? state.rows : null
 
   // Progress across the whole calling list. Suppressed while a filter is on:
   // the denominator would then be "families matching this filter", and a
@@ -260,11 +263,11 @@ export function QueueBoard({
 
       <QueueFilters filters={filters} onChange={handleFilterChange} />
 
-      {state.phase === 'error' ? (
+      {loadError ? (
         <ErrorState
-          title={state.message}
+          title={loadError}
           description={
-            state.rows
+            rows
               ? 'Showing the last list that loaded. Your changes were saved.'
               : undefined
           }
@@ -272,7 +275,7 @@ export function QueueBoard({
         />
       ) : null}
 
-      {state.phase === 'loading' ? (
+      {isPending ? (
         <LoadingRows count={8} />
       ) : rows === null ? null : rows.length === 0 ? (
         // Order matters: the refused-read case is checked BEFORE the filter
