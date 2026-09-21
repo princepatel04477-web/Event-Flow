@@ -82,5 +82,5 @@ select app.attach_standard_triggers('public.rsvp_campaigns');
 select app.attach_standard_triggers('public.rsvp_campaign_jobs');
 
 -- RLS: staff on the event only.
-select app.apply_staff_policies('public.rsvp_campaigns');
-select app.apply_staff_policies('public.rsvp_campaign_jobs');
+select app.apply_staff_policies('rsvp_campaigns');
+select app.apply_staff_policies('rsvp_campaign_jobs');
