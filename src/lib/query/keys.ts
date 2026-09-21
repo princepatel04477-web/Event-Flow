@@ -55,8 +55,15 @@ function eventKey<T extends ReadonlyArray<KeyPart>>(
  */
 function normalizeQueueFilters(filters: QueueFiltersKey): KeyPart {
   return {
-    statuses: [...filters.statuses].sort(),
-    side: filters.side,
+    // Sorted AND deduped. `['confirmed','confirmed']` and `['confirmed']` produce
+    // the identical SQL `.in`, so they must produce the identical key — sorting
+    // alone left them as two entries for one query.
+    statuses: [...new Set(filters.statuses)].sort(),
+    // `?? null`, because `undefined` and `null` mean the same thing here but
+    // stringify differently: `{side: undefined}` drops the property entirely
+    // while `{side: null}` keeps it, so the two would be different cache
+    // entries for the same filter state.
+    side: filters.side ?? null,
     callbackScheduled: filters.callbackScheduled,
     hideLocked: filters.hideLocked,
   }

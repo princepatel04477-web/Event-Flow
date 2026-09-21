@@ -59,6 +59,23 @@ export function QueryProvider({ children }: { children: ReactNode }) {
             // the runner needs to see (docs/INTERACTION-CONTRACT.md T7).
             retry: (failureCount) => onlineManager.isOnline() && failureCount < 2,
 
+            // 'always', NOT the default 'online'. This is a correctness setting,
+            // not a tuning one, and the default is actively wrong here.
+            //
+            // With `networkMode: 'online'` a fetch issued while offline is
+            // PAUSED, not failed: TanStack leaves the query `pending` with
+            // `fetchStatus: 'paused'` and never sets an error. Every screen that
+            // renders a skeleton on `isPending` would then show that skeleton
+            // for as long as the phone stays offline — no error, no retry
+            // button, nothing to act on. That is exactly the "indefinite
+            // spinner" T7 forbids, and it is worse than the TTL cache it
+            // replaced, which caught the failure and rendered an ErrorState.
+            //
+            // With 'always' the fetch is actually attempted, fails, and becomes
+            // an error — so the screen shows its honest failure state with a way
+            // out. `retry` above then correctly declines to retry while offline.
+            networkMode: 'always',
+
             // Exponential backoff, capped at 8s. Uncapped doubling would leave
             // a runner staring at a spinner for over a minute on a bad link.
             retryDelay: (attemptIndex) => Math.min(1_000 * 2 ** attemptIndex, 8_000),

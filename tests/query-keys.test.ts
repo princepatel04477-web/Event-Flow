@@ -152,4 +152,24 @@ describe('query keys are event-scoped', () => {
       queryKeys.guests.search(EVENT_A, 'sharm'),
     )
   })
+
+  it('dedupes repeated statuses — same SQL .in, so the same key', () => {
+    // `['confirmed','confirmed']` and `['confirmed']` produce the identical
+    // `.in(...)`. Sorting alone left them as two entries for one query, which is
+    // the silent re-fetch the factory exists to prevent.
+    const base = { side: null, callbackScheduled: false, hideLocked: false }
+    expect(
+      queryKeys.rsvp.queue(EVENT_A, { ...base, statuses: ['confirmed', 'confirmed'] }),
+    ).toEqual(queryKeys.rsvp.queue(EVENT_A, { ...base, statuses: ['confirmed'] }))
+  })
+
+  it('treats an undefined side the same as an explicit null', () => {
+    // Keys are compared by JSON, and `{side: undefined}` drops the property
+    // while `{side: null}` keeps it — so without `?? null` these are two cache
+    // entries for one filter state.
+    const base = { statuses: [] as const, callbackScheduled: false, hideLocked: false }
+    expect(
+      queryKeys.rsvp.queue(EVENT_A, { ...base, side: undefined as unknown as null }),
+    ).toEqual(queryKeys.rsvp.queue(EVENT_A, { ...base, side: null }))
+  })
 })

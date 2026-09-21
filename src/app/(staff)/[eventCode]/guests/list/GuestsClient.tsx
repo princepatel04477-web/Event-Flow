@@ -117,6 +117,7 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
   const {
     data: searchRows,
     isFetching: searchFetching,
+    isPlaceholderData: searchStale,
     error: searchError,
   } = useQuery({
     queryKey: queryKeys.guests.search(eventId, debouncedSearch),
@@ -128,13 +129,18 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
     placeholderData: keepPreviousData,
   })
 
-  // Only trust results that belong to the term currently in the box. Between a
-  // keystroke and the debounce firing, `searchRows` is still the previous
-  // term's data — showing it under the new query would be a lie.
-  const activeSearchRows = searchActive && debouncedSearch === q ? searchRows : undefined
+  // The previous term's rows stay visible while the new term loads, and
+  // `isPlaceholderData` below is what marks them as old. An earlier version also
+  // required `debouncedSearch === q` here, which threw the placeholder away the
+  // moment the typed term moved ahead of the debounced one — so the list blinked
+  // to a skeleton on every keystroke and the `keepPreviousData` above was dead
+  // code. That is the behaviour T4 explicitly forbids.
+  const activeSearchRows = searchActive ? searchRows : undefined
 
-  // A non-empty search with no results yet and no error is "in flight".
-  const isSearching = searchFetching || (searchActive && !activeSearchRows && !searchError)
+  // "In flight" only describes a search with nothing to show yet. Once
+  // placeholder rows exist, the screen is showing something and the honest
+  // signal is the dimming, not a skeleton.
+  const isSearching = searchActive && searchFetching
 
   // The windowed slice: which rows are near the viewport right now.
   const list = useMemo(
@@ -224,10 +230,11 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
           title="No guest details yet"
           description="Nothing has been shared on this event yet. Usually that means the guest list has not been imported, or your account is on the event but no guests are linked to it. Ask your event team — nothing has gone wrong."
         />
-      ) : searchActive && isSearching ? (
-        // Search is in flight (300ms debounce + RPC round-trip). Show a
-        // skeleton, NOT a false "Nothing matches" — the empty state must
-        // only appear once the server actually answered with zero rows.
+      ) : searchActive && isSearching && !activeSearchRows ? (
+        // Search is in flight AND there is nothing to show yet (300ms debounce +
+        // RPC round trip on a cold term). Show a skeleton, NOT a false "Nothing
+        // matches" — the empty state must only appear once the server actually
+        // answered with zero rows.
         <div className="flex flex-col gap-2" aria-busy>
           {Array.from({ length: 5 }, (_, i) => (
             <div key={i} className="rounded-2xl border border-border bg-surface p-4">
@@ -249,12 +256,19 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
           ) : null}
 
           {/* The windowed list: a full-height scroll container holding a
-              positioned window of rows. Only `windowRows` are mounted. */}
+              positioned window of rows. Only `windowRows` are mounted.
+              Dimmed while the results shown are the PREVIOUS term's — the
+              staleness is visible, which is what makes showing them honest
+              rather than a lie (T4). */}
           <div
-            className="relative overflow-hidden rounded-2xl border border-border bg-surface"
+            className={cn(
+              'relative overflow-hidden rounded-2xl border border-border bg-surface',
+              searchStale && 'opacity-60',
+            )}
             style={{ height: list.length * ROW_HEIGHT }}
             role="list"
             aria-label="Guests"
+            aria-busy={searchStale || undefined}
           >
             <div
               className="absolute inset-0 overflow-y-auto"

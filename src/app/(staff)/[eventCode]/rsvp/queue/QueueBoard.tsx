@@ -152,7 +152,20 @@ export function QueueBoard({
 
   // The filters are already normalised by `queryKeys.rsvp.queue`, so two filter
   // sets that mean the same thing are one cache entry.
-  const queueKey = queryKeys.rsvp.queue(eventId, filters)
+  //
+  // MEMOISED, and that matters for more than avoiding work: this array is a
+  // dependency of the realtime subscription effect below, and
+  // `queryKeys.rsvp.queue` builds a FRESH array (and a fresh normalised filter
+  // object) on every call. Left unmemoised, the effect re-runs on every render
+  // and unsubscribes/rebuilds the Supabase channel each time — leaving repeated
+  // windows with no active subscription, during which a lock taken or an outcome
+  // logged on another phone is MISSED. With `refetchOnWindowFocus: false` and a
+  // 30s staleTime nothing else would correct that, and a caller would see a
+  // family as free that is already locked.
+  //
+  // `filters` is itself memoised on `searchParams` above, so this is stable
+  // across renders and only changes when the URL filters do.
+  const queueKey = useMemo(() => queryKeys.rsvp.queue(eventId, filters), [eventId, filters])
 
   const {
     data,
