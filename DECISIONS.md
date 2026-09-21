@@ -1120,3 +1120,61 @@ produce the real baseline elsewhere.
 **Honesty note.** `e2e/feel.spec.ts` has never executed successfully. It is committed so the
 work is not lost, NOT because it is known good — the first real run should be treated as a
 smoke test of the spec, and selectors will likely need fixing before any number is trusted.
+
+---
+
+## 21 September 2026 — V0/V0b landed; V1 blocked; V2 and V3 NOT started. Session handoff.
+
+**Landed and verified**
+
+- **V0** (`39578f1`) — `docs/INTERACTION-CONTRACT.md`, the timing half of the UX rules.
+  Corrected after an adversarial review found 11 defects, including two cited paths that did
+  not exist and a T5 claim that was simply wrong (see that commit for the `save_rsvp_log` /
+  `locked_by_staff` finding, which decides how V5 must be written).
+- **V0b** (`71a84be`) — the light ground finished: elevation tokenised as `--ef-shadow-e1/e2/e3`
+  on both grounds inside DESIGN.md's 2-4% band, all seven arbitrary shadows and both glows
+  gone, `global-error.tsx` repainted off the last dark screen, nine stale "night ground"
+  comments rewritten, and `tests/no-arbitrary-shadows.test.ts` added as the guard (verified to
+  fail on an injected probe).
+- **V1** (`e3ddbf4`) — the `feel` harness is built (`feel` project, `npm run test:feel`, M1-M5
+  at two throttle profiles) but **produced no baseline**. The Playwright runner hangs before
+  evaluating any spec, and the repo's OWN pre-existing `phone` suite hangs identically, so the
+  runner cannot run in this environment at all. Full evidence in `docs/FEEL-BASELINE.md`. The
+  Budgets table therefore keeps its `[PROPOSED]` markers, and **V12 is blocked for the same
+  reason.**
+
+**Not started, and why — this is the part the next session needs**
+
+V2 (client cache) and V3 (optimistic writes) did not land. V2 was attempted and reverted: the
+driving agent ran out of quota mid-session having converted only 1 of the 3 named screens, and
+left `src/lib/query/reads.ts` with four typecheck errors. A half-converted cache layer is worse
+than none — it implies V2 landed — so it was reverted rather than patched. The tree is clean:
+typecheck passes and all 162 unit tests pass.
+
+**Agent capacity, recorded because it is the binding constraint**
+
+Every CLI agent was exhausted during this session, and the failure modes are worth knowing:
+
+- **Codex** — best tool for long foreground commands (it ran the 369-line spec build and the
+  measurement attempt correctly, and it is the only one that buffered output sensibly). Hit a
+  hard usage cap, resets 27 Sep 2026.
+- **Claude Code** — produced by far the highest-value output in this session: the two
+  adversarial reviews that caught the contrast-ratio errors, the false T5 claim, the
+  incoherent seal and the unusable "night ground" comments. Rate-limited; resets 23:00 IST.
+  **Budget a reviewer pass before starting any V-series session.**
+- **Antigravity (agy)** — works, but in stdin print mode it waits only ~5 seconds for a
+  background task and then ends the whole session and kills it. That silently destroyed two
+  sessions (its first V0b attempt, and the first V1 attempt) with exit code 0, which is the
+  dangerous part: a green exit and an untouched tree. It is usable for short, foreground-only,
+  multi-file edit sessions (V0, V0`, V0b, V0b-fix all landed this way) and unusable for
+  anything that runs a multi-minute command.
+
+**One operational trap, fixed.** Do not put scratch files under `<repo>/test-results/`.
+Playwright's default `outputDir` is `./test-results` and it WIPES that directory at the start
+of every run. An orchestration directory planted there (prompts, logs, runner scripts) was
+destroyed mid-session by an unrelated `playwright test` invocation. Keep orchestration scratch
+outside the repo entirely.
+
+**Where the next session should start.** V2, from its prompt, on a machine where
+`npx playwright test --project=phone` completes — that single check also unblocks V1's real
+baseline and, later, V12.
