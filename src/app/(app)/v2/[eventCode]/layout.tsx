@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
+import { OfflineBanner } from '@/components/native/OfflineBanner'
 import { UndoBar } from '@/components/ui/UndoBar'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
@@ -10,6 +11,29 @@ import { cn } from '@/lib/utils'
 
 import { AppHeader } from './_components/AppHeader'
 import { AppTabs } from './_components/AppTabs'
+import { FirstRunCards } from './_components/FirstRunCards'
+
+/**
+ * The training line from CLAUDE.md §11b, in the words that section quotes.
+ *
+ * IT IS PASSED IN, NOT DERIVED INSIDE THE BANNER, and that is the whole reason
+ * this constant lives here. `src/components/native/OfflineBanner.tsx` is shared
+ * with the live v1 app, whose rendered output must not change; the component
+ * takes an optional `offlineNote` and v1 passes nothing. Reading
+ * `NEXT_PUBLIC_UI` inside the banner would have been the tempting shortcut and
+ * the wrong one: the value is INLINED AT BUILD TIME in a client bundle while
+ * the proxy reads it at RUNTIME, so a build with the flag unset could ship a
+ * banner that believes it is v1 while the server routes as v2 — a disagreement
+ * invisible until someone deploys with the two out of step. A server component
+ * reading it at request time cannot disagree with the proxy that chose the
+ * route, and this layout is that server component.
+ *
+ * The words are not paraphrased. A runner who reloads during a Wi-Fi drop lands
+ * on `offline.html` with nothing behind it, and "don't reload and don't press
+ * back" is the single instruction that prevents it.
+ */
+const OFFLINE_NOTE =
+  "If the app stops responding, don't reload and don't press back. Wait. Whatever is on your screen still works, and anything you already saved will send itself when the signal comes back."
 
 type LayoutProps = {
   children: ReactNode
@@ -81,6 +105,14 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
   const tabs = bottomTabsFor(event.code, access, department)
   const showTabs = tabs.length > 0
 
+  // Where "Skip" and "Start working" on the first-run cards put a runner back.
+  // The FIRST tab is the shell's own answer to "where does this person work",
+  // which is a real answer for every viewer: an event lead's first tab is Home,
+  // a logistics runner's is Arrivals, and a hamper runner — who has no bar at
+  // all — still resolves to `/{event}/hamper` rather than to the dashboard that
+  // would bounce them straight back off it.
+  const homeHref = tabs[0]?.href ?? `/${event.code}`
+
   return (
     // The skin is a property of WHO IS LOOKING, not of an OS setting.
     // Staff get the warm ivory ground they work on in corridors and car
@@ -90,9 +122,18 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
       data-theme={access === 'client' ? 'client' : undefined}
       className="flex min-h-dvh flex-col bg-paper text-ink"
     >
+      {/* Offline is a state, not an error (T7) — and on this surface it carries
+          one extra sentence, because the reload instinct is the single action
+          that makes a drop worse. See OFFLINE_NOTE above. */}
+      <OfflineBanner offlineNote={OFFLINE_NOTE} />
+
       <AppHeader
         event={{ name: event.name, code: event.code }}
         viewer={effectiveViewer}
+        // The cheat sheet describes the bottom bar, so it is offered exactly
+        // where there is a bar to describe. A client has none and the route
+        // would bounce them anyway.
+        showHelp={access !== 'client'}
       />
 
       {/* Content column: safe-area insets, max 480px, single nav row at bottom */}
@@ -111,6 +152,18 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
 
       {/* Undo bar mounted in the shell for global 7-second cross-screen undo capability */}
       <UndoBar />
+
+      {/* The three first-run cards. Last in the tree and `fixed inset-0 z-50`,
+          so they paint over the whole shell including the bar and the undo
+          strip, and they render NOTHING once the device has answered "already
+          seen" — see FirstRunCards and device-flags for why the answer is read
+          before anything is drawn.
+
+          Offered only to staff, and only where the card copy is true: these
+          three lines are addressed to someone who opens the app to work, and a
+          client's app has no Home tab to speak of. An admin sees them too —
+          they are the people who answer the question "how does this work". */}
+      {access !== 'client' ? <FirstRunCards doneHref={homeHref} /> : null}
     </div>
   )
 }

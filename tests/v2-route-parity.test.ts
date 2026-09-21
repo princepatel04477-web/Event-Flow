@@ -88,6 +88,26 @@ const NEW_IN_V8 = new Set([
 ])
 
 /**
+ * The same list, for the next session that added a screen rather than converted
+ * one. Kept as its own set rather than grown into `NEW_IN_V8`: the sets answer
+ * "is this route new?" identically, but the NAME is what tells a reader which
+ * session owed the route and, therefore, which session's brief to re-read
+ * before deleting it. A single set named after one session would quietly
+ * misattribute every later addition.
+ *
+ * `help` is the V11 cheat sheet opened by the "?" control in the new header:
+ * one screen listing what each of this viewer's tabs is for, plus who to ask
+ * when something is wrong. Nothing like it exists in the legacy tree — v1's
+ * equivalent is training, and this app's users get none (that is the brief).
+ */
+const NEW_IN_V11 = new Set([
+  'help', // the "?" cheat sheet — a screen v1 has no counterpart for
+])
+
+/** Every route any session added that has no legacy counterpart at all. */
+const NEW_ROUTES = new Set([...NEW_IN_V8, ...NEW_IN_V11])
+
+/**
  * The one legacy section layout with no v2 shim, and it is deliberate.
  *
  * `hospitality/layout.tsx` guards with `requireSection(..., 'hospitality')`,
@@ -284,11 +304,11 @@ describe('every v2 route is real', () => {
       // V6's new home is a v2-native screen: there is no legacy page at the
       // event root to mirror (the legacy root page is the v1 dashboard).
       .filter((route) => route !== '')
-      // V8's `find` is the other kind of new route — a job no legacy screen
-      // does, so there is no path for it to map onto. Named in `NEW_IN_V8`
-      // rather than excused inline, so the set of genuinely-new screens is one
-      // list a reader can see whole.
-      .filter((route) => !NEW_IN_V8.has(route))
+      // V8's `find` and V11's `help` are the other kind of new route — a job no
+      // legacy screen does, so there is no path for them to map onto. Named in
+      // `NEW_IN_V8` / `NEW_IN_V11` rather than excused inline, so the set of
+      // genuinely-new screens is one list a reader can see whole.
+      .filter((route) => !NEW_ROUTES.has(route))
       .filter((route) => !fs.existsSync(path.join(LEGACY_ROOT, route.split('/').join(path.sep), 'page.tsx')))
 
     expect(
@@ -301,13 +321,13 @@ describe('every v2 route is real', () => {
 
   it('keeps the genuinely-new allowlist honest', () => {
     // An entry here silences the orphan check above, so a stale one would be a
-    // licence to add a path that has no page. Assert every name is a real
-    // route AND every name is still hand-written: if `find` ever became a shim
-    // of a legacy screen, this list would be describing a screen that no
-    // longer exists in the shape it was excused in.
+    // licence to add a path that has no page. Assert every name — in EVERY
+    // session's set, which is why this iterates the union rather than one set —
+    // is a real route. A set that stops naming a route fails here instead of
+    // rotting into a comment.
     const present = new Set(v2PageRoutes())
-    for (const route of NEW_IN_V8) {
-      expect(present, `${route} is on NEW_IN_V8 but no page.tsx exists`).toContain(route)
+    for (const route of NEW_ROUTES) {
+      expect(present, `${route} is on a new-route allowlist but no page.tsx exists`).toContain(route)
     }
   })
 })

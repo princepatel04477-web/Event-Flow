@@ -28,6 +28,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/database.types'
 import { cn, formatDate } from '@/lib/utils'
 
+import { AppHint } from '../../_components/AppHint'
+
 type TravelLegRow = Database['public']['Tables']['travel_legs']['Row']
 type GuestGroupRow = Database['public']['Tables']['guest_groups']['Row']
 
@@ -289,6 +291,9 @@ export function MeetArrivals({ eventId, eventCode }: MeetArrivalsProps) {
           Updating…
         </p>
       ) : null}
+
+      {/* One line, once per device, above the work. Tap anywhere to clear it. */}
+      <AppHint screen="logistics-arrivals">Tap a person when they arrive</AppHint>
 
       {writeError ? (
         <p

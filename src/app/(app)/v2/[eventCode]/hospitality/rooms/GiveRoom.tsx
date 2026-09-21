@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { LoadingRows } from '@/components/ui/LoadingRows'
 import { PageTitle } from '@/components/ui/PageTitle'
 import { StatusPill } from '@/components/ui/StatusPill'
@@ -19,8 +20,16 @@ import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { queryKeys } from '@/lib/query/keys'
 import { cn } from '@/lib/utils'
 
+import { AppHint } from '../../_components/AppHint'
+
 export interface GiveRoomProps {
   eventId: string
+  /**
+   * Needed by the empty state, not by the flow: "there are no rooms yet" has to
+   * point somewhere the reader can act. The shell already knows the code and
+   * the page already has it — passing it is cheaper than a hook per link.
+   */
+  eventCode: string
 }
 
 type GridData = Awaited<ReturnType<typeof readRoomsGrid>>
@@ -47,7 +56,7 @@ type NeedingFamily = GridData['underBedded'][number]
  * so the two screens share one entry rather than holding two copies of the room
  * register that can disagree.
  */
-export function GiveRoom({ eventId }: GiveRoomProps) {
+export function GiveRoom({ eventId, eventCode }: GiveRoomProps) {
   const [pickerFor, setPickerFor] = useState<NeedingFamily | null>(null)
   const [hotel, setHotel] = useState<string | null>(null)
 
@@ -191,6 +200,9 @@ export function GiveRoom({ eventId }: GiveRoomProps) {
         </p>
       ) : null}
 
+      {/* One line, once per device, above the work. Tap anywhere to clear it. */}
+      <AppHint screen="rooms-give">Tap Give a room to place a family</AppHint>
+
       {assign.lastError ? (
         <p
           role="alert"
@@ -208,13 +220,32 @@ export function GiveRoom({ eventId }: GiveRoomProps) {
         <EmptyState
           icon={<BuildingIcon className="h-7 w-7" />}
           title="No rooms on this event yet"
-          description="Ask your event lead to set the hotel and its rooms up."
+          description="Rooms have not been added to this event. Once they are, every confirmed family waiting for one appears here."
+          action={
+            // A dead end is the one thing R3 forbids, and "ask your event lead"
+            // is an instruction, not an action. `rooms/new` is where rooms are
+            // added and it is a real screen in this group (a shim of the v1
+            // adder), reachable by both an event lead and a Rooms runner — the
+            // two people who can act on this line. The bare section root is NOT
+            // the destination: under v2 it is this same screen, i.e. a link
+            // back to itself.
+            <LinkButton href={`/${eventCode}/hospitality/rooms/new`} variant="secondary" fullWidth>
+              Add rooms
+            </LinkButton>
+          }
         />
       ) : needing.length === 0 ? (
         <EmptyState
           icon={<InboxIcon className="h-7 w-7" />}
           title="Every family has a room"
           description="No confirmed family is waiting for one. This fills in as the calling team confirms families."
+          action={
+            // The screen that feeds this one: a family appears here after it is
+            // confirmed on a call.
+            <LinkButton href={`/${eventCode}/rsvp/queue`} variant="secondary" fullWidth>
+              Go to the call list
+            </LinkButton>
+          }
         />
       ) : (
         <ul className="flex flex-col gap-2.5" aria-label="Families waiting for a room">

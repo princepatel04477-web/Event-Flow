@@ -15,6 +15,7 @@ import { SessionBridge } from '@/components/native/SessionBridge'
 import { OfflineBanner } from '@/components/native/OfflineBanner'
 import { SentryErrorBoundary } from '@/components/native/SentryErrorBoundary'
 import { initSentry } from '@/lib/sentry'
+import { getUiVersion } from '@/lib/ui-version'
 import { wireExternalLinkInterception } from '@/lib/native/navigation'
 
 import './globals.css'
@@ -124,6 +125,25 @@ export const viewport: Viewport = {
 }
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+  /**
+   * ONE offline banner, owned by whichever shell is serving the route.
+   *
+   * v1 keeps this one, exactly as it always has. Under `NEXT_PUBLIC_UI=v2` the
+   * banner instead comes from `(app)/v2/[eventCode]/layout.tsx`, because v2's
+   * banner carries an extra training line (CLAUDE.md §11b) that v1 must not
+   * show — and two banners would stack: a duplicate amber strip on every v2
+   * screen, found on a live run of this session, not in review.
+   *
+   * Read through `getUiVersion()`, the same helper `src/proxy.ts` gates the
+   * rewrite on, so the layout and the router cannot disagree about which UI is
+   * serving. This file is a SERVER component: it resolves at request time, so
+   * the value it reads is the deployed one. That is exactly the property a
+   * client-side check would NOT have — `process.env.NEXT_PUBLIC_UI` is inlined
+   * into client bundles at build time, so a banner reading it there could
+   * believe it was v1 while the server routed as v2.
+   */
+  const showOfflineBanner = getUiVersion() !== 'v2'
+
   return (
     // suppressHydrationWarning: the Android WebView injects a style
     // attribute with --safe-area-inset-* vars onto <html> (viewport-fit
@@ -139,7 +159,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
               native init calls Capacitor core's notifyListeners(..., true),
               which throws in Capacitor 8 and blanks the WebView. Restore once
               the core/capgo versions align. */}
-          <OfflineBanner />
+          {showOfflineBanner ? <OfflineBanner /> : null}
           {/* MotionProvider renders no DOM — it supplies the LazyMotion and
               MotionConfig context (OS reduced-motion, the house easing) and
               code-splits the feature bundle off the initial route. It wraps

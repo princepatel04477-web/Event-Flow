@@ -32,5 +32,5 @@ export default async function GiveRoomPage({ params }: PageProps) {
 
   await requireSection(event.id, event.code, 'hospitality')
 
-  return <GiveRoom eventId={event.id} />
+  return <GiveRoom eventId={event.id} eventCode={event.code} />
 }

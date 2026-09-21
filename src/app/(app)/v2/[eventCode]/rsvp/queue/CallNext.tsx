@@ -26,6 +26,8 @@ import { StatusPill } from '@/components/ui/StatusPill'
 import { SyncChip } from '@/components/ui/SyncChip'
 import { startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
 import { saveRsvpLog } from '@/lib/actions/rsvp'
+
+import { AppHint } from '../../_components/AppHint'
 import {
   clearStoredAttempt,
   getStoredAttempt,
@@ -738,6 +740,9 @@ export function CallNext({ eventId, eventCode }: CallNextProps) {
           Updating…
         </p>
       ) : null}
+
+      {/* One line, once per device, above the work. Tap anywhere to clear it. */}
+      <AppHint screen="rsvp-queue">Tap a family to call them</AppHint>
 
       {writeError ? (
         <p

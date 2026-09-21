@@ -5,6 +5,136 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 22 September 2026 — V11: teach on the screen, once, and never twice
+
+### What changed — new, in the new group only
+
+| file | change |
+|---|---|
+| `_components/device-flags.ts` | NEW. Per-device UI memory, read before anything renders |
+| `_components/FirstRunCards.tsx` | NEW. The three cards, skippable from the first |
+| `_components/AppHint.tsx` | NEW. One first-visit line per screen |
+| `help/page.tsx`, `help/HelpScreen.tsx` | NEW. The "?" cheat sheet |
+| `_components/AppHeader.tsx` | the "?" control; a title for the cheat sheet |
+| `layout.tsx` (v2) | mounts the cards, passes the offline note, resolves `homeHref` |
+| `rsvp/queue/CallNext.tsx`, `hospitality/rooms/GiveRoom.tsx`, `hospitality/deliveries/HamperRun.tsx`, `logistics/arrivals/MeetArrivals.tsx` | one hint each; empty states given actions |
+| `hospitality/rooms/page.tsx` | passes `eventCode` for the empty state's link |
+| `src/components/native/OfflineBanner.tsx` | ONE additive optional prop, `offlineNote` |
+| `src/app/layout.tsx` | one banner per shell — see deviations |
+| `tests/v2-route-parity.test.ts` | `NEW_IN_V11` allows `help` |
+
+`device-flags.ts` stores under `nuvent.v2.onboarded` and `nuvent.v2.hint.<screen>`, on
+Capacitor Preferences (Android SharedPreferences) on native and localStorage on web — the
+two branches copied from `src/lib/supabase/capacitor-storage.ts` rather than reinvented.
+**`nuvent.welcome.played` is untouched**: it is the cold-start splash marker and it means
+"this app launch", not "this device, ever", so it cannot be the onboarding flag.
+
+The read starts at module import, the value is served through `useSyncExternalStore`, and
+every caller renders NOTHING until the read settles (`useDeviceFlag` answers `undefined`,
+never `false`, and a missing key is a distinct object from an unread one). That is what stops
+a returning staff member seeing the cards flash and vanish, and it is also why the server and
+the client agree on the first render.
+
+### Why
+
+Nobody trains these users, so the app teaches in place: what the next job is, what a tab is
+for, what the one action on a screen is, and — the only line worth interrupting a first run
+for — that reloading during a Wi-Fi drop is the single action that makes it worse
+(CLAUDE.md §11b). The cheat sheet is built from `bottomTabsFor(event.code, access,
+department)`, the same call the bar makes, so it cannot describe an app other than the one
+the reader is holding, and it costs no read of its own.
+
+### Deliberate deviations
+
+- **`WelcomeOverlay.tsx` is NOT edited, so "reuse it" is honoured differently than the brief
+  words it.** Three facts make editing it the wrong call: it renders from the ROOT layout,
+  above the point where the route is known; it is shared with the LIVE v1 app; and its marker
+  means "this app launch", so it plays on every cold start by design and cannot also be the
+  once-per-device surface. What is reused is its SHELL — the same fixed `bg-paper` panel, the
+  same `z-50`, the same tokens, the same hand-off — with the cards starting only after
+  `WELCOME_CEILING_MS`, so the two never stack. v1's overlay is byte-identical because the
+  file was never opened.
+- **`src/app/layout.tsx` was edited, and it is outside this session's file list.** Not a
+  preference: the root layout mounts `OfflineBanner` and the v2 layout now mounts one too, so
+  a live run showed TWO amber banners stacked on every v2 screen. The guard is
+  `getUiVersion() !== 'v2'` — the same helper `src/proxy.ts` gates the rewrite on, in a
+  SERVER component, so the layout and the router cannot disagree. With the flag unset (the
+  parent's build, and production) the banner is exactly as before; the live v1 check below
+  confirms it.
+- **`offlineNote` is a prop, never a `process.env.NEXT_PUBLIC_UI` read inside the banner.**
+  That variable is inlined into client bundles at BUILD time while the proxy reads it at
+  RUNTIME, so a banner deciding for itself could believe it was v1 while the server routed as
+  v2. The v2 server layout hands the string down.
+- **`help` needed an entry in `tests/v2-route-parity.test.ts`.** A new route with no legacy
+  counterpart is exactly what that orphan check exists to catch, so the fix is the named
+  allowlist V8 established — added as its own `NEW_IN_V11` set rather than grown into
+  `NEW_IN_V8`, so each new screen stays attributable to the session that owed it.
+- **The cheat sheet was rebuilt once, after measuring.** The first version was 735px of
+  content against ~655px of usable column at 360x800 — a scroll bar on the one screen whose
+  whole job is to be read at a glance. The title block, the "Your screens" heading and the
+  24px tab icons came out, and label and line share one flow. Measured after: 557px including
+  the sticky header.
+- **The hint exists on four screens, not every screen.** The queue, rooms, hampers and
+  arrivals — the screens with one primary action. `/find` already says what to do in its
+  empty state, and V9's rule was to delete explanations that are not screens; a hint
+  repeating an empty state is that same sentence twice.
+
+### The bug this session found in its own work, on a live first-run walk
+
+**The hint was dismissed by the very tap that revealed it, on every fresh device.** The cards
+are dismissed by a tap; the hint mounts in the commit that tap causes, while that same tap is
+still being dispatched — so a document-level `pointerdown` listener attached during that
+commit caught the tail of the gesture and cleared the line before a human saw it. `tsc`,
+eslint and all 275 tests were green and the feature was invisible on exactly the device the
+brief cares about.
+
+The fix consumes the FIRST `pointerup` the listener ever sees as "the gesture that got us
+here"; a pointerup cannot arrive without a pointerdown this listener predates, so no
+deliberate tap is ever swallowed. A time-based arming delay was tried first and rejected: it
+makes a fast tap do nothing, and "my first tap did nothing" is worse than no hint. Both the
+failure and the fix were found by driving a real browser, not by review.
+
+### Verification
+
+`npx tsc --noEmit` exit 0 · `npx eslint` exit 0 on all 15 changed files (0 errors, 0
+warnings) · `npx vitest run` 21 files / 275 tests, all pass (unchanged count — the parity test
+gained a route name, not a case).
+
+Live, against `next dev` on a real code-auth session, browser API only (the Playwright RUNNER
+hangs in this repo) — 18/18 checks with `NEXT_PUBLIC_UI=v2`, then 5/5 on a second server with
+the flag unset:
+
+- fresh context, no storage: three cards, deck exactly 800px with no scroll at 360x800, Skip
+  on card one, flag written, cards gone;
+- the hint present and singular, cleared by a tap, flag written, absent on the next launch;
+- the cheat sheet: five rows for an event lead, header titled "How this app works", 557px
+  against 700px usable;
+- exactly ONE offline banner under v2, carrying the brief's sentence verbatim;
+- v1 (flag unset): no cards, no hints, and the banner byte-identical to before —
+  `"Offline — 0 changes queued"`, note absent.
+
+`npm run build` NOT run (the parent runs it). **No handset exists here** — nothing above is a
+phone or a Wi-Fi-off test. The dev server was driven in desktop Chromium at a 360x800
+viewport, so Capacitor Preferences was NOT exercised (the web localStorage branch only) and
+"the flag survives an Android WebView remount" remains a design claim from the two existing
+consumers of that adapter, not a measurement.
+
+### What is still owed
+
+- **A handset with the APK, on venue Wi-Fi** — above all the Preferences branch, which is the
+  entire reason the key is not in localStorage.
+- **`scripts/tabs-reach.mjs` should visit `/help`.** Its header-link block will collect it
+  automatically; it resolves on disk, but only a built server proves the route graph.
+- **The rooms "no rooms yet" empty state is unexercised** — SAMPLE2026 has rooms. Its
+  destination (`/hospitality/rooms/new`, an existing shim) is verified as a route on disk, not
+  as a tap.
+- **MeetArrivals' "no arrival is on file" branch** keeps its existing "Choose what to see"
+  action, which is a real control but not an action on the emptiness. Left alone on purpose:
+  the useful next step for a travel runner with no arrivals is nothing this screen can do, and
+  inventing a link into another section is how a tab the reader cannot open gets rendered.
+
+---
+
 ## 22 September 2026 — V10: the two 23514 causes, the RSVP outcome's real reversibility, and the caller lock named
 
 ### What changed

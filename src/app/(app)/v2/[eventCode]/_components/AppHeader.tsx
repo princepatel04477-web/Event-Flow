@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import type { SVGProps } from 'react'
 
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { SearchIcon } from '@/components/icons'
@@ -23,6 +24,17 @@ interface AppHeaderProps {
     isAdmin: boolean
     memberships: Membership[]
   }
+  /**
+   * Whether the "?" cheat sheet belongs in this header.
+   *
+   * Passed in rather than derived here, because the answer is the SERVER's: the
+   * shell has already resolved `getEventAccess`, and the help route runs
+   * `requireStaff`, which bounces a client to their one screen. A client who
+   * tapped a "?" this component rendered itself would be thrown off the page
+   * they were reading — so the control is withheld for them here rather than
+   * discovered to be a dead end by tapping it.
+   */
+  showHelp: boolean
 }
 
 /**
@@ -53,7 +65,37 @@ interface AppHeaderProps {
  * serves them their own list (see `find/page.tsx`), so it is not a staff door
  * in the header of a client's screen.
  */
-export function AppHeader({ event, viewer }: AppHeaderProps) {
+/**
+ * The "?" glyph.
+ *
+ * Local to the new group's header rather than added to `src/components/icons.tsx`,
+ * which is shared with v1: this session may not grow the icon set the live app
+ * depends on for a glyph only the new UI draws. Same 24px stroke geometry and
+ * the same props contract as that module's icons, so swapping it for a shared
+ * export later is a one-line change and not a redraw.
+ */
+function QuestionIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      width={24}
+      height={24}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      {...props}
+    >
+      <path d="M9.1 9a3 3 0 1 1 4.2 2.7c-.8.4-1.3 1.1-1.3 2v.3" />
+      <path d="M12 17.5h.01" />
+    </svg>
+  )
+}
+
+export function AppHeader({ event, viewer, showHelp }: AppHeaderProps) {
   const pathname = usePathname()
 
   // Strip leading slash, route groups (app)/(staff), and event code
@@ -72,6 +114,12 @@ export function AppHeader({ event, viewer }: AppHeaderProps) {
       } else {
         screenTitle = section.label
       }
+    } else if (rest === 'help') {
+      // The cheat sheet is a screen with no section — `resolveActive` answers
+      // `sectionId: null` for it, so without this line the header would title
+      // the one screen that explains the app "Home", while the reader is
+      // standing on it and Home is the link they came from.
+      screenTitle = 'How this app works'
     }
   }
 
@@ -92,6 +140,15 @@ export function AppHeader({ event, viewer }: AppHeaderProps) {
           >
             <SearchIcon className="h-5 w-5" />
           </Link>
+          {showHelp ? (
+            <Link
+              href={`/${event.code}/help`}
+              aria-label="Help"
+              className="tap flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted transition-colors duration-press ease-ledger hover:bg-surface-2 active:bg-surface-2"
+            >
+              <QuestionIcon className="h-5 w-5" />
+            </Link>
+          ) : null}
           {viewer.memberships.length > 1 ? (
             <EventSwitcher
               events={viewer.memberships}

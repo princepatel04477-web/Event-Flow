@@ -21,6 +21,8 @@ import {
 } from '@/lib/actions/deliveries'
 import { queryKeys } from '@/lib/query/keys'
 
+import { AppHint } from '../../_components/AppHint'
+
 const KIND_LABEL: Record<string, string> = {
   hamper: 'Hamper',
   return_gift: 'Return gift',
@@ -155,6 +157,9 @@ export function HamperRun({ eventId, eventCode, canGenerate }: HamperRunProps) {
         </p>
       ) : null}
 
+      {/* One line, once per device, above the work. Tap anywhere to clear it. */}
+      <AppHint screen="hamper-run">Tap a person to open their hamper</AppHint>
+
       {loadError ? (
         <ErrorState
           title={loadError}
@@ -173,6 +178,29 @@ export function HamperRun({ eventId, eventCode, canGenerate }: HamperRunProps) {
             canGenerate
               ? 'Hampers and return gifts are created from the guest list — every family with a room gets a hamper, and every family marked for a return gift gets one. Nothing is written twice if you run it again.'
               : 'Hampers and return gifts are created from the guest list by your event admin. This screen fills in by itself once they have.'
+          }
+          action={
+            canGenerate ? (
+              // This reader is the one who can act, and the action already
+              // exists further down the screen. The empty state runs THE SAME
+              // handler rather than a second one, and that handler creates only
+              // what is missing (hence "Create what is missing" below), so a
+              // tap here cannot write a duplicate hamper. R3: an empty state
+              // that only explains is a dead end.
+              <Button variant="secondary" fullWidth onClick={() => void handleGenerate()}>
+                {generating ? 'Creating…' : 'Create them now'}
+              </Button>
+            ) : (
+              // A hamper runner cannot create them; the useful next step is the
+              // screen that says whether the guest list they come from is real
+              // yet, so the instruction to "ask your admin" has a destination.
+              <Link
+                href={`/${eventCode}/guests/list`}
+                className="tap flex min-h-12 items-center justify-center rounded-xl border border-rule-strong bg-surface px-3 text-center text-base font-medium text-ink active:bg-surface-2"
+              >
+                Open the guest list
+              </Link>
+            )
           }
         />
       ) : visible.length === 0 ? (
