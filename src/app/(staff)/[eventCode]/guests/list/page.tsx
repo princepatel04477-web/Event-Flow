@@ -22,11 +22,18 @@ type PageProps = {
  * One URL, two screens — because two roles both live here and neither can use
  * the other's data source.
  *
- * DO NOT PUT `requireStaff` BACK ON THIS PAGE. It redirects a client to
- * `/{eventCode}/guests`, which is this page: the client's only permitted
- * screen bounced them at itself forever, and the loop surfaced as the event
- * error boundary ("This screen did not load"). This is the one route in the
- * app where the staff gate is the bug rather than the guard.
+ * THE COMMENT BELOW WAS COPIED FROM `guests/page.tsx` AND WAS TRUE THERE, NOT
+ * HERE. It warns that `requireStaff` would bounce a client to
+ * `/{eventCode}/guests` — but a client is not sent to THIS route. Clients are
+ * redirected to `/guests` (src/lib/events/paths.ts:52 and
+ * src/lib/supabase/queries.ts:423, :459), a separate and now-divergent copy of
+ * this screen. So the loop it describes cannot happen on this URL, and the
+ * warning was pointing at the wrong page while looking authoritative.
+ *
+ * The rule it encodes is still worth keeping: do not put `requireStaff` on a
+ * route a client can reach. Written down because a guard-comment that names the
+ * wrong destination is worse than none — see the same failure mode in UX-RULES
+ * R3, where `BackRow` hardcoded "Back to queue" on every screen that used it.
  *
  * Staff and admins get the windowed list over `search_guest_profiles` — every
  * row carries `group_id`, so each links to its family's RSVP record.
