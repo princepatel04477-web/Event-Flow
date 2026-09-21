@@ -1,7 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
-import { BottomTabs } from '@/components/nav/BottomTabs'
 import { UndoBar } from '@/components/ui/UndoBar'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
@@ -10,6 +9,7 @@ import { getEventAccess, getViewer, resolveEventByCode } from '@/lib/supabase/qu
 import { cn } from '@/lib/utils'
 
 import { AppHeader } from './_components/AppHeader'
+import { AppTabs } from './_components/AppTabs'
 
 type LayoutProps = {
   children: ReactNode
@@ -70,7 +70,16 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
   // neither does a runner whose department is a single screen (Hampers,
   // Setup) — so `pb-nav` would reserve 56px of clearance under a page with
   // nothing beneath it.
-  const showTabs = bottomTabsFor(event.code, access, department).length > 0
+  //
+  // Resolved ONCE, here, and handed to the bar below. The bar renders this list
+  // rather than calling `bottomTabsFor` a second time, so the clearance and the
+  // bar cannot disagree even in principle — which is the bug this line was
+  // written to fix in v1. Passing it down also means the tab SET still comes
+  // from the shared config, while only the DESTINATIONS are remapped for the
+  // new UI (Calls → `rsvp/queue`, not its legacy default `rsvp/campaigns`) by
+  // `tabHrefFor` inside AppTabs.
+  const tabs = bottomTabsFor(event.code, access, department)
+  const showTabs = tabs.length > 0
 
   return (
     // The skin is a property of WHO IS LOOKING, not of an OS setting.
@@ -98,7 +107,7 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
         </div>
       </main>
 
-      <BottomTabs eventCode={event.code} access={access} department={department} />
+      <AppTabs tabs={tabs} />
 
       {/* Undo bar mounted in the shell for global 7-second cross-screen undo capability */}
       <UndoBar />

@@ -1938,3 +1938,111 @@ counters, search box, three toggles and five-chip mode strip are all behind one 
 228/228 pass. No `npm run build` (the parent session runs it) and **no handset**: nothing
 here is claimed as tested on a phone, with a camera, or against a real tap budget.
 
+
+
+---
+
+## V7b — the new UI is reachable, not just present (22 September 2026)
+
+### What changed
+
+**42 shim route files under `(app)/v2/[eventCode]/`**, each a two-line re-export of its
+legacy counterpart: 25 `page.tsx` (incl. `debug/pipeline`), 12 `loading.tsx`, 6 section
+`layout.tsx`, 1 `not-found.tsx`. `src/app/(app)/v2/[eventCode]/page.tsx` is V6's new home
+and is untouched; V7's own screens were left alone.
+
+The sweep is `page.tsx`, `layout.tsx`, `loading.tsx` and `not-found.tsx`, because all four
+are files the legacy group owns and the new group lacked. The section layouts are the
+load-bearing ones: in v1 they are where `requireSection` lives, and the new group is a
+different tree, so a v2 screen without the shim loses that guard entirely.
+
+**`_components/AppTabs.tsx`** — the new group's own bar, rendered by the v2 shell in place
+of `BottomTabs`. The tab SET still comes from `bottomTabsFor` (unchanged); only the
+destinations are remapped, by one exported pure function:
+
+    tabHrefFor('/EVENT/rsvp/campaigns') -> '/EVENT/rsvp/queue'
+
+`src/lib/sections/config.tsx` is shared with v1 and `tests/nav-model.test.ts` deliberately
+pins the legacy hrefs, so the mapping belongs in the new group, once. The layout now
+resolves the tab list ONCE and passes it down, so the bar and the `pb-nav` clearance read
+the same value rather than calling `bottomTabsFor` twice.
+
+**`tests/v2-route-parity.test.ts`** — 9 cases walking both trees on disk: every legacy
+page/layout has a v2 counterpart or is on the documented `REPLACED_BY_V7` list, every shim
+re-export resolves to a real file, every hand-written v2 page maps to a real legacy path,
+and the tab remap is exactly one remap.
+
+**`scripts/tabs-reach.mjs`** — the live half, in the shape of `feel-baseline.mjs`
+(Playwright's BROWSER api, not the runner, which hangs here). Signs in for real, visits the
+bar and the home's own links, classifies each destination, prints a table, exits non-zero
+on any failure. `--pick "<name>"` taps a staff member; without it the session has no
+department and the bar collapses to a single Home tab.
+
+### Why
+
+A missing v2 route is a 404 with no fallback (AMENDMENTS §3), and the bar is the only
+navigation most of these users have. Typecheck sees the contents of a route file, never the
+existence of a route; eslint sees an `href` as a string; component tests render the bar
+without asking whether its destination is on disk. Only the filesystem can answer it, which
+is why the parity test exists and why this session is mechanical.
+
+### Deliberate deviations
+
+- **`hospitality/layout.tsx` is NOT shimmed.** Its guard is
+  `requireSection(..., "hospitality")` -> `sectionAllowedForDepartment`, and `getEventAccess`
+  answers `"event_team"` for ANY team code, so for a `hamper` runner that guard is false and
+  `requireSection` redirects to `departmentHomePath(...)?denied=section`. But the v2 hamper
+  screens are reached by the hamper team THROUGH the hospitality URL, and
+  `v2/.../deliveries/_guard.ts` exists precisely to allow the union of the two departments.
+  Shimming the layout would override that union with the strict `hospitality` guard and bounce
+  the hamper team off the screen that is their whole job — a regression that shows up only
+  on a handset. The parity test encodes this as a named exception with the reasoning, and
+  asserts the shim stays absent so it cannot rot into a stale comment.
+- **The search button was removed from `AppHeader`.** It linked `/{event}/find`, which
+  exists in NEITHER group — not a known-404 in the brief, and the single most-tapped dead
+  control in the new UI. `find` has no other reference anywhere in `src/`. A link to a 404 is
+  worse than an absent link, so the control is gone until V8 ships the destination.
+- **`loading.tsx` and `not-found.tsx` were included in the sweep.** The brief's parity test
+  mandates only `page` and `layout`, but the rule is "shim where no v2 file exists" and both
+  are legacy files the new group lacked. Cost: a section-level `loading.tsx` can now wrap
+  V7's routes (e.g. `rsvp/queue` under a shimmed `rsvp/layout.tsx`), i.e. a skeleton during a
+  slow render rather than a blank wait. That is correct loading semantics and could not
+  interfere with the pages, but it is a rendering-path change on routes V7 already shipped,
+  so it is named rather than buried.
+- **`export *` does not carry `metadata`,** contrary to the brief's note. Next special-cases
+  it away, so a shimmed page falls back to the layout's title. Low impact, and the
+  alternative (a re-exported metadata binding) was not worth the risk here.
+
+### The bug this session surfaced, which it did NOT cause
+
+**`/rsvp/campaigns` throws on every render, in v1 as well as v2.** Server log:
+
+    Route /v2/[eventCode]/rsvp/campaigns used "revalidatePath /SAMPLE2026/rsvp/campaigns"
+    during render which is unsupported.
+
+`ensureCampaigns` (`src/lib/actions/campaigns.ts:125`) calls `revalidatePath` unconditionally
+before returning, and `(staff)/[eventCode]/rsvp/campaigns/page.tsx:38` calls it during a
+server render. Next 16 rejects that during render. **Confirmed pre-existing:** with
+`NEXT_PUBLIC_UI` unset the same route renders "This screen did not load" from v1, so this is
+not a shim regression — the shim made the route resolve and the underlying screen was
+already broken.
+
+This matters beyond one screen, because `departmentHomePath(eventCode, "management")` is
+`/rsvp/campaigns`: an event lead's post-login destination, the Home tab for a lead, and
+`requireSection`'s bounce target are all a screen that throws. The shim is kept (a route
+that exists and fails beats a silent 404) and the fix is NOT made here: AMENDMENTS §4
+forbids changing the behaviour of any server action, and `campaigns.ts` has two further
+`revalidatePath` calls in its action bodies that are legitimate. The fix is to drop the
+trailing call at `:125` — the read immediately after it is fresh, so revalidation adds
+nothing on the first render and is redundant on later ones.
+
+### Verification
+
+`npx tsc --noEmit` clean · `npx eslint` clean on all five hand-written files · `npx vitest
+run` 19 files / 237 tests, all pass (228 before + 9 new). `npm run build` was run for Task
+4's live proof (with `NEXT_PUBLIC_UI=v2`), exit 0, with every shim in the route table.
+`scripts/tabs-reach.mjs` passes cleanly with exit 0 on the brief's exact recipe (no staff
+pick): 6 destinations, 0 x 404, 0 x throwing. With `--pick "Test Caller A"` it finds the
+five-tab bar with Calls → `/rsvp/queue` and 28 destinations, 0 x 404, and exits 1 on the two
+destinations that land on the campaigns crash above. **No handset** — nothing here is
+claimed as tested on a phone.

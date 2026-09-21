@@ -1,12 +1,10 @@
 'use client'
 
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { AdminLink } from '@/components/nav/AdminLink'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
-import { SearchIcon } from '@/components/icons'
 import { StickyHeader } from '@/components/ui/StickyHeader'
 import { SECTIONS, resolveActive } from '@/lib/sections/config'
 import type { Membership } from '@/lib/supabase/queries'
@@ -32,9 +30,17 @@ interface AppHeaderProps {
  * - Header carries the screen's plain name and its back control, NOT the event
  *   name. A runner three screens deep needs to know where they are, not which
  *   wedding it is (the wedding name lives on the home screen).
- * - A search button on every screen pointing at /(app)/{event}/find (destination
- *   lands in V8).
  * - No welcome banner in the shell.
+ *
+ * There was a search button here pointing at `/{event}/find`. It was removed in
+ * V7b, not because find was cancelled but because the route does not exist in
+ * EITHER group — `(staff)/[eventCode]/find` was never built and no v2 shim can
+ * cover a page that does not exist. Under v2 a missing route is a 404 and there
+ * is no fallback (see AMENDMENTS §3), so every screen in the new UI carried a
+ * permanent 404 in its header, and it would have been the single most-tapped
+ * dead control in the app. A link to a 404 is worse than an absent link, so the
+ * control is gone until V8 builds the destination. Restore the button WITH the
+ * route, not before it.
  */
 export function AppHeader({ event, viewer }: AppHeaderProps) {
   const pathname = usePathname()
@@ -68,13 +74,6 @@ export function AppHeader({ event, viewer }: AppHeaderProps) {
       backLabel={backLabel}
       right={
         <nav className="flex items-center gap-1.5" aria-label="Header actions">
-          <Link
-            href={`/${event.code}/find`}
-            aria-label="Search"
-            className="tap flex h-11 w-11 items-center justify-center rounded-xl text-muted transition-colors duration-press ease-ledger hover:bg-surface-2 active:bg-surface-2"
-          >
-            <SearchIcon className="h-5 w-5" />
-          </Link>
           {viewer.memberships.length > 1 ? (
             <EventSwitcher
               events={viewer.memberships}
