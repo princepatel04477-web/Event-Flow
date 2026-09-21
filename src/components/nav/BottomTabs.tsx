@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import { type StaffDepartment } from '@/lib/departments'
+import { useBoundedPrefetch } from '@/lib/query/prefetch'
 import { cn } from '@/lib/utils'
 import { SECTIONS, bottomTabsFor, resolveActive, type TabAccess } from '@/lib/sections/config'
 
@@ -31,6 +32,9 @@ export function BottomTabs({ eventCode, access, department = null }: BottomTabsP
   // segments = [eventCode, ...rest]
   const rest = pathname.split('/').filter(Boolean).slice(1).join('/')
 
+  // Above the early return below, because hooks are.
+  const { isArmed, arm } = useBoundedPrefetch()
+
   const tabs = bottomTabsFor(eventCode, access, department)
   if (tabs.length === 0) return null
 
@@ -55,6 +59,43 @@ export function BottomTabs({ eventCode, access, department = null }: BottomTabsP
             <li key={tab.key} className="relative">
               <Link
                 href={tab.href}
+                // FULL prefetch — the route AND its data — not Next's default.
+                //
+                // The default for a dynamic route is a PARTIAL prefetch that
+                // stops at the nearest `loading.tsx`, and this app has 28 of
+                // them. So without this the bar was warming skeletons: the tap
+                // still crossed to Seoul, it just got a skeleton to look at
+                // while it did. A skeleton arriving in 40ms does not make the
+                // app fast, it makes the wait visible.
+                //
+                // ARMED ON TOUCH, NOT EAGERLY, AND THAT IS A MEASUREMENT
+                // RESULT RATHER THAN A PREFERENCE. Prefetching all five on
+                // mount is a bounded cost in requests and an unbounded one in
+                // contention: on the venue-Wi-Fi profile (300ms / 1.5Mbps) five
+                // full RSC renders land on the same pipe the screen the runner
+                // is ON still needs. Measured at n=5, it made Home's frame far
+                // faster and every other route SLOWER — the calling queue's
+                // destination frame went 1280ms → 2556ms. Five prefetches is
+                // not a fixed cost when the link is the scarce thing; it is a
+                // fixed cost charged to the wrong request. Numbers in
+                // DECISIONS.md, 21 September 2026.
+                //
+                // `undefined` is Next's default (viewport, partial — stops at
+                // the nearest loading.tsx). `true` is the full route and its
+                // data, and is reached only once a thumb is on this tab, which
+                // spends the touchstart-to-tap gap instead of the runner's
+                // bandwidth.
+                //
+                // All five destinations only read, which is what makes arming
+                // them safe at all. The one exception is Calls →
+                // `rsvp/campaigns`, whose `ensureCampaigns` inserts the default
+                // draft waves if none exist — idempotent, and the same rows the
+                // first real visit would create. Any tab added here needs that
+                // check first: a full prefetch runs the destination's server
+                // render for real. See src/lib/query/prefetch.ts.
+                prefetch={isArmed(tab.href) ? true : undefined}
+                onPointerDown={() => arm(tab.href)}
+                onTouchStart={() => arm(tab.href)}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'tap relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 py-2',

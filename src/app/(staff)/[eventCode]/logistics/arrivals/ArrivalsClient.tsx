@@ -93,6 +93,7 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
   const {
     data: raw,
     isPending: loading,
+    isFetching,
     error,
     refetch,
   } = useQuery({
@@ -252,6 +253,17 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
   const expectedToday = rows?.filter((r) => r.leg.travel_date === todayKey).length ?? 0
   const arrivedToday = rows?.filter((r) => r.leg.travel_date === todayKey && r.leg.arrived_at !== null).length ?? 0
 
+  // Numbers are only true once the rows are here. A cold screen used to be
+  // wholly replaced by a skeleton, so the question never arose; now that the
+  // frame paints first, "0 / 0" would be a confident lie about an event with
+  // forty arrivals today. An em-dash says "not yet known", which is the fact.
+  const countsKnown = rows !== null
+
+  // The frame is here and the rows behind it are being re-read. Say so quietly
+  // rather than either hiding it or throwing the rows away for a skeleton
+  // (docs/INTERACTION-CONTRACT.md T4).
+  const stale = isFetching && rows !== null
+
   if (loadError && !rows) {
     return (
       <EmptyState
@@ -262,45 +274,10 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
     )
   }
 
-  if (loading || !rows) {
-    // Loading: skeleton rows shaped like the arrival cards, so the screen
-    // does not flash a false "Nothing matches" empty state while the fetch
-    // is in flight.
-    return (
-      <div className="flex flex-col gap-4">
-        <div>
-          <div className="h-6 w-24 rounded bg-rule-strong" />
-          <div className="mt-1.5 h-4 w-40 rounded bg-rule" />
-        </div>
-        <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="h-8 w-16 rounded bg-rule" />
-            <div className="h-8 w-16 rounded bg-rule" />
-            <div className="h-8 w-16 rounded bg-rule" />
-          </div>
-        </div>
-        <div className="h-12 rounded-xl border border-border bg-surface px-3" />
-        {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className="rounded-2xl border border-border bg-surface p-4">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="h-5 w-2/5 rounded bg-rule-strong" />
-                <div className="mt-2 h-4 w-3/4 rounded bg-rule" />
-                <div className="mt-1.5 h-4 w-1/2 rounded bg-rule" />
-              </div>
-              <div className="h-6 w-16 rounded-full bg-rule" />
-            </div>
-            <div className="mt-3 h-11 w-full rounded-xl bg-rule" />
-          </div>
-        ))}
-      </div>
-    )
-  }
-
   return (
     <div className="flex flex-col gap-4">
       <PageTitle
-        right={`${arrivedToday} / ${expectedToday}`}
+        right={countsKnown ? `${arrivedToday} / ${expectedToday}` : '—'}
         note="Expected today first, then later dates."
       >
         Arrivals
@@ -308,14 +285,20 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
 
       {/* Counts */}
       <div className="flex items-center justify-between rounded-xl border border-rule bg-surface px-4 py-3">
-        <Count label="Expected today" value={expectedToday} />
-        <Count label="Arrived" value={arrivedToday} tone="success" />
+        <Count label="Expected today" value={countsKnown ? expectedToday : null} />
+        <Count label="Arrived" value={countsKnown ? arrivedToday : null} tone="success" />
         <Count
           label="Still pending"
-          value={expectedToday - arrivedToday}
-          tone={expectedToday - arrivedToday > 0 ? 'warning' : 'neutral'}
+          value={countsKnown ? expectedToday - arrivedToday : null}
+          tone={countsKnown && expectedToday - arrivedToday > 0 ? 'warning' : 'neutral'}
         />
       </div>
+
+      {stale ? (
+        <p role="status" className="-mt-1 text-xs text-muted">
+          Updating…
+        </p>
+      ) : null}
 
       {/* Filters + search */}
       <div className="flex flex-col gap-2.5">
@@ -362,7 +345,32 @@ export function ArrivalsClient({ eventId, eventCode }: ArrivalsClientProps) {
         </div>
       </div>
 
-      {rows && rows.length === 0 ? (
+      {loading && !rows ? (
+        // Genuinely cold: nothing is cached for this event yet. Skeleton cards
+        // shaped like the arrival cards, so the rows do not jump when they
+        // land — and so the screen does not flash a false "Nothing matches".
+        //
+        // This block is now the ROWS only. It used to be an early return that
+        // replaced the title, the counts and the filters as well, which meant a
+        // tab switch dropped the whole screen and rebuilt it: the one thing T4
+        // says a navigation must never do. The frame above paints from what the
+        // client already knows; only these rows wait on Seoul.
+        <div className="flex flex-col gap-2.5" aria-busy>
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="rounded-xl border border-rule bg-surface p-3.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="h-5 w-2/5 rounded bg-rule-strong" />
+                  <div className="mt-2 h-4 w-3/4 rounded bg-rule" />
+                  <div className="mt-1.5 h-4 w-1/2 rounded bg-rule" />
+                </div>
+                <div className="h-6 w-16 rounded-full bg-rule" />
+              </div>
+              <div className="mt-3 h-11 w-full rounded-lg bg-rule" />
+            </div>
+          ))}
+        </div>
+      ) : rows && rows.length === 0 ? (
         <EmptyState title="No expected arrivals" description="No arrival travel legs are on file for this event yet." />
       ) : filtered.length === 0 ? (
         <EmptyState title="Nothing matches" description="No arrivals match these filters — try clearing one." />
@@ -629,13 +637,14 @@ function ArrivalRowCard({
   )
 }
 
+/** `value: null` means the rows have not landed yet — an em-dash, not a zero. */
 function Count({
   label,
   value,
   tone = 'neutral',
 }: {
   label: string
-  value: number
+  value: number | null
   tone?: 'neutral' | 'success' | 'warning'
 }) {
   return (
@@ -643,14 +652,16 @@ function Count({
       <span
         className={cn(
           'figure text-2xl leading-none font-medium',
-          tone === 'success'
-            ? 'text-ledger-green'
-            : tone === 'warning'
-              ? 'text-brand'
-              : 'text-ink',
+          value === null
+            ? 'text-subtle'
+            : tone === 'success'
+              ? 'text-ledger-green'
+              : tone === 'warning'
+                ? 'text-brand'
+                : 'text-ink',
         )}
       >
-        {value}
+        {value ?? '—'}
       </span>
       <span className="text-xs text-muted">{label}</span>
     </div>

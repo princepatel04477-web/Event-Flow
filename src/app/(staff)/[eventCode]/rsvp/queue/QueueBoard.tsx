@@ -170,6 +170,7 @@ export function QueueBoard({
   const {
     data,
     isPending,
+    isFetching,
     error,
     refetch,
   } = useQuery({
@@ -178,6 +179,13 @@ export function QueueBoard({
   })
 
   const rows = data ?? null
+
+  // `isPending` is false the moment this key holds rows, so the LoadingRows
+  // below are reached only on a genuinely cold first load — a re-entry, a
+  // back-tap, or a realtime invalidation paints the rows it already has and
+  // marks them stale instead (docs/INTERACTION-CONTRACT.md T4). This line is
+  // the mark: the list is live and honest about being one read behind.
+  const stale = isFetching && rows !== null
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
   const retry = () => void refetch()
 
@@ -275,6 +283,12 @@ export function QueueBoard({
       ) : null}
 
       <QueueFilters filters={filters} onChange={handleFilterChange} />
+
+      {stale ? (
+        <p role="status" className="-mt-1 text-xs text-muted">
+          Updating…
+        </p>
+      ) : null}
 
       {loadError ? (
         <ErrorState

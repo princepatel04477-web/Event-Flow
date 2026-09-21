@@ -1562,3 +1562,139 @@ observation as settled and stopped probing: the mojibake I dismissed as console 
 the runner hang I recorded as "the environment cannot measure". The browser launch was already
 in my own notes as proof the environment worked. Re-reading a conclusion is not the same as
 re-testing it.
+
+---
+
+## 2026-09-21 — V4: the tap pays for the destination, not for a skeleton
+
+`prefetch=` appeared nowhere in `src/`. With 28 `loading.tsx` files that made every
+navigation the same shape: tap → skeleton → wait for Seoul → content. The skeleton was
+not softening the wait, it was rendering it.
+
+### Next's default prefetch warms the skeleton, which is the problem, not the fix
+
+The thing that took a while to see: these routes were *already* being prefetched. A
+`<Link>` in the viewport prefetches by default. But for a **dynamic** route the default
+is a PARTIAL prefetch that stops at the nearest `loading.tsx` — so what the bottom bar
+had been warming, all along, was the spinner. The tap still crossed to Seoul for the
+data; it just got something to look at on the way.
+
+`prefetch` (the boolean `true` form) is the one that fetches the route *and* its data.
+That one word is most of this change.
+
+**Why not `router.prefetch()`.** `router.prefetch(href)` defaults to `PrefetchKind.AUTO`
+— the partial kind again — and `PrefetchKind.FULL` is only reachable through a
+`next/dist/...` private import. So the public route to a full prefetch is to flip a
+`<Link>`'s `prefetch` prop, which is exactly what Next's own `unstable_dynamicOnHover`
+does internally. `useBoundedPrefetch` (`src/lib/query/prefetch.ts`) therefore holds a set
+of *armed* hrefs, and a link renders `prefetch` when its own href is in it.
+
+- **Bottom bar: five tabs, prefetched eagerly and unconditionally.** Constant rather than
+  `!isActive`, because the shell survives navigation (below) — so the five `<Link>`s mount
+  once per SESSION, not once per screen. Gating on `isActive` would flip the prop on every
+  route change and re-prefetch the tab just left.
+- **Section strip: armed on touch, not eagerly.** Travel carries four children; four full
+  route renders per section entry is a fan-out where the bar's five are a one-off. The gap
+  between the finger landing and the tap completing is free latency, and that is what it
+  spends.
+
+### A full prefetch is a server render, and two of this app's routes WRITE on render
+
+This is the finding that changed the shape of the work, and it is the reason the brief's
+item 2 — prefetch the row under the thumb — is **not built**.
+
+A full prefetch does not fetch a cached artifact. It runs the destination page's server
+render, for real, against the live database:
+
+- `rsvp/status/[groupId]` calls `claimGroupForCall` on render. **It takes the 15-minute
+  caller lock.** A guest list that prefetched under the thumb would lock families nobody
+  opened, and per CLAUDE.md §11b a lock has no manual override — `locked_until` expiry is
+  the only recovery, and no admin UI lists locked families. A fling down 238 rows would
+  have seeded the queue with frozen families discoverable only one at a time, by walking
+  into them.
+- `rsvp/call/[groupId]` stamps `last_opened_by_staff` on render. That column is what the
+  queue's "Ravi, 2 min ago" label reads, so prefetching would have made the presence
+  signal report people who never opened the family.
+
+Those two are the only destinations the three converted lists drill into, so row
+prefetching is off. **The bound the brief asked for — 3 in flight, cancel on scroll —
+would not have saved it.** Three locks taken by mistake is not three times better than
+forty; it is the same bug at a volume that takes longer to notice.
+
+Every nav destination was audited the same way before being armed. All read-only except
+Calls → `rsvp/campaigns`, whose `ensureCampaigns` inserts the default draft waves when
+none exist — idempotent, and the same rows the first real visit creates. Flagged rather
+than silently accepted. **Anything added to `SECTIONS` needs this check first.**
+
+### The guest row was a full page load, in an app with no local bundle
+
+`GuestListRow` linked with a bare `<a href>`. In remote-shell mode (CLAUDE.md §11c) there
+is no bundled copy of the app, so every guest tap threw the whole thing away and re-fetched
+it from Vercel — shell, query cache, pending undo and all. Now a `<Link>`, so the
+navigation is soft and only the destination is fetched.
+
+It carries `prefetch={false}` explicitly, and that is a safety requirement rather than a
+tuning choice: it makes the lock hazard above structurally impossible on this route instead
+of dependent on where Next happens to place a Suspense boundary.
+
+### Frame-first: arrivals was dropping the whole screen
+
+Of the three converted lists, only `arrivals` genuinely violated T4. `GuestsClient` and
+`QueueBoard` already gate their skeletons on `isPending`, which is false the moment the
+key holds rows — so a cached list was never showing one. `ArrivalsClient` early-returned a
+skeleton for the **entire screen**, title and counts and filters included, so a tab switch
+dropped the frame and rebuilt it. The skeleton is now the rows only; everything above them
+paints from what the client already has.
+
+That change created a question the early return had hidden: the counts. `expectedToday`
+and `arrivedToday` coalesce to 0 when the rows are absent, and "0 / 0" on a day with forty
+arrivals is not a loading state, it is a confident lie. `Count` now takes `number | null`
+and renders an em-dash for "not yet known".
+
+All three lists now mark a background re-read with a quiet `Updating…` rather than either
+hiding it or throwing cached rows away for a skeleton.
+
+### Item 5 — the double identity resolution — is NOT fixed, and the reason is not the guard
+
+The brief allowed a wider cache and forbade weakening a guard. Neither applies: the fix is
+outside the allowed file list, and what is actually expensive is not what the layout comment
+says it is.
+
+`getEventAccess` is **already free on the hot path**. For a code-auth session — every
+runner on a phone — it reads the JWT claims and returns without touching the database. The
+event lookup is already deduped across the layout/page boundary by the session-scoped TTL
+cache in `queries.ts`. So the documented "resolves the event again inside each page" cost
+has already been paid off.
+
+What is not deduped is **`getSessionClaims()`, and it makes a network call every time** —
+`isAccessCodeLive()` POSTs `session_code_live` to Supabase in Seoul on each invocation, and
+the function is memoised by nothing. Counted on one staff navigation: `getViewer` (1), the
+layout directly (2), `getEventAccess` (3), `getStaffViewerContext` (4), the section layout's
+`requireSection` (5), and the page's own `requireStaff` (6). That is up to six serial round
+trips to Seoul to answer one question about one identity, and it is the real cost on this
+path.
+
+It is a textbook `perRequest` case — the answer cannot change inside one request, so
+memoising it changes no guard's behaviour. But `getSessionClaims` lives in
+`src/lib/auth/server.ts`, which this session was explicitly barred from touching, and a
+wider cache in `request-cache.ts` alone does nothing because every caller is in
+`src/lib/auth` or `src/lib/supabase`. **Reported, not done.** Left as the single
+highest-value item on this path.
+
+### Item 4 — the shell already survives navigation
+
+Checked rather than assumed, and no fix was needed. `StickyHeader`, `SectionTabs` and
+`BottomTabs` all live in `(staff)/[eventCode]/layout.tsx`; there is no `template.tsx`
+anywhere in `src/app` (a template is the one thing that would force a remount per
+navigation); and the four section layouts under it render `children` and nothing else, so
+crossing sections unmounts no chrome. Verified statically — the handset round in §14 has
+not run.
+
+### What is still owed
+
+- `eventId` does not reach `BottomTabs`, so a tab tap cannot warm the destination's
+  TanStack cache for `arrivals` or `rooms` (both fetch client-side under the viewer's own
+  RLS). Threading it through means editing `(staff)/[eventCode]/layout.tsx`, outside this
+  session's file list. `guests/list` is unaffected — its route prefetch already carries the
+  dehydrated query data.
+- `useBoundedPrefetch` has no test. `tests/` was outside the file list.

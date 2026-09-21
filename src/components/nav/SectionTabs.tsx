@@ -12,6 +12,7 @@ import {
   visibleChildren,
   type TabAccess,
 } from '@/lib/sections/config'
+import { useBoundedPrefetch } from '@/lib/query/prefetch'
 import { cn } from '@/lib/utils'
 
 interface SectionTabsProps {
@@ -37,6 +38,13 @@ interface SectionTabsProps {
 export function SectionTabs({ eventCode, access, department = null }: SectionTabsProps) {
   const pathname = usePathname()
   const rest = pathname.split('/').filter(Boolean).slice(1).join('/')
+
+  // Above the early returns, because hooks are. Armed on touch rather than
+  // eagerly like the bottom bar: a section can carry four children (Travel
+  // does), and four full route renders per section entry is a fan-out where
+  // the bottom bar's five are a one-off. The gap between the finger landing
+  // and the tap completing is free latency; this spends it.
+  const { isArmed, arm } = useBoundedPrefetch()
 
   // The runner's screens are already the bottom bar.
   if (childrenAreInBottomBar(access, department)) return null
@@ -64,10 +72,20 @@ export function SectionTabs({ eventCode, access, department = null }: SectionTab
     >
       {visible.map((child) => {
         const isActive = currentChild === child.segment
+        const href = childHref(eventCode, section.id, child)
         return (
           <Link
             key={child.segment}
-            href={childHref(eventCode, section.id, child)}
+            href={href}
+            // `undefined` is Next's default (viewport, partial — stops at the
+            // nearest loading.tsx). `true` is the full route and its data, and
+            // is only reached once a thumb is actually on this tab. Every
+            // destination in SECTIONS.children reads only; the one write on
+            // render anywhere in the nav is `rsvp/campaigns`, and it is
+            // idempotent. Re-check that before adding a child here.
+            prefetch={isArmed(href) ? true : undefined}
+            onPointerDown={() => arm(href)}
+            onTouchStart={() => arm(href)}
             aria-current={isActive ? 'page' : undefined}
             className={cn(
               // min-h-11 keeps the 44px tap target the rest of the app holds

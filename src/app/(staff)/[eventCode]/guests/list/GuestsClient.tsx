@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 
 import { ChevronRightIcon, SearchIcon, UsersIcon } from '@/components/icons'
@@ -87,12 +88,19 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
   const {
     data: rows,
     isPending: loading,
+    isFetching: listFetching,
     error,
     refetch,
   } = useQuery({
     queryKey: queryKeys.guests.list(eventId),
     queryFn: () => traceFetch('guests :: load', () => readGuestsList(eventId)),
   })
+
+  // The list is on screen and being re-read behind it. Said quietly, because
+  // the alternative T4 forbids is throwing 543 cached rows away for a skeleton
+  // on every re-entry. Distinct from `searchStale` below, which dims the
+  // PREVIOUS term's results while a new term is in flight.
+  const listStale = listFetching && rows !== undefined
 
   // Debounced server-side search. The effect owns the timer: typing keeps
   // resetting it, and only a 300ms pause promotes the term into the key. The
@@ -180,6 +188,11 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
           {total} {total === 1 ? 'guest' : 'guests'} · read-only. Tap a guest to open their
           family&apos;s record.
         </p>
+        {listStale ? (
+          <p role="status" className="mt-0.5 text-xs text-muted">
+            Updating…
+          </p>
+        ) : null}
       </div>
 
       {/* Search — server-side, debounced, lives in the component state. */}
@@ -347,9 +360,24 @@ function GuestListRow({ row, eventCode }: { row: GuestSearchRow; eventCode: stri
   }
 
   return (
-    <a href={href} className={cls} role="listitem">
+    // `Link`, not a bare `<a>`. A plain anchor is a full document navigation,
+    // and in remote-shell mode (CLAUDE.md §11c) there is no local bundle — so
+    // every guest tap threw the whole app away and re-fetched it from Vercel,
+    // cache and all. A soft navigation fetches only the destination and leaves
+    // the shell, the query cache and the undo bar standing.
+    //
+    // `prefetch={false}` is NOT a performance oversight, it is a safety
+    // requirement, and it is the reason this row is not armed by
+    // `useBoundedPrefetch` like the nav tabs are. A full prefetch runs the
+    // destination's server render for real, and `rsvp/status/[groupId]` calls
+    // `claimGroupForCall` on render — it TAKES THE 15-MINUTE CALLER LOCK. A
+    // list that prefetched under the thumb would lock families nobody opened,
+    // and a lock has no manual override: it expires or it does not clear
+    // (CLAUDE.md §11b). Prefetching this route is a data bug wearing a
+    // performance costume.
+    <Link href={href} prefetch={false} className={cls} role="listitem">
       {inner}
-    </a>
+    </Link>
   )
 }
 
