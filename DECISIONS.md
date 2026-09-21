@@ -1242,3 +1242,41 @@ rather than given a fake Undo:
 
 The next session starts at the wiring, not at the design: `useOptimisticAction` is written,
 tested, and documented in the commit message for this session.
+
+---
+
+## 21 September 2026 — CORRECTION to the V3 entry above: check in/out has NO reverse either
+
+The V3 entry above lists check in/out as WIREABLE. **That is wrong and I am correcting it
+rather than leaving it to mislead the next session.**
+
+`check_in_room` and `check_out_room` (`20260806160000_event_day_state.sql:137` and `:216`)
+are strictly FORWARD-MOVING. `check_out_room` sets `checked_out_at = now()` and requires
+`checked_in_at is not null and checked_out_at is null`; it never clears `checked_in_at`.
+Neither RPC clears any timestamp.
+
+So undoing a check-in by calling `checkOutRoom` does not restore the prior state — it moves
+the row on to "Out", which is a DIFFERENT wrong state, and the user would see their undo
+produce something they never asked for. There is no reverse action in `src/lib/actions/`
+that clears a timestamp.
+
+Corrected reverse availability for V3's four writes:
+
+| write | reverse | why |
+|---|---|---|
+| vehicle assignment | **NO** | no unassign helper; `commitTrips` takes a whole proposal |
+| check in / out | **NO** | the RPCs only move forward; nothing clears a timestamp |
+| guest room assignment | **YES** | `releaseGuestFromRoom` sets `released_at`, returning the guest to unplaced; `moveGuestsToRoom` moves them back |
+| RSVP outcome | **YES** | `saveRsvpLog` overwrites `guest_groups`, so re-saving the prior snapshot restores it — but the `call_attempts` row still freezes (CLAUDE.md §5.4) |
+
+Which raises the design question this exposes: **a write with no reverse action can still
+have an honest undo — by not sending it yet.** V10 states the pattern for exactly this case
+("either the outcome commits on a delay with a real undo window before the write fires, or
+it commits immediately and the screen says it is final"). Deferring the server write until
+the undo window closes makes Undo real without any reverse RPC: nothing was sent, so there
+is nothing to reverse.
+
+The trade is explicit and must be chosen per write: a deferred write that the app dies
+before flushing is a write that never happened. For forward-only state (a check-in, a
+vehicle dispatch) that is a genuine risk on a phone that can die, so it is a decision to
+make deliberately, not a default to apply everywhere.
