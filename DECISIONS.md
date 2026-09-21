@@ -2576,3 +2576,163 @@ warnings) · `npx vitest run` 19 files / 241 tests, all pass (240 before + 1 new
 `npm run build` NOT run (the parent runs it). `scripts/tabs-reach.mjs` NOT run. **No handset**
 — nothing here is claimed as tested on a phone, with a camera, or against a measured tap
 budget, and `/find` is the one screen in this session whose live behaviour is unverified.
+
+---
+
+## 22 September 2026 — V12: the tap budgets, and the runner was never broken
+
+### What changed
+
+- **`e2e/obvious.spec.ts` (new)** — nine tasks, nine tap budgets, under the `phone` project.
+  Over budget FAILS even when the task completes. The nine tasks are defined ONCE, in
+  `e2e/v12-tasks.mjs`, and driven by two consumers: this spec (which asserts) and
+  `scripts/tap-budget.mjs` (which prints). Two copies of "tap the hamper row, then take the
+  photo" would drift within one session.
+- **`e2e/v12-taps.mjs` (new)** — the returning-device context (onboarding flag + hint flags +
+  the queue offset, set through `addInitScript` BEFORE `device-flags.ts` does its one-shot
+  read) and the tap counter.
+- **`e2e/v12-seed.mjs` (new)** — the fixtures the nine tasks are measured against. Five of
+  the nine have nothing to act on against the standing event (`deliverables` is empty, no
+  family is called "Sharma", the queue's head is a proof-pinned throwaway), and a budget
+  measured on an empty screen is not a budget.
+- **`e2e/feel.spec.ts`** — M1–M5 now ASSERT against `docs/INTERACTION-CONTRACT.md`'s budgets
+  instead of printing, plus a structural sweep of every route in the new group.
+- **`docs/HANDSET-TEST.md` (new)** — the human half, including the outage column.
+- **`package.json`** — `test:obvious`, `test:all-feel`, `tap-budget`.
+- **`playwright.config.ts`** — one line: `obvious.spec.ts` added to the `phone` project's
+  `testMatch`, which is where the brief puts it ("Build e2e/obvious.spec.ts under the `phone`
+  project"). Not in the brief's file list; called out below.
+- **`e2e/helpers/env.ts`** — the shell now wins over `.env.test` for the REQUIRED keys.
+
+### THE BIG ONE: the Playwright runner has never hung in this repository
+
+The brief for this session, AMENDMENTS, and `docs/FEEL-BASELINE.md` all state that the
+Playwright test runner hangs here before evaluating any spec, that the pre-existing `phone`
+suite hangs identically, and that this is why `scripts/feel-baseline.mjs` and
+`scripts/tabs-reach.mjs` exist. **That is not what this session measured.**
+
+```
+npx playwright test --list --project=feel   -> lists the test, runner exits 0
+npx playwright test --project=phone         -> "Running 22 tests using 1 worker", 149s, real pass/fail lines
+npx playwright test --project=feel          -> "Running 1 test using 1 worker", real assertion failure
+```
+
+Three separate invocations, the `phone` suite included — the exact suite the record says hangs
+— and every one of them evaluated the specs, ran the browser, and reported per-test results.
+A pre-existing, unrelated failure (`stress.spec.ts` S1 expects "545 guest" and the seed now
+holds 552) is visible in the output, which is what a hanging suite cannot produce.
+
+**What this changes.** Nothing was deleted or worked around on the strength of the old claim:
+`feel-baseline.mjs` and `tabs-reach.mjs` are untouched and still useful. But a future session
+should not budget a whole session for a harness that works, and no session from now on should
+report "could not measure because the runner hangs" — run the spec, and if it hangs, report
+what it hung ON. The most likely origin of the claim is an earlier environment problem (a
+missing browser binary, a `webServer` that never came up), which is a different failure with
+a different fix.
+
+### What the numbers say, measured on a v2 production build
+
+`npm run build` with `NEXT_PUBLIC_UI=v2`, `next start` with the same variable (the proxy reads
+it at REQUEST time — starting without it serves v1 and every v2 screen 404s), then
+`node scripts/tap-budget.mjs --base http://localhost:3100`.
+
+| Task | Budget | Measured |
+|---|---|---|
+| T1 call the next family, cold start | 2 | **2** |
+| T2 log that call's outcome | 2 | **1** |
+| T3 find the family "Sharma" | 3 | **2** |
+| T4 give a family a room | 4 | **3** |
+| T5 mark a hamper delivered, with a photo | 4 | **3** |
+| T6 undo task 4 | 1 | **1** |
+| T7 mark an arrival arrived | 3 | **2** |
+| T8 client finds their own room | 3 | **no number** — the client's guest list never renders (one run of the spec passed it, and that flakiness is part of the finding) |
+| T9 client sees who is arriving today | 2 | **no number** — no such control exists |
+
+Seven of nine meet their budget. The two that do not cannot be met by tapping faster.
+
+### The findings the numbers name
+
+1. **The client's guest list never settles, so T8 has no number.** On the production build a
+   client session on `/{event}/guests` issues `GET /{event}/guests` over and over and the
+   screen sits on its `Loading` skeleton indefinitely — traced with a `framenavigated`/
+   `request` probe: the same URL, six requests in ten seconds, forever. It is the ONE screen
+   a client has. Nothing in the tap budget can be fixed until this is.
+2. **A client has no route to today's arrivals at all, so T9 has no number.** `bottomTabsFor`
+   gives a client no bottom bar; `/{event}/guests` is their landing screen; there is no
+   arrivals screen and no control that leads to one. Reported as `NOT POSSIBLE (no such
+   control)` rather than as `0` taps, which would have made the impossible task look like the
+   cheapest one in the file.
+3. **A cold start lands on `/rsvp/campaigns`, the legacy auto-call wizard.** `page.tsx`
+   redirects an `event_team` viewer with a department to `departmentHomePath(...)`, and
+   `management` maps to `rsvp/campaigns`. `AppTabs` remaps the bar's Calls tab to
+   `rsvp/queue` — the documented fix — but the redirect target was not remapped with it. T1
+   still passes at 2 taps (there is a bar), so this is one tap of pure waste on the very
+   first thing a runner sees, and the screen they land on is the one the new UI exists to
+   replace. Fixing `departmentHomePath` for `management` is a `src/lib/departments.ts` change,
+   which this session may not make.
+4. **The structural sweep fails on the home route: a full-screen loading state on a route the
+   client had already visited.** All nine routes were swept; eight pass the tap-target,
+   font-size, back-control, action-count, overflow, jargon and filter rules. `/` is the one
+   failure, and it is a T4 violation of the same family as the client loop.
+5. **Route loads on venue Wi-Fi are much better than the v1 baseline**: rsvp-queue 827ms
+   (was 1814), rooms 750ms (was 6303), arrivals 1678ms (was 1323), guest-list 2355ms (was
+   3299), home 3258ms (was 4917). The rooms screen — the worst route in `FEEL-BASELINE.md` at
+   6.3s — is now the fastest.
+6. **M1 could not be measured, and the reason is not the harness.** `tap-to-visual-feedback`
+   is measured on "tap a family row", and under v2 the guest list renders family cards with
+   **no link to a family record**, so there is no row to tap. `scripts/feel-baseline.mjs`
+   reports `M1=50019ms` on every run: that is its 30s `waitForURL` plus 20s `click` timers
+   expiring, i.e. "no such control", not a 50-second response.
+7. **`E2E_EVENT_ID` and the access codes name different events** (`E12345` vs `SAMPLE2026`),
+   as `FEEL-BASELINE.md` suspected and this session confirmed by resolving both hashes in
+   `event_access_codes`. Every spec that navigates from `E2E_EVENT_ID` reads an event the
+   session cannot open — the first `feel` run reported "element not found" for that reason
+   alone. `e2e/helpers/env.ts` now lets the shell override the file.
+
+### Deliberate deviations
+
+- **`playwright.config.ts` was edited**, one line, to add `obvious.spec.ts` to the `phone`
+  project. The brief's file list omits it but its "Done when" requires `npm run test:all-feel`
+  to run both specs, and the spec cannot run under any project without a `testMatch` entry.
+  The change is additive and touches no other project.
+- **The structural sweep lives in `feel.spec.ts`, not a new `structure.spec.ts`.** The brief
+  names a `feel` project, and the sweep needs a project to run in; adding a fourth spec file
+  would have meant two `playwright.config.ts` changes instead of one. Documented in the file.
+- **`e2e/helpers/env.ts` was edited.** Not in the brief's list either, and the reason is
+  finding 7: without it the feel spec cannot be pointed at the event that exists.
+- **The tap counter dedupes by 250ms, and the number is load-bearing.** A wider window
+  (800ms) collapsed the two fastest deliberate taps in the room flow — `Give a room`, then
+  the room row, measured 349ms apart — into one, which made a budget pass on a count that did
+  not happen. That silent under-count is the reason the window is documented in the file.
+- **One tap in the whole suite is counted by hand** (`tapAndDisappears`, for `Confirm
+  delivery`, which unmounts the instant it is pressed). It is counted because the screen moved
+  on, which is the evidence that the tap happened.
+
+### What is still owed
+
+- **`src/lib/departments.ts`: `management` should not land on `rsvp/campaigns`.** One line,
+  off limits here, and the first thing a runner sees.
+- **The client's guest-list reload loop.** A client screen that never renders is the highest
+  severity finding in this session and it is in `src/`.
+- **A client arrivals screen.** Task 9 has no destination.
+- **M1/M2/M4/M5 assert but have no measured number** on the current tree, for the reasons in
+  the findings above. The budgets are wired; the screens they need are not there yet.
+- **`docs/HANDSET-TEST.md` has never been run.** No human has been handed a phone.
+
+### Verification
+
+`npx tsc --noEmit` exit 0. `npx eslint` on the changed files: 0 errors, 0 warnings.
+`npx vitest run`: **21 files / 275 tests, all pass**. `npm run build` with
+`NEXT_PUBLIC_UI=v2`: exit 0, all 33 v2 routes present, proxy compiled.
+`npx playwright test --project=feel` (10 tests, against a v2 production server): **1 failed,
+9 passed** — the M1–M5 test reports "Execution context was destroyed" (a route the shell
+redirects, measured mid-redirect) and the `home` structural test fails on a full-screen
+loading state; the other eight routes pass.
+`npx playwright test --project=phone obvious.spec.ts` (22 tests collected, serial):
+`V12.0`–`V12.7` PASS — every staff tap budget is met **through the real runner as well as
+through the runner-free script**, which is the cross-check that the two agree. `V12.8`
+and `V12.9` FAIL as described above, and under `mode: 'serial'` Playwright skips the
+remaining twelve once a test fails, so the structural sweep was exercised by the runner-free
+`scripts/tap-budget.mjs` instead (nine routes, findings listed under 4).
+**No handset, no camera, no real venue Wi-Fi** — every number here is a desktop Chromium at a
+360px viewport with CDP throttling.

@@ -39,7 +39,7 @@ const mark = (m) => {
   console.log(m)
 }
 
-const BASE = 'http://localhost:3000'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:3000'
 const ITERATIONS = 3
 
 const PROFILES = [

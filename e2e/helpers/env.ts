@@ -74,7 +74,29 @@ export function loadTestEnv(): TestEnv {
   }
 
   const raw = parseEnvFile(path)
-  const env = raw as unknown as TestEnv
+
+  /**
+   * THE SHELL WINS OVER THE FILE, and V12 needs it to.
+   *
+   * `.env.test` names `E2E_EVENT_ID = E12345`, and the team and client access
+   * codes in the same file sign into `SAMPLE2026`. `docs/FEEL-BASELINE.md`
+   * recorded the disagreement; V12 measured its consequence — every spec that
+   * resolves the event from `E2E_EVENT_ID` navigates to a screen the session
+   * cannot open, and reports it as a missing element rather than as the wrong
+   * event. The file cannot be corrected from a session that may not commit, and
+   * the value is genuinely per-run, so the shell is given the last word:
+   *
+   *   E2E_EVENT_ID=<the event the codes actually sign into> npm run test:feel
+   *
+   * Nothing about the default changes: with no variable exported this block is a
+   * no-op and the file is the source of truth, exactly as before.
+   */
+  const overridden = { ...raw }
+  for (const key of REQUIRED) {
+    const fromShell = process.env[key]
+    if (fromShell) overridden[key] = fromShell
+  }
+  const env = overridden as unknown as TestEnv
 
   const missing = REQUIRED.filter((key) => !env[key] || env[key].includes('replace-me'))
   if (missing.length > 0) {

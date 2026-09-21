@@ -23,7 +23,10 @@
     "test:t1": "vitest run --config vitest.integration.config.ts tests/t1_isolation.test.ts",
     "test:t2": "vitest run --config vitest.integration.config.ts tests/t2_reality.test.ts",
     "test:t2:offline": "npx playwright test e2e/t2_offline.spec.ts --project=phone",
-    "test:feel": "npx playwright test --project=feel"
+    "test:feel": "npx playwright test --project=feel",
+    "test:obvious": "npx playwright test e2e/obvious.spec.ts --project=phone",
+    "test:all-feel": "npx playwright test --project=feel --project=phone",
+    "tap-budget": "node scripts/tap-budget.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",

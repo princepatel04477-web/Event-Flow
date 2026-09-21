@@ -2,8 +2,70 @@ import { expect, test, type Page, type Response } from '@playwright/test'
 
 import { loggedInContext, loginTeam } from './helpers/auth'
 import { db, EVENT_ID } from './helpers/db'
+import { installTapCounter, markOnboarded } from './v12-taps.mjs'
+import { probeStructure } from './v12-tasks.mjs'
 
 const ITERATIONS = 5
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * V12 (extends V1) — DOES IT FEEL INSTANT?
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * V1 wrote this file to REPORT M1–M5. V12 makes it ASSERT, which is the whole
+ * difference between a baseline and a contract: a regression in any of these
+ * numbers now fails the build instead of appearing in a log nobody reads.
+ *
+ * ── THE BUDGETS, AND WHERE EACH ONE COMES FROM ───────────────────────────
+ *
+ * Every number below is `docs/INTERACTION-CONTRACT.md`'s Budgets table. None of
+ * them was chosen here, and none of them was softened to match a measurement —
+ * the contract says so in its own words, and `docs/FEEL-BASELINE.md` records the
+ * 2026-09-21 measurement each one is a target AGAINST:
+ *
+ *   M1  tap → first visual change      ≤ 100 ms    (T1's rule; measured 2258–3172 ms)
+ *   M2  tap → destination frame        ≤ 300 ms    (unmeasured; set from `arrivals` at 1323 ms)
+ *   M3  tap → real rows, CACHED        ≤ 150 ms    (one frame plus a fade; nothing met it at baseline)
+ *   M3  tap → real rows, UNCACHED      ≤ 2000 ms   (met by 2 of 4 routes at baseline; `rooms` was 6303 ms)
+ *   M4  one action's server time       ≤ 500 ms    (unchanged from the proposal; needs server-side timing)
+ *   M5  back → list restored, cached   ≤ 150 ms    (same reasoning as M3-cached)
+ *
+ * A route that is over budget FAILS. That is the point of the file. When M3
+ * fails on `rooms`, the message names `rooms`, and the next session has its
+ * worklist — which is worth more than a green line that hides a six-second wait.
+ *
+ * ── WHAT THE ONBOARDING FLAG IS DOING HERE ───────────────────────────────
+ *
+ * A fresh Playwright context is a fresh DEVICE, and `FirstRunCards` paints a
+ * full-screen overlay on one. Every measurement in this file is taken through a
+ * context marked onboarded (and with the per-screen hints dismissed), because
+ * otherwise M1 would be timing the onboarding cards rather than the tap. See
+ * `e2e/v12-taps.mjs` for the full reasoning.
+ *
+ * ── WHY THE ROUTES ARE THE v2 ONES ───────────────────────────────────────
+ *
+ * These are the five screens the new UI actually ships, and two of V1's five
+ * are not them: `/{code}/guests/list` was a 404 under v2 when AMENDMENTS §3 was
+ * written (it is a shim now), and the event's home is not `/{code}` for a
+ * management runner — `page.tsx` redirects them to `/{code}/rsvp/campaigns`
+ * before anything renders. Measuring a redirect target as if it were the home
+ * understates the home and never measures the screen people land on.
+ */
+
+const BUDGET = {
+  /** M1 — T1. The tap owns the first 100ms. */
+  m1: 100,
+  /** M2 — the destination's structural frame. */
+  m2: 300,
+  /** M3 on a list the client already had. */
+  m3Cached: 150,
+  /** M3 on a list that has to come from the server. */
+  m3Uncached: 2000,
+  /** M4 — a single action's total server time. */
+  m4: 500,
+  /** M5 — back, with the list restored from cache and no refetch. */
+  m5: 150,
+} as const
 
 const PROFILES = [
   { name: 'venue-wifi', latencyMs: 300, downMbps: 1.5, upMbps: 0.75 },
@@ -11,12 +73,13 @@ const PROFILES = [
 ] as const
 
 const ROUTES = [
-  { label: 'home', path: (code: string) => `/${code}` },
   { label: 'rsvp-queue', path: (code: string) => `/${code}/rsvp/queue` },
   { label: 'guest-list', path: (code: string) => `/${code}/guests/list` },
   { label: 'rooms', path: (code: string) => `/${code}/hospitality/rooms` },
   { label: 'arrivals', path: (code: string) => `/${code}/logistics/arrivals` },
+  { label: 'hamper-run', path: (code: string) => `/${code}/hospitality/deliveries` },
 ] as const
+
 
 type ProfileName = (typeof PROFILES)[number]['name']
 type RouteLabel = (typeof ROUTES)[number]['label']
@@ -31,7 +94,8 @@ interface Sample {
 
 interface Summary {
   profile: ProfileName
-  route: RouteLabel
+  /** A route label, or a named action for a metric that is not route-scoped. */
+  route: string
   metric: MetricName
   medianMs: number
   worstMs: number
@@ -315,10 +379,32 @@ async function measureBackRestore(page: Page, code: string, routePath: string): 
   return { ms, ...network, refetched }
 }
 
+/**
+ * A fresh context that is a RETURNING device.
+ *
+ * `loggedInContext` builds its own context, so the onboarding flag has to be
+ * installed on it after the fact — and it has to be installed BEFORE the first
+ * navigation of the measurement, or `FirstRunCards` paints over the screen and
+ * M1 measures the onboarding cards. `addInitScript` is injected into every
+ * document from that point on, including the ones the taps navigate to.
+ */
+async function measuredContext(
+  browser: Parameters<typeof loginTeam>[0],
+  profile: (typeof PROFILES)[number],
+) {
+  const { context, page } = await loggedInContext(browser, await loginTeam(browser))
+  await markOnboarded(context)
+  await installTapCounter(context)
+  await throttle(page, profile)
+  return { context, page }
+}
+
 test.describe('feel baseline', () => {
   test.describe.configure({ mode: 'serial', timeout: 20 * 60 * 1000 })
 
-  test('prints M1-M5 for five routes under venue Wi-Fi and 4G', async ({ browser }) => {
+  test('M1-M5 on every new route, under venue Wi-Fi and 4G, asserted against the contract', async ({
+    browser,
+  }) => {
     const code = await eventCode()
     const counts = await seededCounts()
     console.log(`[feel] event=${code} seed=${counts.guests} SEED-543 guests families=${counts.families}`)
@@ -326,36 +412,95 @@ test.describe('feel baseline', () => {
     expect(counts.families, 'full-scale family count must be present').toBeGreaterThanOrEqual(238)
 
     const summaries: Summary[] = []
+    const failures: string[] = []
 
     for (const profile of PROFILES) {
-      const { context, page } = await loggedInContext(browser, await loginTeam(browser))
-      await throttle(page, profile)
+      const { context, page } = await measuredContext(browser, profile)
 
       await warmRoutes(page, code)
       console.log(`[feel] warmed all routes before timing (${profile.name})`)
 
       for (const route of ROUTES) {
         const routeSamples: Record<'M1' | 'M2' | 'M3', Sample[]> = { M1: [], M2: [], M3: [] }
+
+        // M3 is measured TWICE on purpose. The contract's cached budget is
+        // 150ms and its uncached budget is 2000ms, and a single number cannot
+        // say which one applies. Pass 1 runs against a cold cache (the route has
+        // just been loaded from scratch by `clickRoute`'s source navigation);
+        // pass 2 runs immediately after, inside TanStack's 30s stale window, so
+        // the rows are already in the cache and the slow branch is unreachable.
+        // Grading a cached hit against the uncached budget would ratify a
+        // regression; grading a cold miss against the cached budget would fail
+        // every screen on the first run.
+        const uncached: Sample[] = []
         for (let i = 0; i < ITERATIONS; i += 1) {
           const sample = await measureRoute(page, code, route)
           routeSamples.M1.push(sample.m1)
           routeSamples.M2.push(sample.m2)
-          routeSamples.M3.push(sample.m3)
+          uncached.push(sample.m3)
         }
-        summaries.push(summarize(profile.name, route.label, 'M1', routeSamples.M1))
-        summaries.push(summarize(profile.name, route.label, 'M2', routeSamples.M2))
-        summaries.push(summarize(profile.name, route.label, 'M3', routeSamples.M3))
+        const cached: Sample[] = []
+        for (let i = 0; i < ITERATIONS; i += 1) {
+          const sample = await measureRoute(page, code, route)
+          cached.push(sample.m3)
+        }
+
+        const m1 = summarize(profile.name, route.label, 'M1', routeSamples.M1)
+        const m2 = summarize(profile.name, route.label, 'M2', routeSamples.M2)
+        const m3cold = summarize(profile.name, route.label, 'M3', uncached)
+        const m3warm = summarize(profile.name, route.label, 'M3', cached)
+        summaries.push(m1, m2, m3cold, m3warm)
 
         const m5Samples: Sample[] = []
         for (let i = 0; i < ITERATIONS; i += 1) {
           m5Samples.push(await measureBackRestore(page, code, route.path(code)))
         }
-        summaries.push(summarize(profile.name, route.label, 'M5', m5Samples))
+        const m5 = summarize(profile.name, route.label, 'M5', m5Samples)
+        summaries.push(m5)
+
+        // ---- the assertions, one metric at a time ----
+        const grade = (metric: string, row: Summary, budget: number, note = '') => {
+          const line =
+            `${profile.name} ${route.label} ${metric}: median ${row.medianMs}ms (worst ${row.worstMs}ms) ` +
+            `against ${budget}ms${note ? ` — ${note}` : ''}`
+          if (row.medianMs > budget) failures.push(line)
+        }
+
+        grade('M1 tap-to-visual-feedback', m1, BUDGET.m1, 'T1: the tap owns the first 100ms')
+        grade('M2 tap-to-destination-frame', m2, BUDGET.m2)
+        grade('M3 tap-to-content (uncached)', m3cold, BUDGET.m3Uncached)
+        grade('M3 tap-to-content (cached)', m3warm, BUDGET.m3Cached)
+        if (m5.refetched) {
+          // A refetch on Back is a T4 failure in its own right. It is reported
+          // as a failed budget rather than a soft note because the number is
+          // meaningless without it: a 40ms "restore" that went to the server is
+          // not a restore.
+          failures.push(
+            `${profile.name} ${route.label} M5 back-to-list REFETCHED on Back (requests=${m5.requests}) — T4: no route transition may re-fetch data the client already had`,
+          )
+        } else {
+          grade('M5 back-to-list (no refetch)', m5, BUDGET.m5)
+        }
       }
 
+      // ---- M4: one action's total server time ----
+      //
+      // Reported ONCE per profile, not once per route. The metric is about the
+      // write, and the write is the RSVP outcome — the same action whichever
+      // screen the runner came from. The V1 version of this loop copied the same
+      // five samples onto all five route labels, which made one number look like
+      // five independent measurements. `route` is deliberately typed as a plain
+      // string here so a label outside `ROUTES` is not a type error.
       const m4Samples: Sample[] = []
       for (let i = 0; i < ITERATIONS; i += 1) m4Samples.push(await measureSave(page, code))
-      for (const route of ROUTES) summaries.push(summarize(profile.name, route.label, 'M4', m4Samples))
+      const m4: Summary = { ...summarize(profile.name, ROUTES[0].label, 'M4', m4Samples), route: 'rsvp-status (the write itself)' }
+      summaries.push(m4)
+      if (m4.medianMs > BUDGET.m4) {
+        failures.push(
+          `${profile.name} M4 one action's total server time: median ${m4.medianMs}ms ` +
+            `(worst ${m4.worstMs}ms) against ${BUDGET.m4}ms — measured on the RSVP outcome save`,
+        )
+      }
 
       await stopThrottle(page)
       await context.close()
@@ -369,5 +514,94 @@ test.describe('feel baseline', () => {
       )
     }
     console.log(`[feel-json] ${JSON.stringify(summaries)}`)
+
+    // EVERY failure at once, not the first. The value of this test is the
+    // worklist it leaves behind, and stopping at the first over-budget metric
+    // would hide the other four.
+    expect(
+      failures,
+      `${failures.length} feel budget(s) missed. Each line names the profile, the route, the ` +
+        `metric and the number it missed by:\n` +
+        failures.map((f) => `      • ${f}`).join('\n'),
+    ).toEqual([])
   })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE STRUCTURAL SWEEP — every route in the new group
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * The brief's structural rules, checked against the rendered DOM of every route
+ * in the new group:
+ *
+ *   - every interactive element is at least 44 × 44 CSS px
+ *   - computed body font-size is at least 16px
+ *   - a visible back control, or the route is a bottom-bar destination
+ *   - no more than 7 primary tappable actions in the main column
+ *   - no horizontal scroll at 360px
+ *   - no element containing the strings "pax", "deliverable", "extraction",
+ *     "travel leg"
+ *   - at most one row of filter controls, and none above the first content row
+ *   - no full-screen loading state on a route whose data is already cached
+ *
+ * The probes live in `e2e/v12-tasks.mjs` so this sweep and
+ * `scripts/tap-budget.mjs` measure the same things; the reasoning for the
+ * `bottomBarDestination` flag is in that file. The last rule is the only one
+ * that needs a second visit, and it is checked here by loading each route twice
+ * and asserting the second load never shows a full-page `Loading` state.
+ */
+const SWEEP_ROUTES = [
+  { path: '', label: 'home', bar: true },
+  { path: 'rsvp/queue', label: 'rsvp/queue (Calls tab)', bar: true },
+  { path: 'rsvp/campaigns', label: 'rsvp/campaigns (cold-start destination)', bar: false },
+  { path: 'guests/list', label: 'guests/list (Guests tab)', bar: true },
+  { path: 'hospitality/rooms', label: 'hospitality/rooms (Rooms tab)', bar: true },
+  { path: 'hospitality/deliveries', label: 'hospitality/deliveries', bar: true },
+  { path: 'logistics/arrivals', label: 'logistics/arrivals (Travel tab)', bar: true },
+  { path: 'find', label: 'find (header search)', bar: false },
+  { path: 'help', label: 'help (header ?)', bar: false },
+] as const
+
+test.describe('structure — every route in the new group', () => {
+  test.describe.configure({ mode: 'serial', timeout: 10 * 60 * 1000 })
+
+  for (const route of SWEEP_ROUTES) {
+    test(`${route.label}`, async ({ browser }) => {
+      const { context, page } = await loggedInContext(browser, await loginTeam(browser))
+      await markOnboarded(context)
+
+      const url = `/${await eventCode()}${route.path ? `/${route.path}` : ''}`
+
+      // Second visit, so anything cached already is: this is the rule about not
+      // showing a full-screen loading state for data the client already had.
+      await page.goto(url)
+      await page.waitForLoadState('networkidle').catch(() => {})
+      await page.goto(url)
+      await page.waitForLoadState('domcontentloaded')
+      await page.waitForTimeout(600)
+
+      const loading = await page
+        .locator('text=/^Loading…?$/')
+        .first()
+        .isVisible()
+        .catch(() => false)
+      expect(
+        loading,
+        `${route.label}: showed a full-screen loading state on a route the client had already ` +
+          `visited (T4 — navigation is instant or it is not navigation)`,
+      ).toBe(false)
+
+      const probe = await probeStructure(page, { bottomBarDestination: route.bar })
+
+      expect(
+        probe.results,
+        `${route.label} (${probe.path}) breaks ${probe.results.length} structural rule(s):\n` +
+          probe.results.map((r: { rule: string; detail: string }) => `      • [${r.rule}] ${r.detail}`).join('\n'),
+      ).toEqual([])
+      expect(probe.bodyFontSize, `${route.label}: body font-size must be >= 16px`).toBeGreaterThanOrEqual(16)
+
+      await context.close()
+    })
+  }
 })

@@ -43,7 +43,13 @@ export default defineConfig({
         viewport: { width: 360, height: 800 },
       },
       // The acceptance run is the phone project only.
-      testMatch: /tier0\.spec\.ts|tier1\.spec\.ts|tier2\.spec\.ts|stress\.spec\.ts/,
+      //
+      // `obvious.spec.ts` (V12) hangs off this project because the brief puts it
+      // here — "Build e2e/obvious.spec.ts under the `phone` project". It is a
+      // 360px handset suite like the tiers, and `--project=phone` is already the
+      // switch the acceptance script uses, so nothing new has to be remembered
+      // to run it. `npm run test:all-feel` names it explicitly as well.
+      testMatch: /tier0\.spec\.ts|tier1\.spec\.ts|tier2\.spec\.ts|stress\.spec\.ts|obvious\.spec\.ts/,
     },
     {
       name: 'desktop',
