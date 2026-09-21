@@ -36,7 +36,17 @@ export async function requireHamperScreen(eventCode: string) {
   if (!ctx) redirect(`/${eventCode}`)
 
   if (access === 'admin' || ctx.department === 'management') {
-    return { event, canGenerate: access === 'admin' }
+    return {
+      event,
+      canGenerate: access === 'admin',
+      // Answered here rather than guessed in the component: the guest list is a
+      // section a hamper or hospitality runner is NOT a member of, so offering
+      // them a link to it sends them into `requireSection`'s bounce and back to
+      // their own screen with a `?denied=section` marker nothing renders. That
+      // is a button that looks dead, which is the dead end R3 is written
+      // against. Found by the R1 review.
+      canOpenGuestList: true,
+    }
   }
 
   const allowed =
@@ -48,5 +58,9 @@ export async function requireHamperScreen(eventCode: string) {
     redirect(`${home}?denied=section`)
   }
 
-  return { event, canGenerate: false }
+  return {
+    event,
+    canGenerate: false,
+    canOpenGuestList: sectionAllowedForDepartment('guests', ctx.department),
+  }
 }

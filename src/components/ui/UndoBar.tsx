@@ -4,8 +4,11 @@ import { useSyncExternalStore } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import {
+  clearFailedWrite,
   commitPendingUndo,
   extendPendingUndo,
+  getFailedWriteServerSnapshot,
+  getFailedWriteSnapshot,
   getUndoServerSnapshot,
   getUndoSnapshot,
   subscribeUndo,
@@ -39,6 +42,11 @@ import {
  */
 export function UndoBar() {
   const pending = useSyncExternalStore(subscribeUndo, getUndoSnapshot, getUndoServerSnapshot)
+  const failed = useSyncExternalStore(
+    subscribeUndo,
+    getFailedWriteSnapshot,
+    getFailedWriteServerSnapshot,
+  )
 
   return (
     // THE LIVE REGION IS PERSISTENT, and that is the point. Rendering it only
@@ -83,6 +91,35 @@ export function UndoBar() {
               className="shrink-0"
             >
               Undo
+            </Button>
+          </div>
+        </div>
+      ) : failed ? (
+        // A WRITE THE SERVER REFUSED, after the screen that sent it was gone.
+        //
+        // The pending-undo branch above cannot carry this: by the time the
+        // refusal arrives there is no undo to offer — the write was committed on
+        // the user's behalf by the timer, and the answer is no. Without this
+        // branch the refusal reached nobody, because the only other reporter is
+        // React state on a component that has unmounted (see
+        // useOptimisticAction's `report` and undo-store.ts's `reportFailedWrite`).
+        //
+        // It uses the same persistent live region and the same position as the
+        // undo bar, so it is announced rather than appearing silently, and it sits
+        // above the tab bar where the thumb already is.
+        <div className="mx-auto w-full max-w-[480px] px-4 pb-2">
+          <div className="flex items-start gap-2 rounded-xl border border-ledger-red/40 bg-surface py-2 pl-4 pr-2 shadow-e3">
+            <span className="min-w-0 flex-1 text-sm leading-snug text-ink">
+              <span className="block font-medium">That did not save.</span>
+              <span className="mt-0.5 block text-muted">{failed.message}</span>
+            </span>
+            <Button
+              size="md"
+              variant="secondary"
+              onClick={clearFailedWrite}
+              className="shrink-0"
+            >
+              Dismiss
             </Button>
           </div>
         </div>

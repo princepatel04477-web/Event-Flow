@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
 import { requireSection } from '@/lib/auth/section-guard'
-import { resolveEventByCode } from '@/lib/supabase/queries'
+import { sectionAllowedForDepartment } from '@/lib/departments'
+import { getEventAccess, resolveEventByCode } from '@/lib/supabase/queries'
 
 import { GiveRoom } from './GiveRoom'
 
@@ -30,7 +31,23 @@ export default async function GiveRoomPage({ params }: PageProps) {
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
 
-  await requireSection(event.id, event.code, 'hospitality')
+  const ctx = await requireSection(event.id, event.code, 'hospitality')
 
-  return <GiveRoom eventId={event.id} eventCode={event.code} />
+  // Whether the "Go to the call list" empty-state action may be offered.
+  //
+  // Answered HERE because only the guard knows: `hospitality` is not a member of
+  // `DEPARTMENT_SECTIONS.rsvp`, so for the runner this screen is built for,
+  // `rsvp/queue`'s own guard bounces them straight back to this page with
+  // `?denied=section` — which this page does not read. The one button on the
+  // empty state would do nothing at all, and "every family has a room" is where
+  // a hospitality runner lands every time they clear their queue. Found by the
+  // R1 review; `getEventAccess` is memoised per request, so re-reading it here
+  // costs nothing.
+  const access = await getEventAccess(event.id)
+  const canOpenCallList =
+    access === 'admin' || sectionAllowedForDepartment('rsvp', ctx.department)
+
+  return (
+    <GiveRoom eventId={event.id} eventCode={event.code} canOpenCallList={canOpenCallList} />
+  )
 }

@@ -138,6 +138,61 @@ export function extendPendingUndo(): void {
 export function __resetUndoStoreForTests(): void {
   clearTimer()
   current = null
+  failed = null
   nextId = 1
+  nextFailedId = 1
   emit()
+}
+
+/* -------------------------------------------------------------------------- */
+/* A write that was committed on the user's behalf, and refused               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * WHY THIS SLOT EXISTS, AND WHY IT IS NOT THE UNDO SLOT.
+ *
+ * `offerUndo` above is built to outlive the screen — that is its whole reason for
+ * being module-level. But the RESULT of the commit was reported through React
+ * state on the component that armed it (`setSyncState` / `setLastError` in
+ * `useOptimisticAction`). So the sequence a coordinator actually performs —
+ * tap "Give a room", watch the family leave the list, walk to the next door —
+ * could end with the server refusing the write at second seven, the cache
+ * rolling back, and nobody being told anything at all. The row simply reappears
+ * in a list the user is no longer looking at.
+ *
+ * A transport failure is fine: it is queued, and `SyncChip` counts the queue. A
+ * SERVER DECISION is not queued (replaying it would fail identically), so it had
+ * no surface whatsoever once the screen was gone. This is that surface, read by
+ * `UndoBar`, which is mounted once in the shell and survives navigation for the
+ * same reason the pending undo does.
+ */
+export interface FailedWrite {
+  /** Monotonic id, so two consecutive failures are distinguishable. */
+  id: number
+  /** The server's own words, already passed through `friendlyDbError`. */
+  message: string
+}
+
+let failed: FailedWrite | null = null
+let nextFailedId = 1
+
+/** Record a write the server refused after the screen that sent it had gone. */
+export function reportFailedWrite(message: string): void {
+  failed = { id: nextFailedId++, message }
+  emit()
+}
+
+/** The user has seen it. */
+export function clearFailedWrite(): void {
+  if (!failed) return
+  failed = null
+  emit()
+}
+
+export function getFailedWriteSnapshot(): FailedWrite | null {
+  return failed
+}
+
+export function getFailedWriteServerSnapshot(): FailedWrite | null {
+  return null
 }

@@ -16,6 +16,7 @@ import { OfflineBanner } from '@/components/native/OfflineBanner'
 import { SentryErrorBoundary } from '@/components/native/SentryErrorBoundary'
 import { initSentry } from '@/lib/sentry'
 import { getUiVersion } from '@/lib/ui-version'
+import { V2_OFFLINE_NOTE } from '@/lib/offline-note'
 import { wireExternalLinkInterception } from '@/lib/native/navigation'
 
 import './globals.css'
@@ -126,23 +127,22 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   /**
-   * ONE offline banner, owned by whichever shell is serving the route.
+   * ONE offline banner, on every route, owned by this layout.
    *
-   * v1 keeps this one, exactly as it always has. Under `NEXT_PUBLIC_UI=v2` the
-   * banner instead comes from `(app)/v2/[eventCode]/layout.tsx`, because v2's
-   * banner carries an extra training line (CLAUDE.md §11b) that v1 must not
-   * show — and two banners would stack: a duplicate amber strip on every v2
-   * screen, found on a live run of this session, not in review.
+   * This used to be `getUiVersion() !== 'v2'` while the v2 shell rendered its
+   * own banner with an extra training line. That fixed a double banner and broke
+   * the routes the v2 shell does not cover — `/login`, `/pick-staff` and
+   * `/admin/**` lost the banner entirely under v2, and the sign-in screen is
+   * exactly where a staff member with no signal is most likely to be. Found by
+   * the R1 review, not by a test.
    *
-   * Read through `getUiVersion()`, the same helper `src/proxy.ts` gates the
-   * rewrite on, so the layout and the router cannot disagree about which UI is
-   * serving. This file is a SERVER component: it resolves at request time, so
-   * the value it reads is the deployed one. That is exactly the property a
-   * client-side check would NOT have — `process.env.NEXT_PUBLIC_UI` is inlined
-   * into client bundles at build time, so a banner reading it there could
-   * believe it was v1 while the server routed as v2.
+   * So the banner is always rendered here and only its NOTE depends on the flag:
+   * v1 passes nothing and its output is unchanged, v2 adds the line from
+   * CLAUDE.md §11b. Read through `getUiVersion()`, the same helper `src/proxy.ts`
+   * gates the rewrite on, in a SERVER component so it resolves at request time
+   * and cannot disagree with the router.
    */
-  const showOfflineBanner = getUiVersion() !== 'v2'
+  const offlineNote = getUiVersion() === 'v2' ? V2_OFFLINE_NOTE : undefined
 
   return (
     // suppressHydrationWarning: the Android WebView injects a style
@@ -159,7 +159,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
               native init calls Capacitor core's notifyListeners(..., true),
               which throws in Capacitor 8 and blanks the WebView. Restore once
               the core/capgo versions align. */}
-          {showOfflineBanner ? <OfflineBanner /> : null}
+          {<OfflineBanner offlineNote={offlineNote} />}
           {/* MotionProvider renders no DOM — it supplies the LazyMotion and
               MotionConfig context (OS reduced-motion, the house easing) and
               code-splits the feature bundle off the initial route. It wraps

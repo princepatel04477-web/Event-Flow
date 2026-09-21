@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient, type QueryKey } from '@tanstack/react-query'
 
 import { useOnline } from '@/lib/useOnline'
-import { offerUndo } from './undo-store'
+import { offerUndo, reportFailedWrite } from './undo-store'
 import { stageOptimisticWrite, type ActionResult, type WriteOutcome } from './optimistic'
 import { queuedWriteCount, flushWriteQueue, queueWrite, registerWriteReplay } from './write-queue'
 
@@ -115,6 +115,19 @@ export function useOptimisticAction<TData, TVars, TResult>(
   useEffect(() => {
     onlineRef.current = online
   })
+
+  // A write can be in flight, or waiting out its undo window, when the screen
+  // that armed it unmounts. `report` below writes to this component's state, and
+  // a message written to an unmounted component is rendered by nobody — which
+  // made a server refusal silent. The module store can still be seen, so the
+  // failure is routed there when this is no longer mounted. See `undo-store.ts`.
+  const mountedRef = useRef(true)
+  useEffect(
+    () => () => {
+      mountedRef.current = false
+    },
+    [],
+  )
 
   useEffect(() => {
     // Depends on the KIND (a string), not the options object: callers pass an
@@ -256,6 +269,12 @@ export function useOptimisticAction<TData, TVars, TResult>(
         }
         setSyncState('failed')
         setLastError(outcome.message)
+
+        // ...and if this screen is already gone, the two lines above reached
+        // nobody. The write was committed on the user's behalf by a timer they
+        // armed and walked away from, so its refusal has to be visible somewhere
+        // that still exists. UndoBar renders this.
+        if (!mountedRef.current) reportFailedWrite(outcome.message)
       }
 
       const { queryKey, apply, action, reconcile, callSite, message, undo, deferUntilCommit } = o

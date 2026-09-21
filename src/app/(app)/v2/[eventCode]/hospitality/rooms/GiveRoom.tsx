@@ -30,6 +30,16 @@ export interface GiveRoomProps {
    * the page already has it — passing it is cheaper than a hook per link.
    */
   eventCode: string
+  /**
+   * Whether this viewer's department may open the call list.
+   *
+   * Answered by the page's guard, not guessed here. `hospitality` is not in
+   * `DEPARTMENT_SECTIONS.rsvp`, so for the runner this screen is built for the
+   * link would bounce off `rsvp/queue`'s own guard and land back here with a
+   * `?denied=section` marker nothing renders — the empty state's only control,
+   * doing nothing. Offered only when the guard would let them in.
+   */
+  canOpenCallList: boolean
 }
 
 type GridData = Awaited<ReturnType<typeof readRoomsGrid>>
@@ -56,7 +66,7 @@ type NeedingFamily = GridData['underBedded'][number]
  * so the two screens share one entry rather than holding two copies of the room
  * register that can disagree.
  */
-export function GiveRoom({ eventId, eventCode }: GiveRoomProps) {
+export function GiveRoom({ eventId, eventCode, canOpenCallList }: GiveRoomProps) {
   const [pickerFor, setPickerFor] = useState<NeedingFamily | null>(null)
   const [hotel, setHotel] = useState<string | null>(null)
 
@@ -241,10 +251,15 @@ export function GiveRoom({ eventId, eventCode }: GiveRoomProps) {
           description="No confirmed family is waiting for one. This fills in as the calling team confirms families."
           action={
             // The screen that feeds this one: a family appears here after it is
-            // confirmed on a call.
-            <LinkButton href={`/${eventCode}/rsvp/queue`} variant="secondary" fullWidth>
-              Go to the call list
-            </LinkButton>
+            // confirmed on a call. Offered ONLY to a viewer the call list's own
+            // guard would admit — for a Rooms runner that link bounced straight
+            // back to this page, silently, and this empty state is where they
+            // land every time they clear their queue.
+            canOpenCallList ? (
+              <LinkButton href={`/${eventCode}/rsvp/queue`} variant="secondary" fullWidth>
+                Go to the call list
+              </LinkButton>
+            ) : null
           }
         />
       ) : (

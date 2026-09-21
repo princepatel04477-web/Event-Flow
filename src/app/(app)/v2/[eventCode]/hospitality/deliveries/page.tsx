@@ -22,9 +22,14 @@ type PageProps = {
  */
 export default async function HampersPage({ params }: PageProps) {
   const { eventCode } = await params
-  const { event, canGenerate } = await requireHamperScreen(eventCode)
+  const { event, canGenerate, canOpenGuestList } = await requireHamperScreen(eventCode)
 
   return (
-    <HamperRun eventId={event.id} eventCode={event.code} canGenerate={canGenerate} />
+    <HamperRun
+      eventId={event.id}
+      eventCode={event.code}
+      canGenerate={canGenerate}
+      canOpenGuestList={canOpenGuestList}
+    />
   )
 }

@@ -33,6 +33,15 @@ export interface HamperRunProps {
   eventCode: string
   /** Admin only — the one control that creates `deliverables` rows. */
   canGenerate: boolean
+  /**
+   * Whether this viewer's department may open the guest list.
+   *
+   * Answered by the guard, not guessed here: `hamper` and `hospitality` are both
+   * outside `DEPARTMENT_SECTIONS.guests`, so the link this gates would bounce
+   * them into `requireSection`'s redirect and back with a `?denied=section`
+   * marker that nothing renders — a button that looks dead. R1 found it.
+   */
+  canOpenGuestList: boolean
 }
 
 /**
@@ -50,7 +59,7 @@ export interface HamperRunProps {
  * list is only the families still owed something, in walking order, and the two
  * filter sets are behind one control.
  */
-export function HamperRun({ eventId, eventCode, canGenerate }: HamperRunProps) {
+export function HamperRun({ eventId, eventCode, canGenerate, canOpenGuestList }: HamperRunProps) {
   const [hotel, setHotel] = useState<string | null>(null)
   const [kind, setKind] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -190,16 +199,23 @@ export function HamperRun({ eventId, eventCode, canGenerate }: HamperRunProps) {
               <Button variant="secondary" fullWidth onClick={() => void handleGenerate()}>
                 {generating ? 'Creating…' : 'Create them now'}
               </Button>
-            ) : (
+            ) : canOpenGuestList ? (
               // A hamper runner cannot create them; the useful next step is the
               // screen that says whether the guest list they come from is real
               // yet, so the instruction to "ask your admin" has a destination.
+              // Offered only to a department the guards would actually let in.
               <Link
                 href={`/${eventCode}/guests/list`}
                 className="tap flex min-h-12 items-center justify-center rounded-xl border border-rule-strong bg-surface px-3 text-center text-base font-medium text-ink active:bg-surface-2"
               >
                 Open the guest list
               </Link>
+            ) : (
+              // No control for anyone else. R3's dead end is a button that does
+              // nothing, not the absence of a button — the description above
+              // already says who to ask, and this runner's department cannot
+              // open the guest list at all.
+              null
             )
           }
         />

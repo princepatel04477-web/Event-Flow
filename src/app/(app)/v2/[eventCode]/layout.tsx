@@ -1,7 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
-import { OfflineBanner } from '@/components/native/OfflineBanner'
 import { UndoBar } from '@/components/ui/UndoBar'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
@@ -13,27 +12,9 @@ import { AppHeader } from './_components/AppHeader'
 import { AppTabs } from './_components/AppTabs'
 import { FirstRunCards } from './_components/FirstRunCards'
 
-/**
- * The training line from CLAUDE.md §11b, in the words that section quotes.
- *
- * IT IS PASSED IN, NOT DERIVED INSIDE THE BANNER, and that is the whole reason
- * this constant lives here. `src/components/native/OfflineBanner.tsx` is shared
- * with the live v1 app, whose rendered output must not change; the component
- * takes an optional `offlineNote` and v1 passes nothing. Reading
- * `NEXT_PUBLIC_UI` inside the banner would have been the tempting shortcut and
- * the wrong one: the value is INLINED AT BUILD TIME in a client bundle while
- * the proxy reads it at RUNTIME, so a build with the flag unset could ship a
- * banner that believes it is v1 while the server routes as v2 — a disagreement
- * invisible until someone deploys with the two out of step. A server component
- * reading it at request time cannot disagree with the proxy that chose the
- * route, and this layout is that server component.
- *
- * The words are not paraphrased. A runner who reloads during a Wi-Fi drop lands
- * on `offline.html` with nothing behind it, and "don't reload and don't press
- * back" is the single instruction that prevents it.
- */
-const OFFLINE_NOTE =
-  "If the app stops responding, don't reload and don't press back. Wait. Whatever is on your screen still works, and anything you already saved will send itself when the signal comes back."
+/* The offline training line that used to live here as a constant now lives in
+   `src/lib/offline-note.ts`, because the banner that renders it is mounted by
+   the ROOT layout rather than by this shell. See that file for why. */
 
 type LayoutProps = {
   children: ReactNode
@@ -122,10 +103,12 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
       data-theme={access === 'client' ? 'client' : undefined}
       className="flex min-h-dvh flex-col bg-paper text-ink"
     >
-      {/* Offline is a state, not an error (T7) — and on this surface it carries
-          one extra sentence, because the reload instinct is the single action
-          that makes a drop worse. See OFFLINE_NOTE above. */}
-      <OfflineBanner offlineNote={OFFLINE_NOTE} />
+      {/* NO OFFLINE BANNER HERE, DELIBERATELY. The root layout renders it, once,
+          on every route — this shell used to render a second one and the root
+          layout skipped its own under v2, which cost `/login`, `/pick-staff` and
+          `/admin/**` their banner. The extra sentence this surface wants is
+          passed to that banner from the root layout; see `src/lib/offline-note.ts`
+          and the comment there. */}
 
       <AppHeader
         event={{ name: event.name, code: event.code }}
