@@ -5,6 +5,7 @@ import { useSyncExternalStore } from 'react'
 import { Button } from '@/components/ui/Button'
 import {
   commitPendingUndo,
+  extendPendingUndo,
   getUndoServerSnapshot,
   getUndoSnapshot,
   subscribeUndo,
@@ -39,40 +40,53 @@ import {
 export function UndoBar() {
   const pending = useSyncExternalStore(subscribeUndo, getUndoSnapshot, getUndoServerSnapshot)
 
-  if (!pending) return null
-
   return (
+    // THE LIVE REGION IS PERSISTENT, and that is the point. Rendering it only
+    // when something is pending inserts a region that already contains its text,
+    // which screen readers commonly do not announce — the reliable pattern is a
+    // region that is present and whose CONTENT changes.
     <div
       className="fixed inset-x-0 bottom-nav z-50 px-safe"
       role="status"
       aria-live="polite"
     >
-      <div className="mx-auto w-full max-w-[480px] px-4 pb-2">
-        <div className="flex items-center gap-2 rounded-xl border border-rule-strong bg-surface py-1.5 pl-4 pr-1.5 shadow-e3">
-          {/* The message area is itself the "keep it" control: tapping the bar
-              dismisses it and lets the write stand, which is the non-destructive
-              of the two choices and therefore the one that gets the bigger
-              target. */}
-          <button
-            type="button"
-            onClick={commitPendingUndo}
-            className="tap min-h-11 min-w-0 flex-1 text-left"
-            aria-label={`Keep: ${pending.message}`}
+      {pending ? (
+        <div className="mx-auto w-full max-w-[480px] px-4 pb-2">
+          <div
+            className="flex items-center gap-2 rounded-xl border border-rule-strong bg-surface py-1.5 pl-4 pr-1.5 shadow-e3"
+            // Hold the window open while the user is actually dealing with it.
+            // Without this the offer can expire mid-interaction, and for a screen
+            // reader user the seven seconds are spent before they reach it
+            // (WCAG 2.2.1).
+            onPointerEnter={extendPendingUndo}
+            onPointerDown={extendPendingUndo}
+            onFocus={extendPendingUndo}
           >
-            <span className="block truncate text-sm font-medium text-ink">
-              {pending.message}
-            </span>
-          </button>
-          <Button
-            size="md"
-            variant="secondary"
-            onClick={undoPendingUndo}
-            className="shrink-0"
-          >
-            Undo
-          </Button>
+            {/* The message area is itself the "keep it" control: tapping the bar
+                dismisses it and lets the write stand, which is the non-destructive
+                of the two choices and therefore the one that gets the bigger
+                target. */}
+            <button
+              type="button"
+              onClick={commitPendingUndo}
+              className="tap min-h-11 min-w-0 flex-1 text-left"
+              aria-label={`Keep: ${pending.message}`}
+            >
+              <span className="block truncate text-sm font-medium text-ink">
+                {pending.message}
+              </span>
+            </button>
+            <Button
+              size="md"
+              variant="secondary"
+              onClick={undoPendingUndo}
+              className="shrink-0"
+            >
+              Undo
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }

@@ -186,6 +186,16 @@ export async function stageOptimisticWrite<TData, TVars, TResult>(
 
   return {
     revert: () => {
+      // REFUSE once the write has been sent. The server has already been told to
+      // change this, so putting the pre-tap value back would leave the screen
+      // asserting something that is no longer true, with nothing to correct it —
+      // reversing the write is the server's job now, not the cache's.
+      //
+      // Not reachable through today's hook (the undo store clears the entry
+      // before running either callback, so a staged write can only commit or
+      // undo, never both), but the guard costs nothing and the bug it prevents
+      // is silent.
+      if (sent) return
       queryClient.setQueryData<TData>(queryKey, previous)
     },
     send: async () => {

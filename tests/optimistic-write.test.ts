@@ -6,6 +6,7 @@ import {
   UNDO_WINDOW_MS,
   __resetUndoStoreForTests,
   commitPendingUndo,
+  extendPendingUndo,
   getUndoSnapshot,
   offerUndo,
   undoPendingUndo,
@@ -288,6 +289,28 @@ describe('undo store', () => {
     // useSyncExternalStore re-renders on identity change, so a fresh object here
     // would loop forever.
     expect(a).toBe(b)
+  })
+
+  it('EXTENDS the window on interaction, so it cannot expire while in use', () => {
+    const commit = vi.fn()
+    offerUndo({ message: 'x', commit, undo: vi.fn() })
+
+    // Six seconds in — most of the way through — the user reaches for it.
+    vi.advanceTimersByTime(UNDO_WINDOW_MS - 1_000)
+    extendPendingUndo()
+
+    // Another six seconds: without the extension this would have committed.
+    vi.advanceTimersByTime(UNDO_WINDOW_MS - 1_000)
+    expect(commit).not.toHaveBeenCalled()
+
+    // Past the extended window it commits as normal.
+    vi.advanceTimersByTime(2_000)
+    expect(commit).toHaveBeenCalledTimes(1)
+  })
+
+  it('extending when nothing is pending is a no-op, not a throw', () => {
+    expect(() => extendPendingUndo()).not.toThrow()
+    expect(getUndoSnapshot()).toBeNull()
   })
 })
 

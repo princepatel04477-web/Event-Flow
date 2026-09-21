@@ -113,6 +113,25 @@ export function offerUndo(entry: Omit<PendingUndo, 'id'>): void {
 }
 
 /**
+ * Push the auto-commit back by another full window.
+ *
+ * WCAG 2.2.1 (Timing Adjustable): a control that disappears on a timer has to be
+ * extendable. Seven seconds is long enough for someone already looking at the
+ * screen and nowhere near long enough for someone using a screen reader, who has
+ * to hear the announcement and then travel to the control before it can be used.
+ * Extending on focus and on pointer contact means the window cannot expire while
+ * the user is actually interacting with it — which is the honest reading of "the
+ * user can extend the limit".
+ */
+export function extendPendingUndo(): void {
+  if (!current) return
+  clearTimer()
+  timer = setTimeout(() => {
+    commitPendingUndo()
+  }, UNDO_WINDOW_MS)
+}
+
+/**
  * Test-only reset. Vitest runs many cases in one process and the module store
  * would otherwise leak a pending undo (and its timer) between them.
  */
