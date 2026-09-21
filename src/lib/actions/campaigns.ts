@@ -122,7 +122,22 @@ export async function ensureCampaigns(
     }
   }
 
-  revalidatePath(`/${eventCode}/rsvp/campaigns`)
+  // There used to be a `revalidatePath(`/${eventCode}/rsvp/campaigns`)` here.
+  // It is gone on purpose, and it is not a tidy-up: this function has exactly
+  // one caller, `(staff)/[eventCode]/rsvp/campaigns/page.tsx`, which calls it
+  // during a server render — and since Next 16 `revalidatePath` during a render
+  // is unsupported. It does not warn, it throws, and the whole screen is
+  // replaced by the error boundary. Measured: "Route /[eventCode]/rsvp/campaigns
+  // used `revalidatePath` during render which is unsupported", on v1 as well as
+  // v2, because the flag has nothing to do with it. It matters more than one
+  // screen: `departmentHomePath('management')` is this path, so every event lead
+  // landed on a dead app.
+  //
+  // Nothing replaces it, and nothing needs to. The only write above is the
+  // insert of the default rows when the event has none, and the reads that
+  // follow it are part of the same render — so the page already shows the rows
+  // it just created. The two `revalidatePath` calls that remain in this file are
+  // in server-action bodies, where revalidating is both legal and wanted.
   return campaigns.map((c) => {
     const n = counts.get(c.id) ?? { pending: 0, completed: 0, total: 0 }
     return {
