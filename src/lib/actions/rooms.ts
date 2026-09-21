@@ -1,7 +1,12 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { friendlyDbError } from '@/lib/errors'
+import {
+  friendlyDbError,
+  roomGuardCause,
+  roomGuardMessage,
+  type RoomGuardCause,
+} from '@/lib/errors'
 import { suggestRooms } from '@/lib/allocate/suggest'
 
 /** Per-phase timing for server actions (instrument-first). */
@@ -825,7 +830,21 @@ export async function addGuestMember(
 
 export type MoveGuestsResult =
   | { ok: true; count: number }
-  | { ok: false; error: string; code: 'capacity' | 'other'; roomId?: string; roomNumber?: string }
+  | {
+      ok: false
+      error: string
+      code: 'capacity' | 'other'
+      roomId?: string
+      roomNumber?: string
+      /**
+       * Which room-guard refusal this was, when the guard raised the 23514: a
+       * full room (`capacity`), an overlapping stay (`overlap`), or reversed
+       * dates (`date_order`). `null`/absent when the failure came from anywhere
+       * else — same additive shape as `AssignGroupResult.cause`, so the two room
+       * write paths answer the "which 23514?" question the same way.
+       */
+      cause?: RoomGuardCause | null
+    }
 
 /**
  * Move several occupants to one room in a SINGLE statement.
@@ -871,12 +890,21 @@ export async function moveGuestsToRoom(
         .select('room_number')
         .eq('id', targetRoomId)
         .maybeSingle()
+      // WHICH 23514, read off the trigger's own message. `capacity` keeps this
+      // path's message and its `code` verbatim — the override sheet keys on
+      // that — while an overlapping stay and a reversed date range get their
+      // own sentence, because neither is forceable and telling a runner the
+      // room is "at capacity" for a date collision sends them to the wrong fix.
+      const cause = roomGuardCause(error)
       return {
         ok: false,
-        error: `Room ${room?.room_number ?? targetRoomId} is at capacity. Nothing was moved.`,
+        error:
+          roomGuardMessage(cause, { roomNumber: room?.room_number }) ??
+          `Room ${room?.room_number ?? targetRoomId} is at capacity. Nothing was moved.`,
         code: 'capacity',
         roomId: targetRoomId,
         roomNumber: room?.room_number ?? '',
+        cause,
       }
     }
     return { ok: false, error: friendlyDbError(error), code: 'other' }
@@ -992,7 +1020,25 @@ export async function assignGuestToRoom(
 
 export type AssignGroupResult =
   | { ok: true; assigned: number }
-  | { ok: false; error: string; code?: string; roomId?: string; roomNumber?: string }
+  | {
+      ok: false
+      error: string
+      code?: string
+      roomId?: string
+      roomNumber?: string
+      /**
+       * WHICH 23514 this was, when the room guard raised it.
+       *
+       * `code: 'capacity'` is the override path's signal and stays exactly as it
+       * was: the room being full is the only cause a written reason can bypass.
+       * But the merged guard raises the same SQLSTATE for an overlapping stay and
+       * for a reversed date range, and neither of those can be forced through —
+       * so a screen that only knows "23514" ends up offering an override that
+       * cannot work. This field is added, and nothing else about this action
+       * changes, so the existing callers read the same union they always did.
+       */
+      cause?: RoomGuardCause | null
+    }
 
 /**
  * Assign all unplaced guests of a family to the chosen room — the confirm
@@ -1051,6 +1097,10 @@ export async function assignGroupToRoom(
         code: 'capacity',
         roomId,
         roomNumber: room?.room_number ?? '',
+        // Read from the trigger's own message, not guessed. `null` when the
+        // failure is a 23514 this classifier does not recognise, which callers
+        // treat as "not the capacity case".
+        cause: roomGuardCause(error),
       }
     }
     return { ok: false, error: friendlyDbError(error), code: 'other' }

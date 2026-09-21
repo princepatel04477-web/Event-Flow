@@ -19,6 +19,7 @@ import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { Input } from '@/components/ui/Input'
+import { ListRow } from '@/components/ui/ListRow'
 import { LoadingRows } from '@/components/ui/LoadingRows'
 import { PageTitle } from '@/components/ui/PageTitle'
 import { StatusPill } from '@/components/ui/StatusPill'
@@ -32,6 +33,7 @@ import {
   type StoredCallAttempt,
 } from '@/lib/call/session'
 import { MAX_PLAUSIBLE_CALL_SEC, type CallOutcome, type GuestGroupRow } from '@/lib/call/types'
+import { lockNote, useStaffNames } from '@/lib/lock'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { dialTarget, placeCall } from '@/lib/native-call'
 import { traceFetch } from '@/lib/perf'
@@ -47,7 +49,7 @@ import {
 import { captureDiagnostic } from '@/lib/sentry'
 import { createClient } from '@/lib/supabase/client'
 import { statusTone } from '@/lib/status'
-import { formatDateTime } from '@/lib/utils'
+import { cn, formatDateTime } from '@/lib/utils'
 
 type QueueRow = {
   group_id: string | null
@@ -59,6 +61,18 @@ type QueueRow = {
   rsvp_status: string | null
   priority: number | null
   is_locked: boolean | null
+  /**
+   * WHO holds the 15-minute caller lock — the team member's id.
+   *
+   * CLAUDE.md §5.9: a team session claims through the `_staff` sibling, so the
+   * view's `locked_by` (an auth uid) is the admin case and `locked_by_staff` is
+   * the one a runner's phone writes. The NAME is not on this row and cannot be
+   * joined onto a view from PostgREST; `useStaffNames` resolves it from
+   * `staff_members` for the event. See `src/lib/lock.ts` for why that is a
+   * second read rather than a migration.
+   */
+  locked_by_staff: string | null
+  locked_until: string | null
   attempt_count: number | null
   last_outcome: string | null
   next_callback_at: string | null
@@ -307,6 +321,17 @@ const SIDES: { value: Side | null; label: string }[] = [
 const QUEUE_OFFSET_KEY = 'eventflow:queue:offset'
 
 /**
+ * How many families the register under the card shows before it stops.
+ *
+ * One screenful on a 360px handset. The screen's job is the card; this list is
+ * there so a frozen row is visible without walking into it, and a register that
+ * scrolls past a hundred names would put the work a long way above the fold.
+ * The remainder is counted and the runner is pointed at the filter, which is the
+ * control that actually narrows the list.
+ */
+const FAMILY_LIST_LIMIT = 12
+
+/**
  * A per-phone starting point in the list.
  *
  * THE PROBLEM THIS SOLVES IS NEW TO THIS SCREEN, and it is the reason the v1
@@ -406,8 +431,64 @@ export function CallNext({ eventId, eventCode }: CallNextProps) {
 
   const family = (rawFamily ?? null) as FamilyRow | null
 
+  // ------------------------------------------------------------------
+  // The caller lock (CLAUDE.md §11b, V10 Part C)
+  // ------------------------------------------------------------------
+
+  /**
+   * The event's staff names, so a locked family can name its holder.
+   *
+   * `v_rsvp_queue` carries `locked_by_staff` — an id — and no name, and there is
+   * no read that joins one onto a view. This is the one extra query the lock
+   * costs, and it is per EVENT, not per locked family: the same map answers
+   * every row on the screen. `src/lib/lock.ts` records why a migration was not
+   * the answer here.
+   */
+  const staffNames = useStaffNames(eventId)
+
+  /**
+   * The lock on the family currently on screen, as a sentence.
+   *
+   * THE WRITE IS NOT BLOCKED BY THIS, and the copy says so rather than implying
+   * otherwise. CLAUDE.md §6: the lock is claimed and released on the RSVP STATUS
+   * screen only; the call screen neither claims nor releases. So a runner may
+   * still dial a locked family — what the lock means is that somebody else is
+   * already logging this family, so an outcome logged here will be the second
+   * one.
+   */
+  const currentLock = useMemo(
+    () =>
+      current
+        ? lockNote(
+            {
+              isLocked: current.is_locked,
+              lockedUntil: current.locked_until,
+              lockedByStaff: current.locked_by_staff,
+            },
+            staffNames,
+          )
+        : null,
+    [current, staffNames],
+  )
+
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
   const stale = isFetching && rows !== null
+
+  /**
+   * How many families in the list on screen are open on another phone.
+   *
+   * Straight off the view's own `is_locked`, counted here rather than fetched:
+   * the rows are already in hand, so this is a filter over an array, not a
+   * round trip. `filters.hideLocked` can empty this to zero by removing the
+   * locked families from the query entirely — which is why the count is
+   * derived from what is actually on screen rather than from a query of its
+   * own. It reads "0" when the runner has chosen to skip them, and that is the
+   * truth about the list they are looking at.
+   */
+  const lockedAhead = useMemo(
+    () => callable.filter((r) => r.is_locked === true).length,
+    [callable],
+  )
 
   // ------------------------------------------------------------------
   // The write
@@ -697,6 +778,7 @@ export function CallNext({ eventId, eventCode }: CallNextProps) {
           <FamilyCard
             row={current}
             dialling={diallingGroupId === current.group_id}
+            lock={currentLock}
             onCall={() => void handleCall(current)}
           />
 
@@ -744,6 +826,52 @@ export function CallNext({ eventId, eventCode }: CallNextProps) {
                 ))}
               </div>
             )}
+
+            {/* ------------------------------------------------------------------
+                THESE BUTTONS HAVE NO UNDO, AND THE SCREEN SAYS SO FIRST
+                ------------------------------------------------------------------
+
+                docs/UX-RULES.md R5 is "undo, do not confirm", and the reason it
+                is safe to have no dialog here is that this is the case R5
+                exempts — but the exemption only holds if the screen says which
+                case it is. It did not, so a runner's honest expectation was that
+                a wrong tap could be taken back. It cannot:
+
+                  - `app.guard_call_attempt()` (CLAUDE.md §5.4) stamps
+                    `finalized_at` the instant `outcome` goes non-null and
+                    force-restores the identity columns on every later update, so
+                    THAT call record is frozen for good;
+                  - DELETE on `call_attempts` is blocked by trigger and revoked
+                    grant, so the row cannot be tidied away either — not by an
+                    admin, not by the service role (CLAUDE.md §12's list of
+                    un-correctable writes).
+
+                WHY NOT THE OTHER OPTION — deferring the write behind a
+                7-second window so Undo means "nothing was sent". It was
+                considered and rejected for this write, and the ground is in
+                `src/lib/mutate/optimistic.ts`: deferral's cost is that a write
+                the app dies on before the window closes never happens, and it is
+                chosen per write and never by default. This write is exactly the
+                one where that cost is unacceptable — it is the record that a
+                phone call was made, `tel:` backgrounds the WebView on every
+                dial, and Android may discard the page while the dialler is open
+                (CLAUDE.md §12). A window in which the call is not yet recorded is
+                a window in which a killed app loses the call entirely, which is
+                strictly worse than an outcome that cannot be edited. Add that
+                the RSVP half is overwritable and the call half is not, so a
+                deferred or reversed write would leave the two records
+                disagreeing about the same phone call.
+
+                A NOTE, NOT A DIALOG. It is visible before the tap rather than
+                after it, it does not block anything (T3), and it is one sentence
+                for all five outcomes because the freeze is identical for all
+                five — confirming, declining and "no answer" all write
+                `outcome`. */}
+            <p className="rounded-xl border border-rule bg-surface-2 px-3.5 py-2.5 text-sm leading-snug text-muted">
+              These are written the moment you tap them, and the call record cannot be
+              changed or deleted afterwards. The family&rsquo;s own answer can be
+              overwritten by calling them again.
+            </p>
           </section>
 
           {dialError ? (
@@ -754,6 +882,55 @@ export function CallNext({ eventId, eventCode }: CallNextProps) {
               {dialError}
             </p>
           ) : null}
+
+          {/* ------------------------------------------------------------------
+              The family list, with a locked row marked as locked
+              ------------------------------------------------------------------
+
+              WHY THE LIST IS HERE AT ALL, on a screen whose whole design is one
+              family at a time. CLAUDE.md §11b: "no admin UI lists locked
+              families, so discovery is one family at a time, by walking into
+              it", and the queue's presence label is presence, not lock state.
+              Marking the family on screen only fixes discovery for the family
+              already on screen — the runner who is sixteen rows above the
+              frozen one still walks into it.
+
+              A READ-ONLY REGISTER, not a second way to call. Rows carry no
+              press target: the card above is where calls are placed, and a
+              tappable row would make this list a second caller of the same
+              writes. The list is windowed to one screenful so it cannot become
+              a 238-row scroll under the work. */}
+          <section className="flex flex-col gap-2.5" aria-labelledby="family-list-heading">
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 id="family-list-heading" className="eyebrow">
+                In this list
+              </h3>
+              {lockedAhead > 0 ? (
+                <span className="text-xs text-muted">
+                  {lockedAhead === 1
+                    ? '1 family is open on another phone'
+                    : `${lockedAhead} families are open on another phone`}
+                </span>
+              ) : null}
+            </div>
+
+            <ul className="flex flex-col gap-2">
+              {callable.slice(0, FAMILY_LIST_LIMIT).map((row) => (
+                <FamilyLine
+                  key={row.group_id}
+                  row={row}
+                  isCurrent={row.group_id === currentId}
+                />
+              ))}
+            </ul>
+
+            {callable.length > FAMILY_LIST_LIMIT ? (
+              <p className="text-center text-xs text-muted">
+                {callable.length - FAMILY_LIST_LIMIT} more in this list. Narrow it with
+                “{preset.label}”.
+              </p>
+            ) : null}
+          </section>
         </>
       )}
 
@@ -906,10 +1083,12 @@ export function CallNext({ eventId, eventCode }: CallNextProps) {
 function FamilyCard({
   row,
   dialling,
+  lock,
   onCall,
 }: {
   row: QueueRow
   dialling: boolean
+  lock: ReturnType<typeof lockNote>
   onCall: () => void
 }) {
   const name = displayName(row)
@@ -918,7 +1097,6 @@ function FamilyCard({
   const status = row.rsvp_status ?? 'not_started'
   const attempts = row.attempt_count ?? 0
   const callback = row.next_callback_at
-  const locked = row.is_locked === true
   const canDial = dialTarget(mobile) !== null
 
   return (
@@ -958,9 +1136,25 @@ function FamilyCard({
         </p>
       ) : null}
 
-      {locked ? (
-        <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-muted">
-          Another caller has this family open.
+      {/* THE CALLER LOCK, NAMED AND TIMED (CLAUDE.md §11b, V10 Part C).
+          What this replaced said "Another caller has this family open" — no
+          name, no time, and nothing a runner could act on. §11b's whole point
+          is that discovery of a stuck lock is "one family at a time, by walking
+          into it", and the fix it does not have is a manual override: the only
+          recovery IS the expiry. So the expiry is what gets shown, to the
+          minute, and the holder is named when the id resolves to a person.
+          The line is rendered ONLY while the lock still stands — a stale
+          `is_locked` from a queue the phone cached a minute ago reads as a past
+          event with an instruction, not as a live lock. */}
+      {lock ? (
+        <p
+          className={cn(
+            'flex items-start gap-2 rounded-lg px-3 py-2 text-sm leading-snug',
+            lock.locked ? 'bg-brand-tint text-ink' : 'bg-surface-2 text-muted',
+          )}
+        >
+          <ClockIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden />
+          <span>{lock.sentence}</span>
         </p>
       ) : null}
 
@@ -971,7 +1165,12 @@ function FamilyCard({
         leadingIcon={<PhoneIcon className="h-5 w-5" aria-hidden />}
         onClick={onCall}
       >
-        {dialling ? 'Logging the call…' : `Call ${firstName(name)}`}
+        {/* The dial is NOT blocked by the lock, and the label says so plainly
+            rather than leaving the runner to wonder (§6: only the RSVP status
+            screen claims and releases). */}
+        {dialling
+          ? 'Logging the call…'
+          : `Call ${firstName(name)}${lock?.locked ? ' anyway' : ''}`}
       </Button>
       {!canDial ? (
         <p className="-mt-1.5 text-sm text-muted">
@@ -979,6 +1178,52 @@ function FamilyCard({
         </p>
       ) : null}
     </section>
+  )
+}
+
+/**
+ * One family in the register under the card.
+ *
+ * A LOCKED ROW MUST NOT LOOK NORMAL (V10 Part C). The marker is a `StatusPill`
+ * on the tone the vocabulary reserves for a lock — `active`, "in hand, in
+ * progress" (`src/lib/status.ts`) — and the lock state is ALSO in the meta line,
+ * because `ListRow`'s own rule is that a row carries at most one pill and
+ * secondary facts belong in the meta. The pill is what the eye catches running
+ * down the column; the words are what a colour-blind reader gets.
+ *
+ * Deliberately NOT the presence label. CLAUDE.md §11b: "the queue row's presence
+ * label ('Ravi, 2 min ago') is presence, not lock state — a frozen family looks
+ * normal in the queue." `last_opened_at` is on the row and is not read here.
+ *
+ * The row is not pressable: the card above is the only place a call is placed
+ * from, so this cannot become a second route into the same writes.
+ */
+function FamilyLine({ row, isCurrent }: { row: QueueRow; isCurrent: boolean }) {
+  const name = displayName(row)
+  const guests = row.confirmed_pax ?? row.expected_pax ?? 0
+  const locked = row.is_locked === true
+
+  return (
+    <li
+      className={cn(
+        'rounded-xl border bg-surface',
+        locked ? 'border-brand/35' : 'border-rule',
+        isCurrent && 'border-l-[3px] border-l-ink',
+      )}
+    >
+      <ListRow
+        identifier={name}
+        meta={[
+          guests > 0 ? `${guests} ${guests === 1 ? 'guest' : 'guests'}` : 'Guests not recorded',
+          rsvpStatusLabel(row.rsvp_status ?? 'not_started'),
+          locked ? 'Open on another phone' : null,
+          isCurrent ? 'On screen now' : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+        right={locked ? <StatusPill tone="active">In progress</StatusPill> : undefined}
+      />
+    </li>
   )
 }
 

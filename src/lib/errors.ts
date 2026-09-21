@@ -65,6 +65,107 @@ export function isFrozenRowError(error: MaybePostgrestError): boolean {
 }
 
 /**
+ * WHICH room-guard refusal is this?
+ *
+ * `23514` is not one failure. `app.guard_room_assignment()` (formerly the two
+ * halves `app.guard_room_capacity` and `app.guard_room_overlap`) raises it for
+ * three different reasons, and the screen's correct next action is different
+ * for each:
+ *
+ *   - `capacity`   — the room is at its extra-bed ceiling. Legitimately
+ *                    bypassable with a written reason (`is_override`), so this
+ *                    is the ONE cause that may offer the override sheet.
+ *   - `overlap`    — that room already holds an active stay whose dates overlap.
+ *                    No override exists: the `23514` is raised unconditionally.
+ *                    Offering "add anyway" here is the same class of wrong as
+ *                    offering it for a swap — it is a control that cannot work.
+ *   - `date_order` — check-out before check-in. A typo in the dates, and the
+ *                    fix is the dates, not the room.
+ *
+ * THE TRIGGER'S OWN WORDING IS THE ONLY RELIABLE DISCRIMINATOR, so that is what
+ * this reads — same approach as `isFrozenRowError` above, and for the same
+ * reason. The three messages are distinct in
+ * `20260816150000_room_guard_row_lock.sql`: "is at max capacity (max %…)", "is
+ * already booked for an overlapping stay.", "check-out % is before check-in %".
+ * Everything else — including any future message the trigger learns to raise —
+ * is `unknown`, which callers render as the generic refusal it is.
+ *
+ * `overlapOrCapacity` exists because the FIRST two causes are the ones a room
+ * screen has to tell apart and the third (a date typo) reads as neither. A
+ * caller that only has copy for capacity-versus-everything-else should not have
+ * to know that `date_order` exists.
+ *
+ * Returns `null` when the error is not a room-guard `23514` at all, so a caller
+ * can leave every other failure to `friendlyDbError`.
+ */
+export type RoomGuardCause = 'capacity' | 'overlap' | 'date_order'
+
+export function roomGuardCause(error: MaybePostgrestError): RoomGuardCause | null {
+  if (error?.code !== '23514') return null
+  const m = text(error)
+  if (m.includes('at max capacity')) return 'capacity'
+  if (m.includes('overlapping stay')) return 'overlap'
+  if (m.includes('is before check-in')) return 'date_order'
+  return null
+}
+
+/**
+ * The same answer, folded for a caller that only needs the pair that changes
+ * what it does: the room is full (offer the override), or it is not (do not).
+ *
+ * `date_order` folds into `'other'` deliberately. It is not an over-capacity
+ * state, so it must never reach the override path — which is exactly the bug
+ * this distinction exists to close, for the second cause as well as the first.
+ */
+export function roomGuardCausePair(
+  error: MaybePostgrestError,
+): 'capacity' | 'other' | null {
+  const cause = roomGuardCause(error)
+  if (cause === null) return null
+  return cause === 'capacity' ? 'capacity' : 'other'
+}
+
+/**
+ * What to say when a room refused the write, per cause — for callers that
+ * render their own copy (the v2 `GiveRoom` screen) rather than the legacy
+ * "Add anyway?" prompt.
+ *
+ * WHY THE COPY IS HERE AND NOT IN THE SCREEN. The three sentences have to stay
+ * consistent with `roomGuardCause`'s three branches; two lists that can drift
+ * apart is how a screen ends up offering an override for an overlap again. One
+ * place, keyed by the same union, and the compiler keeps them in step.
+ */
+export function roomGuardCopy(
+  cause: RoomGuardCause,
+  where: { roomNumber?: string | null } = {},
+): string {
+  const room = where.roomNumber ? `Room ${where.roomNumber}` : 'That room'
+  switch (cause) {
+    case 'capacity':
+      return `${room} has no bed left for these guests. Choose another room, or add a written reason to put them in anyway.`
+    case 'overlap':
+      return `${room} is already booked for another family on overlapping dates. Pick a different room, or change the dates — there is no way to force this one through.`
+    case 'date_order':
+      return 'The check-out date is before the check-in date. Fix the dates and try again.'
+  }
+}
+
+/**
+ * The same copy, from a cause the caller already has.
+ *
+ * Returns `null` for `null`, so a caller can write
+ * `roomGuardMessage(maybeCause, …) ?? '<its own fallback>'` and keep the
+ * fallback it had. That shape is the point: this module says what a room-guard
+ * refusal MEANS, never what a caller does about it.
+ */
+export function roomGuardMessage(
+  cause: RoomGuardCause | null,
+  where: { roomNumber?: string | null } = {},
+): string | null {
+  return cause === null ? null : roomGuardCopy(cause, where)
+}
+
+/**
  * Log a constraint violation to the reporter when one is provided, so the
  * call site's diagnostics surface records the SQLSTATE and constraint name
  * rather than forcing a developer to reproduce it blind.

@@ -14,6 +14,7 @@ import { PageTitle } from '@/components/ui/PageTitle'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { SyncChip } from '@/components/ui/SyncChip'
 import { assignGroupToRoom, readRoomsGrid } from '@/lib/actions/rooms'
+import { roomGuardMessage } from '@/lib/errors'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { queryKeys } from '@/lib/query/keys'
 import { cn } from '@/lib/utils'
@@ -103,14 +104,22 @@ export function GiveRoom({ eventId }: GiveRoomProps) {
         if (result.ok) return { ok: true, data: { assigned: result.assigned } }
 
         // 23514 from the merged guard is the ONE failure this screen has to
-        // explain, and the action folds two causes into one code: the room
-        // cannot fit this family on those dates, or it is at its ceiling.
-        // Saying which one is impossible from here, so it says both and gives
-        // the one action that works.
+        // explain, and it is NOT one failure. The guard raises the same
+        // SQLSTATE for a room at its bed ceiling and for a room that already
+        // holds an overlapping stay, and the second cannot be forced through at
+        // all — so saying "either" was the old copy's problem, and offering an
+        // override for an overlap would be worse. The action now hands back
+        // WHICH cause it was, read from the trigger's own message;
+        // `roomGuardMessage` turns that into the sentence and the next step, and
+        // returns null for a cause it does not recognise — which is when the old
+        // either/or sentence is shown, now as a genuine fallback rather than as
+        // the answer to every failure.
         if (result.code === 'capacity') {
           return {
             ok: false,
-            message: `Room ${result.roomNumber ?? v.roomId} cannot take this family — it is either full for those dates or has no bed left. Choose another room.`,
+            message:
+              roomGuardMessage(result.cause ?? null, { roomNumber: result.roomNumber }) ??
+              `Room ${result.roomNumber ?? v.roomId} cannot take this family — it is either full for those dates or has no bed left. Choose another room.`,
           }
         }
         return { ok: false, message: result.error }

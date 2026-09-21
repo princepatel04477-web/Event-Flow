@@ -97,6 +97,19 @@ export const queryKeys = {
     detail: (eventId: string, groupId: string) => eventKey(eventId, 'family', groupId),
   },
 
+  /**
+   * The event's staff roster, by name — the only read that can say WHO holds a
+   * caller lock (the queue view carries the holder's uuid, not their name).
+   *
+   * A key of its own rather than a field on the queue entry, because it is a
+   * different relation answering a different question: it is the same answer for
+   * every locked family on the event, so one read serves them all and two
+   * screens showing a lock share it. See `src/lib/lock.ts`.
+   */
+  staff: {
+    names: (eventId: string) => eventKey(eventId, 'staff', 'names'),
+  },
+
   rsvp: {
     queue: (eventId: string, filters: QueueFiltersKey) =>
       eventKey(eventId, 'rsvp', 'queue', normalizeQueueFilters(filters)),

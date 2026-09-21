@@ -5,6 +5,191 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 22 September 2026 — V10: the two 23514 causes, the RSVP outcome's real reversibility, and the caller lock named
+
+### What changed
+
+| file | change |
+|---|---|
+| `src/lib/errors.ts` | added `roomGuardCause`, `roomGuardCausePair`, `roomGuardCopy`, `roomGuardMessage`. No existing export changed. |
+| `src/lib/actions/rooms.ts` | `MoveGuestsResult` and `AssignGroupResult` gained an optional `cause`. `moveGuestsToRoom`'s error sentence now comes from the cause; `assignGroupToRoom` only gained the field. |
+| `src/lib/lock.ts` | NEW. `useStaffNames` (the roster read), `lockNote` (lock facts to a sentence), `StaffNameLookup`. |
+| `src/lib/query/keys.ts` | added `staff.names(eventId)`. |
+| `v2/.../hospitality/rooms/GiveRoom.tsx` | capacity and overlap no longer share a sentence. |
+| `v2/.../rsvp/queue/CallNext.tsx` | the lock is named and timed; a locked row is marked; the RSVP outcome says it is final. |
+| `tests/room-guard-error.test.ts`, `tests/caller-lock.test.ts` | NEW. 18 and 13 cases. |
+
+### Part A — the swap half is not reachable from the new group, and here is the evidence
+
+The prompt's swap trap lives in the select-then-place flow of
+`(staff)/[eventCode]/hospitality/rooms/RoomsGridClient.tsx`, which AMENDMENTS §4 freezes.
+Checked rather than assumed, every caller of the four 23514 handlers in
+`src/lib/actions/rooms.ts`:
+
+| handler | callers | reachable from `(app)/v2/**`? |
+|---|---|---|
+| `moveGuestsToRoom` | `RoomsGridClient.tsx:292`, `:460` | **no** — frozen tree only. This is the swap path. |
+| `assignGuestToRoom` | `RoomsGridClient.tsx:390`, `:467` | **no** — frozen tree only. |
+| `commitAllocations` | `(staff)/.../rooms/allocate/AllocateClient.tsx:96` | only through the **shim** `v2/.../rooms/allocate/page.tsx`, which re-exports the legacy page. The screen is v1 code; editing its copy means editing `(staff)`. |
+| `assignGroupToRoom` | `GiveRoom.tsx:103` (v2) and `(staff)/.../RoomSuggestPanel.tsx:59` | **yes** |
+
+And the v2 caller cannot produce a swap even in principle:
+
+- `GiveRoom`'s list is `underBedded.filter((f) => f.placed === 0)` — families holding **no**
+  room. There is no move affordance and no second room involved.
+- `assignGroupToRoom` **inserts** (`is_override: false` hardcoded, one INSERT of all the
+  family's members). It never UPDATEs a `room_id`, so the intermediate over-capacity state a
+  swap creates does not exist on this path.
+
+So the swap half is **blocked by the file allowlist**. The identical fix is already live in
+v1 at `RoomsGridClient.tsx:371-380`, which on a capacity refusal says "To swap, release its
+current occupants to unplaced first" — the very behaviour Part A asks for, in the tree this
+session may not touch. Nothing was edited there to make Part A "work".
+
+### Part A — what WAS reachable, and is done: the two causes no longer share a message
+
+`app.guard_room_assignment()` raises **23514 for three different reasons**, verbatim from
+`20260816150000_room_guard_row_lock.sql`:
+
+- `Room % is at max capacity (max %, % overlapping stay% currently). Set is_override with a reason to force.`
+- `Room % is already booked for an overlapping stay.`
+- `Room % check-out % is before check-in %.`
+
+Only the first is bypassable. `roomGuardCause` reads the **trigger's own wording** (the same
+technique `isFrozenRowError` already uses for `42501`, and for the same reason — the SQLSTATE
+is ambiguous). `roomGuardCausePair` folds `date_order` into `other` so a caller that only has
+capacity-versus-everything copy can never route reversed dates into an override flow.
+
+Where the old code told the runner the room was "at capacity" for a **date collision**:
+`assignGuestToRoom` and `moveGuestsToRoom` both classified `23514` as `code: 'capacity'`, and
+the v1 grid answered that by opening the override sheet (`attemptAssign`,
+`RoomsGridClient.tsx:395`). That is the same class of wrong as the swap trap — a control that
+cannot work for the cause it is being offered for. `moveGuestsToRoom` now reports the true
+cause first; its capacity sentence and its `code` are **byte-identical to before**, so v1's
+swap copy still fires and the override sheet still opens where it should.
+
+`assignGuestToRoom` was deliberately **left alone** beyond the result field: its
+`code: 'capacity'` drives v1's override sheet for the single-unplaced path, where the override
+is legitimate, and changing its message would change what v1 renders.
+
+### Part B — the RSVP outcome: commits immediately, and the screen says so
+
+**Decision: the outcome commits immediately; there is no undo window; the screen states
+plainly that the call record cannot be changed or deleted.** Undo is NOT offered.
+
+The trade-off, decided on CLAUDE.md §5.4 (§6 of the prompt's list) and not on taste:
+
+1. **The call record is freezable-once.** `app.guard_call_attempt()` stamps `finalized_at` the
+   instant `outcome` goes non-null and force-restores the identity columns on every later
+   update. DELETE is blocked by trigger *and* revoked grant — not even the service role can
+   tidy the row (CLAUDE.md §12). So there is no reverse write and no compensating write.
+2. **The other option was deferral** — hold the send until the 7-second window closes, so
+   Undo means *nothing was sent* (the pattern V3 introduced for forward-only state, and the
+   first of the two shapes the prompt names). It was rejected **for this write** and the
+   reason is §11c/§12: the write is the record that a phone call happened, `tel:` backgrounds
+   the WebView on every dial, and Android may discard the page while the dialler is open. A
+   window in which the call is not yet recorded is a window in which a killed app **loses the
+   call entirely** — strictly worse than an outcome that cannot be edited. That is exactly the
+   cost `src/lib/mutate/optimistic.ts` says deferral carries and why it is opt-in per write.
+3. **The two halves disagree anyway.** `guest_groups` IS overwritable (`save_rsvp_log`
+   coalesces and re-writes), while `call_attempts` is not. A deferred or reversed write would
+   leave the two records disagreeing about the same phone call, which is worse than either
+   record being final on its own.
+
+So the on-screen line reads: *"These are written the moment you tap them, and the call record
+cannot be changed or deleted afterwards. The family's own answer can be overwritten by
+calling them again."* — the second sentence is there because it is true and because it is the
+one thing a runner can actually do about a mistake.
+
+The rest of Part B was audited, not assumed:
+
+| action | state |
+|---|---|
+| room assign (`GiveRoom`) | undo, deferred, no dialog — already wired (V7) |
+| mark an arrival (`MeetArrivals`) | undo, deferred, no dialog — already wired (V7) |
+| check in / out | no screen in the live v2 group: `v2/.../hospitality/checkin/page.tsx` is a shim of `(staff)`. The converted screen V3 wired is the v1 one. |
+| vehicle assign | no screen in the live v2 group: all five `v2/.../logistics/*` routes are shims. `logistics/fleet` renders v1. |
+| sealing a delivery proof | confirmation + `loading` + "cannot be changed or deleted" already live at `(staff)/.../DeliveryDetail.tsx:361-376`, which v2 **imports** rather than copies. Nothing to change, and nothing that may be changed. |
+| `generateDeliverables` ("Create what is missing") | not in Part B's list; idempotent and additive; no delete path exists, so no undo is offered and the screen reports counts instead. |
+
+No confirm dialog on a reversible action was found anywhere under `src/app/(app)/v2/**`: the
+only `window.confirm` calls in the repo are four admin screens under `(admin)`.
+
+### Part C — the caller lock, named and timed
+
+CLAUDE.md §11b: `release_group`'s admin branch is gone, `locked_until` expiry is the **only**
+recovery, and discovery was "one family at a time, by walking into it". The override half
+needs a migration and is out of bounds; the discovery half is done:
+
+- **`CallNext`'s card** now says *"Ravi already has this family open on another phone. It
+  frees up on its own by 21:47."* — holder and exact clear time, from `locked_by_staff` and
+  `locked_until`.
+- **A locked row in the family list** carries a `StatusPill tone="active"` reading
+  **"In progress"**, plus `Open on another phone` in the meta line. Per `ListRow`'s own rule
+  ("a row carries at most one pill; secondary facts belong in the meta line") the words carry
+  the state as well as the colour.
+- **The presence label is not used as a lock** (§11b is explicit). `last_opened_at` is on the
+  row and is deliberately not read.
+
+Two things this needed, both stated because they are the shape of the fix:
+
+- **The holder's NAME is not readable from `v_rsvp_queue`.** The view carries `is_locked` and
+  `locked_until` but names the holder only by uuid, and PostgREST cannot join a view without a
+  declared embedded relation. So `useStaffNames` does a second read of `staff_members` for the
+  event — a handful of rows, one query per event rather than per row, under the policy the
+  "Who are you?" picker already uses. **No migration.** `v_rsvp_queue` also lost
+  `locked_by_staff` in `20260812000000` (`drop view` … no `locked_by_staff`) which is why the
+  id has to come from the view's `locked_by_staff` only where it is present; where it is not,
+  the note says "This family is open on another phone" rather than inventing a person.
+- **A stale `is_locked` is not rendered as a live lock.** The queue can be a `staleTime` old,
+  so a lock that has already expired can still be on screen. When `locked_until` is in the
+  phone's past, the card says the lock "has now run out — reload to bring the family back"
+  instead of showing a time that has already passed. This is the ONE place a phone-clock
+  comparison is allowed: it compares two absolute instants at minute granularity, which a
+  skewed clock still gets right, and it never decides whether a write may proceed.
+
+The dial is **not** blocked by the lock, and the button says "Call Ravi anyway" rather than
+leaving the runner to wonder — §6: only the RSVP status screen claims and releases.
+
+### Deliberate deviations
+
+- **The swap fix was not implemented in v2 because there is no v2 swap.** Recorded above with
+  the caller evidence rather than approximated with dead code.
+- **`assignGuestToRoom`'s message was left unchanged.** It is the v1 override trigger for the
+  legitimate single-unplaced case; only its result union gained `cause`.
+- **A read-only "In this list" register was added to `CallNext`.** The screen is one family at
+  a time by design, and marking only the on-screen family fixes discovery for exactly the
+  family you have already walked into. Rows have no press target and the list is windowed to
+  12, so it cannot become a second way to call or a 238-row scroll. This is the interpretation
+  of Part C's "the family list" — the only family list in the new group is this screen; the
+  guest list is a v1 shim.
+- **`useStaffNames` uses a staggered `staleTime` query key rather than a server action.** The
+  calling screens read Supabase in the browser deliberately (`src/lib/query/reads.ts`), and a
+  server action would add a Seoul round trip to the screen whose problem is round trips.
+
+### What is still owed
+
+- **No handset, and no browser.** Nothing in this session was rendered. The two room paths,
+  the locked card and the new list are typechecked, linted and unit-tested only. The comment
+  about the 23514 causes is pinned against the trigger's copy by
+  `tests/room-guard-error.test.ts`; that it reaches a *screen* is not.
+- **`v_rsvp_queue` should carry `locked_by_staff`.** `20260812000000` dropped and recreated
+  the view without it, so the app reads the id from the row where it exists and cannot resolve
+  an admin-held lock to a name at all. Adding the column back is a migration and was not
+  written.
+- **Check-in/out and vehicle assignment still have no screen in the new group**, so Part B's
+  undo requirement for them is unverifiable from `(app)/v2/**`. Both are shims.
+- **`scripts/tabs-reach.mjs` was not run** (no server in this session).
+
+### Verification
+
+`npx tsc --noEmit` exit 0 · `npx eslint` exit 0 on all eight changed/added files (0 errors,
+0 warnings) · `npx vitest run` 21 files / 275 tests, all pass (19/241 before + 2 files / 34
+cases). `npm run build` NOT run (the parent runs it). **No handset** — no tap budget, no
+camera, no live lock exercised.
+
+---
+
 ## 22 September 2026 — V9: plain words, and the explanations deleted
 
 ### What changed
