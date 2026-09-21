@@ -1406,3 +1406,55 @@ the arrivals board.
 Noted separately and still true: about 40 `loading={...}` controls remain app-wide, most on
 screens outside V0-V3's scope (fleet, departures, deliveries, import, admin). They are the
 backlog, not a regression introduced here.
+
+---
+
+## 21 September 2026 — FOUND: two divergent copies of the guest list, and clients get the stale one
+
+Found while auditing what `useStableData` still covers, and it is the same class of defect
+UX-RULES R2 and R3 both document (a fork the nav never opened). It is NOT introduced by
+V2 — V2 made it visible.
+
+There are two complete implementations of the guest list:
+
+    /guests        guests/GuestsClient.tsx      + guests/_components/*        <- STALE
+    /guests/list   guests/list/GuestsClient.tsx + guests/list/_components/*   <- CURRENT
+
+Evidence that `list/` is the current one: `git log` shows `guests/list/page.tsx` last
+touched by `5ee1389` ("Partial M2: section config, redirects, BottomTabs rewrite, **route
+moves**") and then by V2, while `guests/page.tsx` was last touched by `613fb81` — it predates
+the route move. The event home links to `/guests/list` (`page.tsx:169`).
+
+**Who reaches which:**
+
+| session | lands on | gets |
+|---|---|---|
+| staff, from the event home | `/guests/list` | the current screen — and V2's cached read |
+| client | `/guests` | the stale screen |
+
+The client path is stale because two redirect points still name the pre-route-move URL:
+
+    src/lib/events/paths.ts:52       eventHomePath()  -> `/${eventCode}/guests`
+    src/lib/supabase/queries.ts:423  redirect(`/${eventCode}/guests`)
+    src/lib/supabase/queries.ts:459  redirect(`/${eventCode}/guests`)
+
+**The copies have drifted, measured not guessed** (`git diff --no-index --stat`):
+
+    GuestsClient.tsx     77 insertions / 48 deletions
+    ClientGuestList.tsx  56 / 8
+    format.ts            68 / 9
+    page.tsx             27 / 1
+
+So a fix applied to one copy does not reach the other, and this is the mechanism by which
+the earlier `dashboard/page.tsx` fork went unnoticed: the board people actually opened
+showed zeros while the fixed copy sat on a route nobody visited.
+
+**V2 made the divergence wider.** `guests/list` is now on the shared query cache and
+`guests` is still on `useStableData`, so the two copies now differ in behaviour, not just in
+markup — one paints from a warm shared cache and one re-fetches per visit.
+
+**Recommendation, not done here:** decide which URL is canonical, point `eventHomePath` and
+both client redirects at it, delete the other, and update the stale doc comment in
+`guests/list/page.tsx` which still claims a client is redirected to *this* page. Deleting a
+route is a product decision and the last fork deletion in this repo was recorded as a
+deliberate one, so it is left to a human rather than taken unilaterally by this session.
