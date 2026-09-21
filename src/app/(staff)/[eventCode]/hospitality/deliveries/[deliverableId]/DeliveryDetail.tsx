@@ -358,6 +358,17 @@ export function DeliveryDetail({
               placeholder="Received by (name) — optional"
               className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-base"
             />
+            {/* The one place in the app where a confirmation is right rather
+                than a nuisance, so it has to say WHY. `delivery_proofs` has no
+                update policy and no delete policy, and two unconditional
+                triggers refuse both — for everyone, including the admin who owns
+                the account (CLAUDE.md §5.2). Until this line existed the
+                finality was written down only in the source comments below, so a
+                runner tapping Confirm had nothing on screen telling them it was
+                the last chance. */}
+            <p className="rounded-lg bg-tint-warning px-3 py-2 text-xs font-medium text-warning">
+              Once confirmed, this proof cannot be changed or deleted — not even by an admin.
+            </p>
             <div className="flex gap-2">
               <Button variant="secondary" fullWidth disabled={phase.name === 'uploading'} onClick={() => setPhase({ name: 'ready' })}>
                 Retake
