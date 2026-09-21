@@ -6,9 +6,9 @@ import type { StatusTone } from '@/lib/status'
 /**
  * The card's ground.
  *
- * - `default` — a card on the night ground. Every list row, every panel.
+ * - `default` — a card on the ivory paper ground. Every list row, every panel.
  * - `hero`    — the one figure a screen exists to show, lifted off the
- *               ground with a brass wash. At most one per screen; two
+ *               ground with a gold wash. At most one per screen; two
  *               heroes is no hero.
  * - `attention` / `done` — a panel that IS a status (the "needs eyes on
  *               it" block, a sealed proof). Not decoration: the tint
@@ -34,7 +34,7 @@ const TONES: Record<CardTone, string> = {
   hero:
     'border border-brand/25 bg-surface ' +
     'bg-[linear-gradient(158deg,var(--ef-brand-tint),transparent_62%)] ' +
-    'shadow-[0_16px_40px_-22px_rgba(0,0,0,0.85)]',
+    'shadow-e1',
   attention: 'border border-ledger-red/35 bg-red-tint',
   done: 'border border-ledger-green/35 bg-green-tint',
   queued: 'border-2 border-dashed border-muted/45 bg-transparent',

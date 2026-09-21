@@ -44,7 +44,7 @@ export function ErrorState({
       </span>
 
       {/* Sans, not the display serif. Cormorant is a high-contrast face with
-          thin hairlines; set untracked at 20px in signal red on the night
+          thin hairlines; set untracked at 20px in signal red on the light
           ground it renders as a whisper on a cheap LCD — and this is the one
           sentence on the screen someone reads when something has broken. */}
       <h2 className="text-lg font-medium text-balance text-ledger-red">{title}</h2>

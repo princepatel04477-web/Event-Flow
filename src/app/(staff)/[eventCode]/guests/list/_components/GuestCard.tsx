@@ -25,9 +25,9 @@ export interface GuestCardProps {
 /**
  * One guest, read-only.
  *
- * This is the client's screen, and it is the only place in the app rendered
- * on warm paper rather than the night ground (see `data-theme='client'` in
- * the event layout). The tone is a printed itinerary, not an ops console:
+ * This is the client's screen, rendered on warm cream paper rather than
+ * the staff ivory ground (see `data-theme='client'` in the event layout).
+ * The tone is a printed itinerary, not an ops console:
  * the name is set in the display serif, the facts sit in a labelled grid
  * like a ticket, and there is not one control on it. No writes, no forms —
  * a client has no write access to anything, and staff who land here have
@@ -74,7 +74,7 @@ export function GuestCard({ row, headingLevel, showFamilyHead = false }: GuestCa
   ].filter((f) => f.delivered !== null)
 
   return (
-    <article className="list-fade overflow-hidden rounded-2xl border border-rule-strong bg-surface shadow-[0_2px_10px_-6px_rgba(27,36,38,0.28)]">
+    <article className="list-fade overflow-hidden rounded-2xl border border-rule-strong bg-surface shadow-e1">
       <header className="flex items-start justify-between gap-3 border-b border-rule px-4 py-3.5">
         <div className="min-w-0">
           <Heading className="font-display text-2xl leading-tight font-medium text-pretty text-ink">

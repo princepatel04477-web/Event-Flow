@@ -31,12 +31,11 @@ const BASE =
   'aria-disabled:opacity-55'
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  // Brass on the ground with dark type — 8:1, and the only solid brass
-  // fill on any screen, so "the commit" is never ambiguous. The shadow is
-  // a brass glow rather than a black drop: on a #071A1D ground a black
-  // shadow is invisible.
+  // Gold fill with white text, and the only solid gold fill on any screen,
+  // so "the commit" is never ambiguous. The shadow is a hairline lift
+  // (shadow-e1) on the light ground.
   primary:
-    'border-transparent bg-brand text-brand-fg shadow-[0_10px_30px_-12px] shadow-brand/70 ' +
+    'border-transparent bg-brand text-brand-fg shadow-e1 ' +
     'hover:bg-brand-hover active:bg-brand-hover',
   secondary:
     'border-rule-strong bg-surface text-ink hover:bg-surface-2 active:bg-surface-2',

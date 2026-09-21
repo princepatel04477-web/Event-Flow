@@ -25,7 +25,7 @@ export interface PageTitleProps {
  *
  * The tracked uppercase treatment is deliberate at this size: Cormorant is
  * a high-contrast old-style face with thin hairlines, and set tight at 20px
- * on a night ground on a cheap LCD the thin strokes disappear. Spacing the
+ * on a light ground on a cheap LCD the thin strokes disappear. Spacing the
  * letters gives each one room to survive.
  */
 export function PageTitle({ children, right, note, className }: PageTitleProps) {

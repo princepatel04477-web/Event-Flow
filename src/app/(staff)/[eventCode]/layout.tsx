@@ -79,9 +79,9 @@ export default async function EventLayout({ children, params }: LayoutProps) {
 
   return (
     // The skin is a property of WHO IS LOOKING, not of an OS setting.
-    // Staff get the night-teal ground they work on in corridors and car
+    // Staff get the warm ivory ground they work on in corridors and car
     // parks; a client — reading this in a hotel lobby in daylight, and
-    // often the oldest user of the app — gets warm paper. `data-theme`
+    // often the oldest user of the app — gets warm cream paper. `data-theme`
     // re-points the same token names (see globals.css), so nothing below
     // this line branches on the role to get its colours right.
     <div

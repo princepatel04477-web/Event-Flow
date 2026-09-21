@@ -1021,4 +1021,68 @@ An independent review checked every citation in `docs/INTERACTION-CONTRACT.md` a
 - **T7:** Corrected overstatements in `RsvpLogForm.tsx`: line 182 calls `setSaving(false)` unconditionally and errors are sanitized through `friendlyDbError()` (`src/lib/actions/rsvp.ts:99`). Clarified that the real defect is the lack of a `try/catch` around lines 176–181, which would leave `saving` permanently true on unhandled promise rejections, alongside the absence of an offline outbox queue.
 - Verified all 22 cited file paths exist on disk via `test-results/ui2/check-paths.mjs`.
 
+---
 
+## 21 September 2026 — UI2 V0b: Finish the Royal Ivory & Gold Re-Skin (Elevation & Stale Palette)
+
+### Completed the Re-Skin across Shadows, Inline Hexes, and Code Comments
+Following the Royal Ivory & Gold redesign (DESIGN.md), colour tokens had re-skinned while shadows, inline styles, and code comments retained remnants of the legacy dark teal (#071A1D) and brass palette. This session completed the re-skin:
+
+1. **Tokenised elevation (`--shadow-e1`, `--shadow-e2`, `--shadow-e3`):**
+   - Added two-layer elevation tokens in `src/app/globals.css` across `:root` (tinted with staff charcoal `--ef-ink` #191c1d) and `[data-theme='client']` (tinted with client charcoal `--ef-ink` #1b2426). Exposed them via `@theme inline`.
+   - Each layer stays strictly within the DESIGN.md 2%–4% opacity band (tight contact layer at 0.03/0.04, diffuse ambient layer at 0.03/0.04).
+   - `--shadow-e1` provides hairline lift for resting cards and list rows.
+   - `--shadow-e2` provides lift for raised surfaces like headline panels.
+   - `--shadow-e3` provides directional lift for bottom sheets (negative vertical offsets rising from bottom edge).
+
+2. **Replaced all 7 arbitrary `shadow-[...]` definitions:**
+   - `src/components/ui/Card.tsx:37`: `shadow-[0_16px_40px_-22px_rgba(0,0,0,0.85)]` -> `shadow-e1`.
+   - `src/app/(staff)/[eventCode]/page.tsx:198`: `shadow-[0_16px_40px_-22px_rgba(0,0,0,0.85)]` -> `shadow-e2`.
+   - `src/components/ui/BottomSheet.tsx:75`: `shadow-[0_-20px_50px_-12px_rgba(0,0,0,0.8)]` -> `shadow-e3`.
+   - `src/components/ui/Button.tsx:39`: removed `shadow-[0_10px_30px_-12px] shadow-brand/70` dark-UI brass glow -> `shadow-e1`. Rewrote comment to document white text on gold fill (`text-brand-fg` on `bg-brand`) and light ground, preserving the rule that it remains the only solid gold fill.
+   - `src/app/(staff)/[eventCode]/hospitality/deliveries/[deliverableId]/DeliveryDetail.tsx:406`: replaced `shadow-[0_0_46px_-10px] shadow-brand/60` and `var(--ef-brand-tint)` with `bg-[radial-gradient(circle,var(--ef-green-tint),transparent)] shadow-e2`, shifting from a dark-plane light bloom to the emerald COMPLETED tint while preserving the `seal-in` flourish.
+   - Both `GuestCard.tsx` files (`guests/list/_components/GuestCard.tsx:77` and `guests/_components/GuestCard.tsx:73`): `shadow-[0_2px_10px_-6px_rgba(27,36,38,0.28)]` -> `shadow-e1`.
+
+3. **Enforced zero arbitrary shadows via regression test:**
+   - Created `tests/no-arbitrary-shadows.test.ts`, scanning all `.tsx` files in `src/` to ensure no `shadow-[` class names can re-enter the tree.
+
+4. **Repainted `src/app/global-error.tsx` in the light palette:**
+   - Eliminated the only dark screen remaining in the app.
+   - Applied inline hex values matching `:root` tokens: ground `#f8f9fa`, text `#191c1d`, muted `#4d4635`, button `#735c00` with text `#ffffff`.
+   - Annotated WCAG contrast ratios in code comments (#191c1d on #f8f9fa is 16.8:1, #4d4635 on #f8f9fa is 8.9:1, #ffffff on #735c00 is 7.4:1). Added explanatory comment why inline hexes are required (root layout replacement without CSS bundle).
+
+5. **Re-expressed sign-in wash (`src/app/(auth)/layout.tsx`):**
+   - Removed legacy brass (17%) + verdigris (7%) two-wash gradient. Replaced with single soft gold wash using `var(--ef-brand-tint)` over `bg-paper`.
+
+6. **Corrected stale dark-ground comments across 9 files:**
+   - `(staff)/[eventCode]/layout.tsx:82`: warm ivory staff ground vs warm cream client paper.
+   - `Card.tsx:9`: ivory paper ground.
+   - `Field.tsx:73`: light ground and gold focus ring.
+   - `PageTitle.tsx:28`: light ground LCD contrast.
+   - `ErrorState.tsx:47`: light ground.
+   - `(auth)/layout.tsx:7`: warm ivory ground with single gold wash.
+   - Both `GuestCard.tsx` files: cream paper client view vs ivory staff ground.
+   - `globals.css:302`: overscroll revealing warm ivory paper.
+   - Noted known remaining comment in `src/app/layout.tsx:121` ("teal ground"), intentionally untouched due to strict session file modification boundaries.
+
+---
+
+## 21 September 2026 — UI2 V0b Correction Pass: Contrast Ratios, Seal Coherence, and Terminology
+
+### Corrections Applied:
+1. **Measured WCAG Contrast Ratios in `src/app/global-error.tsx`:**
+   - Corrected the measured contrast values:
+     - Text: `#191c1d` on `#f8f9fa` = 16.26:1 (AAA) (previously overstated as 16.8:1).
+     - Muted: `#4d4635` on `#f8f9fa` = 8.88:1 (AAA) (previously rounded as 8.9:1).
+     - Button: `#ffffff` on `#735c00` = 6.44:1 (AA) (previously claimed 7.4:1 AAA; correctly labelled AA since 6.44:1 is below the 7.0:1 threshold for normal text).
+   - Root cause: The 7.4:1 figure was copied from a pre-existing comment in `src/app/globals.css` (lines 97–98 in the `--ef-brand` block, which claims `#735c00 carries white text at 7.4:1 as a fill`). That pre-existing comment in `globals.css` is also inaccurate and is reported here rather than silently changed.
+
+2. **Visual Coherence of the Seal in `DeliveryDetail.tsx`:**
+   - Restored the radial fill to `var(--ef-brand-tint)` (`bg-[radial-gradient(circle,var(--ef-brand-tint),transparent)]`), matching the gold outer ring (`border-brand`), inner ring (`border-brand/45`), text ("SEALED" `text-brand`), and divider (`bg-brand/50`).
+   - Satisfied the "emerald COMPLETED tint rather than a light bloom" requirement by tinting the tokenised elevation using Tailwind's shadow-colour utility: `shadow-e2 shadow-ledger-green/40`.
+   - `shadow-<colour>` is the correct architectural pattern because it colours the tokenised blur without introducing arbitrary `shadow-[...]` rules or placing an incoherent green fill inside a gold stamp.
+   - Preserved `seal-in` animation, proof capture logic, and all existing classes.
+
+3. **Terminology Consistency in `src/app/globals.css`:**
+   - Aligned the comment at line 233 from `/* Brass — the accent. */` to `/* Gold — the accent. */` in accordance with the "Royal Ivory & Gold" design system.
+   - Noted that `src/components/ui/Chip.tsx`, `src/components/ui/StatusPill.tsx`, and `src/app/(staff)/[eventCode]/logistics/fleet/FleetClient.tsx` also contain legacy references to "brass", left untouched because they fall outside the allowed file modification list for this session.

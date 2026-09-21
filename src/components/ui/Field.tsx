@@ -70,10 +70,10 @@ export function Field({
  * Shared control styling. 16px text is deliberate — smaller and iOS Safari
  * zooms the page on focus.
  *
- * The field is a lifted well rather than an outlined box: on the night
+ * The field is a lifted well rather than an outlined box: on the light
  * ground a 1px outline alone reads as a divider, so the surface is raised
- * a few percent to say "type here". Focus adds a brass ring, which is the
- * one place besides the primary button that brass appears as a fill.
+ * a few percent to say "type here". Focus adds a gold ring, which is the
+ * one place besides the primary button that gold appears as a fill.
  */
 export function fieldControlClasses(hasError: boolean): string {
   return cn(

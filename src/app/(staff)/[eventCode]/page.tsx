@@ -195,7 +195,7 @@ export default async function EventHomePage({ params, searchParams }: PageProps)
 
       {/* The headline. One figure, the size of a thumb, and the split that
           explains it — this is the number someone shouts across a room. */}
-      <section className="list-fade rounded-2xl border border-brand/25 bg-surface bg-[linear-gradient(158deg,var(--ef-brand-tint),transparent_62%)] p-4 shadow-[0_16px_40px_-22px_rgba(0,0,0,0.85)]">
+      <section className="list-fade rounded-2xl border border-brand/25 bg-surface bg-[linear-gradient(158deg,var(--ef-brand-tint),transparent_62%)] p-4 shadow-e2">
         <h2 className="eyebrow text-brand">Guests expected</h2>
 
         <div className="mt-2 flex items-end gap-3">

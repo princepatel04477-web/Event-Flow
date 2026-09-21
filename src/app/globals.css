@@ -138,6 +138,17 @@
   /* Eyebrow tracking — the spec's `label-md` 0.05em, uppercase, "to mimic
      luxury signage". Was 0.16em. */
   --ef-tracking-eyebrow: 0.05em;
+
+  /* Elevation & Depth — Royal Ivory & Gold (DESIGN.md).
+     Extra-diffused shadows with 2%-4% opacity, tinted with the primary
+     charcoal color (--ef-ink #191c1d). Two-layer shadows: tight contact
+     shadow plus diffuse ambient layer. */
+  /* e1: a hairline lift: a resting card, a list row */
+  --ef-shadow-e1: 0 1px 2px -1px rgba(25, 28, 29, 0.04), 0 2px 6px 0 rgba(25, 28, 29, 0.03);
+  /* e2: a raised surface: the headline panel, a popover */
+  --ef-shadow-e2: 0 4px 6px -2px rgba(25, 28, 29, 0.03), 0 12px 24px -4px rgba(25, 28, 29, 0.04);
+  /* e3: an overlay: the bottom sheet (directional, lifting upward from the bottom edge) */
+  --ef-shadow-e3: 0 -4px 6px -1px rgba(25, 28, 29, 0.03), 0 -16px 32px -4px rgba(25, 28, 29, 0.04);
 }
 
 /* --------------------------------------------------------------------
@@ -184,6 +195,14 @@
 
   --ef-ring: #1b2426;
   --ef-nav: #fbf8f1;
+
+  /* Client ground elevation — tinted with client charcoal (--ef-ink #1b2426). */
+  /* e1: a hairline lift: a resting card, a list row */
+  --ef-shadow-e1: 0 1px 2px -1px rgba(27, 36, 38, 0.04), 0 2px 6px 0 rgba(27, 36, 38, 0.03);
+  /* e2: a raised surface: the headline panel, a popover */
+  --ef-shadow-e2: 0 4px 6px -2px rgba(27, 36, 38, 0.03), 0 12px 24px -4px rgba(27, 36, 38, 0.04);
+  /* e3: an overlay: the bottom sheet (directional, lifting upward from the bottom edge) */
+  --ef-shadow-e3: 0 -4px 6px -1px rgba(27, 36, 38, 0.03), 0 -16px 32px -4px rgba(27, 36, 38, 0.04);
 }
 
 @theme inline {
@@ -211,7 +230,7 @@
   --color-margin-rule: var(--ef-margin-rule);
   --color-ring: var(--ef-ring);
 
-  /* Brass — the accent. */
+  /* Gold — the accent. */
   --color-brand: var(--ef-brand);
   --color-brand-hover: var(--ef-brand-hover);
   --color-brand-strong: var(--ef-brand-strong);
@@ -283,6 +302,11 @@
   --spacing-6: 1.5rem;
   --spacing-8: 2rem;
   --spacing-12: 3rem;
+
+  /* Elevation tokens — 2%-4% charcoal tint per DESIGN.md */
+  --shadow-e1: var(--ef-shadow-e1);
+  --shadow-e2: var(--ef-shadow-e2);
+  --shadow-e3: var(--ef-shadow-e3);
 }
 
 @layer base {
@@ -299,7 +323,7 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     overflow-x: clip;
-    /* The ground, so overscroll on the APK reveals teal and not white. */
+    /* The ground, so overscroll on the APK reveals warm ivory paper. */
     background-color: var(--ef-paper);
   }
 

@@ -403,7 +403,7 @@ export function DeliveryDetail({
 
           <div
             aria-hidden
-            className="seal-in relative mt-3.5 flex h-33 w-33 flex-col items-center justify-center rounded-full border-2 border-brand bg-[radial-gradient(circle,var(--ef-brand-tint),transparent)] shadow-[0_0_46px_-10px] shadow-brand/60"
+            className="seal-in relative mt-3.5 flex h-33 w-33 flex-col items-center justify-center rounded-full border-2 border-brand bg-[radial-gradient(circle,var(--ef-brand-tint),transparent)] shadow-e2 shadow-ledger-green/40"
           >
             <span className="absolute inset-2 rounded-full border border-brand/45" />
             <span className="font-display text-sm leading-none tracking-[0.24em] text-brand indent-[0.24em]">

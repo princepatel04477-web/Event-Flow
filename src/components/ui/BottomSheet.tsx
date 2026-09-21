@@ -72,7 +72,7 @@ export function BottomSheet({ open, onClose, label, children, className }: Botto
         className={cn(
           'sheet-in relative w-full rounded-t-2xl border-t border-brand/30 bg-surface',
           'max-h-[85dvh] overflow-y-auto px-5 pt-2 pb-6 outline-none pb-safe',
-          'shadow-[0_-20px_50px_-12px_rgba(0,0,0,0.8)]',
+          'shadow-e3',
           className,
         )}
       >
