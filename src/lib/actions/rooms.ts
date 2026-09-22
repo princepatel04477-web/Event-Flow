@@ -1111,3 +1111,119 @@ export async function assignGroupToRoom(
 
   return { ok: true, assigned: ordered.length }
 }
+
+export type AssignGuestsResult =
+  | { ok: true; assigned: number; remaining: number }
+  | {
+      ok: false
+      error: string
+      code: 'capacity' | 'other'
+      roomId?: string
+      roomNumber?: string
+      cause?: RoomGuardCause | null
+    }
+
+/**
+ * Put N of a family's unplaced guests into one room.
+ *
+ * WHY THIS EXISTS, IN ONE SENTENCE FROM A COORDINATOR: "if one family head has 6
+ * pax, what is the problem with allocating 2 pax to one room?"
+ *
+ * There was no problem with it in the database — `room_assignments` is one row
+ * per guest and the guards count beds, not families. The problem was that the
+ * only door the new UI had was `assignGroupToRoom`, which puts the WHOLE family
+ * in one room or nothing. So a family of six could never be placed in a room of
+ * two, and the screen answered a correct request with a capacity refusal. v1's
+ * grid could do this (it assigns one guest at a time); moving the screen to a
+ * family-first flow quietly dropped the capability.
+ *
+ * WHAT IT DOES. Tops the family's member rows up to its headcount first (the
+ * import creates one row per family, so a six-pax family otherwise has exactly
+ * one assignable person), drops the guests who already hold an active
+ * assignment, takes `count` from what is left — head first — and inserts them in
+ * ONE statement.
+ *
+ * WHY ONE STATEMENT AND NOT A LOOP. Same reason as `assignGroupToRoom`: each
+ * call is its own round trip, so a loop that stops on the first refusal leaves
+ * the earlier rows committed and the family half-placed with no record of what
+ * was intended. A single INSERT is one statement, so the merged room guard
+ * either fits all of them or rejects all of them.
+ *
+ * `remaining` is what the screen needs to keep the family on the list with an
+ * honest "4 still to place" instead of guessing.
+ */
+export async function assignGuestsToRoom(
+  eventId: string,
+  groupId: string,
+  roomId: string,
+  count: number,
+): Promise<AssignGuestsResult> {
+  const wanted = Math.floor(count)
+  if (!Number.isFinite(wanted) || wanted < 1) {
+    return { ok: false, error: 'Choose how many guests to place.', code: 'other' }
+  }
+
+  const supabase = await createClient()
+
+  const ensured = await ensureGroupMembers(eventId, groupId)
+  if (!ensured.ok) return { ok: false, error: ensured.error, code: 'other' }
+
+  const ordered = ensured.result.guestIds
+  if (ordered.length === 0) {
+    return { ok: false, error: 'This family has no guests to assign.', code: 'other' }
+  }
+
+  // Who already has a bed. Read AFTER the top-up, so the guests that were just
+  // materialised are candidates rather than invisible.
+  const { data: placedRows, error: placedErr } = await supabase
+    .from('room_assignments')
+    .select('guest_id')
+    .eq('event_id', eventId)
+    .eq('group_id', groupId)
+    .is('released_at', null)
+
+  if (placedErr) return { ok: false, error: friendlyDbError(placedErr), code: 'other' }
+
+  const placed = new Set((placedRows ?? []).map((r) => r.guest_id))
+  const unplaced = ordered.filter((id) => !placed.has(id))
+
+  if (unplaced.length === 0) {
+    return { ok: false, error: 'Everyone in this family already has a room.', code: 'other' }
+  }
+
+  // Clamped, not rejected: a screen that asks for four when three are left is
+  // asking for all of them, and the answer the caller wants is "three placed",
+  // not an error to decode.
+  const take = Math.min(wanted, unplaced.length)
+  const rows = unplaced.slice(0, take).map((guestId) => ({
+    event_id: eventId,
+    room_id: roomId,
+    guest_id: guestId,
+    group_id: groupId,
+    is_override: false,
+  }))
+
+  const { error } = await supabase.from('room_assignments').insert(rows)
+
+  if (error) {
+    if (error.code === '23514' || error.message?.includes('capacity')) {
+      const { data: room } = await supabase
+        .from('rooms')
+        .select('room_number')
+        .eq('id', roomId)
+        .maybeSingle()
+
+      return {
+        ok: false,
+        error: `Room ${room?.room_number ?? roomId} is full. Add anyway?`,
+        code: 'capacity',
+        roomId,
+        roomNumber: room?.room_number ?? '',
+        cause: roomGuardCause(error),
+      }
+    }
+    return { ok: false, error: friendlyDbError(error), code: 'other' }
+  }
+
+  return { ok: true, assigned: take, remaining: unplaced.length - take }
+}

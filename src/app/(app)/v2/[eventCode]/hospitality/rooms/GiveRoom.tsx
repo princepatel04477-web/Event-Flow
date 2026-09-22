@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
-import { BuildingIcon, InboxIcon } from '@/components/icons'
+import { BuildingIcon, InboxIcon, MinusIcon, PlusIcon } from '@/components/icons'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
@@ -14,7 +14,7 @@ import { LoadingRows } from '@/components/ui/LoadingRows'
 import { PageTitle } from '@/components/ui/PageTitle'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { SyncChip } from '@/components/ui/SyncChip'
-import { assignGroupToRoom, readRoomsGrid } from '@/lib/actions/rooms'
+import { assignGuestsToRoom, readRoomsGrid } from '@/lib/actions/rooms'
 import { roomGuardMessage } from '@/lib/errors'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { queryKeys } from '@/lib/query/keys'
@@ -46,7 +46,7 @@ type GridData = Awaited<ReturnType<typeof readRoomsGrid>>
 type NeedingFamily = GridData['underBedded'][number]
 
 /**
- * Job 2's screen: pick a family, then pick a room.
+ * Job 2's screen: name the family, then choose how many of them go in which room.
  *
  * THE ORDER IS THE WHOLE CHANGE. The v1 rooms screen is a grid of numbered
  * tiles with dots and a five-state legend — nothing on it is a person's name,
@@ -55,20 +55,28 @@ type NeedingFamily = GridData['underBedded'][number]
  * Mrs Sharma's six people have nowhere to sleep. So this screen leads with the
  * families, by name, and the room list is the second step of that one flow.
  *
- * WHAT COUNTS AS "NEEDS A ROOM". `readRoomsGrid`'s `underBedded` is every
- * confirmed family whose placed head count is below its headcount — that is the
- * whole population this job is for. `placed === 0` is "nowhere to sleep" and
- * gets the full write; a family that already has a room but not enough beds is
- * reported honestly instead of being offered a write that cannot work (see the
- * note at the foot of the list).
+ * BEDS, NOT FAMILIES, AND THAT IS THE SECOND CHANGE. The first version of this
+ * screen could only place a WHOLE family in ONE room, because
+ * `assignGroupToRoom` is atomic per family. A family of six therefore could not
+ * go into a room of two — a perfectly ordinary request ("two of them in 412, the
+ * rest next door") came back as a capacity refusal, and once a family had any
+ * beds at all the screen gave up and told the runner to go and find their event
+ * lead. Room allocation is per bed in the database, so it is per bed here: choose
+ * how many, choose the room, and put the rest somewhere else the same way. Two
+ * of six in one room and four in another is two taps each, not an escalation.
  *
- * The read is the SAME server action and the SAME cache key the v1 grid uses,
- * so the two screens share one entry rather than holding two copies of the room
- * register that can disagree.
+ * WHAT COUNTS AS "NEEDS A ROOM". `readRoomsGrid`'s `underBedded` is every
+ * confirmed family whose placed head count is below its headcount — the whole
+ * population this job is for, whether they have none or some. The read is the
+ * SAME server action and the SAME cache key the v1 grid uses, so the two screens
+ * share one entry rather than holding two copies of the room register that can
+ * disagree.
  */
 export function GiveRoom({ eventId, eventCode, canOpenCallList }: GiveRoomProps) {
   const [pickerFor, setPickerFor] = useState<NeedingFamily | null>(null)
   const [hotel, setHotel] = useState<string | null>(null)
+  /** How many guests this tap places. Reset to the family's need on open. */
+  const [count, setCount] = useState(1)
 
   const {
     data,
@@ -82,80 +90,130 @@ export function GiveRoom({ eventId, eventCode, canOpenCallList }: GiveRoomProps)
   })
 
   /**
-   * Placing a whole family in one room.
+   * Placing `count` of a family's unplaced guests in one room.
    *
-   * `assignGroupToRoom` is the only action here that can do the job correctly:
-   * it tops the family's `guests` rows up to its headcount FIRST — the Excel
-   * import creates one row per family, so assigning "the family" without that
-   * placed one person out of six and reported success — and then inserts every
-   * member in ONE statement, so the merged room guard either fits them all or
-   * rejects the lot. A loop of single-guest assigns would leave a half-placed
-   * family on the first refusal.
+   * `assignGuestsToRoom` tops the family's `guests` rows up to its headcount
+   * FIRST — the Excel import creates one row per family, so assigning "two of
+   * them" without that placed one person and reported success — then drops the
+   * guests who already hold a bed, and inserts the rest in ONE statement, so the
+   * merged room guard either fits all of them or rejects the lot. A loop of
+   * single-guest assigns would leave a half-placed family on the first refusal.
    *
-   * DEFERRED, so Undo is real. A room assignment is reversible in principle,
-   * but the reverse (`releaseGuestFromRoom`) is per ASSIGNMENT and this write
-   * creates the family's assignments in one statement whose ids do not exist
-   * until the server answers — an Undo built on that could not name what to
-   * release without a second read. Holding the write until the window closes
-   * makes Undo mean NOTHING WAS SENT instead (docs/UX-RULES.md R5).
+   * DEFERRED, so Undo is real. A room assignment is reversible in principle, but
+   * the reverse (`releaseGuestFromRoom`) is per ASSIGNMENT and this write creates
+   * assignments whose ids do not exist until the server answers — an Undo built
+   * on that could not name what to release without a second read. Holding the
+   * write until the window closes makes Undo mean NOTHING WAS SENT instead
+   * (docs/UX-RULES.md R5).
    *
-   * The trade is stated where the decision is made: for seven seconds the bed
-   * is not really taken, so a second coordinator can claim it, and the deferred
+   * The trade is stated where the decision is made: for seven seconds the bed is
+   * not really taken, so a second coordinator can claim it, and the deferred
    * write then fails the room guard and says so on the list. That is a visible
    * failure rather than a silent one.
    */
-  const assign = useOptimisticAction<GridData, { groupId: string; roomId: string; headName: string }, { assigned: number }>(
-    {
-      queryKey: queryKeys.rooms.grid(eventId),
-      callSite: 'v2-assign-group-to-room',
-      deferUntilCommit: true,
-      message: (v) => `${v.headName} · Room given`,
-      // The family leaves the list on the tap. `apply` can run before the first
-      // read has landed, so the empty branch has to be a value of the same
-      // shape rather than `undefined` — the write is only reachable from a
-      // family row, which means the real data was on screen a moment ago.
-      apply: (prev, v) =>
-        prev
-          ? { ...prev, underBedded: prev.underBedded.filter((f) => f.groupId !== v.groupId) }
-          : { rooms: [], unplaced: [], underBedded: [] },
-      action: async (v) => {
-        const result = await assignGroupToRoom(eventId, v.groupId, v.roomId)
-        if (result.ok) return { ok: true, data: { assigned: result.assigned } }
-
-        // 23514 from the merged guard is the ONE failure this screen has to
-        // explain, and it is NOT one failure. The guard raises the same
-        // SQLSTATE for a room at its bed ceiling and for a room that already
-        // holds an overlapping stay, and the second cannot be forced through at
-        // all — so saying "either" was the old copy's problem, and offering an
-        // override for an overlap would be worse. The action now hands back
-        // WHICH cause it was, read from the trigger's own message;
-        // `roomGuardMessage` turns that into the sentence and the next step, and
-        // returns null for a cause it does not recognise — which is when the old
-        // either/or sentence is shown, now as a genuine fallback rather than as
-        // the answer to every failure.
-        if (result.code === 'capacity') {
-          return {
-            ok: false,
-            message:
-              roomGuardMessage(result.cause ?? null, { roomNumber: result.roomNumber }) ??
-              `Room ${result.roomNumber ?? v.roomId} cannot take this family — it is either full for those dates or has no bed left. Choose another room.`,
-          }
-        }
-        return { ok: false, message: result.error }
-      },
-      queue: { eventId, kind: 'assign-group-room', what: 'room assignment' },
+  const assign = useOptimisticAction<
+    GridData,
+    { groupId: string; roomId: string; headName: string; count: number },
+    { assigned: number; remaining: number }
+  >({
+    queryKey: queryKeys.rooms.grid(eventId),
+    callSite: 'v2-assign-guests-to-room',
+    deferUntilCommit: true,
+    message: (v) =>
+      `${v.headName} · ${v.count === 1 ? '1 guest' : `${v.count} guests`} placed`,
+    // The family's own numbers move on the tap: it keeps its place in the list
+    // with an honest "2 of 6 placed" and only leaves once nothing is left to
+    // place. `apply` can run before the first read has landed, so the empty
+    // branch has to be a value of the same shape rather than `undefined` — the
+    // write is only reachable from a family row, which means the real data was
+    // on screen a moment ago.
+    apply: (prev, v) => {
+      if (!prev) return { rooms: [], unplaced: [], underBedded: [] }
+      return {
+        ...prev,
+        underBedded: prev.underBedded
+          .map((f) =>
+            f.groupId === v.groupId
+              ? {
+                  ...f,
+                  placed: f.placed + v.count,
+                  shortfall: Math.max(0, f.shortfall - v.count),
+                }
+              : f,
+          )
+          .filter((f) => f.shortfall > 0),
+      }
     },
-  )
+    action: async (v) => {
+      const result = await assignGuestsToRoom(eventId, v.groupId, v.roomId, v.count)
+      if (result.ok) {
+        return { ok: true, data: { assigned: result.assigned, remaining: result.remaining } }
+      }
+
+      // 23514 from the merged guard is the ONE failure this screen has to
+      // explain, and it is NOT one failure. The guard raises the same SQLSTATE
+      // for a room at its bed ceiling and for a room that already holds an
+      // overlapping stay, and the second cannot be forced through at all — so
+      // saying "either" was the old copy's problem, and offering an override for
+      // an overlap would be worse. The action hands back WHICH cause it was, read
+      // from the trigger's own message; `roomGuardMessage` turns that into the
+      // sentence and the next step, and returns null for a cause it does not
+      // recognise — which is when the old either/or sentence is shown, now as a
+      // genuine fallback rather than as the answer to every failure.
+      if (result.code === 'capacity') {
+        return {
+          ok: false,
+          message:
+            roomGuardMessage(result.cause ?? null, { roomNumber: result.roomNumber }) ??
+            `Room ${result.roomNumber ?? v.roomId} took none of them — it is either full for those dates or has no bed left. Try fewer guests, or another room.`,
+        }
+      }
+      return { ok: false, message: result.error }
+    },
+    queue: { eventId, kind: 'assign-guests-room', what: 'room assignment' },
+  })
 
   const rooms = useMemo(() => data?.rooms ?? [], [data])
+
+  /**
+   * Every family short of a bed, nowhere-to-sleep first.
+   *
+   * Ordered by what a coordinator is looking for rather than alphabetically:
+   * a family with nobody housed at all is the urgent one, then the biggest gap.
+   * Within that, name order, so the same list reads the same way twice.
+   */
   const needing = useMemo(
     () =>
-      (data?.underBedded ?? [])
-        .filter((f) => f.placed === 0)
-        .sort((a, b) => a.headName.localeCompare(b.headName)),
+      [...(data?.underBedded ?? [])].sort((a, b) => {
+        if ((a.placed === 0) !== (b.placed === 0)) return a.placed === 0 ? -1 : 1
+        if (a.shortfall !== b.shortfall) return b.shortfall - a.shortfall
+        return a.headName.localeCompare(b.headName)
+      }),
     [data],
   )
-  const partlyPlaced = (data?.underBedded ?? []).filter((f) => f.placed > 0)
+
+  /**
+   * Where each family already is: `{ groupId: [{ roomNumber, count }] }`.
+   *
+   * Shown next to the family's name, because "2 of 6 placed" is a number and
+   * "2 in Room 412" is the fact a coordinator needs before deciding where the
+   * other four go. Derived from the room list rather than a second read.
+   */
+  const familyRooms = useMemo(() => {
+    const map = new Map<string, { roomNumber: string; count: number }[]>()
+    for (const room of rooms) {
+      const perFamily = new Map<string, number>()
+      for (const occupant of room.occupants) {
+        perFamily.set(occupant.groupId, (perFamily.get(occupant.groupId) ?? 0) + 1)
+      }
+      for (const [groupId, n] of perFamily) {
+        const list = map.get(groupId) ?? []
+        list.push({ roomNumber: room.roomNumber, count: n })
+        map.set(groupId, list)
+      }
+    }
+    return map
+  }, [rooms])
 
   const hotels = useMemo(() => {
     const names = new Set(rooms.filter((r) => !r.isBlocked).map((r) => r.hotelName))
@@ -165,29 +223,34 @@ export function GiveRoom({ eventId, eventCode, canOpenCallList }: GiveRoomProps)
   const pickable = useMemo(() => {
     const open = rooms.filter((r) => !r.isBlocked)
     const list = hotel === null ? open : open.filter((r) => r.hotelName === hotel)
-    const beds = pickerFor ? Math.max(1, pickerFor.shortfall) : 1
-    // Most headroom first, then the hotel/room order a person walking a
-    // corridor reads. Rooms that LOOK too small stay in the list: `freeBeds` is
-    // measured against `rooms.capacity`, and the database's own ceiling is
+    // Most headroom first, then the hotel/room order a person walking a corridor
+    // reads. Rooms that LOOK too small stay in the list: `freeBeds` is measured
+    // against `rooms.capacity`, and the database's own ceiling is
     // `max_capacity`, which this read does not carry — so the room that fits a
     // family of six may well be the one that reads "4 of 4 taken", and hiding it
     // would remove the only room that works.
     return [...list].sort((a, b) => {
-      const aRoom = a.capacity - a.occupants.length
-      const bRoom = b.capacity - b.occupants.length
-      const aFits = aRoom >= beds ? 1 : 0
-      const bFits = bRoom >= beds ? 1 : 0
+      const aFits = a.freeBeds >= count ? 1 : 0
+      const bFits = b.freeBeds >= count ? 1 : 0
       if (aFits !== bFits) return bFits - aFits
-      if (aFits === 1 && bFits === 1 && aRoom !== bRoom) return bRoom - aRoom
+      if (aFits === 1 && bFits === 1 && a.freeBeds !== b.freeBeds) return b.freeBeds - a.freeBeds
       const h = a.hotelName.localeCompare(b.hotelName)
       if (h !== 0) return h
       return a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true })
     })
-  }, [rooms, hotel, pickerFor])
+  }, [rooms, hotel, count])
 
   const blockedCount = rooms.filter((r) => r.isBlocked).length
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
   const stale = isFetching && data !== undefined
+
+  function openPicker(family: NeedingFamily) {
+    setHotel(null)
+    // Default to the whole family when a room can take them: the common case
+    // ("put them all in 412") then costs the same two taps it always did.
+    setCount(Math.max(1, family.shortfall))
+    setPickerFor(family)
+  }
 
   if (loadError && data === undefined) {
     return (
@@ -211,7 +274,9 @@ export function GiveRoom({ eventId, eventCode, canOpenCallList }: GiveRoomProps)
       ) : null}
 
       {/* One line, once per device, above the work. Tap anywhere to clear it. */}
-      <AppHint screen="rooms-give">Tap Give a room to place a family</AppHint>
+      <AppHint screen="rooms-give">
+        Tap Give a room, then pick how many and where
+      </AppHint>
 
       {assign.lastError ? (
         <p
@@ -264,49 +329,51 @@ export function GiveRoom({ eventId, eventCode, canOpenCallList }: GiveRoomProps)
         />
       ) : (
         <ul className="flex flex-col gap-2.5" aria-label="Families waiting for a room">
-          {needing.map((family) => (
-            <li
-              key={family.groupId}
-              className="list-fade flex flex-col gap-3 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-lg leading-snug font-medium text-ink">
-                    {displayName(family)}
-                  </h2>
-                  <p className="mt-0.5 text-sm text-muted">
-                    {family.headcount === 1
-                      ? '1 guest, no room yet'
-                      : `${family.headcount} guests, no room yet`}
-                  </p>
-                </div>
-                {family.memberRows < family.headcount ? (
-                  <StatusPill tone="neutral">Names to add</StatusPill>
-                ) : null}
-              </div>
-
-              <Button
-                size="lg"
-                fullWidth
-                onClick={() => {
-                  setHotel(null)
-                  setPickerFor(family)
-                }}
+          {needing.map((family) => {
+            const here = familyRooms.get(family.groupId) ?? []
+            return (
+              <li
+                key={family.groupId}
+                className="list-fade flex flex-col gap-3 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1"
               >
-                Give a room
-              </Button>
-            </li>
-          ))}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-lg leading-snug font-medium text-ink">
+                      {displayName(family)}
+                    </h2>
+                    <p className="mt-0.5 text-sm text-muted">
+                      {family.headcount === 1
+                        ? '1 guest'
+                        : `${family.headcount} guests`}
+                      {family.placed === 0
+                        ? ' · no room yet'
+                        : ` · ${family.placed} placed, ${family.shortfall} to go`}
+                    </p>
+                    {here.length > 0 ? (
+                      <p className="mt-0.5 text-sm text-muted">
+                        {here
+                          .map((r) =>
+                            r.count === 1
+                              ? `1 in Room ${r.roomNumber}`
+                              : `${r.count} in Room ${r.roomNumber}`,
+                          )
+                          .join(' · ')}
+                      </p>
+                    ) : null}
+                  </div>
+                  {family.memberRows < family.headcount ? (
+                    <StatusPill tone="neutral">Names to add</StatusPill>
+                  ) : null}
+                </div>
+
+                <Button size="lg" fullWidth onClick={() => openPicker(family)}>
+                  {family.placed === 0 ? 'Give a room' : 'Give more beds'}
+                </Button>
+              </li>
+            )
+          })}
         </ul>
       )}
-
-      {partlyPlaced.length > 0 ? (
-        <p className="rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-sm leading-snug text-muted">
-          {partlyPlaced.length === 1
-            ? '1 family already has a room but not enough beds for everyone. Tell your event lead which family it is.'
-            : `${partlyPlaced.length} families already have a room but not enough beds for everyone. Tell your event lead which family it is.`}
-        </p>
-      ) : null}
 
       {blockedCount > 0 ? (
         <p className="text-center text-xs leading-relaxed text-muted">
@@ -328,10 +395,52 @@ export function GiveRoom({ eventId, eventCode, canOpenCallList }: GiveRoomProps)
             </h2>
             <p className="text-sm leading-snug text-muted">
               {pickerFor
-                ? `${pickerFor.shortfall === 1 ? '1 guest' : `${pickerFor.shortfall} guests`} to place.`
+                ? pickerFor.placed === 0
+                  ? `${pickerFor.shortfall} to place. You can split them across rooms.`
+                  : `${pickerFor.placed} already placed, ${pickerFor.shortfall} to go. You can split them across rooms.`
                 : ''}
             </p>
           </div>
+
+          {/* HOW MANY — the stepper is the whole point of this screen. It
+              defaults to the family's remaining need, so placing all of them is
+              still one tap on the room; it comes down for a room that is
+              smaller, and the rest go somewhere else the same way. */}
+          {pickerFor ? (
+            <div
+              role="group"
+              aria-label="How many guests"
+              className="flex items-center justify-between gap-3 rounded-xl border border-rule-strong bg-surface px-3.5 py-2.5"
+            >
+              <span className="text-base font-medium text-ink">How many guests?</span>
+              <span className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCount((c) => Math.max(1, c - 1))}
+                  disabled={count <= 1}
+                  aria-label="One fewer guest"
+                  className="tap flex h-11 w-11 items-center justify-center rounded-lg border border-rule-strong text-ink active:bg-surface-2 disabled:opacity-40"
+                >
+                  <MinusIcon className="h-5 w-5" />
+                </button>
+                <span
+                  className="figure w-10 text-center text-xl leading-none font-medium text-ink"
+                  aria-live="polite"
+                >
+                  {count}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCount((c) => Math.min(pickerFor.shortfall, c + 1))}
+                  disabled={count >= pickerFor.shortfall}
+                  aria-label="One more guest"
+                  className="tap flex h-11 w-11 items-center justify-center rounded-lg border border-rule-strong text-ink active:bg-surface-2 disabled:opacity-40"
+                >
+                  <PlusIcon className="h-5 w-5" />
+                </button>
+              </span>
+            </div>
+          ) : null}
 
           {hotels.length > 1 ? (
             <div className="flex flex-wrap gap-2" role="group" aria-label="Which hotel">
@@ -352,11 +461,9 @@ export function GiveRoom({ eventId, eventCode, canOpenCallList }: GiveRoomProps)
               rooms.
             </p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-2" aria-label="Rooms to choose from">
               {pickable.map((room) => {
-                const beds = pickerFor ? Math.max(1, pickerFor.shortfall) : 1
-                const free = room.capacity - room.occupants.length
-                const tight = free < beds
+                const tight = room.freeBeds < count
                 return (
                   <li key={room.roomId}>
                     <button
@@ -367,6 +474,7 @@ export function GiveRoom({ eventId, eventCode, canOpenCallList }: GiveRoomProps)
                           groupId: pickerFor.groupId,
                           roomId: room.roomId,
                           headName: displayName(pickerFor),
+                          count,
                         })
                         setPickerFor(null)
                       }}
@@ -385,12 +493,18 @@ export function GiveRoom({ eventId, eventCode, canOpenCallList }: GiveRoomProps)
                         <span
                           className={cn(
                             'figure text-sm',
-                            free <= 0 ? 'text-ledger-red' : 'text-muted',
+                            room.freeBeds <= 0 ? 'text-ledger-red' : 'text-muted',
                           )}
                         >
                           {room.occupants.length} of {room.capacity} beds
                         </span>
-                        {tight ? <StatusPill tone="attention">May be too small</StatusPill> : null}
+                        {tight ? (
+                          <StatusPill tone="attention">
+                            {room.freeBeds <= 0
+                              ? 'May need an extra bed'
+                              : `Only ${room.freeBeds} free`}
+                          </StatusPill>
+                        ) : null}
                       </span>
                     </button>
                   </li>
