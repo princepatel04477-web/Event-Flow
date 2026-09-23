@@ -9,7 +9,6 @@ import { dialTarget } from '@/lib/native-call'
 import { formatMobile } from '@/lib/phone'
 import { SIDE_LABELS } from '@/lib/review/payload'
 import { rsvpStatusLabel } from '@/lib/rsvp'
-import { extractCallName } from '@/lib/rsvp-log'
 import { statusTone } from '@/lib/status'
 import { cn, formatDateTime } from '@/lib/utils'
 
@@ -52,8 +51,9 @@ export function CurrentFamilyCard({
   const callback = row.next_callback_at
   const canDial = dialTarget(mobile) !== null
 
-  // Fixed "Call 0" bug: uses extractCallName to cleanly extract family surname or head name
-  const callName = extractCallName(row.head_name)
+  // The button names the family the way the list does: the head's full display
+  // name, never a shortened form. A long name is ellipsised by CSS, not cut by
+  // string slicing, so "0 V12-Call Next" reads whole and the DOM keeps the rest.
   const relation = relationLabel(row.group_type)
 
   return (
@@ -107,7 +107,8 @@ export function CurrentFamilyCard({
         </p>
       ) : null}
 
-      {/* ONE filled primary button on this card: "Call <name>" (fixing "Call 0") */}
+      {/* ONE filled primary button on this card: "Call <full name>". A name
+          too long for the row is ellipsised by CSS, never by slicing. */}
       <Button
         variant="primary"
         size="lg"
@@ -116,9 +117,11 @@ export function CurrentFamilyCard({
         leadingIcon={<PhoneIcon className="h-5 w-5" aria-hidden />}
         onClick={onCall}
       >
-        {dialling
-          ? 'Logging the call…'
-          : `Call ${callName}${lock?.locked ? ' anyway' : ''}`}
+        <span className="min-w-0 truncate">
+          {dialling
+            ? 'Logging the call…'
+            : `Call ${headName}${lock?.locked ? ' anyway' : ''}`}
+        </span>
       </Button>
 
       {!canDial ? (

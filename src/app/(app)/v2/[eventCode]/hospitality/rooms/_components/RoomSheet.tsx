@@ -260,7 +260,7 @@ export function RoomSheet({
                     className="tap flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-left active:bg-surface-2"
                   >
                     <span className="min-w-0">
-                      <span className="figure block text-lg leading-none font-medium text-ink">
+                      <span className="block text-lg leading-none font-medium text-ink">
                         {target.roomNumber}
                       </span>
                       <span className="mt-1 block truncate text-sm text-muted">

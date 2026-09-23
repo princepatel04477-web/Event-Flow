@@ -742,7 +742,9 @@ function RoomsList({ hotels, eventCode, onOpen }: RoomsListProps) {
                         )}
                       >
                         <span className="min-w-0 flex-1">
-                          <span className="figure block text-base leading-snug font-medium text-ink">
+                          {/* The room number is a name, not a figure: sans, so
+                              it matches every other title on the screen. */}
+                          <span className="block text-base leading-snug font-medium text-ink">
                             {room.roomNumber} · {bedsLabel(occupied, room.capacity)}
                           </span>
                           <span className="mt-0.5 block truncate text-sm text-muted">

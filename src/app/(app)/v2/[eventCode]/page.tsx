@@ -223,7 +223,7 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
 
           {activeJobs.length > 0 ? (
             <div className="flex flex-col gap-3">
-              {activeJobs.map((job) => (
+              {activeJobs.map((job, index) => (
                 <div
                   key={job.id}
                   className="flex flex-col gap-3 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1"
@@ -231,10 +231,12 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
                   <p className="text-base leading-snug font-medium text-ink">
                     {job.description}
                   </p>
+                  {/* One filled primary per screen: the worst job keeps the
+                      gold fill, every job below it is an outline. */}
                   <LinkButton
                     href={job.href}
                     size="lg"
-                    variant="primary"
+                    variant={index === 0 ? 'primary' : 'secondary'}
                     fullWidth
                   >
                     {job.actionLabel}
