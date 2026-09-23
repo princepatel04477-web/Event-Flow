@@ -266,3 +266,226 @@ function parseCount(raw: string): number | null {
 export function toDisplayCount(raw: string): number {
   return parseCount(raw) ?? 0
 }
+
+// ---------------------------------------------------------------------------
+// Pure chip->value mappings & helper functions for v2 Calling Queue
+// ---------------------------------------------------------------------------
+
+export interface DateChipOption {
+  id: string
+  label: string
+  sublabel: string
+  dateString: string
+}
+
+/**
+ * Returns arrival date chip options for event days (-2...+1 around event start).
+ * e.g. for startsOn '2026-12-20':
+ * - day_-2: '2026-12-18' (18 Dec, -2d)
+ * - day_-1: '2026-12-19' (19 Dec, Eve)
+ * - day_0:  '2026-12-20' (20 Dec, Start)
+ * - day_+1: '2026-12-21' (21 Dec, Day 2)
+ */
+export function getArrivalDateChips(startsOn: string | null | undefined): DateChipOption[] {
+  const base = startsOn ? new Date(`${startsOn}T00:00:00`) : new Date()
+  const validBase = Number.isNaN(base.getTime()) ? new Date() : base
+
+  const offsets = [
+    { offset: -2, id: 'day_-2', sublabel: '-2d' },
+    { offset: -1, id: 'day_-1', sublabel: 'Eve' },
+    { offset: 0, id: 'day_0', sublabel: 'Start' },
+    { offset: 1, id: 'day_+1', sublabel: 'Day 2' },
+  ]
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+  return offsets.map(({ offset, id, sublabel }) => {
+    const d = new Date(validBase.getTime())
+    d.setDate(d.getDate() + offset)
+    const day = d.getDate()
+    const month = months[d.getMonth()]
+    const dateString = toDateInputValue(d)
+    return {
+      id,
+      label: `${day} ${month}`,
+      sublabel,
+      dateString,
+    }
+  })
+}
+
+export function arrivalDateChipToValue(
+  chipId: string,
+  startsOn: string | null | undefined,
+  customDate?: string,
+): string {
+  if (chipId === 'other') return customDate ?? ''
+  const chips = getArrivalDateChips(startsOn)
+  const found = chips.find((c) => c.id === chipId)
+  return found ? found.dateString : (customDate ?? '')
+}
+
+export const ARRIVAL_TIME_SLOTS = [
+  { id: 'morning', label: 'Morning', time: '09:00', hint: 'Around 9 AM' },
+  { id: 'afternoon', label: 'Afternoon', time: '14:00', hint: 'Around 2 PM' },
+  { id: 'evening', label: 'Evening', time: '18:00', hint: 'Around 6 PM' },
+  { id: 'night', label: 'Night', time: '21:00', hint: 'Around 9 PM' },
+] as const
+
+export type ArrivalTimeSlotId = (typeof ARRIVAL_TIME_SLOTS)[number]['id']
+
+export function arrivalTimeChipToValue(
+  slotId: ArrivalTimeSlotId | 'custom' | string,
+  customTime?: string,
+): string {
+  if (slotId === 'custom') return customTime ?? ''
+  const slot = ARRIVAL_TIME_SLOTS.find((s) => s.id === slotId)
+  return slot ? slot.time : (customTime ?? '')
+}
+
+export const TRAVEL_MODE_CHIPS = [
+  { id: 'train', label: 'Train', value: 'train' as const },
+  { id: 'flight', label: 'Flight', value: 'air' as const },
+  { id: 'bus', label: 'Bus', value: 'bus' as const },
+  { id: 'road', label: 'By road', value: 'self_drive' as const },
+] as const
+
+export type TravelModeChipId = (typeof TRAVEL_MODE_CHIPS)[number]['id']
+
+export function travelModeChipToValue(chipId: TravelModeChipId | string): TravelMode {
+  const match = TRAVEL_MODE_CHIPS.find((m) => m.id === chipId)
+  return match ? match.value : 'self_drive'
+}
+
+export const CALLBACK_CHIPS = [
+  { id: '1hour', label: 'In 1 hour' },
+  { id: 'evening', label: 'This evening' },
+  { id: 'tomorrow_morning', label: 'Tomorrow morning' },
+  { id: 'custom', label: 'Pick time' },
+] as const
+
+export type CallbackChipId = (typeof CALLBACK_CHIPS)[number]['id']
+
+export function toDateTimeLocalValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+export function callbackChipToValue(
+  chipId: CallbackChipId | string,
+  baseDate: Date = new Date(),
+  customValue?: string,
+): string {
+  if (chipId === 'custom') return customValue ?? ''
+  const d = new Date(baseDate.getTime())
+  if (chipId === '1hour') {
+    d.setHours(d.getHours() + 1)
+    d.setMinutes(Math.round(d.getMinutes() / 5) * 5, 0, 0)
+    return toDateTimeLocalValue(d)
+  }
+  if (chipId === 'evening') {
+    if (d.getHours() >= 17) {
+      d.setDate(d.getDate() + 1)
+    }
+    d.setHours(18, 0, 0, 0)
+    return toDateTimeLocalValue(d)
+  }
+  if (chipId === 'tomorrow_morning') {
+    d.setDate(d.getDate() + 1)
+    d.setHours(10, 0, 0, 0)
+    return toDateTimeLocalValue(d)
+  }
+  return customValue ?? ''
+}
+
+/**
+ * Extracts a respectful call name from a family/head name,
+ * fixing the "Call 0" bug where leading digits or serial numbers were picked.
+ *
+ * e.g.:
+ * - "0 V12-Call Next" -> "V12-Call" (never "0")
+ * - "0 Sharma" -> "Sharma"
+ * - "Ramesh Sharma" -> "Sharma"
+ * - "Sharma, Ramesh" -> "Sharma"
+ * - "Mr. Ramesh Sharma" -> "Sharma"
+ * - "Sharma Family" -> "Sharma"
+ * - "Pooja" -> "Pooja"
+ * - "0" or "" or null -> "family"
+ */
+export function extractCallName(rawName: string | null | undefined): string {
+  if (!rawName) return 'family'
+  let s = rawName.trim()
+  if (!s || s === 'Unnamed' || s === 'Unnamed family') return 'family'
+
+  // Strip leading numbers/indexes and separators like "0 ", "01. ", "0 - ", "01) "
+  s = s.replace(/^[\d\s\-_.:#)]+/, '').trim()
+  if (!s) return 'family'
+
+  // If "LastName, FirstName", take LastName
+  if (s.includes(',')) {
+    const beforeComma = s.split(',')[0].trim()
+    if (beforeComma) return beforeComma
+  }
+
+  // Strip common honorifics
+  s = s.replace(/^(mr|mrs|ms|dr|prof|shri|smt|er)\.?\s+/i, '').trim()
+
+  // Strip trailing "Family", "Parivar", "Household"
+  s = s.replace(/\s+(family|parivar|household)$/i, '').trim()
+
+  const words = s.split(/\s+/).filter(Boolean)
+  if (words.length === 0) return 'family'
+  if (words.length === 1) return words[0]
+
+  const lastWord = words[words.length - 1]
+  const firstWord = words[0]
+
+  if (/^[A-Za-z]+$/.test(lastWord) && !/^(next|test|proof)$/i.test(lastWord)) {
+    return lastWord
+  }
+  return firstWord || s
+}
+
+export interface BuildRsvpLogPayloadParams {
+  rsvpStatus: RsvpStatus
+  adultsCount: number
+  childrenCount: number
+  arrivalDate: string
+  arrivalTime: string
+  travelMode: TravelMode | ''
+  flightTrainNo?: string
+  needsPickup: boolean
+  departureDate?: string
+  departureTime?: string
+  departureMode?: TravelMode | ''
+  departureFlightTrainNo?: string
+  callbackDatetime?: string
+  notes?: string
+}
+
+export function buildRsvpLogPayload(params: BuildRsvpLogPayloadParams): RsvpLogFormValues {
+  return {
+    rsvpStatus: params.rsvpStatus,
+    adultsConfirmed: params.adultsCount > 0 ? String(params.adultsCount) : '',
+    childrenConfirmed: params.childrenCount > 0 ? String(params.childrenCount) : '',
+    needsPickup: params.needsPickup,
+    specialRequirements: [],
+    callbackDatetime: params.callbackDatetime ?? '',
+    notes: params.notes ?? '',
+    arrival: {
+      mode: params.travelMode || '',
+      date: params.arrivalDate || '',
+      time: params.arrivalTime || '',
+      location: '',
+      flightTrainNo: params.flightTrainNo ?? '',
+    },
+    departure: {
+      mode: params.departureMode || '',
+      date: params.departureDate || '',
+      time: params.departureTime || '',
+      location: '',
+      flightTrainNo: params.departureFlightTrainNo ?? '',
+    },
+  }
+}
+
