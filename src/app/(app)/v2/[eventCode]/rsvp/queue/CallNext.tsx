@@ -1,15 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
-import { AlertTriangleIcon, InboxIcon } from '@/components/icons'
+import { InboxIcon } from '@/components/icons'
+import { BottomBar } from '@/components/ui/BottomBar'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { LoadingRows } from '@/components/ui/LoadingRows'
-import { PageTitle } from '@/components/ui/PageTitle'
-import { SyncChip } from '@/components/ui/SyncChip'
+import { Progress } from '@/components/ui/Progress'
 import { startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
 import { saveRsvpLog } from '@/lib/actions/rsvp'
 import {
@@ -32,14 +32,12 @@ import {
 import { captureDiagnostic } from '@/lib/sentry'
 import { createClient } from '@/lib/supabase/client'
 
-import { AppHint } from '../../_components/AppHint'
 import { AdminCampaignsLink } from './AdminCampaignsLink'
-import { CallbackCaptureStep } from './CallbackCaptureStep'
+import { AlternateOutcomeSheet } from './AlternateOutcomeSheet'
 import { CurrentFamilyCard } from './CurrentFamilyCard'
-import { FamilyQueueList } from './FamilyQueueList'
+import { FamilyQueueSheet } from './FamilyQueueSheet'
 import { InlineCaptureStep } from './InlineCaptureStep'
 import { OutcomeButtons } from './OutcomeButtons'
-import { ProgressAndFilters } from './ProgressAndFilters'
 import type { CallNextProps, FamilyRow, FilterChipId, OutcomeStatus, QueueRow } from './types'
 
 const QUEUE_OFFSET_KEY = 'eventflow:queue:offset'
@@ -109,17 +107,17 @@ interface OutcomeVars {
 export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: CallNextProps) {
   const supabase = useMemo(() => createClient(), [])
 
-  // Filter state per SPEC §B: To call | Call back | Coming | Not coming | All
   const [activeFilter, setActiveFilter] = useState<FilterChipId>('to_call')
-
-  // Selected family override (tapping row in list below)
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
-
-  // Active inline capture expansion ('confirmed' | 'tentative' | 'callback' | null)
   const [activeInlineOutcome, setActiveInlineOutcome] = useState<OutcomeStatus | null>(null)
+  const [queueSheetOpen, setQueueSheetOpen] = useState(false)
+  const [alternateSheetOpen, setAlternateSheetOpen] = useState(false)
 
   const [dialError, setDialError] = useState<string | null>(null)
   const [diallingGroupId, setDiallingGroupId] = useState<string | null>(null)
+
+  const [deferredSubmit, setDeferredSubmit] = useState<(() => void) | null>(null)
+  const [deferredCanSave, setDeferredCanSave] = useState(false)
 
   const attemptRef = useRef<StoredCallAttempt | null>(null)
 
@@ -133,13 +131,11 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
     [],
   )
 
-  // Query all queue rows for the event
   const queueKey = useMemo(() => queryKeys.rsvp.queue(eventId, filters), [eventId, filters])
 
   const {
     data: rawRows,
     isPending,
-    isFetching,
     error,
     refetch,
   } = useQuery({
@@ -149,19 +145,13 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
 
   const allRows = useMemo(() => rawRows ?? [], [rawRows])
 
-  // Progress stats computed from all rows
   const totalCount = allRows.length
-  const calledCount = allRows.filter(
+  const doneCount = allRows.filter(
     (r) =>
       (r.rsvp_status && r.rsvp_status !== 'not_started') ||
       (r.attempt_count !== null && r.attempt_count > 0),
   ).length
-  const comingCount = allRows.filter((r) => r.rsvp_status === 'confirmed').length
-  const callbackCount = allRows.filter(
-    (r) => r.rsvp_status === 'callback' || r.next_callback_at !== null,
-  ).length
 
-  // Filter rows based on active filter chip
   const filteredRows = useMemo(() => {
     switch (activeFilter) {
       case 'to_call':
@@ -188,10 +178,8 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
 
   const callable = useMemo(() => filteredRows.filter((r) => r.group_id !== null), [filteredRows])
 
-  // Offset per session to distribute staff across the list
   const [offset] = useState(() => getOrCreateOffset())
 
-  // Current family determination: selected row wins, else offset/first
   const current = useMemo<QueueRow | null>(() => {
     if (callable.length === 0) return null
     if (selectedGroupId) {
@@ -203,7 +191,6 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
 
   const currentId = current?.group_id ?? null
 
-  // Fetch full details for the current family
   const { data: rawFamily, error: familyError } = useQuery({
     queryKey: queryKeys.families.detail(eventId, currentId ?? 'none'),
     queryFn: () => fetchFamily(supabase, eventId, currentId as string),
@@ -213,7 +200,6 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
 
   const family = (rawFamily ?? null) as FamilyRow | null
 
-  // Caller lock state
   const staffNames = useStaffNames(eventId)
   const currentLock = useMemo(
     () =>
@@ -231,18 +217,11 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
   )
 
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
-  const isStale = isFetching && rawRows !== undefined
-  const lockedAhead = useMemo(
-    () => callable.filter((r) => r.is_locked === true).length,
-    [callable],
-  )
 
-  // Optimistic action for logging outcomes
   const outcome = useOptimisticAction<QueueRow[], OutcomeVars, GuestGroupRow>({
     queryKey: queueKey,
     callSite: 'v2-rsvp-outcome',
     apply: (prev, v) => {
-      // Optimistically update the row in the queue cache
       return (prev ?? []).map((r) => {
         if (r.group_id !== v.groupId) return r
         return {
@@ -299,7 +278,6 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
 
   const writeError = outcome.lastError
 
-  // Dialler visibility listener
   useEffect(() => {
     function onVisible() {
       if (document.visibilityState !== 'visible') return
@@ -314,7 +292,6 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
-  // Handle dial
   async function handleCall(row: QueueRow) {
     const groupId = row.group_id
     if (!groupId || diallingGroupId !== null) return
@@ -364,23 +341,21 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
     await placeCall(target)
   }
 
-  // Handle outcome selection
-  function handleSelectOutcome(choice: OutcomeStatus) {
-    if (choice === 'confirmed' || choice === 'tentative') {
-      // Toggle or set inline capture step
-      setActiveInlineOutcome((prev) => (prev === choice ? null : choice))
-      return
-    }
+  function advanceToNextFamily(savedGroupId: string) {
+    setActiveInlineOutcome(null)
+    setDeferredSubmit(null)
+    setDeferredCanSave(false)
+    setAlternateSheetOpen(false)
 
-    if (choice === 'callback') {
-      setActiveInlineOutcome((prev) => (prev === 'callback' ? null : 'callback'))
-      return
-    }
-
-    // Terminal choices: 'unreachable' (No answer) and 'declined' (Not coming)
-    // One-tap instant log and auto-advance per SPEC §B
-    if (current) {
-      logOutcomeDirectly(current, choice)
+    const currentIndex = callable.findIndex((r) => r.group_id === savedGroupId)
+    if (currentIndex !== -1 && currentIndex + 1 < callable.length) {
+      const nextGroup = callable[currentIndex + 1]
+      setSelectedGroupId(nextGroup.group_id)
+    } else if (callable.length > 1) {
+      const firstOther = callable.find((r) => r.group_id !== savedGroupId)
+      setSelectedGroupId(firstOther?.group_id ?? null)
+    } else {
+      setSelectedGroupId(null)
     }
   }
 
@@ -413,11 +388,9 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
       },
     })
 
-    // Auto-advance
     advanceToNextFamily(groupId)
   }
 
-  // Save from InlineCaptureStep (Coming / Maybe)
   function handleSaveInline(values: RsvpLogFormValues) {
     if (!current?.group_id) return
     const groupId = current.group_id
@@ -439,7 +412,6 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
     advanceToNextFamily(groupId)
   }
 
-  // Save from CallbackCaptureStep
   function handleSaveCallback(callbackDatetime: string) {
     if (!current?.group_id) return
     const groupId = current.group_id
@@ -470,62 +442,42 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
     advanceToNextFamily(groupId)
   }
 
-  // Auto-advance helper: moves to next family in callable list and closes inline forms
-  function advanceToNextFamily(savedGroupId: string) {
-    setActiveInlineOutcome(null)
+  const handleSubmitReady = useCallback((submit: () => void, canSave: boolean) => {
+    setDeferredSubmit(() => submit)
+    setDeferredCanSave(canSave)
+  }, [])
 
-    // Find next family in callable list
-    const currentIndex = callable.findIndex((r) => r.group_id === savedGroupId)
-    if (currentIndex !== -1 && currentIndex + 1 < callable.length) {
-      const nextGroup = callable[currentIndex + 1]
-      setSelectedGroupId(nextGroup.group_id)
-    } else if (callable.length > 1) {
-      const firstOther = callable.find((r) => r.group_id !== savedGroupId)
-      setSelectedGroupId(firstOther?.group_id ?? null)
-    } else {
-      setSelectedGroupId(null)
-    }
-  }
+  const showCapture =
+    activeInlineOutcome === 'confirmed' || activeInlineOutcome === 'tentative'
+  const showBottomBar = showCapture && activeInlineOutcome === 'confirmed'
+
+  const familiesLeft = callable.length
 
   if (loadError && !rawRows) {
     return (
       <div className="flex flex-col gap-4">
-        <PageTitle>Call the next family</PageTitle>
         <ErrorState title={loadError} onRetry={() => void refetch()} />
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-20">
-      {/* Top Header Row with Title and Admin Link */}
-      <div className="flex items-start justify-between gap-3">
-        <PageTitle className="min-w-0 flex-1">Call the next family</PageTitle>
-        {/* Admin link for auto-call rounds moved off the caller's path per SPEC §B */}
-        <AdminCampaignsLink eventCode={eventCode} isAdmin={isAdmin} />
-      </div>
-
-      {isStale ? (
-        <p role="status" className="-mt-2 text-xs text-muted">
-          Updating queue…
-        </p>
+    <div className="flex flex-col gap-4 pb-nav-bottombar">
+      {isAdmin ? (
+        <div className="flex justify-end">
+          <AdminCampaignsLink eventCode={eventCode} isAdmin={isAdmin} />
+        </div>
       ) : null}
 
-      {/* Progress line & filter chips per SPEC §B */}
-      <ProgressAndFilters
-        totalCount={totalCount}
-        calledCount={calledCount}
-        comingCount={comingCount}
-        callbackCount={callbackCount}
-        activeFilter={activeFilter}
-        onFilterChange={(f) => {
-          setActiveFilter(f)
-          setActiveInlineOutcome(null)
-          setSelectedGroupId(null)
-        }}
-      />
-
-      <AppHint screen="rsvp-queue">Tap a family below to switch to them</AppHint>
+      {totalCount > 0 ? (
+        <Progress
+          label="Families called"
+          done={doneCount}
+          total={totalCount}
+          tone="green"
+          ariaLabel={`${doneCount} of ${totalCount} families called`}
+        />
+      ) : null}
 
       {writeError ? (
         <p
@@ -536,28 +488,25 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
         </p>
       ) : null}
 
-      <SyncChip count={outcome.queuedCount} what="call outcome" />
-
       {isPending ? (
         <LoadingRows count={3} />
       ) : callable.length === 0 || current === null ? (
         <EmptyState
           icon={<InboxIcon className="h-7 w-7" />}
-          title={activeFilter === 'to_call' ? "That's everyone!" : 'No families in this filter'}
+          title={activeFilter === 'to_call' ? "That's everyone" : 'No families here'}
           description={
             activeFilter === 'to_call'
-              ? 'Every family in this queue has been called. View other families with the chips above.'
-              : 'No families match this filter right now.'
+              ? 'Every family in this list has been called.'
+              : 'Try another filter in the full list.'
           }
           action={
-            <Button variant="secondary" fullWidth onClick={() => setActiveFilter('all')}>
-              View all families
+            <Button variant="secondary" fullWidth onClick={() => setQueueSheetOpen(true)}>
+              See all families
             </Button>
           }
         />
       ) : (
         <>
-          {/* Current Family Card per SPEC §B */}
           <CurrentFamilyCard
             row={current}
             dialling={diallingGroupId === current.group_id}
@@ -566,39 +515,33 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
           />
 
           {familyError ? (
-            <p className="flex items-start gap-2 rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-sm text-muted">
-              <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-ledger-red" aria-hidden />
-              <span>Could not read saved details. Reconnecting…</span>
-            </p>
+            <p className="text-sm text-muted">Could not read saved details. Reconnecting…</p>
           ) : null}
 
-          {/* Neutral Segmented Outcome Buttons per SPEC §B */}
           <OutcomeButtons
-            activeOutcome={activeInlineOutcome}
-            onSelectOutcome={handleSelectOutcome}
+            activeOutcome={activeInlineOutcome === 'confirmed' ? 'confirmed' : null}
             disabled={family === null && !familyError}
+            onSelectComing={() =>
+              setActiveInlineOutcome((prev) => (prev === 'confirmed' ? null : 'confirmed'))
+            }
+            onSelectNotComing={() => logOutcomeDirectly(current, 'declined')}
+            onSelectNoAnswer={() => logOutcomeDirectly(current, 'unreachable')}
+            onOpenAlternate={() => setAlternateSheetOpen(true)}
           />
 
-          {/* Inline Capture Step for Coming / Maybe */}
-          {activeInlineOutcome === 'confirmed' || activeInlineOutcome === 'tentative' ? (
+          {showCapture ? (
             <InlineCaptureStep
-              status={activeInlineOutcome}
+              status={activeInlineOutcome as 'confirmed' | 'tentative'}
               family={family}
               expectedPax={current.expected_pax ?? current.confirmed_pax ?? 1}
               startsOn={startsOn}
               endsOn={endsOn}
               onSave={handleSaveInline}
               onCancel={() => setActiveInlineOutcome(null)}
-              isSaving={outcome.syncState === 'sending'}
-            />
-          ) : null}
-
-          {/* Inline Capture Step for Call back */}
-          {activeInlineOutcome === 'callback' ? (
-            <CallbackCaptureStep
-              onSave={handleSaveCallback}
-              onCancel={() => setActiveInlineOutcome(null)}
-              isSaving={outcome.syncState === 'sending'}
+              deferSubmit={activeInlineOutcome === 'confirmed'}
+              onSubmitReady={
+                activeInlineOutcome === 'confirmed' ? handleSubmitReady : undefined
+              }
             />
           ) : null}
 
@@ -611,18 +554,55 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
             </p>
           ) : null}
 
-          {/* Family List Below: compact rows, tapping makes it current, not hidden by tabs */}
-          <FamilyQueueList
-            rows={callable}
-            currentGroupId={currentId}
-            onSelectFamily={(gid) => {
-              setSelectedGroupId(gid)
-              setActiveInlineOutcome(null)
-            }}
-            lockedCount={lockedAhead}
-          />
+          <button
+            type="button"
+            onClick={() => setQueueSheetOpen(true)}
+            className="tap min-h-11 text-center text-sm font-medium text-brand underline-offset-2 hover:underline"
+          >
+            See all families ({callable.length})
+          </button>
         </>
       )}
+
+      <FamilyQueueSheet
+        open={queueSheetOpen}
+        onClose={() => setQueueSheetOpen(false)}
+        rows={callable}
+        currentGroupId={currentId}
+        activeFilter={activeFilter}
+        onFilterChange={(f) => {
+          setActiveFilter(f)
+          setActiveInlineOutcome(null)
+          setSelectedGroupId(null)
+        }}
+        onSelectFamily={(gid) => {
+          setSelectedGroupId(gid)
+          setActiveInlineOutcome(null)
+        }}
+      />
+
+      <AlternateOutcomeSheet
+        open={alternateSheetOpen}
+        onClose={() => setAlternateSheetOpen(false)}
+        onSaveCallback={handleSaveCallback}
+        onPickMaybe={() => setActiveInlineOutcome('tentative')}
+        isSaving={outcome.syncState === 'sending'}
+      />
+
+      {showBottomBar ? (
+        <BottomBar
+          summary={
+            familiesLeft <= 1
+              ? 'Last family in this list'
+              : `${familiesLeft - 1} more in this list`
+          }
+          primary={{
+            label: 'Save · next family',
+            onPress: () => deferredSubmit?.(),
+            disabled: !deferredCanSave || outcome.syncState === 'sending',
+          }}
+        />
+      ) : null}
     </div>
   )
 }

@@ -7,7 +7,7 @@ import { getViewer, resolveEventByCode } from '@/lib/supabase/queries'
 import { CallNext } from './CallNext'
 
 export const metadata: Metadata = {
-  title: 'Call the next family',
+  title: 'Calls',
 }
 
 type PageProps = {

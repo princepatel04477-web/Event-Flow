@@ -22,7 +22,7 @@ import { describe, expect, it } from 'vitest'
 
 const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8')
 
-const FILTERS = 'src/app/(app)/v2/[eventCode]/rsvp/queue/ProgressAndFilters.tsx'
+const FILTERS = 'src/app/(app)/v2/[eventCode]/rsvp/queue/FamilyQueueSheet.tsx'
 const CARD = 'src/app/(app)/v2/[eventCode]/rsvp/queue/CurrentFamilyCard.tsx'
 const CHIP = 'src/components/ui/Chip.tsx'
 
@@ -141,9 +141,9 @@ describe('Current family heading: shrinks and clamps, never breaks mid-token', (
   })
 
   it('keeps the full name in the accessible label', () => {
-    // The clamp is presentational. The name a screen reader announces, and the
-    // name the Call button says, are both the untruncated string.
+    // The clamp is presentational. The name a screen reader announces is the
+    // untruncated string; the Call control names the family in aria-label.
     expect(src).toContain('aria-label={`Current family: ${headName}`}')
-    expect(src).toContain('`Call ${headName}')
+    expect(src).toContain('aria-label={`Call ${headName}`}')
   })
 })

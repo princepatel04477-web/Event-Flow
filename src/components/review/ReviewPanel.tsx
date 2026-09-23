@@ -1,17 +1,14 @@
 'use client'
 
-import { forwardRef, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { acceptExtractionWithAudit, type FieldReviewDecision } from '@/lib/actions/review-audit'
-import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
-import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card'
+import { BottomBar } from '@/components/ui/BottomBar'
+import { Chip } from '@/components/ui/Chip'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { StatusPill } from '@/components/ui/StatusPill'
 import { Textarea } from '@/components/ui/Textarea'
-import { AlertTriangleIcon, CheckCircleIcon, ShieldAlertIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { formatMobile } from '@/lib/phone'
 import type { Json } from '@/lib/supabase/database.types'
@@ -89,10 +86,28 @@ export interface ReviewPanelProps {
 
 type Decision = 'accepted' | 'edited' | 'rejected'
 
+/**
+ * The one-word state of a decided field, as a `Row`-style word plus a tone.
+ * Wording is fixed here so the row, the commit summary and the audit trail all
+ * say the same thing.
+ */
 const DECISION_META: Record<Decision, { label: string; tone: 'done' | 'active' | 'attention' }> = {
   accepted: { label: 'Accepted', tone: 'done' },
   edited: { label: 'Edited', tone: 'active' },
   rejected: { label: 'Rejected', tone: 'attention' },
+}
+
+const DOT_TONE: Record<'neutral' | 'done' | 'waiting' | 'problem', string> = {
+  neutral: 'bg-subtle',
+  done: 'bg-ledger-green',
+  waiting: 'bg-ledger-amber',
+  problem: 'bg-ledger-red',
+}
+
+const DECISION_DOT: Record<Decision, keyof typeof DOT_TONE> = {
+  accepted: 'done',
+  edited: 'waiting',
+  rejected: 'problem',
 }
 
 export function ReviewPanel({
@@ -261,59 +276,63 @@ export function ReviewPanel({
   // --- Render -----------------------------------------------------------
   const lowCount = lowFields.size
 
-  return (
-    <div className="flex flex-col gap-4 pb-4">
-      <div className="flex flex-col gap-4">
-        {/* Family header */}
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <h2 className="truncate text-lg font-semibold text-fg">{headName}</h2>
-              <p className="mt-0.5 text-sm text-muted">
-                {[
-                  primaryMobile ? formatMobile(primaryMobile) : null,
-                  side ? (SIDE_LABELS[side as keyof typeof SIDE_LABELS] ?? side) : null,
-                  `${expectedPax} expected`,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </p>
-            </CardTitle>
-            <div className="flex shrink-0 flex-col items-end gap-1">
-              <StatusPill tone={lowCount > 0 ? 'attention' : 'done'} size="sm">
-                {lowCount > 0 ? `${lowCount} low-confidence` : 'Looks solid'}
-              </StatusPill>
-              {callDurationLabel ? (
-                <span className="text-xs text-subtle">{callDurationLabel}</span>
-              ) : null}
-            </div>
-          </CardHeader>
-          {callDateLabel ? (
-            <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm text-muted">
-              <span>{callDateLabel}</span>
-            </CardBody>
-          ) : null}
-        </Card>
+  const familyMeta = [
+    primaryMobile ? formatMobile(primaryMobile) : null,
+    side ? (SIDE_LABELS[side as keyof typeof SIDE_LABELS] ?? side) : null,
+    `${expectedPax} expected`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
-        {/* Pinned audio + transcript */}
-        <Card>
+  return (
+    <div className="flex flex-col gap-4 pb-nav-bottombar">
+      <div className="flex flex-col gap-4">
+        {/* WHO AND WHEN. The shell's header names the section; the record's own
+            identity is the first thing in the body. */}
+        <section
+          className="flex flex-col gap-2 rounded-2xl border border-rule bg-surface p-4 shadow-e1"
+          aria-label={`Reviewing ${headName}`}
+        >
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 className="line-clamp-2 font-display text-xl leading-tight font-semibold break-words text-ink">
+                {headName}
+              </h2>
+              <p className="mt-1 truncate text-sm text-muted">{familyMeta}</p>
+            </div>
+            <span className="flex shrink-0 items-center gap-2 pt-1">
+              <span
+                aria-hidden
+                className={cn('h-2.5 w-2.5 rounded-full', lowCount > 0 ? DOT_TONE.problem : DOT_TONE.done)}
+              />
+              <span className="text-sm font-medium text-muted">
+                {lowCount > 0
+                  ? `${lowCount} to check`
+                  : fields.length > 0 && allDecided
+                    ? 'Ready'
+                    : 'Looks solid'}
+              </span>
+            </span>
+          </div>
+          {callDateLabel || callDurationLabel ? (
+            <p className="text-sm text-muted">
+              {[callDateLabel, callDurationLabel].filter(Boolean).join(' · ')}
+            </p>
+          ) : null}
+        </section>
+
+        {/* THE EVIDENCE: the call itself. Pinned, because every field tap
+            scrubs this exact element. */}
+        <section className="flex flex-col rounded-2xl border border-rule bg-surface">
           {audio?.url ? (
-            <CardBody className="border-b border-rule py-3">
-              {/* The pinned player. A field tap scrubs this exact element. */}
+            <div className="border-b border-rule p-3">
               <audio ref={audioRef} controls src={audio.url} className="w-full" preload="metadata" />
-            </CardBody>
+            </div>
           ) : null}
 
           {transcriptText ? (
-            <CardBody className="py-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="eyebrow">Transcript</p>
-                {transcriptSegments?.some((s) => s.speaker === 'guest') ? (
-                  <span className="text-xs text-subtle">
-                    Guest turns in verdigris · staff in slate
-                  </span>
-                ) : null}
-              </div>
+            <div className="p-3">
+              <p className="mb-2 text-sm font-medium text-muted">Transcript</p>
               <div
                 ref={transcriptRef}
                 className="max-h-56 overflow-y-auto text-[0.95rem] leading-relaxed"
@@ -328,19 +347,20 @@ export function ReviewPanel({
                     />
                   ))
                 ) : (
-                  <p className="whitespace-pre-wrap text-fg">{transcriptText}</p>
+                  <p className="whitespace-pre-wrap text-ink">{transcriptText}</p>
                 )}
               </div>
-            </CardBody>
+            </div>
           ) : (
-            <CardBody className="py-3 text-sm text-muted">
-              No transcript is attached to this extraction. Review the fields below on their own.
-            </CardBody>
+            <p className="p-3 text-sm text-muted">
+              No transcript on this extraction. Review the fields below on their own.
+            </p>
           )}
-        </Card>
+        </section>
 
-        {/* Field decision rows */}
-        <div className="flex flex-col gap-3">
+        {/* FIELD DECISIONS. Low-confidence first — the ones that need a person
+            are the ones a person sees first. */}
+        <div className="flex flex-col gap-2.5">
           {orderedFields.map((field) => {
             const evidence = fieldEvidence[field.modelPath ?? field.path]
             return (
@@ -366,63 +386,57 @@ export function ReviewPanel({
 
       {/* Errors that block commit */}
       {clearAttempts.length > 0 ? (
-        <Card className="border-danger/40 bg-tint-danger">
-          <CardBody className="py-3 text-sm text-danger">
-            <p className="font-semibold">
-              {clearAttempts.length} field{clearAttempts.length === 1 ? '' : 's'} can&apos;t be
-              cleared this way.
-            </p>
-            <p className="mt-0.5">
-              apply_rsvp_extraction() keeps the existing value whenever a field is left blank.
-              Type a replacement value for each flagged field.
-            </p>
-          </CardBody>
-        </Card>
+        <div className="rounded-xl border border-ledger-red/40 bg-red-tint px-3.5 py-3 text-sm text-ledger-red">
+          <p className="font-semibold">
+            {clearAttempts.length} field{clearAttempts.length === 1 ? '' : 's'} can&apos;t be
+            cleared this way.
+          </p>
+          <p className="mt-0.5">
+            A blank field keeps the existing value. Type a replacement for each flagged field.
+          </p>
+        </div>
+      ) : null}
+
+      {summaryOpen ? (
+        <CommitSummary fields={fields} decisions={decisions} values={values} />
       ) : null}
 
       {error ? (
         <p
           role="alert"
-          className="rounded-xl border border-danger bg-tint-danger px-4 py-3 text-sm font-medium text-danger"
+          className="rounded-xl border border-ledger-red/40 bg-red-tint px-3.5 py-3 text-sm font-medium text-ledger-red"
         >
           {error}
         </p>
       ) : null}
 
-      {/* Commit */}
-      <Card>
-        <CardBody className="flex flex-col gap-3">
-          {unresolved.length > 0 ? (
-            <p className="text-sm text-muted">
-              {unresolved.length} field{unresolved.length === 1 ? '' : 's'} still need a decision.
-            </p>
-          ) : (
-            <p className="text-sm text-success">
-              Every field has a decision. Ready to commit to guest data.
-            </p>
-          )}
-
-          {summaryOpen ? (
-            <CommitSummary
-              fields={fields}
-              decisions={decisions}
-              values={values}
-              onConfirm={handleCommit}
-              onCancel={() => setSummaryOpen(false)}
-              busy={pendingAction !== null}
-            />
-          ) : (
-            <Button
-              size="lg"
-              fullWidth
-              onClick={() => setSummaryOpen(true)}
-              disabled={!canCommit || pendingAction !== null}
-            >
-              Review &amp; commit
-            </Button>
-          )}
-        </CardBody>
-      </Card>
+      {/* The screen's ONE primary: commit. The two-step (a summary of what
+          changes, then the commit) is kept — this is the only path from AI
+          output into guest data, and `delivery_proofs`-style irreversibility
+          rules do not apply here but a wrong commit is still a data edit. */}
+      <BottomBar
+        summary={
+          unresolved.length > 0
+            ? `${unresolved.length} of ${fields.length} still need a decision`
+            : clearAttempts.length > 0
+              ? 'Fix the flagged fields before committing'
+              : 'Every field decided'
+        }
+        secondary={summaryOpen ? { label: 'Keep reviewing', onPress: () => setSummaryOpen(false) } : undefined}
+        primary={
+          summaryOpen
+            ? {
+                label: 'Commit',
+                onPress: () => void handleCommit(),
+                disabled: !canCommit || pendingAction !== null,
+              }
+            : {
+                label: 'Review & commit',
+                onPress: () => setSummaryOpen(true),
+                disabled: !canCommit || pendingAction !== null,
+              }
+        }
+      />
     </div>
   )
 }
@@ -431,6 +445,13 @@ export function ReviewPanel({
 // Sub-components
 // ---------------------------------------------------------------------------
 
+/**
+ * One transcript turn.
+ *
+ * The speaker label is small sans, not a tracked monospace capital: the v3
+ * look deletes uppercase mono eyebrows outright, and the colour already
+ * separates the two speakers at a glance.
+ */
 function TranscriptLine({
   segment,
   isSelected,
@@ -442,20 +463,12 @@ function TranscriptLine({
   return (
     <div
       data-quote={escapeSelector(segment.text)}
-      className={cn(
-        'rounded-lg px-2 py-1',
-        isSelected && 'bg-brand-tint ring-1 ring-brand/40',
-      )}
+      className={cn('rounded-lg px-2 py-1', isSelected && 'bg-brand-tint ring-1 ring-brand/40')}
     >
-      <span
-        className={cn(
-          'text-[0.6875rem] font-mono uppercase tracking-eyebrow',
-          isGuest ? 'text-ledger-green' : 'text-muted',
-        )}
-      >
+      <span className={cn('text-xs font-medium', isGuest ? 'text-ledger-green' : 'text-muted')}>
         {isGuest ? 'Guest' : 'Staff'}
       </span>
-      <p className={cn('text-fg', isGuest && 'text-ledger-green-strong')}>{segment.text}</p>
+      <p className={cn('text-ink', isGuest && 'text-ledger-green-strong')}>{segment.text}</p>
     </div>
   )
 }
@@ -475,62 +488,63 @@ interface FieldRowProps {
   onChange: (value: string) => void
 }
 
-const FieldDecisionRow = forwardRef<HTMLDivElement, FieldRowProps>(function FieldDecisionRow(
-  {
-    field,
-    value,
-    confidence,
-    decision,
-    editing,
-    isLow,
-    evidenceStartMs,
-    evidenceEndMs,
-    onFocusEvidence,
-    onEdit,
-    onDecide,
-    onChange,
-  },
-  ref,
-) {
-  const evidence = evidenceStartMs != null
+/**
+ * One extracted field as three chips and a value.
+ *
+ * WHY CHIPS AND NOT BUTTONS. The v2 panel gave every field a maroon "Accept"
+ * button, so a 16-field extraction put 16 maroon commits on one screen and
+ * the actual commit — the one that writes guest data — was indistinguishable
+ * from the 16 taps that only set local state. Here the field controls are
+ * chips (a choice), and the screen keeps its single maroon primary for the
+ * commit. Decision state is still visible: the chip that is on carries its
+ * tone, and the row says the word again next to a dot.
+ */
+function FieldDecisionRow({
+  field,
+  value,
+  confidence,
+  decision,
+  editing,
+  isLow,
+  evidenceStartMs,
+  evidenceEndMs,
+  onFocusEvidence,
+  onEdit,
+  onDecide,
+  onChange,
+}: FieldRowProps) {
   const meta = decision ? DECISION_META[decision] : null
+  const low = confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD
 
   return (
     <div
-      ref={ref}
       className={cn(
         'rounded-2xl border bg-surface',
         isLow ? 'border-ledger-red/35' : 'border-rule',
         decision && meta?.tone === 'done' && 'border-ledger-green/35',
       )}
+      aria-label={isLow ? `${field.label}, low confidence` : field.label}
     >
-      <div className="flex items-start gap-3 px-4 py-3">
+      <div className="flex items-start gap-2.5 px-4 pt-3">
         {/* The margin rule: low-confidence fields break into the register's
-            leading edge. This is the ledger-red = attention rule. */}
+            leading edge. This is the ledger-red = attention rule, and it is
+            what makes a column of rows scannable for the one that needs eyes. */}
         <div
-          className={cn(
-            'w-1 shrink-0 self-stretch rounded-full',
-            isLow ? 'bg-ledger-red' : 'bg-transparent',
-          )}
           aria-hidden
+          className={cn('w-1 shrink-0 self-stretch rounded-full', isLow ? 'bg-ledger-red' : 'bg-transparent')}
         />
 
         <button
           type="button"
           onClick={onFocusEvidence}
           className="tap flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-lg px-1 py-0.5 text-left hover:bg-surface-2"
-          title={evidence ? 'Tap to hear the evidence' : undefined}
+          title={evidenceStartMs != null ? 'Tap to hear the evidence' : undefined}
         >
-          <span className="eyebrow flex items-center gap-1.5">
-            {field.label}
-            {confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD ? (
-              <ShieldAlertIcon className="h-3 w-3 text-ledger-red" />
-            ) : null}
-          </span>
+          <span className="text-sm leading-snug text-muted">{field.label}</span>
           <span
             className={cn(
-              'max-w-full text-base leading-snug break-words',
-              decision === 'rejected' ? 'text-muted line-through' : 'text-fg',
+              'max-w-full text-base leading-snug font-medium break-words',
+              decision === 'rejected' ? 'text-muted line-through' : 'text-ink',
             )}
           >
             {value || '—'}
@@ -538,24 +552,29 @@ const FieldDecisionRow = forwardRef<HTMLDivElement, FieldRowProps>(function Fiel
           {evidenceStartMs != null ? (
             <span className="text-xs text-subtle">
               {formatEvidenceMs(evidenceStartMs)}
-              {evidenceEndMs != null ? `–${formatEvidenceMs(evidenceEndMs)}` : ''}
-              · tap to hear
+              {evidenceEndMs != null ? `–${formatEvidenceMs(evidenceEndMs)}` : ''} · tap to hear
             </span>
           ) : null}
         </button>
 
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <span className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
           {confidence !== null ? (
-            <Badge tone={confidence < LOW_CONFIDENCE_THRESHOLD ? 'warning' : 'neutral'} size="sm">
+            <span
+              className={cn(
+                'figure text-sm font-medium tabular-nums',
+                low ? 'text-ledger-red' : 'text-muted',
+              )}
+            >
               {Math.round(confidence * 100)}%
-            </Badge>
+            </span>
           ) : null}
           {decision && meta ? (
-            <StatusPill tone={meta.tone} size="sm">
-              {meta.label}
-            </StatusPill>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden className={cn('h-2 w-2 rounded-full', DOT_TONE[DECISION_DOT[decision]])} />
+              <span className="text-xs font-medium text-muted">{meta.label}</span>
+            </span>
           ) : null}
-        </div>
+        </span>
       </div>
 
       {editing ? (
@@ -564,40 +583,35 @@ const FieldDecisionRow = forwardRef<HTMLDivElement, FieldRowProps>(function Fiel
         </div>
       ) : null}
 
-      <div className="flex items-center gap-2 border-t border-rule px-4 py-2.5">
-        <Button
-          variant="secondary"
-          size="md"
-          className="flex-1"
-          onClick={onEdit}
+      <div className="flex flex-wrap items-center gap-2 px-3 pt-2 pb-3">
+        <Chip
+          selected={decision === 'accepted'}
+          tone="done"
+          disabled={editing}
+          onClick={() => onDecide('accepted')}
+        >
+          Accept
+        </Chip>
+        <Chip
+          selected={decision === 'edited'}
+          tone="active"
           disabled={decision === 'rejected'}
+          onClick={onEdit}
         >
           {editing ? 'Done' : 'Edit'}
-        </Button>
-        <Button
-          variant="primary"
-          size="md"
-          className="flex-1"
-          onClick={() => onDecide('accepted')}
+        </Chip>
+        <Chip
+          selected={decision === 'rejected'}
+          tone="attention"
           disabled={editing}
-        >
-          <CheckCircleIcon className="h-4 w-4" />
-          Accept
-        </Button>
-        <Button
-          variant="danger"
-          size="md"
-          className="flex-1"
           onClick={() => onDecide('rejected')}
-          disabled={editing}
         >
-          <AlertTriangleIcon className="h-4 w-4" />
           Reject
-        </Button>
+        </Chip>
       </div>
     </div>
   )
-})
+}
 
 function FieldEditor({
   field,
@@ -648,20 +662,21 @@ function FieldEditor({
   )
 }
 
+/**
+ * What the commit will actually change.
+ *
+ * Rejected fields are shown struck through — a reviewer who rejected nine
+ * fields and accepted one needs to see, before the write, that the eight they
+ * were unsure about are going to be left alone rather than overwritten.
+ */
 function CommitSummary({
   fields,
   decisions,
   values,
-  onConfirm,
-  onCancel,
-  busy,
 }: {
   fields: ReviewFieldDef[]
   decisions: Record<string, Decision>
   values: ReviewFormValues
-  onConfirm: () => void
-  onCancel: () => void
-  busy: boolean
 }) {
   const changed = fields.filter((f) => {
     const d = decisions[f.path]
@@ -669,45 +684,32 @@ function CommitSummary({
   })
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="rounded-xl bg-surface-2 px-3.5 py-3">
-        <p className="eyebrow mb-1.5">What will change</p>
-        <ul className="flex flex-col gap-1.5">
-          {changed.length === 0 ? (
-            <li className="text-sm text-muted">
-              Accepting the AI&apos;s values as-is — no edits to guest data beyond what it proposed.
+    <div className="rounded-2xl border border-rule bg-surface p-4">
+      <p className="mb-2 text-sm font-medium text-muted">What will change</p>
+      <ul className="flex flex-col gap-1.5">
+        {changed.length === 0 ? (
+          <li className="text-sm text-muted">Nothing — the AI values are going in as-is.</li>
+        ) : (
+          changed.map((f) => (
+            <li key={f.path} className="flex items-start gap-2 text-sm">
+              <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+              <span className="text-ink">
+                <span className="font-medium">{f.label}:</span>{' '}
+                {decisions[f.path] === 'rejected' ? (
+                  <span className="text-muted line-through">
+                    {formFieldDisplayValue(f, values) || 'AI value'} — left unchanged
+                  </span>
+                ) : (
+                  <span>{formFieldDisplayValue(f, values) || '—'}</span>
+                )}
+              </span>
             </li>
-          ) : (
-            changed.map((f) => (
-              <li key={f.path} className="flex items-start gap-2 text-sm">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
-                <span className="text-fg">
-                  <span className="font-medium">{f.label}:</span>{' '}
-                  {decisions[f.path] === 'rejected' ? (
-                    <span className="text-muted line-through">
-                      {formFieldDisplayValue(f, values) || 'AI value'} — left unchanged
-                    </span>
-                  ) : (
-                    <span>{formFieldDisplayValue(f, values) || '—'}</span>
-                  )}
-                </span>
-              </li>
-            ))
-          )}
-        </ul>
-      </div>
-      <p className="text-xs text-subtle">
-        Commits through the review RPC — the only path from AI output into guest data. This is
-        recorded, not reversible from here.
+          ))
+        )}
+      </ul>
+      <p className="mt-3 text-xs text-subtle">
+        Recorded. Not reversible from here.
       </p>
-      <div className="flex gap-2">
-        <Button variant="secondary" fullWidth onClick={onCancel} disabled={busy}>
-          Keep reviewing
-        </Button>
-        <Button variant="primary" fullWidth onClick={onConfirm} loading={busy}>
-          Commit
-        </Button>
-      </div>
     </div>
   )
 }
