@@ -63,7 +63,18 @@ export function CurrentFamilyCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-2xl leading-tight font-semibold text-ink break-words">
+          {/*
+            Long names are evidence, not decoration, but they must not break
+            the layout. `break-words` (overflow-wrap: break-word) lets a
+            machine-made token like "E2E-PROOF-msin37ga" break at the hyphen
+            rather than run past the card, and `line-clamp-2` caps the block at
+            two lines with an ellipsis so a genuinely enormous name cannot push
+            the phone number and the Call button off the screen. The full string
+            stays in the DOM and in `aria-label` on the section below, so the
+            clamp is presentational: nothing is cut for a screen reader, and the
+            button that names the family is unchanged.
+          */}
+          <h2 className="line-clamp-2 text-xl leading-tight font-semibold break-words text-ink">
             {headName}
           </h2>
           {mobile ? (
