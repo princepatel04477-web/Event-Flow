@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
 import { SignOutButton } from '@/components/auth/SignOutButton'
-import { StickyHeader } from '@/components/ui/StickyHeader'
+import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { AdminSidebar } from './AdminSidebar'
 import { AdminMobileNav } from './AdminMobileNav'
 import { getViewer } from '@/lib/supabase/queries'
@@ -25,13 +25,24 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   if (!viewer.isAdmin) redirect('/')
 
   return (
-    <div className="flex min-h-dvh flex-col bg-bg">
-      <StickyHeader
+    <div className="flex min-h-dvh flex-col bg-paper text-ink">
+      {/* The v3 screen title: a small muted context line over a 30px Bricolage
+          title. The signed-in identity is the context line — it is what the
+          old `StickyHeader` subtitle carried — and it no longer competes with
+          the title for the same 40px.
+
+          `search={false}`: `ScreenHeader` derives its round Find button from
+          the path's first segment, which on every admin route is `admin`, so
+          the default would render a link to `/admin/find` — a route that does
+          not exist. Admin has no Find; the button is switched off rather than
+          left pointing at a 404. */}
+      <ScreenHeader
         title="Admin"
-        subtitle={viewer.fullName ?? viewer.email ?? 'Signed in'}
+        context={viewer.fullName ?? viewer.email ?? 'Signed in'}
         backHref="/"
         backLabel="App"
-        right={<SignOutButton compact />}
+        search={false}
+        actions={<SignOutButton compact />}
       />
 
       <div className="flex flex-1">

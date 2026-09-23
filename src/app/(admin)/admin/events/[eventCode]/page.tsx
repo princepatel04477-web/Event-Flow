@@ -7,7 +7,9 @@ import { resolveEventByCode } from '@/lib/supabase/queries'
 import { DashboardClient } from './DashboardClient'
 import { ArchiveEventCard } from './ArchiveEventCard'
 import { readHotelImportContext } from '@/lib/actions/import-hotels'
-import { BuildingIcon, UsersIcon } from '@/components/icons'
+import { BuildingIcon, ChevronRightIcon, UsersIcon } from '@/components/icons'
+import { Card } from '@/components/ui/Card'
+import { Row } from '@/components/ui/Row'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 
@@ -38,48 +40,54 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
         // cries wolf is worse than none, because the next real one is ignored.
         <Link
           href={`/admin/events/${event.code}/staff`}
-          className="tap block rounded-xl bg-tint-warning px-4 py-3 text-sm font-medium text-warning underline"
+          className="tap block rounded-xl border border-ledger-amber/40 bg-amber-tint px-4 py-3 text-sm font-medium text-ledger-amber"
         >
-          No staff names on this event. Everything still works, but calls,
-          photos and room changes will be recorded against nobody.
+          No staff names yet — calls and photos will be recorded against nobody.
         </Link>
       ) : null}
 
       <DashboardClient eventId={event.id} eventCode={event.code} />
 
-      <Link
-        href={`/admin/events/${event.code}/staff`}
-        className="tap flex items-center gap-4 rounded-2xl border border-rule bg-surface p-4 transition-colors hover:bg-surface-2 active:bg-surface-2"
-      >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-tint text-brand">
-          <UsersIcon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-fg">Staff</p>
-          <p className="text-sm text-muted">
-            {staffCount === 1 ? '1 person' : `${staffCount ?? 0} people`} can log calls and
-            save data
-          </p>
-        </div>
-      </Link>
+      {/* Two ways out of the dashboard, in the register's own row shape: a
+          40px glyph, a name, one muted meta line, and the whole row is the
+          tap target. */}
+      <Card>
+        <Link
+          href={`/admin/events/${event.code}/staff`}
+          className="tap block border-b border-rule last:border-b-0"
+        >
+          <Row
+            heading="Staff"
+            meta={`${staffCount === 1 ? '1 person' : `${staffCount ?? 0} people`} can log calls and save data`}
+            badge={
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-tint text-brand">
+                <UsersIcon className="h-5 w-5" />
+              </span>
+            }
+            trailing={<ChevronRightIcon className="h-5 w-5" aria-hidden />}
+          />
+        </Link>
 
-      <Link
-        href={`/admin/events/${event.code}/hotels`}
-        className="tap flex items-center gap-4 rounded-2xl border border-rule bg-surface p-4 transition-colors hover:bg-surface-2 active:bg-surface-2"
-      >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-tint text-brand">
-          <BuildingIcon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-fg">Hotels &amp; Rooms</p>
-          {hotelContext.ok ? (
-            <p className="text-sm text-muted">
-              {hotelContext.existingHotels} hotel{hotelContext.existingHotels === 1 ? '' : 's'},{' '}
-              {hotelContext.existingRooms} room{hotelContext.existingRooms === 1 ? '' : 's'}
-            </p>
-          ) : null}
-        </div>
-      </Link>
+        <Link
+          href={`/admin/events/${event.code}/hotels`}
+          className="tap block border-b border-rule last:border-b-0"
+        >
+          <Row
+            heading="Hotels & rooms"
+            meta={
+              hotelContext.ok
+                ? `${hotelContext.existingHotels} hotel${hotelContext.existingHotels === 1 ? '' : 's'} · ${hotelContext.existingRooms} room${hotelContext.existingRooms === 1 ? '' : 's'}`
+                : 'Imported from a sheet'
+            }
+            badge={
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-tint text-brand">
+                <BuildingIcon className="h-5 w-5" />
+              </span>
+            }
+            trailing={<ChevronRightIcon className="h-5 w-5" aria-hidden />}
+          />
+        </Link>
+      </Card>
 
       {/* Last on the page, deliberately. Nothing routine lives below it, so
           the archive control is never something a thumb passes over on the

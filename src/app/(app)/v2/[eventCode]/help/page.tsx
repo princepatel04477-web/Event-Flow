@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { DEPARTMENT_LABELS } from '@/lib/departments'
-import { bottomTabsFor } from '@/lib/sections/config'
+import { v3TabsFor } from '@/lib/sections/v3'
 import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 
 import { HelpScreen } from './HelpScreen'
@@ -18,7 +18,8 @@ type PageProps = {
 }
 
 /**
- * The cheat sheet, reached from the "?" control in the header.
+ * The cheat sheet, reached from the small "How this app works" link at the
+ * foot of Today (SPEC-V3 §3 — Help is not a header control any more).
  *
  * ── No new data, and no new nav model ─────────────────────────────────────
  * The rows are `bottomTabsFor(event.code, access, department)` — the same call
@@ -28,17 +29,24 @@ type PageProps = {
  * table.
  *
  * ── Why it is a route ─────────────────────────────────────────────────────
- * The header control has to be a LINK: a staff member helping another staff
- * member needs to be able to say "open /SHARMA26/help", and a control that
- * opens a client-side sheet has no address to say. It renders inside the shell,
- * so the reader keeps their tabs and the header's back control — R3's rule that
- * a screen is never a dead end.
+ * The Today link has to be a LINK: a staff member helping another staff member
+ * needs to be able to say "open /SHARMA26/help", and a control that opens a
+ * client-side sheet has no address to say. It renders inside the shell, so the
+ * reader keeps their tabs and the header — R3's rule that a screen is never a
+ * dead end.
  *
  * ── Why `requireStaff` is not optional here ───────────────────────────────
- * The header withholds the control from a client, but a URL is typing distance
- * away. A client reaching this page would be shown a nav model they do not have
- * — a fabricated answer about a staff app — so `requireStaff` bounces them to
- * the one screen a client owns. RLS is still the fence; this is honesty.
+ * Today withholds the link from a client, but a URL is typing distance away. A
+ * client reaching this page would be shown a nav model they do not have — a
+ * fabricated answer about a staff app — so `requireStaff` bounces them to the
+ * one screen a client owns. RLS is still the fence; this is honesty.
+ *
+ * ── The tabs are the v3 bar's, not v1's ───────────────────────────────────
+ * `v3TabsFor`, the same call the shell's own bar makes, with the values this
+ * page's guard has already resolved. It used to be `bottomTabsFor` — v1's
+ * model — which listed "Home … Setup" while the bar under the reader's thumb
+ * said "Today … Travel": a cheat sheet describing an app the reader is not
+ * holding, on the one screen whose entire job is to be true about it.
  */
 export default async function HelpPage({ params }: PageProps) {
   const { eventCode } = await params
@@ -50,7 +58,7 @@ export default async function HelpPage({ params }: PageProps) {
   const staffCtx = await getStaffViewerContext(event.id)
   const department = staffCtx?.department ?? null
 
-  const tabs = bottomTabsFor(event.code, access, department)
+  const tabs = v3TabsFor(event.code, access, department)
 
   return (
     <HelpScreen

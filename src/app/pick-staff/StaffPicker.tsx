@@ -4,10 +4,11 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-import { UserIcon } from '@/components/icons'
+import { Row } from '@/components/ui/Row'
+import { Spinner } from '@/components/ui/Spinner'
 import { setCodeAuthStaffToken } from '@/lib/auth/session'
 import { persistClaims, readStoredClaims } from '@/lib/native/session-keeper'
-import { cn } from '@/lib/utils'
+import { initials } from '@/lib/ui/metrics'
 
 import {
   DEPARTMENT_LABELS,
@@ -37,6 +38,17 @@ interface StaffMember {
  * refuses to guess which UI is rendering and asks `getUiVersion()`. Under v2
  * an event lead lands on the dashboard; under v1 they keep landing on
  * Auto-call. Hardcoding either one here is how this hop was left behind.
+ *
+ * ── v3 (SPEC-V3 §4): "staff picker = big Rows of names" ───────────────────
+ * The list was a column of bordered buttons with a user glyph, a name and a
+ * second line of department text — three visual objects per person, on the
+ * one screen whose entire job is "find your own name and hit it". It is now
+ * the shared `Row`: a 64px tap target, the name as the heading, the
+ * department as the single muted meta line, and initials in the avatar slot
+ * so a reader with a common name can tell two rows apart at a glance.
+ * `onPress`, the disabled-while-pending gate and the spinner are unchanged;
+ * so are `persistClaims`, `setCodeAuthStaffToken` and the `postLoginHome`
+ * redirect, which are the parts that must not drift.
  */
 export function StaffPicker({ members, eventCode }: { members: StaffMember[]; eventCode: string }) {
   const [pending, setPending] = useState<string | null>(null)
@@ -103,11 +115,11 @@ export function StaffPicker({ members, eventCode }: { members: StaffMember[]; ev
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-xl font-semibold text-fg">Tap your name</h2>
-        <p className="mt-0.5 text-sm text-muted">
-          One tap. No password. This opens the screens for your team.
-        </p>
+      <div className="flex flex-col gap-1">
+        <h1 className="font-display text-3xl leading-tight font-semibold tracking-tight text-ink">
+          Tap your name
+        </h1>
+        <p className="text-sm text-muted">One tap. No password.</p>
       </div>
 
       {error ? (
@@ -116,49 +128,44 @@ export function StaffPicker({ members, eventCode }: { members: StaffMember[]; ev
         </p>
       ) : null}
 
-      <ul className="flex flex-col gap-2">
+      <div className="overflow-hidden rounded-2xl border border-rule bg-surface">
         {members.map((m) => (
-          <li key={m.id}>
-            <button
-              type="button"
-              onClick={() => pick(m.id)}
-              disabled={pending !== null}
-              className={cn(
-                'flex min-h-14 w-full items-center gap-3 rounded-2xl border border-border bg-surface px-4 text-left active:bg-surface-2 disabled:opacity-60',
-              )}
-            >
-              <UserIcon className="h-5 w-5 shrink-0 text-muted" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold text-fg">{m.full_name}</span>
-                {m.department ? (
-                  <span className="text-xs text-muted">{DEPARTMENT_LABELS[m.department]}</span>
-                ) : null}
-              </span>
-              {pending === m.id ? (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-rule-strong border-t-brand" aria-hidden />
-              ) : null}
-            </button>
-          </li>
+          <Row
+            key={m.id}
+            heading={m.full_name}
+            meta={m.department ? DEPARTMENT_LABELS[m.department] : undefined}
+            initials={initials(m.full_name)}
+            onPress={() => pick(m.id)}
+            disabled={pending !== null}
+            trailing={
+              pending === m.id ? <Spinner size="sm" label="Saving your name" /> : undefined
+            }
+          />
         ))}
-      </ul>
+      </div>
 
       {/* Skip exists because the RLS write gate is gone (migration
           20260814140000): a name is no longer required to use the app, only to
           record who did what. Without this control the screen would be a hard
           stop for anyone whose name is not on the list yet — on a wedding
           morning, with a staff member standing in front of a family, that is
-          the worst possible time to be blocked by an admin task. */}
+          the worst possible time to be blocked by an admin task.
+
+          It stays an `<a>` to `/{eventCode}` with the text "Skip for now":
+          `scripts/tabs-reach.mjs` reads the event code off exactly this link,
+          and it is the only route onward for a runner whose name is missing. */}
       <Link
         href={`/${eventCode}`}
-        className="tap flex min-h-12 w-full items-center justify-center rounded-2xl border border-rule text-sm font-semibold text-muted active:bg-surface-2"
+        className="tap flex min-h-13 w-full items-center justify-center rounded-xl border-[1.5px] border-rule-strong bg-surface text-base font-semibold text-ink active:bg-surface-2"
       >
         Skip for now
       </Link>
 
-      <p className="text-xs leading-relaxed text-subtle">
-        Skipping is fine — everything still works. Your calls, photos and room changes
-        just will not have your name on them, and that cannot be added afterwards.
-        There is a &quot;Not you? Switch&quot; option in settings later.
+      {/* One line, not the three-line paragraph that used to sit here. The
+          consequence of skipping still has to be said — nothing else in the
+          app will tell them their work is unattributed. */}
+      <p className="text-sm leading-snug text-muted">
+        Skipping is fine — your work just will not carry your name.
       </p>
     </div>
   )

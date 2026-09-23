@@ -2,7 +2,6 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 
 import { resolveEventByCode } from '@/lib/supabase/queries'
-import { createClient } from '@/lib/supabase/server'
 import { LedgerClient } from './LedgerClient'
 
 export const metadata: Metadata = {

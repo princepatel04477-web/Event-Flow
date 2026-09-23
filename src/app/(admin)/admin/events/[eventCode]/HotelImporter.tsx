@@ -20,7 +20,7 @@ interface Props {
  * Reuses the same UI pattern as the guest import: parse in browser, preview
  * before commit, idempotent re-import.
  */
-export function HotelImporter({ eventId, eventCode, context: initialContext }: Props) {
+export function HotelImporter({ eventId, context: initialContext }: Props) {
   const [phase, setPhase] = useState<'upload' | 'preview' | 'done'>('upload')
   const [parseResult, setParseResult] = useState<HotelParseResult | null>(null)
   const [fileName, setFileName] = useState('')
@@ -49,11 +49,11 @@ export function HotelImporter({ eventId, eventCode, context: initialContext }: P
   }, [eventId])
 
   async function handleCommit() {
-    if (!parseResult) return
+    if (!parseResult || !parseResult.ok) return
     setCommitting(true)
     setError(null)
 
-    const result = await commitHotelImport(eventId, fileName, (parseResult as any).rows)
+    const result = await commitHotelImport(eventId, fileName, parseResult.rows)
 
     if (result.ok && result.summary) {
       setCommitResult(result.summary)
@@ -89,23 +89,25 @@ export function HotelImporter({ eventId, eventCode, context: initialContext }: P
       <div className="flex flex-col gap-4">
         <Card>
           <CardBody className="flex flex-col items-center gap-4 py-10 text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-tint-neutral text-muted" aria-hidden>
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-2 text-muted" aria-hidden>
               <UploadIcon className="h-7 w-7" />
             </span>
             <div>
-              <p className="text-base font-semibold text-fg">Import hotel data</p>
+              <p className="text-base font-semibold text-ink">Import hotel data</p>
               <p className="mt-1 text-sm text-muted">
-                Upload a CSV or Excel file with hotel names, room numbers, types, and capacity.
-                The template has the exact columns expected.
+                CSV or Excel, with the template&rsquo;s column names.
               </p>
               {context.ok ? (
                 <p className="mt-1 text-sm text-muted">
-                  {context.existingHotels} hotel{context.existingHotels === 1 ? '' : 's'}, {context.existingRooms} room{context.existingRooms === 1 ? '' : 's'} already on file.
+                  <span className="figure">{context.existingHotels}</span> hotel
+                  {context.existingHotels === 1 ? '' : 's'} &middot;{' '}
+                  <span className="figure">{context.existingRooms}</span> room
+                  {context.existingRooms === 1 ? '' : 's'} on file.
                 </p>
               ) : null}
             </div>
 
-            <div className="flex flex-col gap-2 w-full max-w-xs">
+            <div className="flex w-full max-w-xs flex-col gap-2">
               <input
                 type="file"
                 accept=".csv,.xlsx,.xls,text/csv"
@@ -120,7 +122,7 @@ export function HotelImporter({ eventId, eventCode, context: initialContext }: P
               <Button type="button" size="lg" fullWidth onClick={() => document.getElementById('hotel-file-input')?.click()}>
                 Choose file
               </Button>
-              <Button type="button" variant="secondary" size="md" fullWidth onClick={downloadTemplate}>
+              <Button type="button" variant="secondary" fullWidth onClick={downloadTemplate}>
                 Download template
               </Button>
             </div>
@@ -128,7 +130,12 @@ export function HotelImporter({ eventId, eventCode, context: initialContext }: P
         </Card>
 
         {error ? (
-          <p className="rounded-xl bg-tint-danger px-4 py-3 text-sm font-medium text-danger">{error}</p>
+          <p
+            role="alert"
+            className="rounded-xl border border-ledger-red/35 bg-red-tint px-4 py-3 text-sm font-medium text-ledger-red"
+          >
+            {error}
+          </p>
         ) : null}
       </div>
     )
@@ -142,20 +149,22 @@ export function HotelImporter({ eventId, eventCode, context: initialContext }: P
     return (
       <div className="flex flex-col gap-4">
         <div>
-          <h3 className="text-lg font-semibold text-fg">{fileName}</h3>
-          <p className="text-sm text-muted">
-            Headers: {headers.filter(Boolean).join(', ')}. {rows.length} row{rows.length === 1 ? '' : 's'}.
+          <h3 className="font-display text-lg leading-tight font-semibold tracking-tight text-ink">
+            {fileName}
+          </h3>
+          <p className="truncate text-sm text-muted">
+            {headers.filter(Boolean).join(', ')} · <span className="figure">{rows.length}</span>{' '}
+            row{rows.length === 1 ? '' : 's'}
           </p>
         </div>
 
         <Card>
           <CardBody className="flex flex-col gap-3">
-            <p className="text-sm font-medium text-fg">
-              {rows.length} room{rows.length === 1 ? '' : 's'} will be imported across the
-              hotels in this file. Duplicate rows (same hotel + same room number) are
-              silently skipped — re-importing the same file adds zero new rooms.
+            <p className="text-sm text-muted">
+              Duplicate rows (same hotel + room number) are skipped — re-importing the same
+              file adds nothing.
             </p>
-            <div className="max-h-80 overflow-y-auto rounded-lg border border-rule">
+            <div className="max-h-80 overflow-y-auto rounded-xl border border-rule">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-surface-2">
                   <tr className="text-left text-xs font-medium text-muted">
@@ -168,13 +177,13 @@ export function HotelImporter({ eventId, eventCode, context: initialContext }: P
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-rule">
-                  {rows.map((row: any, i: number) => (
-                    <tr key={i} className="text-fg">
-                      <td className="px-3 py-1.5 text-subtle">{row.rowNumber}</td>
+                  {rows.map((row, i) => (
+                    <tr key={i} className="text-ink">
+                      <td className="figure px-3 py-1.5 text-subtle">{row.rowNumber}</td>
                       <td className="px-3 py-1.5">{row.hotelName}</td>
                       <td className="px-3 py-1.5">{row.roomNumber}</td>
                       <td className="px-3 py-1.5">{row.roomType ?? '—'}</td>
-                      <td className="px-3 py-1.5">{row.capacity ?? '—'}</td>
+                      <td className="figure px-3 py-1.5">{row.capacity ?? '—'}</td>
                       <td className="px-3 py-1.5">{row.floor ?? '—'}</td>
                     </tr>
                   ))}
@@ -194,7 +203,12 @@ export function HotelImporter({ eventId, eventCode, context: initialContext }: P
         </div>
 
         {error ? (
-          <p className="rounded-xl bg-tint-danger px-4 py-3 text-sm font-medium text-danger">{error}</p>
+          <p
+            role="alert"
+            className="rounded-xl border border-ledger-red/35 bg-red-tint px-4 py-3 text-sm font-medium text-ledger-red"
+          >
+            {error}
+          </p>
         ) : null}
       </div>
     )
@@ -206,18 +220,18 @@ export function HotelImporter({ eventId, eventCode, context: initialContext }: P
       <div className="flex flex-col gap-4">
         <Card>
           <CardBody className="flex flex-col items-center gap-3 py-8 text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-tint-success text-success" aria-hidden>
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-green-tint text-ledger-green" aria-hidden>
               <DownloadIcon className="h-7 w-7" />
             </span>
             <div>
-              <p className="text-base font-semibold text-fg">Import complete</p>
+              <p className="text-base font-semibold text-ink">Import complete</p>
               <p className="mt-1 text-sm text-muted">
-                {commitResult?.inserted ?? 0} room{commitResult?.inserted === 1 ? '' : 's'} created,
-                {commitResult?.skipped ?? 0} skipped (already existed),
-                {commitResult?.failed ?? 0} failed.
+                <span className="figure">{commitResult?.inserted ?? 0}</span> created,{' '}
+                <span className="figure">{commitResult?.skipped ?? 0}</span> skipped,{' '}
+                <span className="figure">{commitResult?.failed ?? 0}</span> failed.
               </p>
             </div>
-            <div className="flex gap-3 mt-2">
+            <div className="mt-2 flex gap-3">
               <Button variant="secondary" onClick={() => setPhase('upload')}>
                 Import another file
               </Button>

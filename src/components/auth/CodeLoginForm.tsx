@@ -150,6 +150,13 @@ export function CodeLoginForm({ next }: { next: string }) {
     }
   }
 
+  // v3 (SPEC-V3 §4 — "centred, one field, one primary"). The three-line
+  // paragraph that sat under the field ("The hyphen is optional…") is gone:
+  // the placeholder shows the shape, the label names the field, and a wall of
+  // small print under the only input on the screen is exactly the "explanatory
+  // paragraph longer than one line" the v3 rules delete. The error block above
+  // stays — it is a status, not prose, and it is the only thing that tells a
+  // runner the code was refused.
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3" noValidate>
       {error ? (
@@ -161,7 +168,7 @@ export function CodeLoginForm({ next }: { next: string }) {
         </p>
       ) : null}
 
-      <label htmlFor="access-code" className="text-sm font-medium text-fg">
+      <label htmlFor="access-code" className="text-sm font-medium text-ink">
         Access code
       </label>
       <input
@@ -183,13 +190,9 @@ export function CodeLoginForm({ next }: { next: string }) {
         inputMode="text"
         enterKeyHint="go"
         aria-label="Access code"
-        className="min-h-14 w-full rounded-xl border border-border-strong bg-surface px-4 text-center font-mono text-xl tracking-[0.2em] text-fg placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-ink"
+        className="min-h-14 w-full rounded-xl border border-rule-strong bg-surface px-4 text-center font-mono text-xl tracking-[0.2em] text-ink placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-brand"
         required
       />
-      <p className="text-xs leading-relaxed text-subtle">
-        The hyphen is optional. Codes are case-insensitive. Ask your event admin if you do
-        not have one.
-      </p>
 
       <Button
         type="submit"
@@ -197,7 +200,6 @@ export function CodeLoginForm({ next }: { next: string }) {
         fullWidth
         loading={pending || !hydrated}
         disabled={!hydrated}
-        className="mt-2"
       >
         {pending ? 'Checking…' : 'Enter event'}
       </Button>

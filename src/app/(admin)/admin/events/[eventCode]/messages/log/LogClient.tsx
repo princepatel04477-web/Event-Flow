@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-import { Badge } from '@/components/ui/Badge'
+import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { Button } from '@/components/ui/Button'
-import { Card, CardBody } from '@/components/ui/Card'
+import { Card } from '@/components/ui/Card'
+import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Row, type RowTone } from '@/components/ui/Row'
 import { Spinner } from '@/components/ui/Spinner'
 import { ShieldAlertIcon } from '@/components/icons'
 import {
@@ -14,7 +16,6 @@ import {
   type MessageLogRow,
   type MessageLogFilter,
 } from '@/lib/actions/messages'
-import { cn } from '@/lib/utils'
 
 interface Props {
   eventId: string
@@ -25,13 +26,15 @@ type Phase =
   | { stage: 'ready'; rows: MessageLogRow[]; actionError: string | null }
   | { stage: 'error'; message: string }
 
-const STATUS_META: Record<string, { label: string; tone: 'success' | 'danger' | 'warning' | 'neutral' | 'info' }> = {
+const STATUS_META: Record<string, { label: string; tone: RowTone }> = {
   queued: { label: 'Queued', tone: 'neutral' },
-  sent: { label: 'Sent', tone: 'info' },
-  delivered: { label: 'Delivered', tone: 'success' },
-  read: { label: 'Read', tone: 'success' },
-  failed: { label: 'Failed', tone: 'danger' },
+  sent: { label: 'Sent', tone: 'neutral' },
+  delivered: { label: 'Delivered', tone: 'done' },
+  read: { label: 'Read', tone: 'done' },
+  failed: { label: 'Failed', tone: 'problem' },
 }
+
+const LOG_FILTERS: MessageLogFilter[] = ['all', 'sent', 'delivered', 'failed', 'queued']
 
 export function LogClient({ eventId }: Props) {
   const [phase, setPhase] = useState<Phase>({ stage: 'loading' })
@@ -89,86 +92,75 @@ export function LogClient({ eventId }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-xl font-semibold text-fg">Message log</h2>
-        <p className="mt-0.5 text-sm text-muted">
-          Status updates from the provider webhook.
-        </p>
-      </div>
+      <AdminPageTitle context="Status from the provider webhook">Message log</AdminPageTitle>
 
-      {actionError && (
-        <div className="rounded-xl border border-tint-danger bg-tint-danger px-4 py-3 text-sm text-danger">
+      {actionError ? (
+        <p
+          role="alert"
+          className="rounded-xl border border-ledger-red/35 bg-red-tint px-4 py-3 text-sm font-medium text-ledger-red"
+        >
           {actionError}
-        </div>
-      )}
+        </p>
+      ) : null}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
-        {(['all', 'sent', 'delivered', 'failed', 'queued'] as MessageLogFilter[]).map((f) => (
-          <button
+        {LOG_FILTERS.map((f) => (
+          <Chip
             key={f}
-            type="button"
-            onClick={() => { setFilter(f); load(f) }}
-            className={cn(
-              'tap rounded-full px-3 py-1.5 text-sm font-semibold transition-colors',
-              filter === f
-                ? 'bg-brand text-brand-fg'
-                : 'bg-surface-2 text-muted hover:text-fg',
-            )}
+            selected={filter === f}
+            onClick={() => { setFilter(f); void load(f) }}
           >
             {f === 'all' ? 'All' : STATUS_META[f]?.label ?? f}
-          </button>
+          </Chip>
         ))}
       </div>
 
       {rows.length === 0 ? (
         <p className="text-sm text-muted">No messages yet.</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-2">
           {rows.map((r) => {
             const meta = STATUS_META[r.status] ?? STATUS_META.queued
             return (
-              <Card key={r.id}>
-                <CardBody>
-                  <div className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex items-center gap-2">
-                        <span className="font-medium text-fg truncate">
-                          {r.headName ?? r.toNumber}
-                        </span>
-                        <Badge tone={meta.tone} size="sm">{meta.label}</Badge>
-                      </div>
-                      <p className="text-xs text-muted">
-                        {r.templateKey}
-                        {r.queuedAt ? ` · ${new Date(r.queuedAt).toLocaleString()}` : ''}
-                      </p>
-                      {r.error && (
-                        <p className="mt-1 text-xs text-danger">{r.error}</p>
-                      )}
-                      {r.providerMessageId && (
-                        <p className="text-xs text-subtle mt-0.5">
-                          ID: {r.providerMessageId}
-                        </p>
-                      )}
-                    </div>
+              <li key={r.id}>
+                <Card>
+                  <Row
+                    heading={r.headName ?? r.toNumber}
+                    meta={`${r.templateKey}${r.queuedAt ? ` · ${new Date(r.queuedAt).toLocaleString()}` : ''}`}
+                    status={meta.label}
+                    tone={meta.tone}
+                    trailing={
+                      r.status === 'failed' ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={retrying === r.id}
+                          onClick={() => handleRetry(r.id)}
+                        >
+                          {retrying === r.id ? 'Retrying…' : 'Retry'}
+                        </Button>
+                      ) : undefined
+                    }
+                  />
 
-                    {r.status === 'failed' && (
-                      <button
-                        type="button"
-                        disabled={retrying === r.id}
-                        onClick={() => handleRetry(r.id)}
-                        className="tap shrink-0 rounded-lg px-2 py-1 text-xs text-muted hover:text-fg disabled:opacity-55"
-                      >
-                        {retrying === r.id ? '…' : 'Retry'}
-                      </button>
-                    )}
-                  </div>
-                </CardBody>
-              </Card>
+                  {r.error ? (
+                    <p className="px-3 py-2 text-xs text-ledger-red">{r.error}</p>
+                  ) : null}
+
+                  {r.providerMessageId ? (
+                    <p className="px-3 py-2 text-xs text-subtle">
+                      ID <span className="figure">{r.providerMessageId}</span>
+                    </p>
+                  ) : null}
+                </Card>
+              </li>
             )
           })}
-        </div>
+        </ul>
       )}
     </div>
   )
 }
+
+export default LogClient

@@ -78,22 +78,20 @@ export function ArchiveEventCard({
       <Card>
         <CardBody className="flex flex-col gap-3">
           <div>
-            <p className="font-semibold text-fg">This event is archived</p>
+            <p className="font-semibold text-ink">This event is archived</p>
             <p className="mt-0.5 text-sm text-muted">
-              Archived on{' '}
+              Since{' '}
               {new Date(archivedAt).toLocaleDateString(undefined, {
                 day: 'numeric',
                 month: 'long',
                 year: 'numeric',
               })}
-              . It is hidden from the events list, and nothing in it has been
-              deleted — every guest, room, hamper and photo proof is exactly where
-              it was.
+              . Hidden from the events list — nothing has been deleted.
             </p>
           </div>
 
           {error ? (
-            <p role="alert" className="text-sm font-medium text-danger">
+            <p role="alert" className="text-sm font-medium text-ledger-red">
               {error}
             </p>
           ) : null}
@@ -110,11 +108,9 @@ export function ArchiveEventCard({
     <Card>
       <CardBody className="flex flex-col gap-3">
         <div>
-          <p className="font-semibold text-fg">Archive this event</p>
+          <p className="font-semibold text-ink">Archive this event</p>
           <p className="mt-0.5 text-sm text-muted">
-            Hides {eventName} from the events list. Nothing is deleted and it can
-            be restored at any time — this is a filter on what you see, not a
-            removal.
+            Hides {eventName} from the events list. It can be restored at any time.
           </p>
         </div>
 
@@ -139,7 +135,7 @@ export function ArchiveEventCard({
             />
 
             {error ? (
-              <p role="alert" className="text-sm font-medium text-danger">
+              <p role="alert" className="text-sm font-medium text-ledger-red">
                 {error}
               </p>
             ) : null}

@@ -3,16 +3,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 
-import { Badge } from '@/components/ui/Badge'
+import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
+import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { Spinner } from '@/components/ui/Spinner'
 import { LinkButton } from '@/components/ui/LinkButton'
+import { Spinner } from '@/components/ui/Spinner'
 import { CopyIcon, DownloadIcon, ShieldAlertIcon } from '@/components/icons'
 import {
   readTemplates,
-  resolveRecipients,
   generateMessages,
   type MessageTemplate,
   type RecipientFilter,
@@ -135,14 +135,12 @@ export function ManualSendClient({ eventId, eventCode }: Props) {
     )
   }
 
-  // Copied toast
+  // Copied confirmation — a transient flash between two phases, not a screen.
   if (phase.stage === 'copied') {
     return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
-        <p className="text-sm text-success font-semibold">Copied: {phase.label}</p>
-        <Button onClick={() => {}} variant="ghost" fullWidth>
-          {/* This re-renders via the timeout above — just a visual placeholder */}
-        </Button>
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 text-center">
+        <p className="text-base font-semibold text-ledger-green">Copied</p>
+        <p className="text-sm text-muted">{phase.label}</p>
       </div>
     )
   }
@@ -150,65 +148,51 @@ export function ManualSendClient({ eventId, eventCode }: Props) {
   // Setup: pick template + filter
   if (phase.stage === 'setup') {
     return (
-      <div className="flex flex-col gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-fg">Prepare messages</h2>
-          <p className="mt-0.5 text-sm text-muted">
-            Pick a template, pick a filter. Messages are saved as queued but never sent — you copy them manually.
-          </p>
-        </div>
+      <div className="flex flex-col gap-5">
+        <AdminPageTitle>Prepare messages</AdminPageTitle>
 
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-fg">Template</h3>
+        <div className="flex flex-col gap-2">
+          <h2 className="eyebrow">Template</h2>
           <div className="flex flex-col gap-2">
             {phase.templates.map((t) => (
               <button
                 key={t.key}
                 type="button"
                 onClick={() => setSelectedTemplate(t.key)}
+                aria-pressed={selectedTemplate === t.key}
                 className={cn(
-                  'tap w-full rounded-xl border px-4 py-3 text-left transition-colors',
+                  'tap w-full rounded-xl border px-4 py-3 text-left',
+                  'transition-colors duration-press ease-ledger',
                   selectedTemplate === t.key
-                    ? 'border-brand bg-tint-info text-brand'
-                    : 'border-border bg-surface hover:bg-surface-2',
+                    ? 'border-brand bg-brand-tint'
+                    : 'border-rule bg-surface hover:bg-surface-2',
                 )}
               >
-                <p className="font-semibold text-fg">{t.key}</p>
+                <p className="font-semibold text-ink">{t.key}</p>
                 <p className="text-xs text-muted">{t.category ?? 'No category'}</p>
               </button>
             ))}
           </div>
         </div>
 
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-fg">Recipients</h3>
-          <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
+          <h2 className="eyebrow">Recipients</h2>
+          <div className="flex flex-wrap gap-2">
             {(Object.entries(FILTER_LABELS) as [RecipientFilter, string][]).map(([value, label]) => (
-              <button
+              <Chip
                 key={value}
-                type="button"
+                selected={selectedFilter === value}
                 onClick={() => setSelectedFilter(value)}
-                className={cn(
-                  'tap w-full rounded-xl border px-4 py-3 text-left transition-colors',
-                  selectedFilter === value
-                    ? 'border-brand bg-tint-info text-brand'
-                    : 'border-border bg-surface hover:bg-surface-2',
-                )}
               >
-                <p className="font-semibold text-fg">{label}</p>
-              </button>
+                {label}
+              </Chip>
             ))}
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <Button fullWidth size="lg" onClick={handleGenerate} disabled={!selectedTemplate}>
-            Generate messages
-          </Button>
-          <LinkButton fullWidth variant="ghost" href={`/${eventCode}`}>
-            Back
-          </LinkButton>
-        </div>
+        <Button fullWidth onClick={handleGenerate} disabled={!selectedTemplate}>
+          Generate messages
+        </Button>
 
         <LinkButton fullWidth variant="ghost" href={`/admin/events/${eventCode}/messages/log`}>
           View message log
@@ -223,12 +207,12 @@ export function ManualSendClient({ eventId, eventCode }: Props) {
 
     return (
       <div className="flex flex-col gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-fg">{messages.length} messages ready</h2>
-          <p className="mt-0.5 text-sm text-muted">
-            {template.key} · {FILTER_LABELS[filter]}
-          </p>
-        </div>
+        <AdminPageTitle
+          context={`${template.key} · ${FILTER_LABELS[filter]}`}
+          actions={<span className="figure text-sm text-muted">{messages.length}</span>}
+        >
+          Messages ready
+        </AdminPageTitle>
 
         {/* Actions */}
         <div className="flex gap-2">
@@ -255,19 +239,25 @@ export function ManualSendClient({ eventId, eventCode }: Props) {
           {messages.map((m, i) => (
             <Card key={m.messageId || i}>
               <CardBody className="flex flex-col gap-2 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-fg">{m.headName}</span>
-                    <Badge tone="neutral" size="sm">{m.mobileNumber}</Badge>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 truncate text-sm font-semibold text-ink">
+                      {m.headName}
+                    </span>
+                    <span className="code-figure shrink-0 text-xs text-muted">
+                      {m.mobileNumber}
+                    </span>
                   </div>
                   <Button
                     variant="ghost"
-                    leadingIcon={<CopyIcon className="h-3.5 w-3.5" />}
+                    size="sm"
                     onClick={() => handleCopyOne(m)}
                     aria-label={`Copy message for ${m.headName}`}
-                  />
+                  >
+                    <CopyIcon className="h-4 w-4" />
+                  </Button>
                 </div>
-                <div className="rounded-lg bg-surface-2 px-3 py-2 font-mono text-sm text-fg whitespace-pre-wrap">
+                <div className="rounded-xl bg-surface-2 px-3 py-2 text-sm whitespace-pre-wrap text-ink">
                   {m.body}
                 </div>
               </CardBody>
@@ -284,3 +274,5 @@ export function ManualSendClient({ eventId, eventCode }: Props) {
 
   return null
 }
+
+export default ManualSendClient

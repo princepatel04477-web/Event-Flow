@@ -1,15 +1,16 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 
-import { CalendarIcon, ChevronLeftIcon } from '@/components/icons'
-import { Badge } from '@/components/ui/Badge'
+import { CalendarIcon, ChevronRightIcon } from '@/components/icons'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Row } from '@/components/ui/Row'
 import { friendlyDbError } from '@/lib/errors'
 import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { formatDateRange } from '@/lib/utils'
 
+import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { CreateEventForm } from './CreateEventForm'
 
 export const metadata: Metadata = {
@@ -76,37 +77,39 @@ export default async function AdminEventsPage({ searchParams }: PageProps) {
 
   return (
     <div className="flex flex-col gap-8">
-      <section aria-labelledby="events-heading" className="flex flex-col gap-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 id="events-heading" className="text-lg font-semibold text-fg">
-            Events
-          </h2>
-          {!error && events.length > 0 ? (
-            <span className="text-sm text-muted">
-              {events.length === 1 ? '1 event' : `${events.length} events`}
-            </span>
-          ) : null}
-        </div>
-
-        {/* Only rendered when something is actually hidden. A permanent
-            "show archived" control on a database with nothing archived is a
-            question nobody asked. */}
-        {!error && archivedCount > 0 ? (
-          <Link
-            href={showArchived ? '/admin/events' : '/admin/events?archived=1'}
-            className="tap self-start text-sm font-medium text-brand underline"
-          >
-            {showArchived
-              ? 'Hide archived events'
-              : `Show ${archivedCount} archived event${archivedCount === 1 ? '' : 's'}`}
-          </Link>
-        ) : null}
+      <section aria-label="Events" className="flex flex-col gap-3">
+        <AdminPageTitle
+          context={
+            !error && events.length > 0
+              ? events.length === 1
+                ? '1 event'
+                : `${events.length} events`
+              : undefined
+          }
+          actions={
+            // Only rendered when something is actually hidden. A permanent
+            // "show archived" control on a database with nothing archived is a
+            // question nobody asked.
+            !error && archivedCount > 0 ? (
+              <Link
+                href={showArchived ? '/admin/events' : '/admin/events?archived=1'}
+                className="tap inline-flex min-h-11 items-center text-sm font-medium text-brand underline"
+              >
+                {showArchived
+                  ? 'Hide archived'
+                  : `Show ${archivedCount} archived`}
+              </Link>
+            ) : undefined
+          }
+        >
+          Events
+        </AdminPageTitle>
 
         {error ? (
           // Say nothing about how many events exist — we did not find out.
           <p
             role="alert"
-            className="rounded-xl border border-danger bg-tint-danger px-4 py-3 text-base font-medium text-danger"
+            className="rounded-xl border border-ledger-red/35 bg-red-tint px-4 py-3 text-base font-medium text-ledger-red"
           >
             Could not load the event list. {friendlyDbError(error)}
           </p>
@@ -119,12 +122,12 @@ export default async function AdminEventsPage({ searchParams }: PageProps) {
             title={archivedCount > 0 ? 'Every event is archived' : 'No events yet'}
             description={
               archivedCount > 0
-                ? `All ${archivedCount} event${archivedCount === 1 ? '' : 's'} on this database ${archivedCount === 1 ? 'is' : 'are'} archived. Nothing has been deleted — use the link above to see them, or create a new one below.`
-                : 'Nothing has been created on this database. Fill in the form below to make the first one — you will land on its dashboard, ready to import the calling list.'
+                ? `All ${archivedCount} are archived — nothing has been deleted.`
+                : 'Nothing has been created yet. Add the first one below.'
             }
           />
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col gap-2">
             {events.map((event) => (
               <li key={event.id}>
                 <EventRowCard event={event} />
@@ -148,16 +151,13 @@ export default async function AdminEventsPage({ searchParams }: PageProps) {
         /admin/events/{code}/hotels in the sidebar, and rooms and export from
         the staff nav — so nothing is lost by removing the section.
       */}
-      <section aria-labelledby="create-heading" className="flex flex-col gap-4">
-        <div>
-          <h2 id="create-heading" className="text-lg font-semibold text-fg">
-            Create an event
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            One wedding, one event. Everything else — guests, rooms, hampers, vehicles —
-            hangs off it and is fenced to it.
-          </p>
-        </div>
+      <section
+        aria-label="Create an event"
+        className="flex flex-col gap-4 border-t border-rule pt-6"
+      >
+        <h2 className="font-display text-xl leading-tight font-semibold tracking-tight text-ink">
+          Create an event
+        </h2>
 
         <CreateEventForm />
       </section>
@@ -169,37 +169,24 @@ function EventRowCard({ event }: { event: EventRow }) {
   const dates = formatDateRange(event.starts_on, event.ends_on)
   const couple = [event.bride_name, event.groom_name].filter(Boolean).join(' & ')
 
+  // One muted line under the name, in the order it is read: the code that
+  // identifies the event, then who it is for, then when. `starts_on` is
+  // nullable in the database and the form makes it mandatory, so a blank one
+  // predates this screen or was written by hand — it is flagged in the line
+  // rather than in a second badge, because `Row` carries exactly one status
+  // and that status is the event's state, not its data quality.
+  const meta = [event.code, couple, dates ?? 'No dates'].filter(Boolean).join(' · ')
+
   return (
     <Card className="transition-colors hover:bg-surface-2">
-      <Link
-        href={`/admin/events/${event.code}`}
-        className="tap flex min-h-16 items-center gap-3 px-4 py-3"
-      >
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-lg font-semibold text-fg">
-            {event.name}
-          </span>
-
-          {couple ? (
-            <span className="mt-0.5 block truncate text-sm text-muted">{couple}</span>
-          ) : null}
-
-          <span className="mt-1.5 flex flex-wrap items-center gap-2">
-            <Badge tone="neutral">{event.code}</Badge>
-            {event.archived_at ? <Badge tone="neutral">Archived</Badge> : null}
-            {event.is_active ? null : <Badge tone="warning">Inactive</Badge>}
-            {dates ? (
-              <span className="truncate text-sm text-muted">{dates}</span>
-            ) : (
-              // starts_on is nullable in the database; the form makes it
-              // mandatory, so a blank one predates this screen or was written
-              // by hand. Flag it — the Excel import cannot run without it.
-              <Badge tone="warning">No dates</Badge>
-            )}
-          </span>
-        </span>
-
-        <ChevronLeftIcon className="h-6 w-6 shrink-0 rotate-180 text-muted" aria-hidden />
+      <Link href={`/admin/events/${event.code}`} className="tap block">
+        <Row
+          heading={event.name}
+          meta={meta}
+          status={event.archived_at ? 'Archived' : event.is_active ? undefined : 'Inactive'}
+          tone={event.archived_at ? 'neutral' : 'waiting'}
+          trailing={<ChevronRightIcon className="h-5 w-5" aria-hidden />}
+        />
       </Link>
     </Card>
   )

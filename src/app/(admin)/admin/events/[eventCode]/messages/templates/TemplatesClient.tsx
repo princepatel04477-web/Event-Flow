@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-import { Badge } from '@/components/ui/Badge'
+import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Spinner } from '@/components/ui/Spinner'
 import { FileTextIcon, ShieldAlertIcon } from '@/components/icons'
+import { cn } from '@/lib/utils'
 import {
   readTemplates,
   type MessageTemplate,
@@ -65,20 +66,18 @@ export function TemplatesClient({ eventId }: Props) {
       <EmptyState
         icon={<FileTextIcon className="h-7 w-7" />}
         title="No templates"
-        description="Seed templates are loaded from the database. If this is empty, run the seed migration."
+        description="Run the seed migration to load the defaults."
       />
     )
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-xl font-semibold text-fg">Message templates</h2>
-        <p className="mt-0.5 text-sm text-muted">
-          Global templates with optional event-level overrides.
-          Variables use {'{{double curly}}'} syntax.
-        </p>
-      </div>
+      <AdminPageTitle
+        context={`${templates.length} template${templates.length === 1 ? '' : 's'} · variables in double curly braces`}
+      >
+        Message templates
+      </AdminPageTitle>
 
       <div className="flex flex-col gap-3">
         {templates.map((t) => (
@@ -86,40 +85,53 @@ export function TemplatesClient({ eventId }: Props) {
             <button
               type="button"
               onClick={() => setExpandedKey(expandedKey === t.key ? null : t.key)}
+              aria-expanded={expandedKey === t.key}
               className="tap w-full text-left"
             >
               <CardHeader>
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-fg">{t.key}</h3>
-                  <p className="text-xs text-muted">
+                  <h3 className="truncate font-semibold text-ink">{t.key}</h3>
+                  <p className="truncate text-xs text-muted">
                     {t.category ? `${t.category} · ` : ''}{t.language}
                   </p>
                 </div>
-                <Badge tone={t.isActive ? 'success' : 'neutral'} size="sm">
-                  {t.isActive ? 'Active' : 'Inactive'}
-                </Badge>
+                {/* A status is a word with a dot beside it, not a pill. */}
+                <span className="flex shrink-0 items-center gap-2">
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'h-2.5 w-2.5 rounded-full',
+                      t.isActive ? 'bg-ledger-green' : 'bg-subtle',
+                    )}
+                  />
+                  <span className="text-sm font-medium text-muted">
+                    {t.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </span>
               </CardHeader>
             </button>
 
             {expandedKey === t.key && (
-              <CardBody className="border-t border-border pt-4">
-                <div className="mb-3 rounded-lg bg-surface-2 px-3 py-2 font-mono text-sm text-fg whitespace-pre-wrap">
+              <CardBody className="border-t border-rule pt-4">
+                <div className="mb-3 rounded-xl bg-surface-2 px-3 py-2 text-sm whitespace-pre-wrap text-ink">
                   {t.body}
                 </div>
 
                 {t.variables.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {t.variables.map((v) => (
-                      <Badge key={v} tone="info" size="sm">
+                      <span
+                        key={v}
+                        className="code-figure inline-flex items-center rounded-full bg-surface-2 px-2.5 py-1 text-xs text-muted"
+                      >
                         {v}
-                      </Badge>
+                      </span>
                     ))}
                   </div>
                 )}
 
                 <p className="mt-3 text-xs text-muted">
-                  Templates need BSP approval before they can be sent.
-                  Approval status is tracked in the provider dashboard.
+                  Needs BSP approval before it can be sent.
                 </p>
               </CardBody>
             )}
@@ -129,3 +141,5 @@ export function TemplatesClient({ eventId }: Props) {
     </div>
   )
 }
+
+export default TemplatesClient
