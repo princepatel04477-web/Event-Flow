@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import {
-  Be_Vietnam_Pro,
+  Bricolage_Grotesque,
+  Figtree,
   IBM_Plex_Mono,
   IBM_Plex_Sans_Devanagari,
 } from 'next/font/google'
@@ -31,7 +32,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * The four faces of the design, self-hosted.
+ * The four faces of the v3 design, self-hosted.
  *
  * `next/font/google` downloads and fingerprints these at BUILD time and
  * serves them from our own origin, so the venue's Wi-Fi is never in the
@@ -43,13 +44,29 @@ if (typeof window !== 'undefined') {
  * `display: 'swap'` on all four: fallback text immediately, never a flash
  * of invisible text.
  */
-const beVietnam = Be_Vietnam_Pro({
+
+/**
+ * Display — screen titles, big numbers, the Now-card headline. Nothing
+ * else. The variable axis is requested (Bricolage Grotesque is a variable
+ * face) with the two weights the spec names: 600 for titles, 700 for the
+ * Now-card headline.
+ */
+const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],
-  // 400 body, 500/600 labels and headlines, 700 display — the four weights
-  // the design language names. Nothing else is loaded: each extra weight is
-  // another file over venue Wi-Fi.
+  weight: ['600', '700'],
+  variable: '--font-bricolage',
+  display: 'swap',
+})
+
+/**
+ * Body — every row, label, button and paragraph. 400 for body, 500/600 for
+ * emphasis and labels, 700 for the rare bold. Nothing else is loaded: each
+ * extra weight is another file over venue Wi-Fi.
+ */
+const figtree = Figtree({
+  subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
-  variable: '--font-be-vietnam',
+  variable: '--font-figtree',
   display: 'swap',
 })
 
@@ -66,7 +83,7 @@ const plexDevanagari = IBM_Plex_Sans_Devanagari({
   display: 'swap',
 })
 
-/** Every figure in the app. Loaded for its tabular numerals. */
+/** Every figure in the app, plus every phone and flight number. */
 const plexMono = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
@@ -75,12 +92,15 @@ const plexMono = IBM_Plex_Mono({
 })
 
 /**
- * Cormorant Garamond is gone. The design language puts Be Vietnam Pro
- * "across all tiers", so `font-display` now resolves to it, and shipping a
- * serif nothing references is a font file downloaded for no reason.
+ * Be Vietnam Pro is gone with the gold. v3 puts Bricolage Grotesque on the
+ * display tier and Figtree on the body tier, so shipping a third Latin
+ * family nothing references is a font file downloaded for no reason. The
+ * Devanagari cut and the mono stay: both are load-bearing (see the token
+ * comments in globals.css).
  */
 const fontVariables = [
-  beVietnam.variable,
+  bricolage.variable,
+  figtree.variable,
   plexDevanagari.variable,
   plexMono.variable,
 ].join(' ')
@@ -120,9 +140,10 @@ export const viewport: Viewport = {
   // field. Staff forms are the whole app; keep the shell stable.
   interactiveWidget: 'resizes-content',
   // One colour, both media: the staff app does not follow the OS, so the
-  // system chrome must not either. A white status bar over the teal
-  // ground is the tell that the two disagree.
-  themeColor: '#f8f9fa',
+  // system chrome must not either. A dark status bar over the paper ground
+  // is the tell that the two disagree. v3 paper, kept in step with
+  // `--ef-paper` in globals.css.
+  themeColor: '#f7f3ec',
 }
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

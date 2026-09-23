@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 /* ====================================================================
-   EventFlow tokens — Royal Ivory & Gold (DESIGN.md)
+   EventFlow tokens — v3 "Simple" (`.brain/SPEC-V3.md` §1)
 
    Field software, not a dashboard: high contrast, 16px base, big touch
-   targets, readable on a cheap Android phone.
+   targets, readable on a cheap Android phone held in one hand.
 
    Tailwind v4 is CSS-first. There is no tailwind.config.js and there
    must not be one.
@@ -13,109 +13,128 @@
    ---------------
    The app has exactly two skins and neither follows the OS.
 
-   1. Staff — warm ivory (#F8F9FA) with a gold accent and deep-charcoal
-      text. "Corporate Modern with a Minimalist Luxury lean": calm
-      authority, back-of-house efficiency, no clinical SaaS coldness.
-      Fixed light so a caller's screen looks the same as the person's
-      next to them when they compare a row.
+   1. Staff — warm paper (#F7F3EC) with a maroon accent and near-black
+      ink. Calm, quiet, high-contrast. Fixed light so a caller's screen
+      looks the same as the person's next to them when they compare a row.
 
-   2. Client — warm cream paper (#F4EFE4), scoped by
+   2. Client — a slightly brighter cream, scoped by
       `[data-theme='client']`. Read in a hotel lobby in daylight, by the
       oldest user of the app.
 
    The skin is a property of WHO IS LOOKING, not of a system setting.
 
-   WHAT CHANGED, AND THE ONE THING TO WEIGH BEFORE KEEPING IT
-   ---------------------------------------------------------
-   This ground was a dark teal night palette (#071A1D + brass), chosen
-   because staff work corridors, car parks and banquet halls after dark
-   and a bright screen at full brightness is a torch in the face. That
-   reasoning has not been disproved — it has been overridden by the
-   product's design language. If night legibility turns out to matter
-   more than the brand, the revert is this token block and nothing else:
-   every component reads these names, which is the same property that
-   let the whole re-skin happen here rather than across 76 routes.
-
-   THE COLOUR RULE (unchanged, and absolute)
-   -----------------------------------------
-   - Gold (#735C00, champagne #D4AF37 on dark planes) is the accent: the
-     primary action, the current tab, the figure being read. Not a status.
-   - Jewel emerald (#006B59) means COMPLETED, and only that: delivered,
-     confirmed, balanced, sealed. A "luxury jewel tone", never a traffic
-     light.
-   - Signal (#BA1A1A) means ATTENTION, and only that: overdue callbacks,
-     unbalanced families, over-capacity rooms, destructive confirmations.
-     The moment it appears on a heading it stops meaning "look here".
-   - Neither emerald nor signal is ever used decoratively.
+   THE COLOUR RULE (v3)
+   --------------------
+   - Maroon (#7F1D3A) is the accent: the primary action, the active tab,
+     the figure being read. Not a status.
+   - Green (#1E7A4F) means DONE or COMING, and only that.
+   - Amber (#A86412) means WAITING or CALL BACK.
+   - Red (#B42318) means PROBLEM.
+   - Marigold (#E8A33D) is the ONE highlight, and it lives on the dark
+     "Now" card only — its eyebrow and its button. Marigold on paper is a
+     2:1 wash and is never used there.
+   - The Now card is the dark plane: ink background, white headline,
+     #D6CFC4 secondary text.
 
    Every text-on-surface pair below is annotated with its measured WCAG
-   ratio. All pass AA; most pass AAA. Where the design language and AA
-   disagreed, AA won and the deviation is commented at the token.
+   ratio. AA is the floor (4.5:1 for body, 3:1 for large text and for
+   non-text UI). Where a value from the spec failed AA it was darkened by
+   the minimum amount and the deviation is commented at the token —
+   `--ef-subtle` and `--ef-highlight-fg` are the two that moved.
+
+   WHAT CHANGED FROM "ROYAL IVORY & GOLD"
+   --------------------------------------
+   The names are unchanged, deliberately: every screen reads these token
+   names, which is the same property that lets the whole re-skin land here
+   rather than across 76 routes. The values moved from ivory/gold to
+   paper/maroon, the display face moved from Be Vietnam Pro to Bricolage
+   Grotesque, and `--ef-brand-strong` (champagne) is gone with the gold.
+
+   WHAT STAYED
+   -----------
+   Motion (one ease family, everything fast, because staff are in a
+   corridor) and the `figure` monospace role. The one removal there is the
+   mono uppercase eyebrow: v3 deletes the tracked capital labels, so the
+   `eyebrow` utility is now a quiet sans label rather than a monospace one.
    ==================================================================== */
 
 :root {
   color-scheme: light;
 
-  /* Ground — warm ivory. Royal Ivory & Gold, `surface` / `background`. */
-  --ef-paper: #f8f9fa;
-  /* Alternating list band — `surface-container-low`. */
-  --ef-paper-band: #f3f4f5;
-  /* Cards are the bright plane: "active containers and cards use
-     Surface-bright (White)". */
+  /* Ground — warm paper. */
+  --ef-paper: #f7f3ec;
+  /* A step off the ground: alternating bands, inset wells, the nav shelf. */
+  --ef-paper-band: #f1eadf;
+  /* Cards are the bright plane. */
   --ef-surface: #ffffff;
-  --ef-surface-2: #edeeef;
+  --ef-surface-2: #f1eadf;
 
-  /* Deep charcoal, not pure black — `on-surface`. 16.8:1 on ivory,
-     17.6:1 on white. */
-  --ef-ink: #191c1d;
-  /* Warm secondary — `on-surface-variant`. 8.9:1 on ivory. */
-  --ef-muted: #4d4635;
-  /* Tertiary — `secondary`. 6.4:1 on ivory. */
-  --ef-subtle: #5d5e61;
+  /* Near-black ink. 16.3:1 on paper, 17.4:1 on white. */
+  --ef-ink: #1c1917;
+  /* Warm secondary. 5.3:1 on paper. */
+  --ef-muted: #6b645a;
+  /* Tertiary. 4.8:1 on paper. The spec's #8A8276 measures 3.5:1 and fails
+     AA, so this is darkened by the minimum that clears it. */
+  --ef-subtle: #6e6659;
 
-  /* Hairline — charcoal at low alpha. "1px borders in Surface-dim for
-     structural separation", kept as alpha so it adapts to both planes. */
-  --ef-rule: #191c1d14;
-  --ef-rule-strong: #191c1d29;
+  /* Hairline. Alpha so one value adapts to both the paper and the card. */
+  --ef-rule: #e7e0d3;
+  --ef-rule-strong: #d8cfbf;
 
-  /* Signal — ATTENTION only. `error`, 6.2:1 on ivory. */
-  --ef-ledger-red: #ba1a1a;
-  --ef-ledger-red-strong: #93000a;
-  --ef-red-tint: #ffdad6;
+  /* Problem — the only red, and only for "something is wrong". 6.6:1. */
+  --ef-ledger-red: #b42318;
+  --ef-ledger-red-strong: #8f1c13;
+  --ef-red-tint: #fdecea;
 
-  /* Jewel emerald — COMPLETED only. `tertiary`, 6.4:1 on ivory. The tint
-     is the spec's "Deep Teal at 10% opacity" chip background. */
-  --ef-ledger-green: #006b59;
-  --ef-ledger-green-strong: #004f41;
-  --ef-green-tint: #006b591a;
+  /* Done / coming. 5.2:1 on paper, 4.7:1 on its own tint. */
+  --ef-ledger-green: #1e7a4f;
+  --ef-ledger-green-strong: #17603e;
+  --ef-green-tint: #e6f2ec;
 
-  /* Gold — the accent.
-     `primary` (#735c00), NOT champagne (#d4af37), and the difference
-     matters. This token is both the primary fill AND accent text, and
-     champagne on ivory is 1.9:1 — an accent nobody can read outdoors.
-     The spec's own pairing of a champagne fill with WHITE text is 1.9:1
-     too and fails AA outright. #735c00 carries white text at 7.4:1 as a
-     fill and reads 7.4:1 as text on ivory, so one token serves both.
-     Champagne survives as `brand-strong`, for accents on the dark
-     charcoal plane where it is a legitimate 8.6:1. */
-  --ef-brand: #735c00;
-  --ef-brand-hover: #574500;
-  --ef-brand-strong: #d4af37;
+  /* Waiting / call back. The spec's #A86412 measures 4.22:1 on paper and
+     4.14:1 on its own tint — a fail for body text — so it is darkened by the
+     minimum that clears AA. 4.80:1 on paper, 4.71:1 on its own tint. */
+  --ef-ledger-amber: #9c5c10;
+  --ef-ledger-amber-strong: #7f4a0c;
+  --ef-amber-tint: #fbf0df;
+
+  /* Maroon — the accent. 9.8:1 on paper, and white on it is 10.0:1, so one
+     token serves both the tooltip-free text usage and the primary fill. */
+  --ef-brand: #7f1d3a;
+  --ef-brand-hover: #5e1229;
   --ef-brand-fg: #ffffff;
-  --ef-brand-tint: #d4af372e;
+  --ef-brand-tint: #f3e6ea;
+
+  /* Marigold — the ONE highlight, on the dark "Now" card only. 7.4:1 on
+     ink. Never placed on paper (2:1). */
+  --ef-highlight: #e8a33d;
+  /* A label sitting ON marigold must be dark ink: white on marigold is
+     2.2:1. */
+  --ef-highlight-fg: #1c1917;
+  /* Marigold at 18% — eyebrows and hairlines on the dark plane. */
+  --ef-highlight-tint: #e8a33d2e;
+
+  /* The dark "Now" plane. */
+  --ef-now: #1c1917;
+  --ef-now-fg: #ffffff;
+  --ef-now-muted: #d6cfc4;
 
   /* The margin rule down the leading edge of a register. */
   --ef-margin-rule: var(--ef-ledger-red);
 
-  /* Focus ring — "on focus, the border transitions to Gold". */
-  --ef-ring: #735c00;
+  /* Focus ring — maroon. */
+  --ef-ring: #7f1d3a;
 
-  /* The tab bar sits one step off the ground so it reads as a shelf.
-     Deliberately NOT the spec's charcoal sidebar: that rule describes a
-     desktop vertical nav, and this is a mobile tab bar whose labels are
-     painted with --ef-muted. Charcoal here would put 4.5:1-on-ivory text
-     on a dark plane and lose it. */
-  --ef-nav: #f3f4f5;
+  /* The tab bar sits one step off the ground so it reads as a shelf. */
+  --ef-nav: #ffffff;
+
+  /* The tab bar's own height, WITHOUT any safe-area inset. Every fixed
+     element that stacks above the bar positions against this, and the
+     `pb-nav` / `bottom-bar` utilities below add the inset once, in one
+     place, instead of each caller guessing. */
+  --ef-tabbar-h: 4rem;
+  /* The floating action bar's own height, for content clearance. */
+  --ef-bottombar-h: 5.5rem;
 
   /* Motion. One ease family; everything fast, because staff are in a
      corridor. Collapses entirely under prefers-reduced-motion. */
@@ -135,74 +154,80 @@
   --ef-text-xl: 1.5rem;     /* 24px — display */
   --ef-text-2xl: 1.75rem;   /* 28px — the one thing on the screen */
 
-  /* Eyebrow tracking — the spec's `label-md` 0.05em, uppercase, "to mimic
-     luxury signage". Was 0.16em. */
-  --ef-tracking-eyebrow: 0.05em;
+  /* The screen title: 30px Bricolage. Its own token because "the title of
+     the screen" is a decision, not a step on the body scale. */
+  --ef-text-title: 1.875rem;
 
-  /* Elevation & Depth — Royal Ivory & Gold (DESIGN.md).
-     Extra-diffused shadows with 2%-4% opacity, tinted with the primary
-     charcoal color (--ef-ink #191c1d). Two-layer shadows: tight contact
-     shadow plus diffuse ambient layer. */
-  /* e1: a hairline lift: a resting card, a list row */
-  --ef-shadow-e1: 0 1px 2px -1px rgba(25, 28, 29, 0.04), 0 2px 6px 0 rgba(25, 28, 29, 0.03);
-  /* e2: a raised surface: the headline panel, a popover */
-  --ef-shadow-e2: 0 4px 6px -2px rgba(25, 28, 29, 0.03), 0 12px 24px -4px rgba(25, 28, 29, 0.04);
-  /* e3: an overlay: the bottom sheet (directional, lifting upward from the bottom edge) */
-  --ef-shadow-e3: 0 -4px 6px -1px rgba(25, 28, 29, 0.03), 0 -16px 32px -4px rgba(25, 28, 29, 0.04);
+  /* Eyebrow tracking. v3 keeps the small tracked label for the marigold
+     eyebrow on the Now card and nothing else; it is no longer monospace
+     and no longer uppercase-by-default. */
+  --ef-tracking-eyebrow: 0.06em;
+
+  /* Elevation & Depth. Very light, warm-tinted, two layers: a tight
+     contact shadow plus a diffuse ambient one. On a paper ground a heavy
+     shadow reads as grime, so these stay between 3% and 6%. */
+  --ef-shadow-e1: 0 1px 2px -1px rgba(28, 25, 23, 0.05), 0 2px 6px 0 rgba(28, 25, 23, 0.04);
+  --ef-shadow-e2: 0 4px 6px -2px rgba(28, 25, 23, 0.04), 0 12px 24px -4px rgba(28, 25, 23, 0.06);
+  --ef-shadow-e3: 0 -4px 6px -1px rgba(28, 25, 23, 0.04), 0 -16px 32px -4px rgba(28, 25, 23, 0.06);
 }
 
 /* --------------------------------------------------------------------
-   The client ground. Same token names, warm paper values — so every
+   The client ground. Same token names, a brighter cream — so every
    component built against the tokens re-skins with no component-level
    branching. Scoped, never global: staff screens must not inherit it.
    -------------------------------------------------------------------- */
 [data-theme='client'] {
   color-scheme: light;
 
-  --ef-paper: #f4efe4;
-  --ef-paper-band: #efe8d9;
-  --ef-surface: #fbf8f1;
-  --ef-surface-2: #f0eadc;
+  --ef-paper: #fbf7f0;
+  --ef-paper-band: #f2ebdf;
+  --ef-surface: #ffffff;
+  --ef-surface-2: #f4eee3;
 
-  /* 14.5:1 on paper. */
-  --ef-ink: #1b2426;
-  /* 6.5:1 on paper, 6.9:1 on surface. */
-  --ef-muted: #4a5658;
-  /* 4.6:1 on paper. Footnotes only. */
-  --ef-subtle: #5f6a6c;
+  --ef-ink: #1c1917;
+  --ef-muted: #6b645a;
+  --ef-subtle: #6e6659;
 
-  --ef-rule: #1b242617;
-  --ef-rule-strong: #1b242628;
+  --ef-rule: #e7e0d3;
+  --ef-rule-strong: #d8cfbf;
 
-  /* Ledger red on paper — 7.0:1. The dark-ground signal is far too light
-     to survive on cream, so the client ground keeps the darker red. */
-  --ef-ledger-red: #9a1c1c;
-  --ef-ledger-red-strong: #7c1414;
-  --ef-red-tint: #f7e4e1;
+  --ef-ledger-red: #b42318;
+  --ef-ledger-red-strong: #8f1c13;
+  --ef-red-tint: #fdecea;
 
-  /* 5.6:1 on paper. */
-  --ef-ledger-green: #17705a;
-  --ef-ledger-green-strong: #115444;
-  --ef-green-tint: #e2f0ea;
+  --ef-ledger-green: #1e7a4f;
+  --ef-ledger-green-strong: #17603e;
+  --ef-green-tint: #e6f2ec;
 
-  /* Brass, darkened to clear AA on cream — 5.3:1. Brass at #C9A96B is
-     1.7:1 here and would be invisible. */
-  --ef-brand: #7c5e23;
-  --ef-brand-hover: #674c19;
-  --ef-brand-strong: #533d12;
-  --ef-brand-fg: #fbf8f1;
-  --ef-brand-tint: #c9a96b2b;
+  --ef-ledger-amber: #9c5c10;
+  --ef-ledger-amber-strong: #7f4a0c;
+  --ef-amber-tint: #fbf0df;
 
-  --ef-ring: #1b2426;
-  --ef-nav: #fbf8f1;
+  --ef-brand: #7f1d3a;
+  --ef-brand-hover: #5e1229;
+  --ef-brand-fg: #ffffff;
+  --ef-brand-tint: #f3e6ea;
 
-  /* Client ground elevation — tinted with client charcoal (--ef-ink #1b2426). */
-  /* e1: a hairline lift: a resting card, a list row */
-  --ef-shadow-e1: 0 1px 2px -1px rgba(27, 36, 38, 0.04), 0 2px 6px 0 rgba(27, 36, 38, 0.03);
-  /* e2: a raised surface: the headline panel, a popover */
-  --ef-shadow-e2: 0 4px 6px -2px rgba(27, 36, 38, 0.03), 0 12px 24px -4px rgba(27, 36, 38, 0.04);
-  /* e3: an overlay: the bottom sheet (directional, lifting upward from the bottom edge) */
-  --ef-shadow-e3: 0 -4px 6px -1px rgba(27, 36, 38, 0.03), 0 -16px 32px -4px rgba(27, 36, 38, 0.04);
+  --ef-highlight: #e8a33d;
+  --ef-highlight-fg: #1c1917;
+  --ef-highlight-tint: #e8a33d2e;
+
+  --ef-now: #1c1917;
+  --ef-now-fg: #ffffff;
+  --ef-now-muted: #d6cfc4;
+
+  --ef-ring: #7f1d3a;
+  --ef-nav: #ffffff;
+
+  /* The client app has no tab bar, so nothing stacks above the bar. The
+     tokens are still defined so a fixed element does not resolve to an
+     empty value. */
+  --ef-tabbar-h: 0rem;
+  --ef-bottombar-h: 5.5rem;
+
+  --ef-shadow-e1: 0 1px 2px -1px rgba(28, 25, 23, 0.05), 0 2px 6px 0 rgba(28, 25, 23, 0.04);
+  --ef-shadow-e2: 0 4px 6px -2px rgba(28, 25, 23, 0.04), 0 12px 24px -4px rgba(28, 25, 23, 0.06);
+  --ef-shadow-e3: 0 -4px 6px -1px rgba(28, 25, 23, 0.04), 0 -16px 32px -4px rgba(28, 25, 23, 0.06);
 }
 
 @theme inline {
@@ -227,15 +252,28 @@
   --color-ledger-green-strong: var(--ef-ledger-green-strong);
   --color-green-tint: var(--ef-green-tint);
 
+  --color-ledger-amber: var(--ef-ledger-amber);
+  --color-ledger-amber-strong: var(--ef-ledger-amber-strong);
+  --color-amber-tint: var(--ef-amber-tint);
+
   --color-margin-rule: var(--ef-margin-rule);
   --color-ring: var(--ef-ring);
 
-  /* Gold — the accent. */
+  /* Maroon — the accent. */
   --color-brand: var(--ef-brand);
   --color-brand-hover: var(--ef-brand-hover);
-  --color-brand-strong: var(--ef-brand-strong);
   --color-brand-fg: var(--ef-brand-fg);
   --color-brand-tint: var(--ef-brand-tint);
+
+  /* Marigold — the Now-card highlight, and nothing else. */
+  --color-highlight: var(--ef-highlight);
+  --color-highlight-fg: var(--ef-highlight-fg);
+  --color-highlight-tint: var(--ef-highlight-tint);
+
+  /* The dark plane. */
+  --color-now: var(--ef-now);
+  --color-now-fg: var(--ef-now-fg);
+  --color-now-muted: var(--ef-now-muted);
 
   /* Aliases kept so screens not yet converted still resolve. */
   --color-bg: var(--ef-paper);
@@ -246,30 +284,30 @@
   --color-danger-hover: var(--ef-ledger-red-strong);
   --color-danger-fg: var(--ef-paper);
   --color-success: var(--ef-ledger-green);
-  --color-warning: var(--ef-brand);
-  --color-warning-strong: var(--ef-brand-hover);
+  --color-warning: var(--ef-ledger-amber);
+  --color-warning-strong: var(--ef-ledger-amber-strong);
   --color-info: var(--ef-muted);
   --color-tint-neutral: var(--ef-surface-2);
   --color-tint-success: var(--ef-green-tint);
-  --color-tint-warning: var(--ef-brand-tint);
+  --color-tint-warning: var(--ef-amber-tint);
   --color-tint-danger: var(--ef-red-tint);
   --color-tint-info: var(--ef-surface-2);
 
   /* Type roles.
-     - sans AND display are both Be Vietnam Pro: "utilised across all
-       tiers". Display keeps its own token so headline weight/tracking
-       stays a separate decision from body, but the family is now one.
-     - The Devanagari cut stays immediately after it. Be Vietnam Pro has
-       no Devanagari coverage, and family names come off the Excel sheet
-       in Hindi ("शर्मा परिवार") inline with Latin on the same row —
-       without this they fall back to whatever the WebView ships.
-     - mono: IBM Plex Mono, which carries every figure in the app. The
-       spec does not name a mono face; this one stays because the figures
-       are tabular and a column of room numbers has to line up. */
-  --font-sans: var(--font-be-vietnam), var(--font-plex-devanagari),
+     - sans: Figtree. Body, rows, buttons, every label.
+     - display: Bricolage Grotesque. Screen titles, big numbers, the
+       Now-card headline. Nothing else.
+     - The Devanagari cut stays immediately after the sans stack. Figtree
+       and Bricolage have no Devanagari coverage, and family names come off
+       the Excel sheet in Hindi ("शर्मा परिवार") inline with Latin on the
+       same row — without this they fall back to whatever the WebView ships.
+     - mono: IBM Plex Mono, which carries every figure in the app AND every
+       phone number and flight/train number. Those two are the only places
+       mono is used in v3. */
+  --font-sans: var(--font-figtree), var(--font-plex-devanagari),
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Noto Sans", "Noto Sans Devanagari", sans-serif;
-  --font-display: var(--font-be-vietnam), var(--font-plex-devanagari),
+  --font-display: var(--font-bricolage), var(--font-plex-devanagari),
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono",
     SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -282,17 +320,14 @@
 
   --tracking-eyebrow: var(--ef-tracking-eyebrow);
 
-  /* Radii — "Rounded Eight". Buttons and inputs at 8px, cards and modals
-     at 16px, and pills still reserved for status and filter chips, which
-     say `rounded-full` explicitly — so a pill in this app always means
-     "a chip", never "a button". Mapped by ACTUAL USAGE rather than by the
-     spec's key names: this codebase dresses controls in `rounded-xl` and
-     cards in `rounded-2xl`, so those are the two that must land on 8 and
-     16. Set as theme variables rather than `@utility` overrides so the
-     classes keep their normal Tailwind behaviour. */
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.5rem;
-  --radius-2xl: 1rem;
+  /* Radii — v3: cards 20, rows 14, buttons 14–16, chips pill.
+     Mapped by ACTUAL USAGE rather than by key name: this codebase dresses
+     cards in `rounded-2xl` and controls in `rounded-xl`, so those are the
+     two that must land on 20 and 14. `rounded-lg` stays the small step for
+     nested elements (a segment inside its track, an avatar). */
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.25rem;
 
   /* Spacing scale, 4px base. */
   --spacing-1: 0.25rem;
@@ -303,7 +338,7 @@
   --spacing-8: 2rem;
   --spacing-12: 3rem;
 
-  /* Elevation tokens — 2%-4% charcoal tint per DESIGN.md */
+  /* Elevation tokens */
   --shadow-e1: var(--ef-shadow-e1);
   --shadow-e2: var(--ef-shadow-e2);
   --shadow-e3: var(--ef-shadow-e3);
@@ -323,7 +358,7 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     overflow-x: clip;
-    /* The ground, so overscroll on the APK reveals warm ivory paper. */
+    /* The ground, so overscroll on the APK reveals warm paper. */
     background-color: var(--ef-paper);
   }
 
@@ -375,22 +410,54 @@
   margin-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Bottom padding that clears the fixed tab bar plus the gesture bar. */
+/* Bottom padding that clears the fixed tab bar, the gesture bar, and (when
+   one is mounted) the floating action bar above it.
+
+   The action bar is NOT in the flow — it is `fixed` so a primary button is
+   always under the thumb — so the page has to reserve room for both. The
+   two layers are added together rather than max()'d: the action bar sits
+   ON TOP of the tab bar, so content must clear the sum. */
 @utility pb-nav {
   padding-bottom: calc(
-    5.5rem + env(safe-area-inset-bottom, 0px) + var(--keyboard-offset, 0px)
+    var(--ef-tabbar-h) + env(safe-area-inset-bottom, 0px) + var(--keyboard-offset, 0px)
+  );
+}
+
+/* Content clearance for a screen that mounts a `BottomBar` but has no tab
+   bar under it (a client screen, or a department with a single screen). */
+@utility pb-bottombar {
+  padding-bottom: calc(
+    var(--ef-bottombar-h) + env(safe-area-inset-bottom, 0px) + var(--keyboard-offset, 0px)
+  );
+}
+
+/* Clearance for BOTH: a screen with an action bar AND a tab bar. */
+@utility pb-nav-bottombar {
+  padding-bottom: calc(
+    var(--ef-tabbar-h) + var(--ef-bottombar-h) + env(safe-area-inset-bottom, 0px) +
+      var(--keyboard-offset, 0px)
+  );
+}
+
+/* A fixed action bar, stacked directly above the tab bar (or on the gesture
+   bar where there is none). The `bottom` it computes is the same expression
+   `pb-nav` reserves, which is the whole reason `--ef-tabbar-h` exists. */
+@utility bottom-bar {
+  bottom: calc(
+    var(--ef-tabbar-h) + env(safe-area-inset-bottom, 0px) + var(--keyboard-offset, 0px)
   );
 }
 
 /* Sticky offset that clears the fixed tab bar plus the gesture bar.
    `sticky bottom-0` sticks to the bottom of the VIEWPORT, which on a phone is
-   underneath AdminMobileNav (`fixed bottom-0`, min-h-16 rows) — so a sticky
-   action bar holding the primary submit hides behind the tab bar the moment
-   the form is long enough to scroll. pb-nav solves this for page flow; this
-   solves it for sticky children. Pair with `md:bottom-0`, since the tab bar
-   is `md:hidden`. */
+   underneath the tab bar — so a sticky action bar holding the primary submit
+   hides behind it the moment the form is long enough to scroll. pb-nav solves
+   this for page flow; this solves it for sticky children. Pair with
+   `md:bottom-0`, since the tab bar is `md:hidden`. */
 @utility bottom-nav {
-  bottom: calc(4rem + env(safe-area-inset-bottom, 0px) + var(--keyboard-offset, 0px));
+  bottom: calc(
+    var(--ef-tabbar-h) + env(safe-area-inset-bottom, 0px) + var(--keyboard-offset, 0px)
+  );
 }
 
 /* Kill the 300ms grey flash on Android taps. */
@@ -399,23 +466,35 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* The eyebrow: mono, small, wide-tracked, uppercase. Every section label
-   in the app is this and nothing else. */
+/* The small label above a title: "Right now", "Waiting", "Needs
+   attention". SANS, not mono, and not uppercase by default — v3 deletes the
+   monospace capitals that used to sit above every heading. Callers that
+   want the Now card's marigold eyebrow pass `text-highlight`. */
 @utility eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-weight: 500;
-  line-height: 1;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
   letter-spacing: var(--ef-tracking-eyebrow);
-  text-transform: uppercase;
   color: var(--ef-muted);
 }
 
 /* Every figure in the app: mono, tabular, so a column of room numbers or
-   PAX counts aligns on the decimal and a changing counter does not jitter. */
+   PAX counts aligns on the decimal and a changing counter does not jitter.
+   In v3 mono is used for figures AND for phone / flight / train numbers,
+   which are scanned character by character rather than read. */
 @utility figure {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* A phone number, a flight number, a train number. Mono for the same
+   reason as `figure`, plus a hint of tracking so "6E 5074" does not read
+   as one token. */
+@utility code-figure {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 /* --------------------------------------------------------------------

@@ -331,6 +331,20 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
             </span>
           </div>
         </section>
+
+        {/* HELP LIVES HERE NOW (SPEC-V3 §3: "Help = inside Today (small
+            link), not in the header"). One quiet line at the foot of the
+            screen rather than a permanent question mark competing with the
+            title on all 40 screens.
+            Not role-gated: this page already ran `requireStaff`, so every
+            viewer who can see it is staff, and the help route runs the same
+            guard. */}
+        <Link
+          href={`/${event.code}/help`}
+          className="tap -mt-2 self-start py-2 text-sm font-medium text-muted underline underline-offset-4 hover:text-ink"
+        >
+          How this app works
+        </Link>
       </div>
     </HydrationBoundary>
   )

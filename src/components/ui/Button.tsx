@@ -4,11 +4,21 @@ import { cn } from '@/lib/utils'
 import { Spinner } from './Spinner'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
-export type ButtonSize = 'md' | 'lg'
+/**
+ * - `sm` 44px — the floor. An icon button, or a control inside a row.
+ * - `md` 52px — the v3 secondary height, and the default for a secondary.
+ * - `lg` 56px — the v3 primary height, and the default for a primary.
+ *
+ * The DEFAULT depends on the variant (`defaultButtonSize` below), because
+ * "how tall is a primary" and "how tall is a secondary" are two decisions
+ * the design makes, not one. A caller that wants a specific height passes
+ * `size`; a caller that wants the design's own answer omits it.
+ */
+export type ButtonSize = 'sm' | 'md' | 'lg'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
-  /** `md` is 48px tall, `lg` is 56px. Never go below `md` — thumbs, gloves, rain. */
+  /** Defaults per variant: primary `lg` (56), everything else `md` (52). */
   size?: ButtonSize
   /**
    * FOR IRREVERSIBLE COMMITS ONLY.
@@ -38,9 +48,14 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 /**
  * A rounded rectangle, never a pill. The pill shape is spoken for: in this
- * design a fully-round element is a *chip* (a status, a filter), and a chip
- * is not pressable-to-commit. Keeping the two shapes apart means a caller
- * can tell what a control does before reading it.
+ * design a fully-round element is a *chip* (a status, a filter, a segment),
+ * and a chip is not pressable-to-commit. Keeping the two shapes apart means a
+ * caller can tell what a control does before reading it.
+ *
+ * NEVER FADED AT REST (v3 rule). `disabled:opacity-55` survives because a
+ * genuinely disabled control must look inert, but nothing here dims a
+ * button that is merely sitting on a screen — there is no `opacity` on the
+ * base, and no variant washes its own colour out.
  */
 const BASE =
   'tap inline-flex items-center justify-center gap-2 rounded-xl border font-semibold ' +
@@ -50,22 +65,30 @@ const BASE =
   'aria-disabled:opacity-55'
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  // Gold fill with white text, and the only solid gold fill on any screen,
-  // so "the commit" is never ambiguous. The shadow is a hairline lift
-  // (shadow-e1) on the light ground.
+  // Maroon fill, white text (10.0:1), and the only solid maroon fill on any
+  // screen, so "the commit" is never ambiguous. The shadow is a hairline lift
+  // (shadow-e1) on the paper ground.
   primary:
     'border-transparent bg-brand text-brand-fg shadow-e1 ' +
     'hover:bg-brand-hover active:bg-brand-hover',
+  // White on the paper ground with a 1.5px hairline. The hairline rather than
+  // a fill is what keeps a secondary off the same visual plane as a primary.
   secondary:
-    'border-rule-strong bg-surface text-ink hover:bg-surface-2 active:bg-surface-2',
+    'border-[1.5px] border-rule-strong bg-surface text-ink hover:bg-surface-2 active:bg-surface-2',
   danger:
     'border-transparent bg-ledger-red text-paper hover:bg-ledger-red-strong active:bg-ledger-red-strong',
   ghost: 'border-transparent bg-transparent text-ink hover:bg-surface-2 active:bg-surface-2',
 }
 
 const SIZES: Record<ButtonSize, string> = {
-  md: 'min-h-12 px-4 py-2.5 text-base',
+  sm: 'min-h-11 px-3.5 py-2 text-sm',
+  md: 'min-h-13 px-4 py-3 text-base',
   lg: 'min-h-14 px-5 py-3.5 text-base',
+}
+
+/** The design's own height for a variant, when the caller does not choose. */
+export function defaultButtonSize(variant: ButtonVariant = 'primary'): ButtonSize {
+  return variant === 'primary' ? 'lg' : 'md'
 }
 
 /**
@@ -78,7 +101,7 @@ const SIZES: Record<ButtonSize, string> = {
  */
 export function buttonClassName({
   variant = 'primary',
-  size = 'md',
+  size,
   fullWidth = false,
   className,
 }: {
@@ -87,12 +110,18 @@ export function buttonClassName({
   fullWidth?: boolean
   className?: string
 } = {}): string {
-  return cn(BASE, VARIANTS[variant], SIZES[size], fullWidth && 'w-full', className)
+  return cn(
+    BASE,
+    VARIANTS[variant],
+    SIZES[size ?? defaultButtonSize(variant)],
+    fullWidth && 'w-full',
+    className,
+  )
 }
 
 export function Button({
   variant = 'primary',
-  size = 'md',
+  size,
   loading = false,
   fullWidth = false,
   leadingIcon,
@@ -104,17 +133,19 @@ export function Button({
   ref,
   ...props
 }: ButtonProps) {
+  const resolved = size ?? defaultButtonSize(variant)
+
   return (
     <button
       ref={ref}
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={cn(BASE, VARIANTS[variant], SIZES[size], fullWidth && 'w-full', className)}
+      className={cn(BASE, VARIANTS[variant], SIZES[resolved], fullWidth && 'w-full', className)}
       {...props}
     >
       {loading ? (
-        <Spinner size={size === 'lg' ? 'md' : 'sm'} label={null} />
+        <Spinner size={resolved === 'sm' ? 'sm' : 'md'} label={null} />
       ) : (
         leadingIcon
       )}

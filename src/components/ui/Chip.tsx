@@ -9,13 +9,13 @@ export interface ChipProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>,
   selected: boolean
   children: ReactNode
   /**
-   * The colour a chip takes when selected. Defaults to brass, which means
-   * "this is the filter I have applied".
+   * The colour a chip takes when selected. Defaults to `active` — maroon,
+   * which means "this is the filter I have applied".
    *
    * Pass a status tone when the chip IS the status — the RSVP outcome
-   * picker, where "Confirmed" must go green and "Unreachable" red the
-   * moment it is chosen, because the chip is the thing being recorded and
-   * the colour is the fastest confirmation that the right one was hit.
+   * picker, where "Coming" must go green and "No answer" red the moment it
+   * is chosen, because the chip is the thing being recorded and the colour
+   * is the fastest confirmation that the right one was hit.
    */
   tone?: StatusTone
 }
@@ -29,12 +29,13 @@ const SELECTED: Record<StatusTone, string> = {
 
 /**
  * A filter or a choice. Always a full pill, never a rounded rectangle —
- * that shape belongs to buttons, and the whole point is that a chip and a
- * commit button never look alike.
+ * that shape belongs to buttons and segments, and the whole point is that a
+ * chip and a commit button never look alike.
  *
- * 48px tall so it clears a thumb, which makes a row of chips taller than it
- * looks like it needs to be. That is deliberate: these are tapped by
- * someone walking.
+ * 40px tall, which is the v3 chip height. That is under the 44px tap
+ * minimum on purpose: a chip is a wide target (a short label plus `px-3.5`
+ * either side puts the smallest of them past 44px across) and a 40px pill
+ * is what lets a five-chip filter row sit on one line at 360px.
  */
 export function Chip({ selected, children, tone = 'active', className, ...props }: ChipProps) {
   return (
@@ -42,7 +43,7 @@ export function Chip({ selected, children, tone = 'active', className, ...props 
       type="button"
       aria-pressed={selected}
       className={cn(
-        'tap inline-flex min-h-12 shrink-0 items-center justify-center rounded-full border px-4',
+        'tap inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border px-4',
         'text-sm leading-none font-medium whitespace-nowrap',
         'transition-colors duration-press ease-ledger',
         selected

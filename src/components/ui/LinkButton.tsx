@@ -6,7 +6,11 @@ import { buttonClassName, type ButtonSize, type ButtonVariant } from './Button'
 export interface LinkButtonProps {
   href: string
   variant?: ButtonVariant
-  /** `md` is 44px tall, `lg` is 56px. Never go below `md`. */
+  /**
+   * Omit for the design's own height for the variant — `lg` (56px) for a
+   * primary, `md` (52px) otherwise. Pass it only when a specific screen
+   * needs a specific height. Never go below `sm` (44px).
+   */
   size?: ButtonSize
   fullWidth?: boolean
   leadingIcon?: ReactNode
@@ -27,7 +31,7 @@ export interface LinkButtonProps {
 export function LinkButton({
   href,
   variant = 'primary',
-  size = 'md',
+  size,
   fullWidth = false,
   leadingIcon,
   trailingIcon,

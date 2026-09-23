@@ -56,11 +56,14 @@ export function BottomSheet({ open, onClose, label, children, className }: Botto
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
+      {/* The scrim is the ink token at 70%, not an off-palette dark teal:
+          the retired night palette left #040f11 here, and against v3's warm
+          paper ground it read as a blue cast over the whole screen. */}
       <button
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 h-full w-full cursor-default bg-[#040f11]/70 backdrop-blur-[2px]"
+        className="absolute inset-0 h-full w-full cursor-default bg-ink/70 backdrop-blur-[2px]"
       />
 
       <div
@@ -70,7 +73,7 @@ export function BottomSheet({ open, onClose, label, children, className }: Botto
         aria-label={label}
         tabIndex={-1}
         className={cn(
-          'sheet-in relative w-full rounded-t-2xl border-t border-brand/30 bg-surface',
+          'sheet-in relative w-full rounded-t-2xl border-t border-rule bg-surface',
           'max-h-[85dvh] overflow-y-auto px-5 pt-2 pb-6 outline-none pb-safe',
           'shadow-e3',
           className,
