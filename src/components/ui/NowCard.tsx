@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { Button } from './Button'
 import { LinkButton } from './LinkButton'
 
 export interface NowCardProps {
@@ -16,8 +17,24 @@ export interface NowCardProps {
   context?: string
   /** The button's label — "Start calling", "Open room 104". */
   actionLabel: string
-  /** Where the button goes. The card commits to exactly one destination. */
-  actionHref: string
+  /**
+   * Where the button goes. Give this OR `onPress`, never both.
+   *
+   * Optional since the Travel board: the hamper run's card is a NAVIGATION (to
+   * the proof screen) and the travel board's is an ACTION (open the family
+   * sheet, where the commit lives), and a card whose only control does nothing
+   * is not a card. Adding the prop rather than forking the component keeps one
+   * dark plane, one marigold, one set of classes.
+   */
+  actionHref?: string
+  /**
+   * A write, or opening a sheet on this card's own subject.
+   *
+   * A `<button>` that navigates would lose middle-click, long-press and
+   * prefetch, so the choice is made from the props here rather than left to
+   * each caller's memory — same contract as `BottomBar`'s `BarAction`.
+   */
+  onPress?: () => void
   /**
    * Left-aligned inside the card (default) or pinned full-width to the card's
    * inner edge. Full-width is the right answer on a 360px screen.
@@ -43,6 +60,7 @@ export function NowCard({
   context,
   actionLabel,
   actionHref,
+  onPress,
   actionFullWidth = true,
 }: NowCardProps) {
   return (
@@ -57,11 +75,11 @@ export function NowCard({
         <p className="mt-2 text-base leading-snug text-now-muted">{context}</p>
       ) : null}
 
-      {/* A real link, not a `<button>` with a router.push: this is a
-          navigation, so it keeps middle-click, long-press and prefetch.
+      {/* A real link when the card navigates — it keeps middle-click,
+          long-press and prefetch — and a real button when it acts.
           `LinkButton` shares `buttonClassName` with `Button`, which is what
-          makes the marigold override below land on exactly the same box as
-          every other button on the screen.
+          makes the marigold override below land on exactly the same box either
+          way.
 
           WHY THE OVERRIDE WINS: Tailwind emits `bg-brand` and `bg-highlight`
           as separate single-class utilities sorted by name, so
@@ -69,19 +87,33 @@ export function NowCard({
           independent of the order in this string. `hover:bg-highlight` is
           declared for the same reason (it cancels `hover:bg-brand-hover`),
           because a maroon flash on a marigold button is not the design. */}
-      <LinkButton
-        href={actionHref}
-        size="lg"
-        fullWidth={actionFullWidth}
-        className={cn(
-          'mt-4 border-transparent bg-highlight text-highlight-fg shadow-e1',
-          'hover:bg-highlight active:bg-highlight active:brightness-95',
-        )}
-      >
-        {actionLabel}
-      </LinkButton>
+      {actionHref ? (
+        <LinkButton
+          href={actionHref}
+          size="lg"
+          fullWidth={actionFullWidth}
+          className={NOW_ACTION_CLASS}
+        >
+          {actionLabel}
+        </LinkButton>
+      ) : (
+        <Button
+          size="lg"
+          fullWidth={actionFullWidth}
+          onClick={onPress}
+          className={NOW_ACTION_CLASS}
+        >
+          {actionLabel}
+        </Button>
+      )}
     </section>
   )
 }
+
+/** The one marigold control in the app. Shared by both branches above. */
+const NOW_ACTION_CLASS = cn(
+  'mt-4 border-transparent bg-highlight text-highlight-fg shadow-e1',
+  'hover:bg-highlight active:bg-highlight active:brightness-95',
+)
 
 export default NowCard
