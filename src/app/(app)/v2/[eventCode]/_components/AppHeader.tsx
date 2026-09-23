@@ -74,6 +74,33 @@ interface AppHeaderProps {
  * the same props contract as that module's icons, so swapping it for a shared
  * export later is a one-line change and not a redraw.
  */
+/**
+ * Titles for screens `resolveActive` cannot name from the shared nav config.
+ *
+ * `hospitality/deliveries` has no matching child in `SECTIONS.hospitality`
+ * (its children are `rooms`, `checkin`, and the borrowed `hamper`/
+ * `production`) — so without this map the header fell back to the SECTION's
+ * own label, "Rooms", on the one screen in Rooms that isn't about rooms.
+ * Keyed on `section/childSegment`, not the full `rest` path: the detail
+ * route `hospitality/deliveries/{deliverableId}` resolves to the same
+ * `sectionId`/`childSegment` pair (`resolveActive` only reads the first two
+ * URL segments), and a `rest`-keyed map would miss it the moment an id
+ * followed the child in the URL.
+ */
+const SECTION_CHILD_TITLE_OVERRIDES: Record<string, string> = {
+  'hospitality/deliveries': 'Hampers',
+}
+
+/**
+ * Titles for screens with no section at all — `resolveActive` answers
+ * `sectionId: null` for these, same as `help`. Without an entry here the
+ * title falls through to the 'Home' default: the back destination's name,
+ * not the screen's.
+ */
+const NO_SECTION_TITLE_OVERRIDES: Record<string, string> = {
+  find: 'Find',
+}
+
 function QuestionIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -104,22 +131,37 @@ export function AppHeader({ event, viewer, showHelp }: AppHeaderProps) {
   const isHome = rest === ''
 
   let screenTitle = 'Home'
+  let screenSubtitle: string | undefined
   if (!isHome) {
     const active = resolveActive(rest)
     if (active.sectionId) {
       const section = SECTIONS[active.sectionId]
       if (active.childSegment) {
         const child = section.children.find((c) => c.segment === active.childSegment)
-        screenTitle = child?.label ?? section.label
+        // Keyed on section/child, not the full `rest` path: a detail route
+        // like `hospitality/deliveries/{deliverableId}` still resolves its
+        // childSegment to `deliveries` (`resolveActive` only reads the first
+        // two segments), and a `rest`-keyed lookup would miss it the moment
+        // an id followed the child in the URL.
+        const overrideKey = `${active.sectionId}/${active.childSegment}`
+        screenTitle = child?.label ?? SECTION_CHILD_TITLE_OVERRIDES[overrideKey] ?? section.label
       } else {
         screenTitle = section.label
       }
     } else if (rest === 'help') {
       // The cheat sheet is a screen with no section — `resolveActive` answers
-      // `sectionId: null` for it, so without this line the header would title
-      // the one screen that explains the app "Home", while the reader is
+      // `sectionId: null` for it, so without this the header would title the
+      // one screen that explains the app "Home", while the reader is
       // standing on it and Home is the link they came from.
-      screenTitle = 'How this app works'
+      //
+      // Split across title + subtitle rather than one long title: "How this
+      // app works" alone in the title row, squeezed against search/help/
+      // sign-out, truncated to "HOW THIS A…" — illegible on the one screen
+      // whose entire job is to be read at a glance by someone who is lost.
+      screenTitle = 'Help'
+      screenSubtitle = 'How this app works'
+    } else {
+      screenTitle = NO_SECTION_TITLE_OVERRIDES[rest] ?? screenTitle
     }
   }
 
@@ -129,6 +171,7 @@ export function AppHeader({ event, viewer, showHelp }: AppHeaderProps) {
   return (
     <StickyHeader
       title={screenTitle}
+      subtitle={screenSubtitle}
       backHref={backHref}
       backLabel={backLabel}
       right={

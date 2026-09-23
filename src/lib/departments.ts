@@ -1,4 +1,5 @@
 import type { SectionId } from '@/lib/sections/config'
+import type { UiVersion } from '@/lib/ui-version'
 
 /** Field team department — stored on staff_members and in the code-auth JWT. */
 export type StaffDepartment =
@@ -54,6 +55,71 @@ export function departmentHomePath(eventCode: string, department: StaffDepartmen
     default:
       return `/${eventCode}`
   }
+}
+
+/**
+ * Where a department lands under the v2 shell (`(app)/v2/[eventCode]/page.tsx`)
+ * specifically — `null` means "stay on the dashboard, do not redirect".
+ *
+ * Two remaps on top of `departmentHomePath`, kept as a SEPARATE function
+ * rather than changes to it:
+ *
+ * - `management` gets no redirect. Every other place in the nav model
+ *   (`bottomTabsFor`'s `isLead`) already treats this department as an admin
+ *   equivalent, so v2's dashboard — the render this department is already
+ *   getting — is the right destination, not `rsvp/campaigns`.
+ *   `departmentHomePath('management')` cannot become the dashboard path
+ *   itself: `(staff)/[eventCode]/page.tsx` (v1) runs the identical
+ *   redirect-on-department check against that same route, and pointing the
+ *   shared function at it would send v1's dashboard into a redirect loop —
+ *   v1 has no other screen at that path for this case to land on.
+ * - `hamper` goes to `hospitality/deliveries`, the real v2 build (Job 3,
+ *   `HamperRun`). `/{event}/hamper` under the v2 route group is a stale
+ *   re-export of the v1 screen (see `(app)/v2/[eventCode]/hamper/page.tsx`)
+ *   — correct for v1, a dead end here.
+ *
+ * Every other department is unaffected: `departmentHomePath` already sends
+ * `logistics` and `hospitality` to real v2 screens (`logistics/arrivals`,
+ * `hospitality/rooms`), so this defers to it for them.
+ */
+export function v2DepartmentHome(
+  eventCode: string,
+  department: StaffDepartment,
+): string | null {
+  if (department === 'management') return null
+  if (department === 'hamper') return `/${eventCode}/hospitality/deliveries`
+  return departmentHomePath(eventCode, department)
+}
+
+/**
+ * Where a staff member lands the moment they pick their name — the one hop
+ * `StaffPicker` makes after it re-mints the JWT, before any screen has
+ * rendered.
+ *
+ * The UI version is a PARAMETER rather than a `getUiVersion()` call inside,
+ * for two reasons: this module stays pure, so the test does not have to
+ * mutate `process.env` and re-import it; and the caller already knows which
+ * shell it is rendering.
+ *
+ * Under v1 the version argument selects the shared `departmentHomePath` and
+ * nothing else — including `management → rsvp/campaigns`. That answer is
+ * deliberately unchanged: v1's dashboard at `/{event}` redirects any
+ * department away from itself through that same shared function, so
+ * changing this side alone would trade a wrong landing for a redirect loop.
+ *
+ * v2 uses the shell's own answer. For `management` that is the dashboard
+ * (`/{event}`), not Auto-call — see `v2DepartmentHome`, which returns `null`
+ * there to mean "stay put", a contract that only makes sense to a caller
+ * already standing on that page. Here there is no page yet, so `null` is
+ * resolved to the dashboard path explicitly.
+ */
+export function postLoginHome(
+  ui: UiVersion,
+  eventCode: string,
+  department: StaffDepartment,
+): string {
+  if (ui !== 'v2') return departmentHomePath(eventCode, department)
+  return v2DepartmentHome(eventCode, department) ?? `/${eventCode}`
 }
 
 export function sectionAllowedForDepartment(

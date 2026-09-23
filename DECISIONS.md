@@ -5,6 +5,98 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 22 September 2026 — SHELL: the event lead's Home tab stopped bouncing to Auto-call
+
+### What was wrong, verified by screenshot before touching anything
+
+`v2DepartmentHome(eventCode, 'management')` — reached through the v2 home page's
+"redirect an event_team member to their department's screen" check — sent every
+event lead back to `/rsvp/campaigns` every time they landed on `/{event}`,
+including a tap on their own Home tab. `bottomTabsFor`'s `isLead` already treats
+`management` as an admin equivalent everywhere else in the nav model; this was
+the one place it wasn't. Flagged already in the 22 September 2026 V12 entry
+below ("`src/lib/departments.ts`: `management` should not land on
+`rsvp/campaigns`. One line, off limits here, and the first thing a runner
+sees.") as owed to whoever picked up `src/lib/departments.ts` next.
+
+Two more header bugs found the same way (390×844 screenshots via
+`.brain/shots.mjs`, before touching code): `/find` had no entry in
+`resolveActive`'s section model, so the sticky header fell through to the
+`'Home'` default — the back destination's name, not the screen's. And
+`/hospitality/deliveries` resolves to `sectionId: 'hospitality'` with no
+matching child (`SECTIONS.hospitality`'s children are `rooms`, `checkin`, and
+the borrowed `hamper`/`production` — `deliveries` isn't one), so the header fell
+back to the SECTION's own label, "Rooms", on the one screen in Rooms that isn't
+about rooms.
+
+### The fix, and why it is NOT in the shared `departmentHomePath`
+
+`src/lib/departments.ts` gained a new export, `v2DepartmentHome`, rather than a
+changed `departmentHomePath`. That function is shared with v1:
+`(staff)/[eventCode]/page.tsx` runs the identical "redirect a department away
+from the dashboard" check against the same route, `/{event}`. Pointing
+`departmentHomePath('management')` at the dashboard path itself would send
+v1's check into a redirect loop — v1 has no other screen at that path for the
+case where it isn't management to land on. `v2DepartmentHome` returns `null`
+for `management` (the caller's contract: `null` means "do not redirect, stay
+here") and remaps `hamper` to `hospitality/deliveries` — the real v2 build
+(Job 3, `HamperRun`), where `/{event}/hamper` under this route group is a
+stale re-export of the v1 screen. Every other department defers to
+`departmentHomePath` unchanged. Tested in isolation in
+`tests/v2-department-home.test.ts`, including an explicit assertion that no
+department maps to the bare event-root path — a non-null dest of `/{event}`
+would pass the caller's `if (dest) redirect(dest)` check and reproduce the
+same bounce-off-Home symptom under a different mechanism.
+
+The two header titles are fixed in `AppHeader.tsx` with two small local maps
+(`SECTION_CHILD_TITLE_OVERRIDES`, keyed `section/childSegment` so the
+`[deliverableId]` detail route matches too; `NO_SECTION_TITLE_OVERRIDES`,
+keyed on the bare path) rather than by adding entries to
+`SECTIONS.hospitality.children` in `src/lib/sections/config.tsx` — that config
+is shared with v1's `BottomTabs.tsx` and is pinned by `tests/nav-model.test.ts`
+(`'gives every section that takes a tab slot a default child or no children'`,
+`'marks exactly the borrowed sections as out of the tab bar'`), so adding a
+child there risks the same kind of cross-version drift `v2DepartmentHome` was
+written to avoid. Neither map was touched.
+
+Also fixed while in the file: `/help`'s title was the full sentence "How this
+app works" crammed into the title row against four right-side icons
+(search, help, event switcher, sign out), truncating to "HOW THIS A…" on a
+390px screen — illegible on the one screen whose entire job is to be read at
+a glance by someone who is lost. `AppHeader` now passes `StickyHeader` a
+`subtitle` (a prop it already supported and nothing was using): title "Help",
+subtitle "How this app works" on its own, uncrowded line.
+
+### What was checked and found already correct, so left alone
+
+- **Layout-level bottom padding.** `pb-nav` (`globals.css`) already reserves
+  `5.5rem + safe-area-inset-bottom + keyboard-offset` — more than the bar's
+  actual `min-h-14` (56px) rows plus its own `pb-safe`. Confirmed on a real
+  scrolled-to-bottom viewport screenshot (not `fullPage`, which renders fixed
+  elements at a fixed pixel offset into the stitched image and looks like an
+  overlap that isn't one): the last card in a 9-row arrivals list clears the
+  tab bar with visible space beneath it. No code change.
+- **`Button` variants.** `primary`/`secondary`/`danger`/`ghost` in
+  `components/ui/Button.tsx` apply `opacity-55` only under `disabled`/
+  `aria-disabled`, never as a normal-state style. Every owned screen's
+  buttons render solid gold (primary) or solid-bordered (secondary) at rest
+  in the screenshots. No faded "looks disabled" normal state found; no
+  change made.
+
+### Known gap, not fixed here
+
+`pick-staff/StaffPicker.tsx` — not owned by this session — still calls the
+shared `departmentHomePath` directly after a staff member picks their name, so
+an event lead's very first landing after login is still `/rsvp/campaigns`
+once, before they ever see Home. `v2DepartmentHome` only covers the redirect
+inside `(app)/v2/[eventCode]/page.tsx`, which is what fires on every
+subsequent visit to Home (including every tap of the Home tab) — the
+dominant, recurring instance of the bug — but not that one-time post-login
+hop. Fixing it means editing `StaffPicker.tsx`, out of this session's file
+ownership.
+
+---
+
 ## 22 September 2026 — V11: teach on the screen, once, and never twice
 
 ### What changed — new, in the new group only
