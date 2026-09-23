@@ -3,17 +3,16 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { BuildingIcon, ChevronRightIcon, InboxIcon, SearchIcon } from '@/components/icons'
+import { ChevronRightIcon, SearchIcon } from '@/components/icons'
+import { BottomBar } from '@/components/ui/BottomBar'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { LinkButton } from '@/components/ui/LinkButton'
 import { LoadingRows } from '@/components/ui/LoadingRows'
-import { PageTitle } from '@/components/ui/PageTitle'
-import { SectionHead } from '@/components/ui/SectionHead'
-import { Spinner } from '@/components/ui/Spinner'
-import { StatusPill } from '@/components/ui/StatusPill'
-import { SyncChip } from '@/components/ui/SyncChip'
+import { Progress } from '@/components/ui/Progress'
+import { Row } from '@/components/ui/Row'
+import { Segmented } from '@/components/ui/Segmented'
 import {
   assignGuestToRoom,
   assignGuestsToRoom,
@@ -29,23 +28,17 @@ import {
 import { roomGuardMessage } from '@/lib/errors'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { queryKeys } from '@/lib/query/keys'
-import {
-  bedsLabel,
-  boardSummary,
-  groupRoomsByHotelFloor,
-  matchesTerm,
-  waitingLabel,
-} from '@/lib/rooms/board'
+import { groupRoomsByHotelFloor, matchesTerm, waitingLabel } from '@/lib/rooms/board'
+import { initials } from '@/lib/ui/metrics'
 import { cn } from '@/lib/utils'
 
-import { AppHint } from '../../_components/AppHint'
 import { AllocateReview } from './_components/AllocateReview'
 import { PlaceFamilySheet, type PlaceFamily } from './_components/PlaceFamilySheet'
 import { RoomSheet } from './_components/RoomSheet'
-import { Segmented } from './_components/Segmented'
 
 type GridData = Awaited<ReturnType<typeof readRoomsGrid>>
 type WaitingFamily = GridData['underBedded'][number]
+type GridRoom = GridData['rooms'][number]
 
 const EMPTY_GRID: GridData = {
   rooms: [],
@@ -62,26 +55,33 @@ export interface RoomsBoardProps {
 }
 
 /**
- * The Rooms board — the state of the room register in one screen.
+ * The Rooms board (SPEC-V3 §4).
  *
- * WHAT IT REPLACES. `GiveRoom.tsx` was forty identical full-width "Give a room"
- * buttons, one per waiting family, and nothing else: no view of the rooms, no
- * count of free beds, and no way to see that the allocator existed. Placing 238
- * families meant 238 taps into a sheet, in whatever order the list happened to
- * be in. The engine to do it in one pass had been in `src/lib/allocate/` the
- * whole time; v2 simply never called it.
+ * One job per screen. This one answers "who still has no bed, and can I put
+ * them there in one pass?" — the state of the register in a percentage, one
+ * switch between the two questions a coordinator actually has (what is in
+ * room 214 / who is waiting), and ONE primary button: auto-fill.
  *
- * THE SHAPE. One line of state at the top, a switch between the two questions a
- * coordinator actually has (who has nowhere to sleep / what is in room 214), a
- * search that filters whichever one is showing, and ONE primary button:
- * auto-allocate. The proposal is reviewed before anything is written, and every
- * placement stays editable afterwards from the room sheet — the brief's Phase 2
- * asks for exactly that, a living assignment rather than a fixed one.
+ * WHAT CHANGED FROM v2, AND WHY. v2 said the same things in more furniture: a
+ * prose summary line, a hint banner, a sync chip, a full-width search row above
+ * every list, a "legend" strip, an "Updating…" line, a "Go to the call list"
+ * empty state and a per-family "Names to add" pill next to a chevron. All of
+ * that is gone: the numbers are a `Progress` bar, the two lists are a
+ * `Segmented`, the rooms are a 2-column grid of cards whose fill IS the
+ * information, the waiting families are `Row`s, and one `BottomBar` carries the
+ * commit. A row of helper text under the grid is the only prose left, and it
+ * explains the one thing a coordinator must not learn the hard way (the
+ * database enforces capacity, and going over needs a written reason).
+ *
+ * WHAT DID NOT CHANGE. Every action is the same server function through the
+ * same `useOptimisticAction` hooks with the same `deferUntilCommit` semantics,
+ * the same undo behaviour, the same offline queueing, the same guards and the
+ * same plan → review → commit flow for auto-fill. This file is presentation.
  */
 export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardProps) {
   const queryClient = useQueryClient()
 
-  const [tab, setTab] = useState<'waiting' | 'rooms'>('waiting')
+  const [tab, setTab] = useState<'rooms' | 'waiting'>('waiting')
   const [term, setTerm] = useState('')
   const [plan, setPlan] = useState<RoomPlan | null>(null)
   const [planning, setPlanning] = useState(false)
@@ -99,7 +99,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
   const grid = data ?? EMPTY_GRID
 
   // -------------------------------------------------------------------------
-  // The four reversible writes this screen makes
+  // The four reversible writes this screen makes — unchanged from v2
   // -------------------------------------------------------------------------
 
   /**
@@ -108,7 +108,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
    * DEFERRED, so Undo is real: a room assignment's id does not exist until the
    * server answers, and an Undo built on `releaseGuestFromRoom` could not name
    * what to release without a second read. Holding the write until the undo
-   * window closes makes Undo mean NOTHING WAS SENT instead
+   * window closes makes Undo mean NOTHING WAS SENT
    * (docs/UX-RULES.md R5). The cost is stated plainly: for seven seconds the
    * bed is not really taken, so a second coordinator can claim it and this
    * write then fails the room guard — visibly, on this screen.
@@ -169,7 +169,13 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
   /** Move one occupant to another room. */
   const move = useOptimisticAction<
     GridData,
-    { assignmentId: string; guestName: string; fromRoomId: string; toRoomId: string; toRoomNumber: string },
+    {
+      assignmentId: string
+      guestName: string
+      fromRoomId: string
+      toRoomId: string
+      toRoomNumber: string
+    },
     { count: number }
   >({
     queryKey: queryKeys.rooms.grid(eventId),
@@ -321,7 +327,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
   })
 
   // -------------------------------------------------------------------------
-  // Auto-allocate: plan, review, commit
+  // Auto-fill: plan, review, commit — unchanged
   // -------------------------------------------------------------------------
 
   const startPlanning = useCallback(async () => {
@@ -392,23 +398,6 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
 
   const hotels = useMemo(() => groupRoomsByHotelFloor(roomsShown), [roomsShown])
 
-  /** Where each waiting family already has beds — "2 in room 101". */
-  const familyRooms = useMemo(() => {
-    const map = new Map<string, { roomNumber: string; count: number }[]>()
-    for (const room of grid.rooms) {
-      const perFamily = new Map<string, number>()
-      for (const occupant of room.occupants) {
-        perFamily.set(occupant.groupId, (perFamily.get(occupant.groupId) ?? 0) + 1)
-      }
-      for (const [groupId, n] of perFamily) {
-        const list = map.get(groupId) ?? []
-        list.push({ roomNumber: room.roomNumber, count: n })
-        map.set(groupId, list)
-      }
-    }
-    return map
-  }, [grid.rooms])
-
   const sheetRooms = useMemo(
     () =>
       grid.rooms.map((room) => ({
@@ -429,56 +418,54 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
 
   const openRoom = openRoomId ? (sheetRooms.find((r) => r.roomId === openRoomId) ?? null) : null
 
-  const blockedCount = grid.rooms.filter((r) => r.isBlocked).length
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
   const stale = isFetching && data !== undefined
   const lastError = place.lastError ?? move.lastError ?? remove.lastError ?? add.lastError
   const queuedCount = place.queuedCount + move.queuedCount + remove.queuedCount + add.queuedCount
-  const canAutoAllocate = waiting.length > 0 && grid.totals.bedsFree > 0
+  const canAutoFill = waiting.length > 0 && grid.totals.bedsFree > 0
+  const hasRooms = grid.rooms.length > 0
 
   if (loadError && data === undefined) {
-    return (
-      <div className="flex flex-col gap-4">
-        <PageTitle>Rooms</PageTitle>
-        <ErrorState title={loadError} onRetry={() => void refetch()} />
-      </div>
-    )
+    return <ErrorState title={loadError} onRetry={() => void refetch()} />
   }
 
-  // The review takes over the screen. It is one job — look at the plan, keep
-  // or skip each row, confirm — and a board underneath it would be two.
+  // The review takes over the screen. It is one job — look at the plan, keep or
+  // skip each family, confirm — and a board underneath it would be two.
   if (plan !== null) {
     return (
-      <div className="flex flex-col gap-4">
-        <PageTitle className="min-w-0">Auto-allocate</PageTitle>
-        <AllocateReview
-          plan={plan}
-          rooms={sheetRooms}
-          committing={committing}
-          onCancel={() => setPlan(null)}
-          onConfirm={(items) => void confirmPlan(items)}
-        />
-      </div>
+      <AllocateReview
+        plan={plan}
+        rooms={sheetRooms}
+        committing={committing}
+        onCancel={() => setPlan(null)}
+        onConfirm={(items) => void confirmPlan(items)}
+      />
     )
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageTitle className="min-w-0">Rooms</PageTitle>
-
-      <p className="text-sm leading-snug text-muted" role="status">
-        {isPending ? 'Counting beds…' : boardSummary(grid.totals)}
-      </p>
-
-      {stale ? (
-        <p role="status" className="-mt-2 text-xs text-muted">
-          Updating…
-        </p>
-      ) : null}
-
-      <AppHint screen="rooms-give">
-        Auto-allocate proposes rooms for everyone waiting. Nothing is saved until you confirm.
-      </AppHint>
+    <div className="flex flex-col gap-5 pb-nav-bottombar">
+      {/* The screen's state in one bar. Rooms is maroon (SPEC-V3 §2), and the
+          bar is the label + done/total + a line of what is left. */}
+      <section className="flex flex-col gap-3 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1">
+        {isPending ? (
+          <p role="status" className="text-base text-muted">
+            Counting beds…
+          </p>
+        ) : (
+          <>
+            <Progress
+              label="Guests with a bed"
+              done={grid.totals.guestsWithBed}
+              total={grid.totals.confirmedGuests}
+              tone="brand"
+            />
+            <p className="text-sm leading-snug text-muted">
+              {bedLine(grid.totals.bedsFree, waiting.length)}
+            </p>
+          </>
+        )}
+      </section>
 
       {planError ? (
         <p
@@ -498,23 +485,34 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
         </p>
       ) : null}
 
+      {queuedCount > 0 ? (
+        <p
+          role="status"
+          className="rounded-xl border border-rule-strong bg-amber-tint px-3.5 py-3 text-sm font-medium text-ledger-amber"
+        >
+          {queuedCount === 1 ? '1 room change is' : `${queuedCount} room changes are`} saved on this
+          phone — they send when there is signal.
+        </p>
+      ) : null}
+
       {commitResult ? (
         <CommitSummary result={commitResult} onDismiss={() => setCommitResult(null)} />
       ) : null}
-
-      <SyncChip count={queuedCount} what="room change" />
 
       <Segmented
         label="Which list"
         value={tab}
         onChange={setTab}
         options={[
+          { value: 'rooms', label: 'By room', count: grid.rooms.length },
           { value: 'waiting', label: 'Waiting', count: waiting.length },
-          { value: 'rooms', label: 'Rooms', count: grid.rooms.length },
         ]}
       />
 
-      <label className="flex min-h-14 items-center gap-2 rounded-xl border border-rule-strong bg-surface px-3.5">
+      {/* Searching a 168-room grid by scrolling is not a plan, and a
+          coordinator holding a key card is looking for one number. One field
+          for both tabs: it filters whichever list is showing. */}
+      <label className="flex min-h-12 items-center gap-2 rounded-xl border border-rule-strong bg-surface px-3.5">
         <SearchIcon className="h-5 w-5 shrink-0 text-muted" />
         <span className="sr-only">Search families and rooms</span>
         <input
@@ -522,59 +520,43 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
           value={term}
           onChange={(event) => setTerm(event.target.value)}
           placeholder={tab === 'waiting' ? 'Search a family' : 'Search a room or a name'}
-          className="min-w-0 flex-1 bg-transparent py-3 text-base text-ink outline-none placeholder:text-muted"
+          className="min-w-0 flex-1 bg-transparent py-2.5 text-base text-ink outline-none placeholder:text-subtle"
         />
       </label>
 
-      {/* THE one primary button on this screen. */}
-      {canAutoAllocate ? (
-        planning ? (
-          <p
-            role="status"
-            className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-rule-strong bg-surface text-sm font-medium text-ink"
-          >
-            <Spinner size="sm" label={null} />
-            Working out the best rooms…
-          </p>
-        ) : (
-          <Button size="lg" fullWidth onClick={() => void startPlanning()}>
-            Auto-allocate {waiting.length} {waiting.length === 1 ? 'family' : 'families'}
-          </Button>
-        )
-      ) : null}
-
-      {isPending ? (
-        <LoadingRows count={5} />
-      ) : tab === 'waiting' ? (
-        <WaitingList
-          families={waitingShown}
-          total={waiting.length}
-          familyRooms={familyRooms}
-          hasRooms={grid.rooms.length > 0}
-          eventCode={eventCode}
-          canOpenCallList={canOpenCallList}
-          onPick={(family) =>
-            setPlaceFor({
-              groupId: family.groupId,
-              headName: family.headName,
-              headcount: family.headcount,
-              placed: family.placed,
-              shortfall: family.shortfall,
-              side: family.side ?? null,
-            })
-          }
-        />
-      ) : (
-        <RoomsList hotels={hotels} eventCode={eventCode} onOpen={setOpenRoomId} />
-      )}
-
-      {blockedCount > 0 ? (
-        <p className="text-center text-xs leading-relaxed text-muted">
-          {blockedCount === 1
-            ? '1 room is out of service and is never offered.'
-            : `${blockedCount} rooms are out of service and are never offered.`}
+      {stale ? (
+        <p role="status" className="text-xs text-muted">
+          Updating…
         </p>
       ) : null}
+
+      {tab === 'waiting' ? (
+        isPending ? (
+          <LoadingRows count={5} />
+        ) : (
+          <WaitingList
+            families={waitingShown}
+            total={waiting.length}
+            hasRooms={hasRooms}
+            eventCode={eventCode}
+            canOpenCallList={canOpenCallList}
+            onPick={(family) =>
+              setPlaceFor({
+                groupId: family.groupId,
+                headName: family.headName,
+                headcount: family.headcount,
+                placed: family.placed,
+                shortfall: family.shortfall,
+                side: family.side ?? null,
+              })
+            }
+          />
+        )
+      ) : isPending ? (
+        <LoadingRows count={5} />
+      ) : (
+        <RoomsGrid hotels={hotels} hasRooms={hasRooms} onOpen={setOpenRoomId} />
+      )}
 
       <PlaceFamilySheet
         family={placeFor}
@@ -592,27 +574,66 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
         onRemove={remove.run}
         onAdd={add.run}
       />
+
+      <BottomBar
+        summary={
+          isPending
+            ? 'Counting beds…'
+            : canAutoFill
+              ? // NOT the same numbers as the card above. The card already
+                // says "5 beds free · 2 families waiting" and repeating it
+                // here is two lines saying one thing; this line says what the
+                // button does, which is the one thing the card cannot.
+                'Nothing is saved until you confirm'
+              : bedLine(grid.totals.bedsFree, waiting.length)
+        }
+        primary={
+          !hasRooms
+            ? { label: 'Add rooms', href: `/${eventCode}/hospitality/rooms/new` }
+            : canAutoFill
+              ? {
+                  label: planning
+                    ? 'Working out rooms…'
+                    : `Auto-fill ${waiting.length} ${waiting.length === 1 ? 'family' : 'families'}`,
+                  onPress: () => void startPlanning(),
+                  disabled: planning,
+                }
+              : { label: 'Nothing to fill', onPress: () => {}, disabled: true }
+        }
+      />
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
+// Body pieces
+// ---------------------------------------------------------------------------
+
+/** "38 beds free · 14 waiting" — the one line of state, with zeroes dropped. */
+function bedLine(bedsFree: number, waiting: number): string {
+  const parts: string[] = []
+  parts.push(`${bedsFree} ${bedsFree === 1 ? 'bed' : 'beds'} free`)
+  if (waiting > 0) {
+    parts.push(`${waiting} ${waiting === 1 ? 'family' : 'families'} waiting`)
+  } else {
+    parts.push('every family has a bed')
+  }
+  return parts.join(' · ')
+}
 
 interface WaitingListProps {
   families: readonly WaitingFamily[]
   total: number
-  familyRooms: Map<string, { roomNumber: string; count: number }[]>
   hasRooms: boolean
   eventCode: string
   canOpenCallList: boolean
   onPick: (family: WaitingFamily) => void
 }
 
-/** Compact rows — name, what they still need, where they already are. */
+/** Waiting families as rows — name, what they still need, and where they are. */
 function WaitingList({
   families,
   total,
-  familyRooms,
   hasRooms,
   eventCode,
   canOpenCallList,
@@ -621,9 +642,8 @@ function WaitingList({
   if (!hasRooms) {
     return (
       <EmptyState
-        icon={<BuildingIcon className="h-7 w-7" />}
-        title="No rooms on this event yet"
-        description="Rooms have not been added. Once they are, every confirmed family waiting for one appears here."
+        title="No rooms yet"
+        description="Add the rooms first — every family waiting for one appears here."
         action={
           <LinkButton href={`/${eventCode}/hospitality/rooms/new`} variant="secondary" fullWidth>
             Add rooms
@@ -636,9 +656,8 @@ function WaitingList({
   if (total === 0) {
     return (
       <EmptyState
-        icon={<InboxIcon className="h-7 w-7" />}
         title="Every family has a bed"
-        description="No confirmed family is waiting. This fills in as the calling team confirms families."
+        description="This fills in as the calling team confirms families."
         action={
           canOpenCallList ? (
             <LinkButton href={`/${eventCode}/rsvp/queue`} variant="secondary" fullWidth>
@@ -651,126 +670,159 @@ function WaitingList({
   }
 
   if (families.length === 0) {
-    return (
-      <p className="rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-sm text-muted">
-        No waiting family matches that search.
-      </p>
-    )
+    return <NoMatch />
   }
 
   return (
-    <ul className="flex flex-col gap-2" aria-label="Families waiting for a room">
-      {families.map((family) => {
-        const here = familyRooms.get(family.groupId) ?? []
-        return (
-          <li key={family.groupId}>
-            <button
-              type="button"
-              onClick={() => onPick(family)}
-              className="tap flex min-h-16 w-full items-center gap-3 rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-left active:bg-surface-2"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-base leading-snug font-medium text-ink">
-                  {displayName(family.headName)}
-                </span>
-                <span className="mt-0.5 block truncate text-sm text-muted">
-                  {waitingLabel(family.headcount, family.placed)}
-                  {here.length > 0
-                    ? ` · ${here.map((r) => `${r.count} in ${r.roomNumber}`).join(', ')}`
-                    : ''}
-                </span>
-              </span>
-              {family.needsTopUp ? <StatusPill tone="neutral">Names to add</StatusPill> : null}
-              <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
-            </button>
-          </li>
-        )
-      })}
+    <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
+      {families.map((family) => (
+        <li key={family.groupId}>
+          <Row
+            heading={displayName(family.headName)}
+            meta={waitingLabel(family.headcount, family.placed)}
+            initials={initials(family.headName)}
+            status={family.needsTopUp ? 'Names' : undefined}
+            tone="waiting"
+            onPress={() => onPick(family)}
+            trailing={<ChevronRightIcon className="h-5 w-5" />}
+          />
+        </li>
+      ))}
     </ul>
   )
 }
 
-interface RoomsListProps {
-  hotels: ReturnType<typeof groupRoomsByHotelFloor<GridData['rooms'][number]>>
-  eventCode: string
+interface RoomsGridProps {
+  hotels: ReturnType<typeof groupRoomsByHotelFloor<GridRoom>>
+  hasRooms: boolean
   onOpen: (roomId: string) => void
 }
 
-/** Hotel → floor → room cards. Occupant names on the card, not behind a tap. */
-function RoomsList({ hotels, eventCode, onOpen }: RoomsListProps) {
-  if (hotels.length === 0) {
+/**
+ * Hotel → floor → a 2-column grid of room cards.
+ *
+ * The card is the room: its number, one square per bed (filled = taken), and
+ * the names in it. A coordinator standing in a corridor reads the shape of a
+ * floor without opening anything.
+ */
+function RoomsGrid({ hotels, hasRooms, onOpen }: RoomsGridProps) {
+  if (!hasRooms) {
     return (
-      <EmptyState
-        icon={<BuildingIcon className="h-7 w-7" />}
-        title="No room matches that search"
-        description="Try a room number, a hotel, or a family name."
-        action={
-          <LinkButton href={`/${eventCode}/hospitality/rooms/new`} variant="secondary" fullWidth>
-            Add rooms
-          </LinkButton>
-        }
-      />
+      <p className="rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-sm text-muted">
+        No rooms on this event yet.
+      </p>
     )
   }
 
+  if (hotels.length === 0) return <NoMatch />
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       {hotels.map((hotel) => (
         <section key={hotel.hotelId} className="flex flex-col gap-3">
-          <SectionHead
-            eyebrow={hotel.hotelName}
-            right={`${hotel.roomCount} ${hotel.roomCount === 1 ? 'room' : 'rooms'}`}
-            inline
-          />
+          {hotels.length > 1 || hotel.floors.length > 1 ? (
+            <h2 className="eyebrow text-muted">
+              {hotel.hotelName} · {hotel.roomCount}{' '}
+              {hotel.roomCount === 1 ? 'room' : 'rooms'}
+            </h2>
+          ) : null}
+
           {hotel.floors.map((floor) => (
             <div key={floor.floor || 'none'} className="flex flex-col gap-2">
               {hotel.floors.length > 1 ? (
-                <p className="eyebrow text-muted">{floor.label}</p>
+                <p className="text-sm font-medium text-ink">{floor.label}</p>
               ) : null}
-              <ul className="flex flex-col gap-2" aria-label={`${hotel.hotelName} ${floor.label}`}>
-                {floor.rooms.map((room) => {
-                  const occupied = room.occupants.length
-                  const families = [...new Set(room.occupants.map((o) => o.headName))]
-                  return (
-                    <li key={room.roomId}>
-                      <button
-                        type="button"
-                        onClick={() => onOpen(room.roomId)}
-                        className={cn(
-                          'tap flex min-h-16 w-full items-center gap-3 rounded-xl border bg-surface px-3.5 py-3 text-left active:bg-surface-2',
-                          room.isBlocked ? 'border-rule' : 'border-rule-strong',
-                        )}
-                      >
-                        <span className="min-w-0 flex-1">
-                          {/* The room number is a name, not a figure: sans, so
-                              it matches every other title on the screen. */}
-                          <span className="block text-base leading-snug font-medium text-ink">
-                            {room.roomNumber} · {bedsLabel(occupied, room.capacity)}
-                          </span>
-                          <span className="mt-0.5 block truncate text-sm text-muted">
-                            {room.isBlocked
-                              ? 'Out of service'
-                              : families.length === 0
-                                ? 'Empty'
-                                : families.join(', ')}
-                          </span>
-                        </span>
-                        {!room.isBlocked && room.freeBeds > 0 && occupied > 0 ? (
-                          <StatusPill tone="attention">
-                            {room.freeBeds} free
-                          </StatusPill>
-                        ) : null}
-                        <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
-                      </button>
-                    </li>
-                  )
-                })}
+              <ul
+                className="grid grid-cols-2 gap-2.5"
+                aria-label={`${hotel.hotelName} ${floor.label}`}
+              >
+                {floor.rooms.map((room) => (
+                  <li key={room.roomId}>
+                    <RoomCard room={room} onOpen={onOpen} />
+                  </li>
+                ))}
               </ul>
             </div>
           ))}
         </section>
       ))}
     </div>
+  )
+}
+
+/** One room in the grid. Whole card is the tap target. */
+function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) => void }) {
+  const occupied = room.occupants.length
+  const beds = Math.max(room.capacity, occupied)
+  const heads = [...new Set(room.occupants.map((o) => o.headName))]
+  const names = [...new Set(room.occupants.map((o) => firstName(o.guestName)))]
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(room.roomId)}
+      aria-label={`Room ${room.roomNumber}, ${occupied} of ${room.capacity} beds, ${
+        names.length === 0 ? 'empty' : names.join(', ')
+      }`}
+      className={cn(
+        'tap flex h-full min-h-[6.5rem] w-full flex-col gap-2 rounded-2xl border bg-surface p-3 text-left',
+        'transition-colors duration-press ease-ledger active:bg-surface-2',
+        room.isBlocked ? 'border-rule opacity-70' : 'border-rule-strong',
+      )}
+    >
+      {/* `min-w-0 truncate` on the number and `shrink-0` on the status: a
+          fixture room number ("G3-HOTEL-MSKI51VD") is far wider than half a
+          360px card, and without these the flex row pushes its own status
+          label out of the card instead of ellipsising the number. */}
+      <span className="flex items-baseline justify-between gap-2">
+        <span className="figure min-w-0 truncate text-xl leading-none font-semibold text-ink">
+          {room.roomNumber}
+        </span>
+        {room.isBlocked ? (
+          <span className="shrink-0 text-xs font-medium text-muted">Out</span>
+        ) : occupied === 0 ? (
+          <span className="shrink-0 text-xs font-medium text-subtle">Empty</span>
+        ) : room.freeBeds === 0 ? (
+          <span className="shrink-0 text-xs font-medium text-ledger-green">Full</span>
+        ) : null}
+      </span>
+
+      {/* One square per bed: filled = taken, outlined = free. A blocked room
+          gets a dash — there are no beds to offer. */}
+      <span aria-hidden className="flex flex-wrap gap-1">
+        {room.isBlocked ? (
+          <span className="h-2.5 w-2.5 rounded-xs border border-rule-strong" />
+        ) : (
+          Array.from({ length: beds }, (_, i) => (
+            <span
+              key={i}
+              className={cn(
+                'h-2.5 w-2.5 rounded-xs',
+                i < occupied ? 'bg-brand' : 'border border-rule-strong',
+              )}
+            />
+          ))
+        )}
+      </span>
+
+      <span className="min-w-0">
+        {room.isBlocked ? (
+          <span className="block text-sm text-muted">Out of service</span>
+        ) : names.length === 0 ? (
+          <span className="block text-sm text-muted">{room.capacity} beds free</span>
+        ) : (
+          <>
+            <span className="block truncate text-sm leading-snug text-ink">
+              {names.slice(0, 2).join(', ')}
+              {names.length > 2 ? ` +${names.length - 2}` : ''}
+            </span>
+            {heads.length > 1 ? (
+              <span className="mt-0.5 block text-xs text-muted">Shared</span>
+            ) : null}
+          </>
+        )}
+      </span>
+    </button>
   )
 }
 
@@ -807,9 +859,23 @@ function CommitSummary({
   )
 }
 
+/** A search that matched nothing, in the same voice on both tabs. */
+function NoMatch() {
+  return (
+    <p className="rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-sm text-muted">
+      Nothing matches that search.
+    </p>
+  )
+}
+
 /** A person's name first, never an id. */
 function displayName(headName: string | null | undefined): string {
   return headName?.trim() || 'Unnamed family'
+}
+
+/** The first word of a name — what fits on a 164px card. */
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] || name
 }
 
 export default RoomsBoard

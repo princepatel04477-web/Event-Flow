@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from 'react'
 
-import { SearchIcon } from '@/components/icons'
+import { ChevronRightIcon, SearchIcon } from '@/components/icons'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
-import { StatusPill } from '@/components/ui/StatusPill'
+import { Row } from '@/components/ui/Row'
 import { bedsLabel, compareRoomNumbers, matchesTerm } from '@/lib/rooms/board'
+import { initials } from '@/lib/ui/metrics'
 import { cn } from '@/lib/utils'
 
 export interface SheetOccupant {
@@ -55,7 +56,12 @@ export interface RoomSheetProps {
     toRoomId: string
     toRoomNumber: string
   }) => void
-  onRemove: (input: { assignmentId: string; guestId: string; guestName: string; roomId: string }) => void
+  onRemove: (input: {
+    assignmentId: string
+    guestId: string
+    guestName: string
+    roomId: string
+  }) => void
   onAdd: (input: { guestId: string; guestName: string; roomId: string; roomNumber: string }) => void
 }
 
@@ -70,6 +76,13 @@ type Mode =
  * One room, and everything a coordinator standing outside its door can do:
  * see who is in it, move one of them, take one out, put somebody in, and pair
  * a single with another single.
+ *
+ * v3 RESTYLE ONLY. The writes, the order of the modes and the share rule are
+ * untouched; what changed is the furniture — occupant cards with two buttons
+ * each are now `Row`s with two 44px actions under them (a name is not a
+ * "Move" button), the room pickers are `Row`s with the room number in the
+ * avatar slot, and the sheet has ONE primary ("Add a guest") instead of a
+ * primary plus three equally loud secondaries.
  *
  * REMOVE RELEASES, IT DOES NOT DELETE. `releaseGuestFromRoom` stamps
  * `released_at`, so the row survives as history and the client profile card can
@@ -94,11 +107,14 @@ export function RoomSheet({
   const [mode, setMode] = useState<Mode>({ kind: 'occupants' })
   const [term, setTerm] = useState('')
   const [seededFor, setSeededFor] = useState<string | null>(null)
+  /** The occupant the action bar is currently about — "Move" needs a subject. */
+  const [picked, setPicked] = useState<string | null>(null)
 
   if (room !== null && seededFor !== room.roomId) {
     setSeededFor(room.roomId)
     setMode({ kind: 'occupants' })
     setTerm('')
+    setPicked(null)
   }
 
   const moveTargets = useMemo(() => {
@@ -127,9 +143,7 @@ export function RoomSheet({
               g.groupId !== mode.with.groupId,
           )
         : unplaced
-    return pool
-      .filter((g) => matchesTerm(term, g.guestName, g.headName))
-      .slice(0, 40)
+    return pool.filter((g) => matchesTerm(term, g.guestName, g.headName)).slice(0, 40)
   }, [mode, unplaced, term])
 
   // Nothing to show and nothing to keep mounted: the sheet has no open/close
@@ -139,6 +153,7 @@ export function RoomSheet({
 
   const occupied = room.occupants.length
   const title = `${room.hotelName} · Room ${room.roomNumber}`
+  const pickedOccupant = room.occupants.find((o) => o.assignmentId === picked) ?? null
   const lonelySingle =
     occupied === 1 && room.occupants[0].groupType === 'single' && room.freeBeds > 0
       ? room.occupants[0]
@@ -147,13 +162,17 @@ export function RoomSheet({
   return (
     <BottomSheet open onClose={onClose} label={title}>
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-ink">{title}</h2>
-          <p className="figure text-sm text-muted">
-            {bedsLabel(occupied, room.capacity)}
-            {room.floor ? ` · ${room.floor}` : ''}
-            {room.isBlocked ? ' · out of service' : ''}
-          </p>
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="figure text-3xl leading-none font-semibold text-ink">
+              {room.roomNumber}
+            </p>
+            <p className="mt-1.5 truncate text-sm text-muted">
+              {room.hotelName}
+              {room.floor ? ` · ${room.floor}` : ''} · {bedsLabel(occupied, room.capacity)}
+              {room.isBlocked ? ' · out of service' : ''}
+            </p>
+          </div>
         </div>
 
         {mode.kind === 'occupants' ? (
@@ -163,48 +182,64 @@ export function RoomSheet({
                 This room is empty.
               </p>
             ) : (
-              <ul className="flex flex-col gap-2" aria-label="Who is in this room">
+              <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
                 {room.occupants.map((occupant) => (
-                  <li
-                    key={occupant.assignmentId}
-                    className="flex flex-col gap-2 rounded-xl border border-rule-strong bg-surface px-3.5 py-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-base leading-snug font-medium text-ink">
-                        {occupant.guestName}
-                      </p>
-                      <p className="truncate text-sm text-muted">
-                        {occupant.headName}
-                        {occupant.isHead ? ' · family head' : ''}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="secondary"
-                        className="flex-1"
-                        onClick={() => setMode({ kind: 'move', occupant })}
-                      >
-                        Move
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="flex-1"
-                        onClick={() =>
-                          onRemove({
-                            assignmentId: occupant.assignmentId,
-                            guestId: occupant.guestId,
-                            guestName: occupant.guestName,
-                            roomId: room.roomId,
-                          })
-                        }
-                      >
-                        Remove
-                      </Button>
-                    </div>
+                  <li key={occupant.assignmentId}>
+                    <Row
+                      heading={occupant.guestName}
+                      meta={`${occupant.headName}${occupant.isHead ? ' · family head' : ''}`}
+                      initials={initials(occupant.guestName)}
+                      onPress={() =>
+                        setPicked((prev) =>
+                          prev === occupant.assignmentId ? null : occupant.assignmentId,
+                        )
+                      }
+                      trailing={
+                        picked === occupant.assignmentId ? (
+                          <span className="text-sm font-medium text-brand">Picked</span>
+                        ) : (
+                          <ChevronRightIcon className="h-5 w-5" />
+                        )
+                      }
+                      className={cn(picked === occupant.assignmentId && 'bg-brand-tint')}
+                    />
                   </li>
                 ))}
               </ul>
             )}
+
+            {pickedOccupant ? (
+              <div className="flex items-stretch gap-2.5">
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  fullWidth
+                  onClick={() => setMode({ kind: 'move', occupant: pickedOccupant })}
+                >
+                  Move {firstName(pickedOccupant.guestName)}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  fullWidth
+                  onClick={() => {
+                    onRemove({
+                      assignmentId: pickedOccupant.assignmentId,
+                      guestId: pickedOccupant.guestId,
+                      guestName: pickedOccupant.guestName,
+                      roomId: room.roomId,
+                    })
+                    setPicked(null)
+                  }}
+                >
+                  Take out
+                </Button>
+              </div>
+            ) : occupied > 0 ? (
+              <p className="text-center text-xs text-muted">
+                Tap a name to move or take them out.
+              </p>
+            ) : null}
 
             {lonelySingle ? (
               <Button
@@ -216,7 +251,7 @@ export function RoomSheet({
                   setMode({ kind: 'share', with: lonelySingle })
                 }}
               >
-                Share with another single…
+                Share with another single
               </Button>
             ) : null}
 
@@ -230,24 +265,26 @@ export function RoomSheet({
             >
               Add a guest
             </Button>
-
-            <Button variant="ghost" size="lg" fullWidth onClick={onClose}>
-              Close
-            </Button>
           </>
         ) : null}
 
         {mode.kind === 'move' ? (
           <>
-            <p className="text-sm text-muted">
+            <p className="text-sm leading-snug text-muted">
               Move {mode.occupant.guestName} to which room?
             </p>
-            <ul className="flex flex-col gap-2" aria-label="Move to which room">
+            <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
               {moveTargets.map((target) => (
                 <li key={target.roomId}>
-                  <button
-                    type="button"
-                    onClick={() => {
+                  <Row
+                    heading={`Room ${target.roomNumber}`}
+                    meta={`${target.hotelName} · ${bedsLabel(
+                      target.occupants.length,
+                      target.capacity,
+                    )}`}
+                    status={target.freeBeds > 0 ? `${target.freeBeds} free` : 'Full'}
+                    tone={target.freeBeds > 0 ? 'done' : 'problem'}
+                    onPress={() => {
                       onMove({
                         assignmentId: mode.occupant.assignmentId,
                         guestName: mode.occupant.guestName,
@@ -257,25 +294,7 @@ export function RoomSheet({
                       })
                       onClose()
                     }}
-                    className="tap flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-left active:bg-surface-2"
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-lg leading-none font-medium text-ink">
-                        {target.roomNumber}
-                      </span>
-                      <span className="mt-1 block truncate text-sm text-muted">
-                        {target.hotelName}
-                      </span>
-                    </span>
-                    <span
-                      className={cn(
-                        'figure shrink-0 text-sm',
-                        target.freeBeds <= 0 ? 'text-ledger-red' : 'text-muted',
-                      )}
-                    >
-                      {bedsLabel(target.occupants.length, target.capacity)}
-                    </span>
-                  </button>
+                  />
                 </li>
               ))}
             </ul>
@@ -292,13 +311,13 @@ export function RoomSheet({
 
         {mode.kind === 'add' || mode.kind === 'share' ? (
           <>
-            <p className="text-sm text-muted">
+            <p className="text-sm leading-snug text-muted">
               {mode.kind === 'share'
                 ? `Singles on the ${sideWord(mode.with.side)} with no room yet.`
                 : 'Guests with no room yet.'}
             </p>
 
-            <label className="flex min-h-14 items-center gap-2 rounded-xl border border-rule-strong bg-surface px-3.5">
+            <label className="flex min-h-12 items-center gap-2 rounded-xl border border-rule-strong bg-surface px-3.5">
               <SearchIcon className="h-5 w-5 shrink-0 text-muted" />
               <span className="sr-only">Search guests</span>
               <input
@@ -306,7 +325,7 @@ export function RoomSheet({
                 value={term}
                 onChange={(event) => setTerm(event.target.value)}
                 placeholder="Search by name"
-                className="min-w-0 flex-1 bg-transparent py-3 text-base text-ink outline-none placeholder:text-muted"
+                className="min-w-0 flex-1 bg-transparent py-2.5 text-base text-ink outline-none placeholder:text-subtle"
               />
             </label>
 
@@ -317,12 +336,16 @@ export function RoomSheet({
                   : 'Nobody is waiting for a room under that name.'}
               </p>
             ) : (
-              <ul className="flex flex-col gap-2" aria-label="Guests to add">
+              <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
                 {addable.map((guest) => (
                   <li key={guest.guestId}>
-                    <button
-                      type="button"
-                      onClick={() => {
+                    <Row
+                      heading={guest.guestName}
+                      meta={guest.headName}
+                      initials={initials(guest.guestName)}
+                      status={guest.groupType === 'single' ? 'Single' : undefined}
+                      tone="neutral"
+                      onPress={() => {
                         onAdd({
                           guestId: guest.guestId,
                           guestName: guest.guestName,
@@ -331,20 +354,7 @@ export function RoomSheet({
                         })
                         onClose()
                       }}
-                      className="tap flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-left active:bg-surface-2"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-base leading-snug font-medium text-ink">
-                          {guest.guestName}
-                        </span>
-                        <span className="mt-0.5 block truncate text-sm text-muted">
-                          {guest.headName}
-                        </span>
-                      </span>
-                      {guest.groupType === 'single' ? (
-                        <StatusPill tone="neutral">Single</StatusPill>
-                      ) : null}
-                    </button>
+                    />
                   </li>
                 ))}
               </ul>
@@ -363,6 +373,11 @@ export function RoomSheet({
       </div>
     </BottomSheet>
   )
+}
+
+/** The first word of a name — "Move Ravi", not "Move Ravi Kumar Patel". */
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] || name
 }
 
 function sideWord(side: string | null): string {

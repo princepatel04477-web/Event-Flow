@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from 'react'
 
-import { MinusIcon, PlusIcon } from '@/components/icons'
+import { ChevronRightIcon } from '@/components/icons'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
-import { StatusPill } from '@/components/ui/StatusPill'
+import { Row } from '@/components/ui/Row'
+import { Stepper } from '@/components/ui/Stepper'
 import { suggestRooms, type SuggestRoom } from '@/lib/allocate/suggest'
-import { bedsLabel, compareRoomNumbers } from '@/lib/rooms/board'
-import { cn } from '@/lib/utils'
+import { compareRoomNumbers } from '@/lib/rooms/board'
 
 /** The room facts this sheet needs — a subset of the grid row. */
 export interface PlaceRoom {
@@ -55,6 +55,11 @@ export interface PlaceFamilySheetProps {
  * scored engine with the same plain-language reason string the v1 panel shows.
  * It runs here, on rooms already in the cache, so opening this sheet costs no
  * round trip on venue Wi-Fi.
+ *
+ * v3 RESTYLE: the engine's answer is the only loud thing on the sheet (maroon
+ * hairline), the count is the shared `Stepper`, the room list is `Row`s with
+ * the room number as the heading, and the hotel filter is a `Chip` row that
+ * only appears when there is more than one hotel to choose between.
  */
 export function PlaceFamilySheet({ family, rooms, onClose, onPlace }: PlaceFamilySheetProps) {
   const [count, setCount] = useState(1)
@@ -133,71 +138,48 @@ export function PlaceFamilySheet({ family, rooms, onClose, onPlace }: PlaceFamil
     >
       {family === null ? null : (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold text-ink">
-              Place {family.headName} ({family.headcount})
+          <div className="min-w-0">
+            <h2 className="truncate font-display text-2xl leading-tight font-semibold text-ink">
+              {family.headName}
             </h2>
-            <p className="text-sm leading-snug text-muted">
+            <p className="mt-1 text-sm leading-snug text-muted">
               {family.placed === 0
-                ? `${family.shortfall} to place. You can split them across rooms.`
-                : `${family.placed} already placed, ${family.shortfall} to go.`}
+                ? `${family.headcount} in the family · ${family.shortfall} to place`
+                : `${family.placed} placed, ${family.shortfall} to go`}
             </p>
           </div>
 
+          {/* The engine's answer, and the only loud control on the sheet. */}
           {best ? (
             <button
               type="button"
               onClick={() => place(best.room.id, family.shortfall)}
-              className="tap flex w-full flex-col gap-1 rounded-xl border border-brand bg-brand-tint px-3.5 py-3 text-left active:bg-surface-2"
+              className="tap flex w-full items-center gap-3 rounded-2xl border border-brand bg-brand-tint px-3.5 py-3 text-left active:brightness-95"
             >
-              <span className="flex items-center justify-between gap-3">
-                <span className="figure text-lg leading-none font-semibold text-ink">
-                  {best.room.hotelName} · {best.room.roomNumber}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-base leading-snug font-semibold text-ink">
+                  Room {best.room.roomNumber} · {best.room.hotelName}
                 </span>
-                <StatusPill tone="active">Best fit</StatusPill>
+                <span className="mt-0.5 line-clamp-2 block text-sm leading-snug text-muted">
+                  {reasonTail(best.reason, best.room.roomNumber)}
+                </span>
               </span>
-              <span className="text-sm leading-snug text-muted">{best.reason}</span>
+              <span className="shrink-0 text-sm font-semibold text-brand">Best fit</span>
             </button>
           ) : null}
 
-          <div
-            role="group"
-            aria-label="How many guests"
-            className="flex items-center justify-between gap-3 rounded-xl border border-rule-strong bg-surface px-3.5 py-2.5"
-          >
-            <span className="text-base font-medium text-ink">How many guests?</span>
-            <span className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setCount((c) => Math.max(1, c - 1))}
-                aria-label="One fewer guest"
-                className="tap flex h-11 w-11 items-center justify-center rounded-lg border border-rule-strong text-ink active:bg-surface-2 disabled:opacity-40"
-                disabled={count <= 1}
-              >
-                <MinusIcon className="h-5 w-5" />
-              </button>
-              <span
-                className="figure w-10 text-center text-xl leading-none font-medium text-ink"
-                aria-live="polite"
-              >
-                {count}
-              </span>
-              <button
-                type="button"
-                onClick={() => setCount((c) => Math.min(family.shortfall, c + 1))}
-                aria-label="One more guest"
-                className="tap flex h-11 w-11 items-center justify-center rounded-lg border border-rule-strong text-ink active:bg-surface-2 disabled:opacity-40"
-                disabled={count >= family.shortfall}
-              >
-                <PlusIcon className="h-5 w-5" />
-              </button>
-            </span>
-          </div>
+          <Stepper
+            label="How many go in one room?"
+            value={count}
+            onChange={setCount}
+            min={1}
+            max={Math.max(1, family.shortfall)}
+          />
 
           {hotels.length > 1 ? (
             <div className="flex flex-wrap gap-2" role="group" aria-label="Which hotel">
               <Chip selected={hotel === null} onClick={() => setHotel(null)}>
-                All hotels
+                All
               </Chip>
               {hotels.map((name) => (
                 <Chip key={name} selected={hotel === name} onClick={() => setHotel(name)}>
@@ -209,51 +191,29 @@ export function PlaceFamilySheet({ family, rooms, onClose, onPlace }: PlaceFamil
 
           {pickable.length === 0 ? (
             <p className="rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-sm text-muted">
-              No room is free here. Pick another hotel, or ask your event lead to add rooms.
+              No room is free here.
             </p>
           ) : (
-            <ul className="flex flex-col gap-2" aria-label="Rooms to choose from">
+            <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
               {pickable.map((room) => {
                 const tight = room.freeBeds < count
                 return (
                   <li key={room.roomId}>
-                    <button
-                      type="button"
-                      onClick={() => place(room.roomId, count)}
-                      className="tap flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-left active:bg-surface-2"
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-lg leading-none font-medium text-ink">
-                          {room.roomNumber}
-                        </span>
-                        <span className="mt-1 block truncate text-sm text-muted">
-                          {room.hotelName}
-                          {room.floor ? ` · ${room.floor}` : ''}
-                        </span>
-                      </span>
-                      <span className="flex shrink-0 flex-col items-end gap-1">
-                        <span
-                          className={cn(
-                            'figure text-sm',
-                            room.freeBeds <= 0 ? 'text-ledger-red' : 'text-muted',
-                          )}
-                        >
-                          {bedsLabel(room.occupiedBeds, room.capacity)}
-                        </span>
-                        {tight ? (
-                          <StatusPill tone="attention">
-                            {room.freeBeds <= 0 ? 'Full' : `Only ${room.freeBeds} free`}
-                          </StatusPill>
-                        ) : null}
-                      </span>
-                    </button>
+                    <Row
+                      heading={`Room ${room.roomNumber}`}
+                      meta={`${room.hotelName}${room.floor ? ` · ${room.floor}` : ''}`}
+                      status={tight ? (room.freeBeds <= 0 ? 'Full' : `${room.freeBeds} free`) : undefined}
+                      tone={room.freeBeds <= 0 ? 'problem' : 'waiting'}
+                      onPress={() => place(room.roomId, count)}
+                      trailing={<ChevronRightIcon className="h-5 w-5" />}
+                    />
                   </li>
                 )
               })}
             </ul>
           )}
 
-          <Button variant="secondary" size="lg" fullWidth onClick={onClose}>
+          <Button variant="ghost" size="lg" fullWidth onClick={onClose}>
             Cancel
           </Button>
         </div>
@@ -263,3 +223,21 @@ export function PlaceFamilySheet({ family, rooms, onClose, onPlace }: PlaceFamil
 }
 
 export default PlaceFamilySheet
+
+/**
+ * The engine's reason, minus the clause the card already says out loud.
+ *
+ * `suggestRooms` always opens with "<hotel> Room <n>[(floor)]" — and that is
+ * exactly what the line above this one shows. On a 360px card the repetition
+ * pushes the part that answers "why this room?" into the ellipsis, so the
+ * location clause is dropped when it is there. When it is NOT there (nothing
+ * else scored, so the reason is only the location) the original is returned
+ * rather than an empty line.
+ *
+ * Presentation only: the score, the ranking and the engine are untouched.
+ */
+function reasonTail(reason: string, roomNumber: string): string {
+  const [first, ...rest] = reason.split(', ')
+  if (rest.length === 0 || !first.includes(`Room ${roomNumber}`)) return reason
+  return rest.join(', ')
+}
