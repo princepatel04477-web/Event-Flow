@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveEventByCode, requireStaff } from '@/lib/supabase/queries'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { PageTitle } from '@/components/ui/PageTitle'
+import { Row } from '@/components/ui/Row'
 import { BuildingIcon, ChevronRightIcon } from '@/components/icons'
 
 export const metadata: Metadata = { title: 'Add rooms' }
@@ -60,29 +60,38 @@ export default async function StaffRoomCreatePickerPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageTitle>Add rooms</PageTitle>
-      <p className="text-sm text-muted">Pick the hotel these rooms belong to.</p>
-
-      <div className="flex flex-col gap-3">
-        {hotels.map((hotel) => (
-          <Link
-            key={hotel.id}
-            href={`/${event.code}/hospitality/rooms/new/${hotel.id}`}
-            className="tap flex items-center gap-3 rounded-xl border border-rule bg-surface p-4 transition-colors hover:bg-surface-2 active:bg-surface-2"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-tint text-brand">
-              <BuildingIcon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-semibold text-fg">{hotel.name}</p>
-              {hotel.address ? (
-                <p className="truncate text-sm text-muted">{hotel.address}</p>
-              ) : null}
-            </div>
-            <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
-          </Link>
-        ))}
+      {/* A body subtitle, not a second screen title: under the v3 shell the
+          header already says "Rooms", and the v1 shell names only the event.
+          Keeping it at 20px Bricolage makes it read as "which screen am I on
+          in this section" in both, without two competing 30px titles. */}
+      <div className="min-w-0">
+        <h2 className="font-display text-xl leading-tight font-semibold text-ink">Add rooms</h2>
+        <p className="mt-1 text-sm leading-snug text-muted">
+          Rooms belong to a hotel. Pick the one to add them to.
+        </p>
       </div>
+
+      <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
+        {hotels.map((hotel) => (
+          <li key={hotel.id}>
+            <Link
+              href={`/${event.code}/hospitality/rooms/new/${hotel.id}`}
+              className="tap block transition-colors duration-press ease-ledger active:bg-surface-2"
+            >
+              <Row
+                heading={hotel.name}
+                meta={hotel.address ?? undefined}
+                badge={
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-tint text-brand">
+                    <BuildingIcon className="h-5 w-5" />
+                  </span>
+                }
+                trailing={<ChevronRightIcon className="h-5 w-5" />}
+              />
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
