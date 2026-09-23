@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 
-import { Button } from '@/components/ui/Button'
+import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
+import { Button, buttonClassName } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { issueAccessCode, type IssuedCode } from '@/lib/actions/access-codes'
 
@@ -22,8 +22,8 @@ const ROLE_LABEL: Record<'team' | 'client', string> = {
 }
 
 const ROLE_NOTE: Record<'team' | 'client', string> = {
-  team: 'Staff who call families, allocate rooms and log deliveries.',
-  client: 'Read-only. The family sees guest details and nothing else.',
+  team: 'Calls families, allocates rooms, logs deliveries.',
+  client: 'Read-only. Guest details and nothing else.',
 }
 
 /**
@@ -38,7 +38,6 @@ const ROLE_NOTE: Record<'team' | 'client', string> = {
  */
 export function CodesClient({
   eventId,
-  eventCode,
   eventName,
   rows,
   loadError,
@@ -97,16 +96,7 @@ export function CodesClient({
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <Link href={`/admin/events/${eventCode}`} className="text-sm text-muted underline">
-          ← Back to dashboard
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold text-fg">Access codes</h1>
-        <p className="mt-1 text-sm text-muted">
-          Codes are stored hashed, so an existing code can never be looked up — only
-          replaced. Issuing a new one signs out everyone using the old one.
-        </p>
-      </div>
+      <AdminPageTitle context={eventName}>Access codes</AdminPageTitle>
 
       {loadError ? (
         <Card className="border-ledger-red/40">
@@ -130,16 +120,16 @@ export function CodesClient({
       {issued ? (
         <Card className="border-2 border-ink bg-surface-2">
           <CardBody className="flex flex-col gap-3 py-4">
-            <p className="text-sm font-bold text-fg">
-              This code is shown once. Write it down or copy it now.
+            <p className="text-sm font-bold text-ink">
+              Shown once. Write it down or copy it now.
             </p>
             <p className="text-sm text-muted">
-              {ROLE_LABEL[issued.role]} code for {eventName}. It is stored hashed — leaving
-              this page loses it for good, and the only fix is to issue another.
+              {ROLE_LABEL[issued.role]} code for {eventName} — stored hashed, so leaving
+              this page loses it for good.
             </p>
 
             <p
-              className="select-all rounded-xl border border-border-strong bg-surface px-3 py-4 text-center font-mono text-3xl font-bold tracking-[0.15em] text-fg"
+              className="code-figure select-all rounded-xl border border-rule-strong bg-surface px-3 py-4 text-center text-3xl font-bold text-ink"
               aria-label={`Access code ${issued.code.split('').join(' ')}`}
             >
               {issued.code}
@@ -149,11 +139,15 @@ export function CodesClient({
               <Button type="button" onClick={handleCopy} fullWidth>
                 {copied ? 'Copied' : 'Copy code'}
               </Button>
+              {/* An external target, so this is a plain <a> wearing the
+                  shared button classes rather than a LinkButton — `LinkButton`
+                  has no `target`/`rel`, and `wa.me` must open in the OS
+                  browser, not inside the WebView. */}
               <a
                 href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="tap inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-border-strong bg-surface px-4 text-sm font-semibold text-fg"
+                className={buttonClassName({ variant: 'secondary', fullWidth: true })}
               >
                 Share on WhatsApp
               </a>
@@ -161,8 +155,8 @@ export function CodesClient({
 
             {issued.rotated ? (
               <p className="text-xs text-subtle">
-                The previous {ROLE_LABEL[issued.role].toLowerCase()} code is now retired.
-                Anyone still signed in with it is signed out on their next action.
+                The previous {ROLE_LABEL[issued.role].toLowerCase()} code is retired.
+                Anyone signed in with it is signed out on their next action.
               </p>
             ) : null}
 
@@ -182,28 +176,27 @@ export function CodesClient({
           <Card key={role}>
             <CardBody className="flex flex-col gap-3">
               <div>
-                <h2 className="font-semibold text-fg">{ROLE_LABEL[role]}</h2>
+                <h2 className="text-base font-semibold text-ink">{ROLE_LABEL[role]}</h2>
                 <p className="mt-0.5 text-sm text-muted">{ROLE_NOTE[role]}</p>
               </div>
 
-              <div className="rounded-xl border border-border bg-surface-2 px-3 py-2">
+              <div className="rounded-xl bg-surface-2 px-3 py-2.5">
                 {live ? (
-                  <p className="font-mono text-sm text-fg">
+                  <p className="code-figure text-sm text-ink">
                     {live.prefix}-••••{live.lastFour}{' '}
-                    <span className="font-sans text-xs text-subtle">
+                    <span className="text-xs text-subtle">
                       · live · issued {new Date(live.createdAt).toLocaleDateString()}
                     </span>
                   </p>
                 ) : (
-                  <p className="text-sm font-medium text-warning">
+                  <p className="text-sm font-medium text-ledger-amber">
                     No live code — nobody can sign in with this role.
                   </p>
                 )}
                 {retiredCount > 0 ? (
                   <p className="mt-1 text-xs text-subtle">
-                    {retiredCount} retired or revoked code
-                    {retiredCount === 1 ? '' : 's'} kept, so sessions from them stay
-                    recognised and refused.
+                    <span className="figure">{retiredCount}</span> retired or revoked kept,
+                    so sessions from them stay recognised and refused.
                   </p>
                 ) : null}
               </div>

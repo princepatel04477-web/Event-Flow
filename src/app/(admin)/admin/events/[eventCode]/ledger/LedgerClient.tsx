@@ -1,17 +1,19 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 
-import { Badge } from '@/components/ui/Badge'
+import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
+import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Progress } from '@/components/ui/Progress'
+import { Row, type RowTone } from '@/components/ui/Row'
 import { Spinner } from '@/components/ui/Spinner'
-import { LinkButton } from '@/components/ui/LinkButton'
 import { ShieldAlertIcon, DownloadIcon } from '@/components/icons'
 import { readLedger, type LedgerRow, type LedgerFilter } from '@/lib/actions/departures'
-import { cn } from '@/lib/utils'
 
 interface Props {
   eventId: string
@@ -24,11 +26,17 @@ type Phase =
   | { stage: 'ready'; data: { rows: LedgerRow[]; summary: { total: number; balanced: number; unbalanced: number } }; filter: LedgerFilter }
   | { stage: 'error'; message: string }
 
-const STATE_META: Record<string, { label: string; tone: 'success' | 'danger' | 'warning' }> = {
-  balanced: { label: 'Balanced', tone: 'success' },
-  departure_missing: { label: 'Departure missing', tone: 'danger' },
-  no_arrival: { label: 'No arrival', tone: 'warning' },
+const STATE_META: Record<string, { label: string; tone: RowTone }> = {
+  balanced: { label: 'Balanced', tone: 'done' },
+  departure_missing: { label: 'Departure missing', tone: 'problem' },
+  no_arrival: { label: 'No arrival', tone: 'waiting' },
 }
+
+const FILTERS: { value: LedgerFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'departure_missing', label: 'Missing departure' },
+  { value: 'no_arrival', label: 'No arrival' },
+]
 
 export function LedgerClient({ eventId, eventCode, eventName }: Props) {
   const [phase, setPhase] = useState<Phase>({ stage: 'loading' })
@@ -91,76 +99,69 @@ export function LedgerClient({ eventId, eventCode, eventName }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-xl font-semibold text-fg">Travel ledger</h2>
-        <p className="mt-0.5 text-sm text-muted">{eventName}</p>
-      </div>
+      <AdminPageTitle context={eventName}>Travel ledger</AdminPageTitle>
 
-      {/* Big headline */}
+      {/* The headline is a bar now, not a three-line paragraph: the same
+          balanced/total figures, read at a glance. */}
       <Card>
-        <CardBody className="text-center">
-          <p className="text-3xl font-bold tabular-nums text-fg">
-            {data.summary.balanced}
-            <span className="text-lg font-normal text-muted"> of </span>
-            {data.summary.total}
-          </p>
-          <p className="mt-1 text-sm text-muted">
-            families balanced
-            {data.summary.unbalanced > 0 && (
-              <span className="ml-2 font-semibold text-danger">
-                · {data.summary.unbalanced} still here
-              </span>
-            )}
-          </p>
+        <CardBody className="flex flex-col gap-2">
+          <Progress
+            label="Families balanced"
+            done={data.summary.balanced}
+            total={data.summary.total}
+            tone="neutral"
+          />
+          {data.summary.unbalanced > 0 ? (
+            <p className="text-sm font-medium text-ledger-amber">
+              <span className="figure">{data.summary.unbalanced}</span> still here
+            </p>
+          ) : null}
         </CardBody>
       </Card>
 
       {/* Filters */}
-      <div className="flex gap-2">
-        {([
-          ['all', 'All'],
-          ['departure_missing', 'Missing departure'],
-          ['no_arrival', 'No arrival'],
-        ] as const).map(([value, label]) => (
-          <button
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map(({ value, label }) => (
+          <Chip
             key={value}
-            type="button"
+            selected={filter === value}
             onClick={() => handleFilter(value)}
-            className={cn(
-              'tap rounded-full px-3 py-1.5 text-sm font-semibold transition-colors',
-              filter === value
-                ? 'bg-brand text-brand-fg'
-                : 'bg-surface-2 text-muted hover:text-fg',
-            )}
           >
             {label}
-          </button>
+          </Chip>
         ))}
       </div>
 
       {data.rows.length === 0 ? (
         <p className="text-sm text-muted">No families match this filter.</p>
       ) : (
-        <div className="flex flex-col gap-2">
-          {data.rows.map((r) => {
-            const meta = STATE_META[r.state] ?? STATE_META.no_arrival
-            return (
-              <LinkButton
-                key={r.groupId}
-                href={`/${eventCode}/logistics/departures`}
-                variant="secondary"
-                fullWidth
-                className="justify-between"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="truncate font-medium text-fg">{r.headName}</span>
-                  <Badge tone="neutral" size="sm">{r.pax}</Badge>
-                </div>
-                <Badge tone={meta.tone} size="sm">{meta.label}</Badge>
-              </LinkButton>
-            )
-          })}
-        </div>
+        <Card>
+          <ul>
+            {data.rows.map((r) => {
+              const meta = STATE_META[r.state] ?? STATE_META.no_arrival
+              return (
+                // The divider lives on the <li>, not on `Row`: `Row` carries
+                // `border-b last:border-b-0`, and nested in an anchor inside an
+                // <li> it is always its parent's only child, so its own border
+                // is always suppressed.
+                <li key={r.groupId} className="border-b border-rule last:border-b-0">
+                  <Link href={`/${eventCode}/logistics/departures`} className="tap block">
+                    {/* No trailing chevron: the status word here is
+                        "Departure missing", and at 360px a chevron costs the
+                        family name ~30px it does not have. The whole row is
+                        the link either way. */}
+                    <Row
+                      heading={r.headName}
+                      meta={`${r.pax} guest${r.pax === 1 ? '' : 's'}`}
+                      status={meta.label}
+                      tone={meta.tone}
+                    />
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </Card>
       )}
 
       <div className="flex gap-3 pt-2">
@@ -176,3 +177,5 @@ export function LedgerClient({ eventId, eventCode, eventName }: Props) {
     </div>
   )
 }
+
+export default LedgerClient

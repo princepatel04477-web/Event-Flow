@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 
+import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { Textarea } from '@/components/ui/Textarea'
-import { PageTitle } from '@/components/ui/PageTitle'
 import { CheckCircleIcon } from '@/components/icons'
 import { createHotel } from '@/lib/actions/hotels'
 
@@ -58,23 +58,20 @@ export function HotelCreateForm({ eventId, eventCode, eventName }: Props) {
           <CheckCircleIcon className="h-7 w-7" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold text-fg">{created.name} added</h2>
+          <h2 className="font-display text-xl leading-tight font-semibold tracking-tight text-ink">
+            {created.name} added
+          </h2>
           <p className="mt-1 text-sm text-muted">
-            {slow
-              ? 'Still opening — this connection is slow. Tap below whenever you\'re ready.'
-              : 'Opening it now…'}
+            {slow ? 'Still opening — this connection is slow.' : 'Opening it now…'}
           </p>
         </div>
         {/* A real <Link>, not a second router.push — visible from the first
             frame, not gated behind the slow-connection timer above. The
             automatic push above may still land first; this is what's here
             if it doesn't. */}
-        <Link
-          href={href}
-          className="tap inline-flex min-h-11 w-full max-w-xs items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-brand-fg"
-        >
+        <LinkButton href={href} fullWidth className="max-w-xs">
           Open {created.name}
-        </Link>
+        </LinkButton>
       </div>
     )
   }
@@ -123,36 +120,41 @@ export function HotelCreateForm({ eventId, eventCode, eventName }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <PageTitle>New hotel</PageTitle>
+      <AdminPageTitle context={eventName}>New hotel</AdminPageTitle>
 
       {error ? (
-        <div role="alert" className="rounded-xl bg-tint-danger px-4 py-3 text-sm font-medium text-danger">{error}</div>
+        <div
+          role="alert"
+          className="rounded-xl border border-ledger-red/35 bg-red-tint px-4 py-3 text-sm font-medium text-ledger-red"
+        >
+          {error}
+        </div>
       ) : null}
 
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-fg">Hotel name <span className="text-danger">*</span></span>
+          <span className="eyebrow">Hotel name <span className="text-ledger-red">*</span></span>
           <Input value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Grand Hyatt" />
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-fg">Address</span>
+          <span className="eyebrow">Address</span>
           <Textarea value={address} onChange={e => setAddress(e.target.value)} rows={2} placeholder="Full address" />
         </label>
 
         <div className="grid grid-cols-2 gap-4">
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-fg">Contact person</span>
+            <span className="eyebrow">Contact person</span>
             <Input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Name" />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-fg">Contact number</span>
+            <span className="eyebrow">Contact number</span>
             <Input value={contactMobile} onChange={e => setContactMobile(e.target.value)} type="tel" placeholder="+91 ..." />
           </label>
         </div>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-fg">Notes</span>
+          <span className="eyebrow">Notes</span>
           <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Check-in time, gate close, etc." />
         </label>
       </div>

@@ -1,8 +1,5 @@
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
 
-import { createClient } from '@/lib/supabase/server'
-import { getViewer } from '@/lib/supabase/queries'
 import { HarvestDebugClient } from './HarvestDebugClient'
 
 export const metadata: Metadata = {

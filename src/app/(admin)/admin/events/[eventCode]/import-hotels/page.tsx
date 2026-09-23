@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
+import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { readHotelImportContext } from '@/lib/actions/import-hotels'
 import { resolveEventByCode } from '@/lib/supabase/queries'
 import { HotelImporter } from '../HotelImporter'
@@ -18,13 +19,16 @@ export default async function ImportHotelsPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-display text-xl font-semibold tracking-[0.05em] uppercase">Import hotels</h1>
-      {ctx.ok ? (
-        <p className="text-sm text-muted">
-          {ctx.existingHotels} hotel{ctx.existingHotels === 1 ? '' : 's'},{' '}
-          {ctx.existingRooms} room{ctx.existingRooms === 1 ? '' : 's'} already on file.
-        </p>
-      ) : null}
+      <AdminPageTitle
+        context={
+          ctx.ok
+            ? `${ctx.existingHotels} hotel${ctx.existingHotels === 1 ? '' : 's'} · ${ctx.existingRooms} room${ctx.existingRooms === 1 ? '' : 's'} on file`
+            : undefined
+        }
+      >
+        Import hotels
+      </AdminPageTitle>
+
       <HotelImporter eventId={event.id} eventCode={event.code} context={ctx} />
     </div>
   )

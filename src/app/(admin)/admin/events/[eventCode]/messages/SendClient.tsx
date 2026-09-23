@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
+import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
+import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { Spinner } from '@/components/ui/Spinner'
 import { LinkButton } from '@/components/ui/LinkButton'
+import { Spinner } from '@/components/ui/Spinner'
 import { ShieldAlertIcon } from '@/components/icons'
 import {
   readTemplates,
@@ -114,31 +116,28 @@ export function SendClient({ eventId, eventCode }: Props) {
 
   if (phase.stage === 'setup') {
     return (
-      <div className="flex flex-col gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-fg">Send messages</h2>
-          <p className="mt-0.5 text-sm text-muted">
-            Pick a template and a recipient set. Preview before sending.
-          </p>
-        </div>
+      <div className="flex flex-col gap-5">
+        <AdminPageTitle>Send messages</AdminPageTitle>
 
         {/* Template picker */}
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-fg">Template</h3>
+        <div className="flex flex-col gap-2">
+          <h2 className="eyebrow">Template</h2>
           <div className="flex flex-col gap-2">
             {phase.templates.map((t) => (
               <button
                 key={t.key}
                 type="button"
                 onClick={() => setSelectedTemplate(t.key)}
+                aria-pressed={selectedTemplate === t.key}
                 className={cn(
-                  'tap w-full rounded-xl border px-4 py-3 text-left transition-colors',
+                  'tap w-full rounded-xl border px-4 py-3 text-left',
+                  'transition-colors duration-press ease-ledger',
                   selectedTemplate === t.key
-                    ? 'border-brand bg-tint-info text-brand'
-                    : 'border-border bg-surface hover:bg-surface-2',
+                    ? 'border-brand bg-brand-tint'
+                    : 'border-rule bg-surface hover:bg-surface-2',
                 )}
               >
-                <p className="font-semibold text-fg">{t.key}</p>
+                <p className="font-semibold text-ink">{t.key}</p>
                 <p className="text-xs text-muted">{t.category ?? 'No category'}</p>
               </button>
             ))}
@@ -146,36 +145,30 @@ export function SendClient({ eventId, eventCode }: Props) {
         </div>
 
         {/* Filter picker */}
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-fg">Recipients</h3>
-          <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
+          <h2 className="eyebrow">Recipients</h2>
+          <div className="flex flex-wrap gap-2">
             {(Object.entries(FILTER_LABELS) as [RecipientFilter, string][]).map(([value, label]) => (
-              <button
+              <Chip
                 key={value}
-                type="button"
+                selected={selectedFilter === value}
                 onClick={() => setSelectedFilter(value)}
-                className={cn(
-                  'tap w-full rounded-xl border px-4 py-3 text-left transition-colors',
-                  selectedFilter === value
-                    ? 'border-brand bg-tint-info text-brand'
-                    : 'border-border bg-surface hover:bg-surface-2',
-                )}
               >
-                <p className="font-semibold text-fg">{label}</p>
-              </button>
+                {label}
+              </Chip>
             ))}
           </div>
         </div>
 
         {/* Test mode */}
-        <label className="flex items-center gap-2">
+        <label className="flex min-h-11 items-center gap-3">
           <input
             type="checkbox"
             checked={testMode}
             onChange={(e) => setTestMode(e.target.checked)}
-            className="h-4 w-4 rounded border-border"
+            className="h-5 w-5 rounded accent-brand"
           />
-          <span className="text-sm text-fg">Test mode — send only to one number</span>
+          <span className="text-sm text-ink">Test mode — send to one number only</span>
         </label>
 
         {testMode && (
@@ -184,16 +177,11 @@ export function SendClient({ eventId, eventCode }: Props) {
             value={testNumber}
             onChange={(e) => setTestNumber(e.target.value)}
             placeholder="+919876543210"
-            className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-base text-fg placeholder:text-subtle"
+            className="code-figure min-h-14 w-full rounded-xl border border-rule-strong bg-surface px-4 text-base text-ink placeholder:text-subtle"
           />
         )}
 
-        <Button
-          fullWidth
-          size="lg"
-          onClick={handlePreview}
-          disabled={!selectedTemplate}
-        >
+        <Button fullWidth onClick={handlePreview} disabled={!selectedTemplate}>
           Preview
         </Button>
 
@@ -213,32 +201,18 @@ export function SendClient({ eventId, eventCode }: Props) {
 
     return (
       <div className="flex flex-col gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-fg">Confirm send</h2>
-          <p className="mt-0.5 text-sm text-muted">
-            Template: <span className="font-semibold text-fg">{template.key}</span>
-            {' · '}
-            {FILTER_LABELS[filter]}
-          </p>
-        </div>
-
-        {/* Recipient count */}
-        <Card>
-          <CardBody className="text-center">
-            <p className="text-3xl font-bold tabular-nums text-fg">
-              {recipients.length}
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              recipient{recipients.length !== 1 ? 's' : ''}
-            </p>
-          </CardBody>
-        </Card>
+        <AdminPageTitle
+          context={`${template.key} · ${FILTER_LABELS[filter]}`}
+          actions={<span className="figure text-sm text-muted">{recipients.length}</span>}
+        >
+          Confirm send
+        </AdminPageTitle>
 
         {/* Body preview */}
         <Card>
           <CardBody>
-            <h3 className="mb-2 text-sm font-semibold text-fg">Message preview</h3>
-            <div className="rounded-lg bg-surface-2 px-3 py-2 font-mono text-sm text-fg whitespace-pre-wrap">
+            <h3 className="eyebrow mb-2">Message preview</h3>
+            <div className="rounded-xl bg-surface-2 px-3 py-2 text-sm whitespace-pre-wrap text-ink">
               {template.body}
             </div>
           </CardBody>
@@ -246,45 +220,43 @@ export function SendClient({ eventId, eventCode }: Props) {
 
         {/* Recipient list */}
         <div className="max-h-64 overflow-y-auto">
-          <h3 className="mb-2 text-sm font-semibold text-fg">Recipients</h3>
+          <h3 className="eyebrow mb-2">Recipients</h3>
           <div className="flex flex-col gap-1">
             {recipients.slice(0, 50).map((r) => (
               <div
                 key={r.groupId || r.mobileNumber}
-                className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-sm"
+                className="flex min-h-11 items-center gap-2 rounded-xl bg-surface-2 px-3 py-1.5 text-sm"
               >
-                <span className="min-w-0 flex-1 truncate">{r.headName}</span>
-                <span className="shrink-0 text-xs text-muted">{r.mobileNumber}</span>
+                <span className="min-w-0 flex-1 truncate text-ink">{r.headName}</span>
+                <span className="code-figure shrink-0 text-xs text-muted">{r.mobileNumber}</span>
               </div>
             ))}
             {recipients.length > 50 && (
               <p className="text-center text-xs text-muted">
-                + {recipients.length - 50} more
+                + <span className="figure">{recipients.length - 50}</span> more
               </p>
             )}
           </div>
         </div>
 
         {/* Overwrite guard */}
-        <label className="flex items-center gap-2">
+        <label className="flex min-h-11 items-center gap-3">
           <input
             type="checkbox"
             checked={overwrite}
             onChange={(e) => setOverwrite(e.target.checked)}
-            className="h-4 w-4 rounded border-border"
+            className="h-5 w-5 rounded accent-brand"
           />
-          <span className="text-sm text-fg">Send to groups that already received this template</span>
+          <span className="text-sm text-ink">
+            Re-send to groups that already received this template
+          </span>
         </label>
 
         <div className="flex gap-3">
-          <Button fullWidth variant="danger" size="lg" onClick={handleSend}>
+          <Button fullWidth variant="danger" onClick={handleSend}>
             Send to {recipients.length} families
           </Button>
-          <Button
-            fullWidth
-            variant="ghost"
-            onClick={() => void load()}
-          >
+          <Button fullWidth variant="secondary" onClick={() => void load()}>
             Back
           </Button>
         </div>
@@ -313,23 +285,21 @@ export function SendClient({ eventId, eventCode }: Props) {
     const { result } = phase
     return (
       <div className="flex flex-col gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-fg">Send complete</h2>
-        </div>
+        <AdminPageTitle>Send complete</AdminPageTitle>
 
         <Card>
           <CardBody>
             <div className="flex gap-6 text-center">
               <div>
-                <p className="text-2xl font-bold tabular-nums text-success">{result.sent}</p>
+                <p className="figure text-2xl font-medium text-ledger-green">{result.sent}</p>
                 <p className="text-xs text-muted">sent</p>
               </div>
               <div>
-                <p className="text-2xl font-bold tabular-nums text-danger">{result.failed}</p>
+                <p className="figure text-2xl font-medium text-ledger-red">{result.failed}</p>
                 <p className="text-xs text-muted">failed</p>
               </div>
               <div>
-                <p className="text-2xl font-bold tabular-nums text-muted">{result.skipped}</p>
+                <p className="figure text-2xl font-medium text-muted">{result.skipped}</p>
                 <p className="text-xs text-muted">skipped</p>
               </div>
             </div>
@@ -339,10 +309,10 @@ export function SendClient({ eventId, eventCode }: Props) {
         {result.errors.length > 0 && (
           <Card>
             <CardBody>
-              <h3 className="mb-2 text-sm font-semibold text-danger">Errors</h3>
+              <h3 className="mb-2 text-sm font-semibold text-ledger-red">Errors</h3>
               <ul className="flex flex-col gap-1">
                 {result.errors.map((e, i) => (
-                  <li key={i} className="text-sm text-danger">{e}</li>
+                  <li key={i} className="text-sm text-ledger-red">{e}</li>
                 ))}
               </ul>
             </CardBody>
@@ -366,3 +336,5 @@ export function SendClient({ eventId, eventCode }: Props) {
 
   return null
 }
+
+export default SendClient

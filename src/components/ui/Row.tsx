@@ -7,6 +7,14 @@ export type RowTone = 'neutral' | 'done' | 'waiting' | 'problem'
 export interface RowProps {
   /** The one thing on the row — nearly always a family or guest name. */
   heading: string
+  /**
+   * The heading as nodes, when the plain string is not enough — the search
+   * screen wraps the matched run of a name in a `<mark>`, which a string prop
+   * cannot carry. `heading` is still REQUIRED and is what an assistive
+   * technology reads and what every other caller renders, so this is additive:
+   * omit it and nothing changes.
+   */
+  headingNode?: ReactNode
   /** One muted line under it. Facts only, never a second heading. */
   meta?: string
   /**

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
 import { type Membership } from '@/lib/events/paths'
@@ -105,9 +105,7 @@ export function AdminSidebar({ viewer }: { viewer: Viewer }) {
     <aside className="hidden w-56 shrink-0 border-r border-rule bg-surface-2 md:flex md:flex-col">
       {/* Event switcher at the top — always visible */}
       <div className="border-b border-rule px-3 py-3">
-        <p className="mb-1 font-mono text-[0.625rem] font-bold uppercase tracking-[0.1em] text-subtle">
-          Event
-        </p>
+        <p className="eyebrow mb-1.5">Event</p>
         {isInEvent && activeEvent ? (
           <EventSwitcher
             events={viewer.memberships}
@@ -115,21 +113,19 @@ export function AdminSidebar({ viewer }: { viewer: Viewer }) {
             isAdmin={viewer.isAdmin}
           />
         ) : (
-          <p className="text-sm font-medium text-fg">
+          <p className="text-sm font-medium text-ink">
             {isOnEvents ? 'Event list' : 'No event selected'}
           </p>
         )}
         {isInEvent && !activeEvent ? (
-          <p className="mt-1 text-xs text-warning">Event not found in your memberships</p>
+          <p className="mt-1 text-xs text-ledger-amber">Event not found in your memberships</p>
         ) : null}
       </div>
 
       {/* Event section */}
       {isInEvent && eventCode ? (
         <div className="flex flex-col gap-0.5 px-2 py-3">
-          <p className="mb-1 px-2 font-mono text-[0.625rem] font-bold uppercase tracking-[0.1em] text-subtle">
-            Event pages
-          </p>
+          <p className="eyebrow mb-1.5 px-2">Event pages</p>
           {eventNavItems.map((item) => (
             <SidebarLink key={item.href} item={item} active={isActive(item)} />
           ))}
@@ -138,9 +134,7 @@ export function AdminSidebar({ viewer }: { viewer: Viewer }) {
 
       {/* General section */}
       <div className="flex flex-col gap-0.5 px-2 py-3">
-        <p className="mb-1 px-2 font-mono text-[0.625rem] font-bold uppercase tracking-[0.1em] text-subtle">
-          General
-        </p>
+        <p className="eyebrow mb-1.5 px-2">General</p>
         {ADMIN_NAV.map((item) => (
           <SidebarLink key={item.href} item={item} active={isActive(item)} />
         ))}
@@ -161,7 +155,7 @@ export function AdminSidebar({ viewer }: { viewer: Viewer }) {
       {/* Identity + sign out at the bottom */}
       <div className="border-t border-rule px-3 py-3">
         <div className="mb-2">
-          <p className="truncate text-sm font-medium text-fg">
+          <p className="truncate text-sm font-medium text-ink">
             {viewer.fullName ?? viewer.email ?? 'Admin'}
           </p>
           <p className="truncate text-xs text-muted">{viewer.email ?? ''}</p>
@@ -176,17 +170,19 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
       href={item.href}
+      aria-current={active ? 'page' : undefined}
       className={cn(
-        'tap flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+        'tap flex min-h-11 items-center gap-2.5 rounded-xl px-3 text-sm font-medium',
+        'transition-colors duration-press ease-ledger',
         active
-          ? 'bg-brand/10 text-brand'
-          : 'text-muted hover:bg-surface hover:text-fg',
+          ? 'bg-brand-tint text-brand'
+          : 'text-muted hover:bg-surface hover:text-ink active:bg-surface',
       )}
     >
       {item.icon}
-      <span>{item.label}</span>
+      <span className="min-w-0 truncate">{item.label}</span>
       {active ? (
-        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
+        <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden />
       ) : null}
     </Link>
   )

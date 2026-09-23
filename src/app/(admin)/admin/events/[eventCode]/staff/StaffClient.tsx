@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
 
+import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { UserIcon } from '@/components/icons'
+import { Row } from '@/components/ui/Row'
+import { initials } from '@/lib/ui/metrics'
 import {
   DEPARTMENT_LABELS,
   STAFF_DEPARTMENTS,
@@ -103,31 +104,29 @@ export function StaffClient({
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <Link href={`/admin/events/${eventCode}`} className="text-sm text-muted underline">
-          ← Back to dashboard
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold text-fg">Staff</h1>
-        <p className="mt-1 text-sm text-muted">
-          Who works on {eventName}. Each person picks their name after the team code.
-          Their department controls which screens they see — logistics sees Travel,
-          hospitality sees Hotel, management sees everything including RSVP calling.
-        </p>
-      </div>
+      <AdminPageTitle
+        context={
+          activeCount === 0
+            ? 'Nobody on the list'
+            : `${activeCount} on the list · ${eventName}`
+        }
+      >
+        Staff
+      </AdminPageTitle>
 
       {activeCount === 0 ? (
         <div
           role="alert"
-          className="rounded-xl border border-rule bg-tint-warning px-4 py-3 text-sm font-medium text-warning"
+          className="rounded-xl border border-ledger-amber/40 bg-amber-tint px-4 py-3 text-sm font-medium text-ledger-amber"
         >
-          Nobody is on this list yet. Add names before the team arrives on site.
+          Nobody is on this list yet — add names before the team arrives.
         </div>
       ) : null}
 
       {loadError ? (
         <div
           role="alert"
-          className="rounded-xl border border-ledger-red bg-red-tint px-4 py-3 text-sm font-medium text-ledger-red"
+          className="rounded-xl border border-ledger-red/35 bg-red-tint px-4 py-3 text-sm font-medium text-ledger-red"
         >
           Could not load the staff list: {loadError}
         </div>
@@ -147,11 +146,11 @@ export function StaffClient({
               maxLength={80}
             />
             <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-ink">Department</span>
+              <span className="eyebrow">Department</span>
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value as StaffDepartment)}
-                className="min-h-12 rounded-xl border border-rule bg-surface px-3 text-base text-ink"
+                className="tap min-h-14 rounded-xl border border-rule-strong bg-surface px-4 text-base text-ink"
               >
                 {STAFF_DEPARTMENTS.map((d) => (
                   <option key={d} value={d}>{DEPARTMENT_LABELS[d]}</option>
@@ -169,61 +168,56 @@ export function StaffClient({
         <ul className="flex flex-col gap-2">
           {rows.map((row) => (
             <li key={row.id}>
-              <Card edge={row.isActive ? 'active' : 'neutral'}>
-                <CardBody className="flex flex-col gap-3 py-3">
-                  <div className="flex items-center gap-3">
-                    <UserIcon
-                      className={row.isActive ? 'h-5 w-5 shrink-0 text-muted' : 'h-5 w-5 shrink-0 text-subtle'}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={
-                          row.isActive
-                            ? 'truncate font-semibold text-fg'
-                            : 'truncate font-semibold text-muted'
-                        }
-                      >
-                        {row.fullName}
-                      </p>
-                      {!row.isActive ? (
-                        <p className="text-xs text-subtle">Not on the pick list</p>
-                      ) : null}
-                    </div>
-                    <Button
-                      variant={row.isActive ? 'secondary' : 'primary'}
-                      onClick={() => handleToggle(row)}
-                      loading={busyId === row.id}
-                      disabled={pending && busyId !== row.id}
-                    >
-                      {row.isActive ? 'Remove' : 'Put back'}
-                    </Button>
-                  </div>
+              <Card>
+                {/* The toggle is NOT `Row`'s `trailing`: "Put back" next to the
+                    status word leaves the name about 70px at 360px, and a list
+                    of truncated names is worse than a taller card. The row
+                    stays the register's shape; the controls sit under it. */}
+                <Row
+                  heading={row.fullName}
+                  meta={row.isActive ? DEPARTMENT_LABELS[row.department] : 'Not on the pick list'}
+                  initials={initials(row.fullName)}
+                  status={row.isActive ? 'Active' : 'Off'}
+                  tone={row.isActive ? 'done' : 'neutral'}
+                />
+
+                <div className="flex items-end gap-3 px-3 pt-3 pb-4">
                   {row.isActive ? (
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-muted">Department</span>
+                    <label className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <span className="eyebrow">Department</span>
                       <select
                         value={row.department}
                         onChange={(e) => handleDepartmentChange(row, e.target.value as StaffDepartment)}
                         disabled={pending}
-                        className="min-h-11 rounded-lg border border-rule bg-surface px-3 text-sm text-ink"
+                        className="tap min-h-12 rounded-xl border border-rule-strong bg-surface px-4 text-base text-ink"
                       >
                         {STAFF_DEPARTMENTS.map((d) => (
                           <option key={d} value={d}>{DEPARTMENT_LABELS[d]}</option>
                         ))}
                       </select>
                     </label>
-                  ) : null}
-                </CardBody>
+                  ) : (
+                    <p className="min-w-0 flex-1 text-sm text-muted">
+                      Off the pick list — nothing new is recorded against them.
+                    </p>
+                  )}
+
+                  <Button
+                    variant={row.isActive ? 'secondary' : 'primary'}
+                    size="sm"
+                    onClick={() => handleToggle(row)}
+                    loading={busyId === row.id}
+                    disabled={pending && busyId !== row.id}
+                    className="shrink-0"
+                  >
+                    {row.isActive ? 'Remove' : 'Put back'}
+                  </Button>
+                </div>
               </Card>
             </li>
           ))}
         </ul>
       )}
-
-      <p className="text-xs leading-relaxed text-subtle">
-        Names are never deleted, only taken off the list — every call, photo and room
-        already attributed to someone has to stay answerable after the event.
-      </p>
     </div>
   )
 }

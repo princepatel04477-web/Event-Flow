@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { createEvent, type CreateEventState } from '@/lib/actions/events'
 import { MAX_EVENT_CODE_LENGTH, normaliseEventCode } from './eventCode'
 
@@ -58,16 +59,15 @@ export function CreateEventForm() {
   if (state.created) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded-2xl border border-border bg-surface p-5">
-          <h3 className="font-display text-lg text-ink">Event created</h3>
+        <div className="rounded-2xl border border-rule bg-surface p-5">
+          <h3 className="font-display text-lg leading-tight font-semibold tracking-tight text-ink">
+            Event created
+          </h3>
           <p className="mt-1 text-sm text-muted">
-            Share these access codes with your team and the client.{' '}
+            Share these codes now —{' '}
             <strong className="font-semibold text-ink">
-              This is the only time they are shown.
-            </strong>{' '}
-            They are stored hashed and can never be looked up again — if they are lost,
-            the only remedy is to issue replacements from the event&apos;s access-codes
-            screen, which signs out everyone still using the old ones.
+              this is the only time they are shown.
+            </strong>
           </p>
 
           <div className="mt-4 flex flex-col gap-3">
@@ -82,19 +82,17 @@ export function CreateEventForm() {
             ANDed `app.has_staff_identity`, wrong since migration
             20260814140000 removed that gate. Adding names is now purely about
             attribution, so it is offered, not demanded. */}
-        <a
-          href={`/${state.created.eventCode}`}
-          className="tap inline-flex min-h-14 w-full items-center justify-center rounded-xl border border-transparent bg-ink px-5 py-3.5 text-lg font-semibold text-paper active:opacity-85"
-        >
+        <LinkButton href={`/${state.created.eventCode}`} fullWidth>
           Open {state.created.eventCode}
-        </a>
+        </LinkButton>
 
-        <a
+        <LinkButton
           href={`/admin/events/${state.created.eventCode}/staff`}
-          className="tap inline-flex min-h-14 w-full items-center justify-center rounded-xl border border-rule-strong bg-surface px-5 py-3.5 text-base font-semibold text-ink active:bg-surface-2"
+          variant="secondary"
+          fullWidth
         >
           Add staff names (optional)
-        </a>
+        </LinkButton>
       </div>
     )
   }
@@ -104,7 +102,7 @@ export function CreateEventForm() {
       {state.error ? (
         <p
           role="alert"
-          className="rounded-xl border border-danger bg-tint-danger px-4 py-3 text-base font-medium text-danger"
+          className="rounded-xl border border-ledger-red/35 bg-red-tint px-4 py-3 text-base font-medium text-ledger-red"
         >
           {state.error}
         </p>
@@ -135,15 +133,11 @@ export function CreateEventForm() {
         hint={
           codePreview ? (
             <>
-              Saved as <span className="font-semibold text-fg">{codePreview}</span> — this
-              becomes the web address <span className="font-mono">/{codePreview}</span> and
-              is stamped into every Excel export. It must be unique.
+              Saved as <span className="font-semibold text-ink">{codePreview}</span> — the
+              web address and the Excel export header.
             </>
           ) : (
-            <>
-              A short slug for the web address and for Excel exports. Letters and numbers
-              only — anything else is dropped, and it is uppercased.
-            </>
+            <>Letters and numbers only — anything else is dropped, and it is uppercased.</>
           )
         }
         maxLength={MAX_EVENT_CODE_LENGTH * 2}
@@ -177,7 +171,7 @@ export function CreateEventForm() {
         label="First day"
         defaultValue={state.values.startsOn}
         error={state.fieldErrors.startsOn}
-        hint="Required. The Excel import reads dates written as “4th” against this event’s month, so the import cannot run until the event has a start date."
+        hint="Required. The Excel import reads dates like “4th” against this month, so it cannot run without a start date."
         required
       />
 
@@ -200,18 +194,19 @@ export function CreateEventForm() {
 /** One access code with its role label, monospace, copyable. */
 function CodeReveal({ label, code }: { label: string; code: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-border-strong bg-surface-2 px-4 py-3">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-rule-strong bg-surface-2 px-4 py-3">
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide text-subtle">{label}</p>
-        <p className="mt-0.5 font-mono text-xl font-semibold tracking-[0.15em] text-fg">{code}</p>
+        <p className="eyebrow">{label}</p>
+        <p className="code-figure mt-0.5 text-xl font-semibold text-ink">{code}</p>
       </div>
-      <button
+      <Button
         type="button"
+        variant="secondary"
+        size="sm"
         onClick={() => navigator.clipboard?.writeText(code)}
-        className="tap min-h-12 shrink-0 rounded-lg border border-rule-strong bg-surface px-3 text-sm font-semibold text-ink active:bg-surface-2"
       >
         Copy
-      </button>
+      </Button>
     </div>
   )
 }

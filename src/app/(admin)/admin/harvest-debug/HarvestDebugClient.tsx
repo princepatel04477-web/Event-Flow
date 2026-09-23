@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
+import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
+import { Row, type RowTone } from '@/components/ui/Row'
+import { cn } from '@/lib/utils'
 import {
   hasPermission,
   requestPermission,
@@ -138,17 +140,17 @@ export function HarvestDebugClient() {
     setDurationResults((prev) => new Map(prev).set(filePath, dur))
   }
 
-  const STATUS_TONES: Record<string, 'neutral' | 'success' | 'warning' | 'danger'> = {
+  const STATUS_TONES: Record<string, RowTone> = {
     seen: 'neutral',
-    matched: 'success',
-    uploaded: 'success',
-    unmatched: 'warning',
-    failed: 'danger',
+    matched: 'done',
+    uploaded: 'done',
+    unmatched: 'waiting',
+    failed: 'problem',
   }
 
   return (
     <div className="flex flex-col gap-4 pb-4">
-      <h2 className="text-lg font-semibold text-fg">Harvest debug</h2>
+      <AdminPageTitle context="Device-level diagnostics">Harvest debug</AdminPageTitle>
 
       {/* Plugin status */}
       <Card>
@@ -156,9 +158,12 @@ export function HarvestDebugClient() {
           <CardTitle>Plugin</CardTitle>
         </CardHeader>
         <CardBody>
-          <Badge tone={pluginAvailable ? 'success' : 'danger'}>
-            {pluginAvailable === null ? 'Checking…' : pluginAvailable ? 'Available' : 'Not available'}
-          </Badge>
+          <StatusWord
+            tone={pluginAvailable === null ? 'neutral' : pluginAvailable ? 'done' : 'problem'}
+            label={
+              pluginAvailable === null ? 'Checking…' : pluginAvailable ? 'Available' : 'Not available'
+            }
+          />
         </CardBody>
       </Card>
 
@@ -168,20 +173,23 @@ export function HarvestDebugClient() {
           <CardTitle>Permission</CardTitle>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <Badge tone={granted ? 'success' : 'warning'}>
-              {granted === null ? 'Checking…' : granted ? 'Granted' : 'Not granted'}
-            </Badge>
-          </div>
+          <StatusWord
+            tone={granted === null ? 'neutral' : granted ? 'done' : 'waiting'}
+            label={granted === null ? 'Checking…' : granted ? 'Granted' : 'Not granted'}
+          />
           <div className="flex gap-2">
-            <Button variant="secondary" size="md" onClick={checkPerm}>
+            <Button variant="secondary" onClick={checkPerm}>
               Check again
             </Button>
-            <Button variant="primary" size="md" onClick={handleRequestPermission} loading={granting}>
+            <Button variant="primary" onClick={handleRequestPermission} loading={granting}>
               Open settings
             </Button>
           </div>
-          {error ? <p className="text-sm text-danger">{error}</p> : null}
+          {error ? (
+            <p role="alert" className="text-sm text-ledger-red">
+              {error}
+            </p>
+          ) : null}
         </CardBody>
       </Card>
 
@@ -189,10 +197,12 @@ export function HarvestDebugClient() {
       <Card>
         <CardHeader>
           <CardTitle>
-            Folders ({folders.length})
-            <Button variant="secondary" size="md" className="ml-auto" onClick={handleDiscover} loading={loading}>
-              Discover
-            </Button>
+            <span className="flex items-center gap-3">
+              Folders <span className="figure text-xs text-muted">{folders.length}</span>
+              <Button variant="secondary" size="sm" onClick={handleDiscover} loading={loading}>
+                Discover
+              </Button>
+            </span>
           </CardTitle>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
@@ -203,34 +213,36 @@ export function HarvestDebugClient() {
               const listing = folderListings.find((f) => f.path === folder)
               return (
                 <div key={folder} className="rounded-xl bg-surface-2 p-3">
-                  <p className="font-mono text-xs text-subtle break-all mb-2">{folder}</p>
-                  <div className="flex gap-2 mb-2">
-                    <Button variant="secondary" size="md" onClick={() => handleListFolder(folder)}>
+                  <p className="mb-2 text-xs break-all text-subtle">{folder}</p>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <Button variant="secondary" size="sm" onClick={() => handleListFolder(folder)}>
                       List files
                     </Button>
-                    <Button variant="secondary" size="md" onClick={handleWatch}>
+                    <Button variant="secondary" size="sm" onClick={handleWatch}>
                       Watch
                     </Button>
-                    <Button variant="secondary" size="md" onClick={handleStopWatch}>
+                    <Button variant="secondary" size="sm" onClick={handleStopWatch}>
                       Stop
                     </Button>
                   </div>
                   {listing?.loading ? (
                     <p className="text-xs text-muted">Loading…</p>
                   ) : listing?.error ? (
-                    <p className="text-xs text-danger">{listing.error}</p>
+                    <p className="text-xs text-ledger-red">{listing.error}</p>
                   ) : listing?.files ? (
                     listing.files.length === 0 ? (
                       <p className="text-xs text-muted">Empty folder</p>
                     ) : (
-                      <ul className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+                      <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto">
                         {listing.files.map((f) => (
                           <li key={f.path} className="flex items-center gap-2 text-xs">
-                            <Badge tone="neutral" size="sm">{durLabel(durationResults.get(f.path))}</Badge>
-                            <span className="font-mono text-fg truncate flex-1">{f.name}</span>
-                            <span className="text-subtle shrink-0">{formatBytes(f.size)}</span>
-                            <span className="text-subtle shrink-0">{formatAge(f.ageSec)}</span>
-                            <Button variant="ghost" size="md" onClick={() => handleGetDuration(f.path)}>
+                            <span className="figure shrink-0 text-muted">
+                              {durLabel(durationResults.get(f.path))}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-ink">{f.name}</span>
+                            <span className="figure shrink-0 text-subtle">{formatBytes(f.size)}</span>
+                            <span className="figure shrink-0 text-subtle">{formatAge(f.ageSec)}</span>
+                            <Button variant="ghost" size="sm" onClick={() => handleGetDuration(f.path)}>
                               Duration
                             </Button>
                           </li>
@@ -248,16 +260,22 @@ export function HarvestDebugClient() {
       {/* Detected log */}
       <Card>
         <CardHeader>
-          <CardTitle>Detected ({detectedLog.length})</CardTitle>
+          <CardTitle>
+            <span className="flex items-center gap-3">
+              Detected <span className="figure text-xs text-muted">{detectedLog.length}</span>
+            </span>
+          </CardTitle>
         </CardHeader>
         <CardBody>
           {detectedLog.length === 0 ? (
             <p className="text-sm text-muted">No events yet. Watch folders and place a call.</p>
           ) : (
-            <ul className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+            <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto">
               {detectedLog.map((d, i) => (
-                <li key={i} className="font-mono text-xs text-fg">
-                  <span className="text-subtle">{new Date(d.at).toLocaleTimeString()}</span>{' '}
+                <li key={i} className="text-xs text-ink">
+                  <span className="figure text-subtle">
+                    {new Date(d.at).toLocaleTimeString()}
+                  </span>{' '}
                   {d.name}
                 </li>
               ))}
@@ -270,29 +288,29 @@ export function HarvestDebugClient() {
       <Card>
         <CardHeader>
           <CardTitle>
-            Ledger ({ledger.length})
-            <Button variant="secondary" size="md" className="ml-auto" onClick={handleLoadLedger}>
-              Refresh
-            </Button>
+            <span className="flex items-center gap-3">
+              Ledger <span className="figure text-xs text-muted">{ledger.length}</span>
+              <Button variant="secondary" size="sm" onClick={handleLoadLedger}>
+                Refresh
+              </Button>
+            </span>
           </CardTitle>
         </CardHeader>
         <CardBody>
           {ledger.length === 0 ? (
             <p className="text-sm text-muted">Nothing tracked yet.</p>
           ) : (
-            <ul className="flex flex-col gap-2 max-h-80 overflow-y-auto">
+            <ul className="-mx-4 -my-4 max-h-80 overflow-y-auto">
               {ledger.map((entry) => (
-                <li key={entry.path} className="rounded-lg bg-surface-2 px-3 py-2 text-xs font-mono">
-                  <div className="flex items-center gap-2">
-                    <Badge tone={STATUS_TONES[entry.status] ?? 'neutral'} size="sm">
-                      {entry.status}
-                    </Badge>
-                    <span className="text-fg truncate flex-1">
-                      {entry.path.split('/').pop()}
-                    </span>
-                  </div>
+                <li key={entry.path} className="border-b border-rule last:border-b-0">
+                  <Row
+                    heading={entry.path.split('/').pop() ?? entry.path}
+                    meta={entry.path}
+                    status={entry.status}
+                    tone={STATUS_TONES[entry.status] ?? 'neutral'}
+                  />
                   {entry.lastError ? (
-                    <p className="mt-1 text-danger">{entry.lastError}</p>
+                    <p className="px-3 pb-2 text-xs text-ledger-red">{entry.lastError}</p>
                   ) : null}
                 </li>
               ))}
@@ -301,6 +319,28 @@ export function HarvestDebugClient() {
         </CardBody>
       </Card>
     </div>
+  )
+}
+
+/** A status is a word with a dot beside it — never a coloured pill. */
+function StatusWord({ tone, label }: { tone: RowTone; label: string }) {
+  return (
+    <span className="flex items-center gap-2">
+      <span
+        aria-hidden
+        className={cn(
+          'h-2.5 w-2.5 rounded-full',
+          tone === 'done'
+            ? 'bg-ledger-green'
+            : tone === 'waiting'
+              ? 'bg-ledger-amber'
+              : tone === 'problem'
+                ? 'bg-ledger-red'
+                : 'bg-subtle',
+        )}
+      />
+      <span className="text-sm font-medium text-muted">{label}</span>
+    </span>
   )
 }
 

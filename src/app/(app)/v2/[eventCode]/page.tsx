@@ -3,25 +3,33 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query'
 
-import { ShieldAlertIcon, UsersIcon } from '@/components/icons'
+import { ChevronRightIcon, ShieldAlertIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LinkButton } from '@/components/ui/LinkButton'
-import { StaffWelcomeBanner } from '@/components/nav/StaffWelcomeBanner'
+import { NowCard } from '@/components/ui/NowCard'
+import { Progress } from '@/components/ui/Progress'
+import { Row } from '@/components/ui/Row'
 import { readBoard } from '@/lib/actions/dashboard'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
-import { getSessionClaims } from '@/lib/auth/server'
 import { v2DepartmentHome } from '@/lib/departments'
 import { queryKeys } from '@/lib/query/keys'
-import {
-  requireStaff,
-  resolveEventByCode,
-  type DeniedReason,
-} from '@/lib/supabase/queries'
+import { requireStaff, resolveEventByCode, type DeniedReason } from '@/lib/supabase/queries'
 import { traceFetch } from '@/lib/perf'
-import { count, formatCount, formatDateRange } from '@/lib/utils'
+
+import {
+  attentionJobs,
+  attentionRows,
+  departmentJob,
+  moreNumbers,
+  nowJob,
+  progressBars,
+  type StaffFocus,
+  type TodayNumbers,
+} from './_home/today'
+import { readVisibleNumbers } from './_home/visibleNumbers'
 
 export const metadata: Metadata = {
-  title: 'Home',
+  title: 'Today',
 }
 
 const DENIED_MESSAGES: Record<DeniedReason | 'section', string> = {
@@ -51,14 +59,42 @@ type PageProps = {
   searchParams: Promise<{ denied?: string }>
 }
 
-interface JobItem {
-  id: string
-  count: number
-  description: string
-  actionLabel: string
-  href: string
-}
-
+/**
+ * Today — the home screen, rebuilt to SPEC-V3 §4.
+ *
+ * ONE JOB: "what do I do next, and are we winning". Everything else this
+ * screen used to carry (three stacked job cards, three number tiles, a
+ * guests-expected card with its own legend, a welcome banner, the event name
+ * as a second title under the shell's) is deleted. What is left is the §4
+ * order and nothing else:
+ *
+ *     Now card  →  one card of ≤3 Progress bars  →  "Needs attention" ≤3 Rows
+ *               →  admin extras behind a disclosure  →  one small Help link
+ *
+ * ── No header here, on purpose ─────────────────────────────────────────────
+ * The shell already renders `AppHeader`, and `v3ScreenTitle('')` names this
+ * route "Today" with the event's dates as its context line. §4's
+ * "ScreenHeader(event name, date · Hi <name>)" is therefore served by the
+ * shell for the title and the dates; the greeting would need a read of
+ * `staff_members` only to print a first name, and §3's rule is that words
+ * which do not change what you do are the first thing to delete. Two headers
+ * on one screen is the one thing this screen must not do.
+ *
+ * ── What the EXTRA fixed, and how ──────────────────────────────────────────
+ * `readBoard()` answers `null` for a permissions answer, a transport error and
+ * a genuinely absent row alike (see `_home/visibleNumbers.ts` for the three
+ * cases verbatim), and this page used to render that `null` as a full-screen
+ * "Could not load the numbers". On a staff session that reads nothing from the
+ * invoker-rights board view while still passing the claims-based page gate,
+ * that is a wall where the app should be a screen.
+ *
+ * Now: the board is tried first (it is one round trip and it is cached for
+ * 30s), and if it does not answer, `readVisibleNumbers` counts what this
+ * session demonstrably CAN read — families, guests, beds, hampers — from the
+ * base tables. `numbersDegraded` records which of the two answered, so the
+ * screen can stop claiming a zero count means "an empty event", which is the
+ * one thing a fallback must never do.
+ */
 export default async function AppHomePage({ params, searchParams }: PageProps) {
   const { eventCode } = await params
   const { denied } = await searchParams
@@ -67,10 +103,9 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
 
-  const [access, viewerCtx, codeClaims] = await Promise.all([
+  const [access, viewerCtx] = await Promise.all([
     requireStaff(event.id, event.code),
     getStaffViewerContext(event.id),
-    getSessionClaims(),
   ])
 
   if (access === 'event_team' && viewerCtx?.department) {
@@ -87,26 +122,22 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
     }),
   )
 
-  if (!board) {
-    return (
-      <div className="flex flex-col gap-4">
-        <DeniedNote note={deniedNote} />
-        <EmptyState
-          icon={<ShieldAlertIcon className="h-7 w-7" />}
-          title="Could not load the numbers"
-          description="The counters did not come back from the database this time. This is a load failure, not an empty event — reload the page, and tell your admin if it keeps happening."
-        />
-      </div>
-    )
-  }
+  // THE DEGRADED PATH. Only paid for when the board did not answer, so the
+  // normal render is unchanged.
+  const fallback = board ? null : await readVisibleNumbers(event.id)
+  const numbers: TodayNumbers | null = board ?? fallback
+  const degraded = board === null && fallback !== null
 
-  const totalGroups = count(board.totalGroups)
-  const totalGuests = count(board.totalPax)
-  const confirmed = count(board.rsvpConfirmed)
-  const pending = count(board.rsvpPending)
+  // The viewer this page is for. `staff_members.department` for a code
+  // session; an admin has no department and gets the whole board, which is
+  // what `getStaffViewerContext` already answers as 'management'.
+  const focus: StaffFocus = viewerCtx?.department ?? 'management'
 
-  // Zero-guests empty state from the old home, kept exactly as written (UX-RULES R3).
-  if (totalGroups === 0) {
+  // Zero-guests empty state (UX-RULES R3) — but ONLY when the board itself
+  // answered. A fallback that counted nothing is a permissions answer, not an
+  // empty event, and saying "no guests on this event yet" there would be a
+  // confident lie on a wedding with 238 families.
+  if (board && board.totalGroups === 0) {
     return (
       <div className="flex flex-col gap-4">
         <DeniedNote note={deniedNote} />
@@ -114,238 +145,157 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
         <EmptyState
           icon={<UsersIcon className="h-7 w-7" />}
           title="No guests on this event yet"
-          description="This screen fills in as soon as there is a guest list to count. Import the calling sheet and every number here starts working — families, RSVPs, rooms, arrivals and hampers."
+          description="This screen fills in as soon as there is a guest list to count. Import the calling sheet and every number here starts working."
         />
 
         <nav aria-label="Get started" className="grid grid-cols-1 gap-2.5">
           {access === 'admin' ? (
-            <Link
-              href={`/${event.code}/guests/import`}
-              className="tap flex min-h-12 items-center justify-center rounded-xl border border-transparent bg-brand px-3 text-center text-base font-semibold text-brand-fg transition-colors duration-press ease-ledger"
-            >
+            <LinkButton href={`/${event.code}/guests/import`} size="lg" fullWidth>
               Import the guest list
-            </Link>
+            </LinkButton>
           ) : (
             <p className="rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-sm leading-snug text-muted">
-              Importing the guest list is an admin job. Ask your event admin to
-              run the import — this screen fills in by itself once they have.
+              Importing the guest list is an admin job. Ask your event admin to run the
+              import — this screen fills in by itself once they have.
             </p>
           )}
-          <Link
-            href={`/${event.code}/guests/list`}
-            className="tap flex min-h-12 items-center justify-center rounded-xl border border-rule-strong bg-surface px-3 text-center text-sm font-medium text-ink transition-colors duration-press ease-ledger active:bg-surface-2"
-          >
+          <LinkButton href={`/${event.code}/guests`} variant="secondary" fullWidth>
             Go to the guest list
-          </Link>
+          </LinkButton>
         </nav>
       </div>
     )
   }
 
-  // 1. "Right now": up to three job cards, worst first, from non-zero attention numbers.
-  const attentionJobs: JobItem[] = [
-    {
-      id: 'confirmedNoRoom',
-      count: board.confirmedNoRoom,
-      description: `${formatCount(board.confirmedNoRoom)} confirmed ${
-        board.confirmedNoRoom === 1 ? 'guest has' : 'guests have'
-      } no room assigned.`,
-      actionLabel: 'Assign rooms',
-      href: `/${event.code}/hospitality/rooms`,
-    },
-    {
-      id: 'arrivalsNoVehicle',
-      count: board.arrivalsNoVehicle,
-      description: `${formatCount(board.arrivalsNoVehicle)} ${
-        board.arrivalsNoVehicle === 1 ? 'arrival' : 'arrivals'
-      } today with no vehicle assigned.`,
-      actionLabel: 'Assign vehicles',
-      href: `/${event.code}/logistics/fleet`,
-    },
-    {
-      id: 'noDeparture',
-      count: board.noDeparture,
-      description: `${formatCount(board.noDeparture)} arrived ${
-        board.noDeparture === 1 ? 'guest has' : 'guests have'
-      } no departure logged.`,
-      actionLabel: 'Log departures',
-      href: `/${event.code}/logistics/departures`,
-    },
-    {
-      id: 'hampersPending',
-      count: board.hampersPending,
-      description: `${formatCount(board.hampersPending)} ${
-        board.hampersPending === 1 ? 'hamper needs' : 'hampers need'
-      } delivery proof.`,
-      actionLabel: 'Deliver hampers',
-      href: `/${event.code}/hospitality/deliveries`,
-    },
-  ]
+  // Nothing answered, not even the base tables. Still not a wall: the Now card
+  // falls back to the department's own next action and says, in one line, that
+  // the counters are unavailable. No reload instruction — §11b of CLAUDE.md is
+  // explicit that reloading is the action that makes a bad connection worse.
+  if (!numbers) {
+    const job = departmentJob(focus, event.code)
+    return (
+      <div className="flex flex-col gap-5">
+        <DeniedNote note={deniedNote} />
+        <NowCard
+          eyebrow="Right now"
+          headline={job.headline}
+          context={job.context}
+          actionLabel={job.actionLabel}
+          actionHref={job.href}
+        />
+        <p className="text-sm leading-snug text-muted">
+          The counters are not loading on this phone right now. Every screen still works.
+        </p>
+        <HelpLink eventCode={event.code} />
+      </div>
+    )
+  }
 
-  const activeJobs = attentionJobs
-    .filter((j) => j.count > 0)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 3)
-
-  // Split percentages for headline guests bar.
-  const confirmedPct = totalGroups > 0 ? (confirmed / totalGroups) * 100 : 0
-  const pendingPct = totalGroups > 0 ? (pending / totalGroups) * 100 : 0
-
-  const subtitle =
-    formatDateRange(event.starts_on, event.ends_on) ?? event.venue_city ?? event.code
+  const jobs = attentionJobs(numbers, event.code)
+  const now = nowJob(jobs, focus, event.code)
+  const rest = attentionRows(jobs, now)
+  const bars = progressBars(numbers, focus)
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-5">
         <DeniedNote note={deniedNote} />
 
-        {/* Event identity lives on the home screen, not in the sticky header */}
-        <header className="flex flex-col gap-1">
-          <h1 className="font-display text-2xl leading-tight font-semibold tracking-tight text-ink">
-            {event.name}
-          </h1>
-          {subtitle ? <p className="text-sm text-muted">{subtitle}</p> : null}
-        </header>
+        <NowCard
+          eyebrow="Right now"
+          headline={now.headline}
+          context={now.context}
+          actionLabel={now.actionLabel}
+          actionHref={now.href}
+        />
 
-        {access === 'event_team' ? (
-          <StaffWelcomeBanner
-            eventCode={event.code}
-            department={viewerCtx?.department ?? null}
-            staffMemberId={codeClaims?.staffMemberId ?? null}
-          />
+        {bars.length > 0 ? (
+          <section
+            aria-label="How it is going"
+            className="flex flex-col gap-4 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1"
+          >
+            {bars.map((bar) => (
+              <Progress
+                key={bar.label}
+                label={bar.label}
+                done={bar.done}
+                total={bar.total}
+                tone={bar.tone}
+              />
+            ))}
+          </section>
         ) : null}
 
-        {/* 1. "Right now": up to three job cards, worst first */}
-        <section aria-labelledby="right-now-heading" className="flex flex-col gap-3">
-          <h2 id="right-now-heading" className="eyebrow text-brand">
-            Right now
-          </h2>
-
-          {activeJobs.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              {activeJobs.map((job, index) => (
-                <div
-                  key={job.id}
-                  className="flex flex-col gap-3 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1"
-                >
-                  <p className="text-base leading-snug font-medium text-ink">
-                    {job.description}
-                  </p>
-                  {/* One filled primary per screen: the worst job keeps the
-                      gold fill, every job below it is an outline. */}
-                  <LinkButton
-                    href={job.href}
-                    size="lg"
-                    variant={index === 0 ? 'primary' : 'secondary'}
-                    fullWidth
-                  >
-                    {job.actionLabel}
-                  </LinkButton>
-                </div>
+        {rest.length > 0 ? (
+          <section aria-labelledby="attention-heading" className="flex flex-col gap-2">
+            <h2 id="attention-heading" className="eyebrow text-muted px-1">
+              Needs attention
+            </h2>
+            {/* A Row with no `onPress` renders a div, so wrapping it in a Link
+                is valid HTML and the WHOLE row stays the tap target. */}
+            <div className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
+              {rest.map((job) => (
+                <Link key={job.id} href={job.href} className="tap block">
+                  <Row
+                    heading={job.headline}
+                    meta={job.context}
+                    status={job.status}
+                    tone="waiting"
+                    trailing={<ChevronRightIcon className="h-5 w-5" />}
+                  />
+                </Link>
               ))}
             </div>
-          ) : (
-            <p className="rounded-xl border border-rule-strong bg-surface px-4 py-3.5 text-base text-muted">
-              Nothing needs you right now.
-            </p>
-          )}
-        </section>
+          </section>
+        ) : null}
 
-        {/* 2. "Today": three figures on one row — each linking to its filtered list */}
-        <section aria-labelledby="today-heading" className="flex flex-col gap-3">
-          <h2 id="today-heading" className="eyebrow text-muted">
-            Today
-          </h2>
+        {/* §4: admin-only extra counters go BELOW a "More numbers" disclosure.
+            Native <details> — no script, works before hydration, and it is the
+            one control on this screen that is allowed to be quiet. */}
+        {access === 'admin' ? (
+          <details className="rounded-2xl border border-rule-strong bg-surface">
+            <summary className="tap flex min-h-12 cursor-pointer items-center px-4 text-base font-medium text-ink">
+              More numbers
+            </summary>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-rule px-4 py-3.5">
+              {moreNumbers(numbers).map((row) => (
+                <div key={row.label} className="min-w-0">
+                  <dt className="text-sm leading-snug text-muted">{row.label}</dt>
+                  <dd className="figure mt-0.5 text-lg leading-none font-medium text-ink">
+                    {row.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        ) : null}
 
-          <div className="grid grid-cols-3 gap-2.5">
-            <Link
-              href={`/${event.code}/logistics/arrivals`}
-              className="tap flex min-h-20 flex-col justify-between rounded-xl border border-rule-strong bg-surface p-3 transition-colors duration-press ease-ledger hover:bg-surface-2 active:bg-surface-2"
-            >
-              <span className="figure text-3xl font-medium tracking-tight text-ink">
-                {formatCount(board.arrivalsToday)}
-              </span>
-              <span className="mt-1 text-xs leading-tight text-muted">
-                Arriving today
-              </span>
-            </Link>
+        {degraded ? (
+          <p className="text-xs leading-relaxed text-subtle">
+            Some counters could not be read on this phone, so they are left out rather
+            than shown as zero.
+          </p>
+        ) : null}
 
-            <Link
-              href={`/${event.code}/logistics/departures`}
-              className="tap flex min-h-20 flex-col justify-between rounded-xl border border-rule-strong bg-surface p-3 transition-colors duration-press ease-ledger hover:bg-surface-2 active:bg-surface-2"
-            >
-              <span className="figure text-3xl font-medium tracking-tight text-ink">
-                {formatCount(board.departuresToday)}
-              </span>
-              <span className="mt-1 text-xs leading-tight text-muted">
-                Leaving today
-              </span>
-            </Link>
-
-            <Link
-              href={`/${event.code}/hospitality/deliveries`}
-              className="tap flex min-h-20 flex-col justify-between rounded-xl border border-rule-strong bg-surface p-3 transition-colors duration-press ease-ledger hover:bg-surface-2 active:bg-surface-2"
-            >
-              <span className="figure text-3xl font-medium tracking-tight text-ink">
-                {formatCount(board.hampersPending)}
-              </span>
-              <span className="mt-1 text-xs leading-tight text-muted">
-                Hampers left
-              </span>
-            </Link>
-          </div>
-        </section>
-
-        <section className="list-fade rounded-2xl border border-brand/25 bg-surface bg-[linear-gradient(158deg,var(--ef-brand-tint),transparent_62%)] p-4 shadow-e2">
-          <h2 className="eyebrow text-brand">Guests expected</h2>
-
-          <div className="mt-2 flex items-end gap-3">
-            <span className="figure text-6xl leading-none font-medium tracking-tight text-ink">
-              {formatCount(totalGuests)}
-            </span>
-            <span className="pb-2 text-sm leading-snug text-muted">
-              guests in {formatCount(totalGroups)} families
-            </span>
-          </div>
-
-          <div
-            className="mt-3.5 flex h-1.5 overflow-hidden rounded-full bg-surface-2"
-            role="img"
-            aria-label={`${formatCount(confirmed)} of ${formatCount(totalGroups)} families confirmed, ${formatCount(pending)} still to call`}
-          >
-            <div className="grow-x bg-ledger-green" style={{ width: `${confirmedPct}%` }} />
-            <div
-              className="grow-x bg-brand"
-              style={{ width: `${pendingPct}%`, animationDelay: '90ms' }}
-            />
-          </div>
-
-          <div className="mt-2.5 flex gap-4 text-xs text-muted">
-            <span className="inline-flex items-center gap-1.5">
-              <span aria-hidden className="h-2 w-2 rounded-xs bg-ledger-green" />
-              {formatCount(confirmed)} confirmed
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span aria-hidden className="h-2 w-2 rounded-xs bg-brand" />
-              {formatCount(pending)} still to call
-            </span>
-          </div>
-        </section>
-
-        {/* HELP LIVES HERE NOW (SPEC-V3 §3: "Help = inside Today (small
-            link), not in the header"). One quiet line at the foot of the
-            screen rather than a permanent question mark competing with the
-            title on all 40 screens.
-            Not role-gated: this page already ran `requireStaff`, so every
-            viewer who can see it is staff, and the help route runs the same
-            guard. */}
-        <Link
-          href={`/${event.code}/help`}
-          className="tap -mt-2 self-start py-2 text-sm font-medium text-muted underline underline-offset-4 hover:text-ink"
-        >
-          How this app works
-        </Link>
+        <HelpLink eventCode={event.code} />
       </div>
     </HydrationBoundary>
+  )
+}
+
+/**
+ * §3: "Help = inside Today (small link), not in the header."
+ *
+ * Not role-gated: this page already ran `requireStaff`, so every viewer who can
+ * see it is staff, and the help route runs the same guard.
+ */
+function HelpLink({ eventCode }: { eventCode: string }) {
+  return (
+    <Link
+      href={`/${eventCode}/help`}
+      className="tap -mt-1 self-start py-2 text-sm font-medium text-muted underline underline-offset-4 hover:text-ink"
+    >
+      How this app works
+    </Link>
   )
 }

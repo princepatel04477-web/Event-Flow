@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 
 import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Row } from '@/components/ui/Row'
 import { Spinner } from '@/components/ui/Spinner'
 import { StatCard } from '@/components/dashboard/StatCard'
-import { ShieldAlertIcon } from '@/components/icons'
+import { ChevronRightIcon, ShieldAlertIcon } from '@/components/icons'
 import { readDashboard, readTodayLegs, readAttention, type DashboardRow, type TodayLeg, type AttentionRow } from '@/lib/actions/dashboard'
 
 import { TodayPanel } from './TodayPanel'
@@ -17,6 +19,14 @@ interface Props {
   eventId: string
   eventCode: string
 }
+
+/**
+ * A row-shaped link inside a `Card` that holds several of them.
+ *
+ * See the note at the call site: `Row`'s own `last:border-b-0` cannot supply
+ * the divider once the row is nested in an anchor, so the anchor carries it.
+ */
+const ROW_LINK = 'tap block border-b border-rule last:border-b-0'
 
 export function DashboardClient({ eventId, eventCode }: Props) {
   const [dash, setDash] = useState<DashboardRow | null>(null)
@@ -87,7 +97,7 @@ export function DashboardClient({ eventId, eventCode }: Props) {
         <h2 className="eyebrow mb-3">RSVP</h2>
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Total groups" value={dash.totalGroups} note="families on the list" />
-          <StatCard label="Guests expected" value={dash.totalPax} note="confirmed where known, otherwise expected" />
+          <StatCard label="Guests expected" value={dash.totalPax} note="confirmed where known" />
           <StatCard label="Confirmed" value={dash.rsvpConfirmed} tone="success" />
           <StatCard label="Pending" value={dash.rsvpPending} tone="warning" />
         </div>
@@ -124,53 +134,54 @@ export function DashboardClient({ eventId, eventCode }: Props) {
         </div>
       </section>
 
-      {/* ---- Messages ---- */}
-      <section>
-        <h2 className="eyebrow mb-3">WhatsApp</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <Link
-            href={`/admin/events/${eventCode}/messages`}
-            className="tap flex flex-col gap-1 rounded-2xl border border-border bg-surface p-4"
-          >
-            <span className="text-sm font-semibold text-fg">Prepare messages</span>
-            <span className="text-xs text-muted">Generate + copy / download per family</span>
+      {/* ---- Messages & access ----
+          Five destinations, one register. They used to be five bordered tiles
+          in a two-column grid, which read as a toolbar rather than a list of
+          places to go — and there were only ever four of them plus one, so the
+          grid never lined up. */}
+      <section className="flex flex-col gap-3">
+        <h2 className="eyebrow">Messages &amp; access</h2>
+        <Card>
+          {/* `border-b … last:border-b-0` on the WRAPPER, not the row: `Row`
+              ends in `border-b last:border-b-0`, and inside a per-row <Link>
+              every row is its parent's only child — so `last:` matches
+              unconditionally and the dividers would all vanish. */}
+          <Link href={`/admin/events/${eventCode}/messages`} className={ROW_LINK}>
+            <Row
+              heading="Prepare messages"
+              meta="Generate and copy per family"
+              trailing={<ChevronRightIcon className="h-5 w-5" aria-hidden />}
+            />
           </Link>
-          <Link
-            href={`/admin/events/${eventCode}/messages/send`}
-            className="tap flex flex-col gap-1 rounded-2xl border border-border bg-surface p-4"
-          >
-            <span className="text-sm font-semibold text-fg">Send messages</span>
-            <span className="text-xs text-muted">Bulk send via WhatsApp provider</span>
+          <Link href={`/admin/events/${eventCode}/messages/send`} className={ROW_LINK}>
+            <Row
+              heading="Send messages"
+              meta="Bulk send via the WhatsApp provider"
+              trailing={<ChevronRightIcon className="h-5 w-5" aria-hidden />}
+            />
           </Link>
-          <Link
-            href={`/admin/events/${eventCode}/messages/templates`}
-            className="tap flex flex-col gap-1 rounded-2xl border border-border bg-surface p-4"
-          >
-            <span className="text-sm font-semibold text-fg">Templates</span>
-            <span className="text-xs text-muted">Edit message templates</span>
+          <Link href={`/admin/events/${eventCode}/messages/templates`} className={ROW_LINK}>
+            <Row
+              heading="Templates"
+              meta="Edit message templates"
+              trailing={<ChevronRightIcon className="h-5 w-5" aria-hidden />}
+            />
           </Link>
-          <Link
-            href={`/admin/events/${eventCode}/messages/log`}
-            className="tap flex flex-col gap-1 rounded-2xl border border-border bg-surface p-4"
-          >
-            <span className="text-sm font-semibold text-fg">Message log</span>
-            <span className="text-xs text-muted">Status of every send</span>
+          <Link href={`/admin/events/${eventCode}/messages/log`} className={ROW_LINK}>
+            <Row
+              heading="Message log"
+              meta="Status of every send"
+              trailing={<ChevronRightIcon className="h-5 w-5" aria-hidden />}
+            />
           </Link>
-        </div>
-      </section>
-
-      {/* ---- Access ---- */}
-      <section>
-        <h2 className="eyebrow mb-3">Access</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <Link
-            href={`/admin/events/${eventCode}/codes`}
-            className="tap flex flex-col gap-1 rounded-2xl border border-border bg-surface p-4"
-          >
-            <span className="text-sm font-semibold text-fg">Access codes</span>
-            <span className="text-xs text-muted">Issue a team or client code</span>
+          <Link href={`/admin/events/${eventCode}/codes`} className={ROW_LINK}>
+            <Row
+              heading="Access codes"
+              meta="Issue a team or client code"
+              trailing={<ChevronRightIcon className="h-5 w-5" aria-hidden />}
+            />
           </Link>
-        </div>
+        </Card>
       </section>
 
       {/* ---- Today detail ---- */}
@@ -178,10 +189,6 @@ export function DashboardClient({ eventId, eventCode }: Props) {
 
       {/* ---- Attention ---- */}
       {attn && <AttentionPanel attn={attn} eventCode={eventCode} />}
-
-      <p className="text-xs leading-relaxed text-subtle">
-        Refreshed on every visit and every 60 seconds. A zero means nothing has been recorded yet — if a read fails you get a message, never a silent zero.
-      </p>
     </div>
   )
 }

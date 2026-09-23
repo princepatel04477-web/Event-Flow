@@ -91,15 +91,22 @@ export function AdminMobileNav() {
               aria-haspopup="dialog"
               className={cn(
                 'tap relative flex min-h-16 w-full flex-col items-center justify-center gap-1.5 px-0.5 py-2',
-                'font-mono text-[0.625rem] leading-none font-medium tracking-[0.08em] uppercase',
+                'text-[0.6875rem] leading-none font-medium',
                 'transition-colors duration-press ease-ledger',
                 tab === 'more' ? 'text-brand' : 'text-muted active:text-ink',
               )}
             >
-              {tab === 'more' ? (
-                <span aria-hidden className="absolute top-0 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-b-sm bg-brand" />
-              ) : null}
-              <ListIcon className="h-6 w-6" aria-hidden />
+              {/* v3 tab idiom: the active item is a maroon glyph in a tint
+                  pill, not a rule drawn across the top edge. Same treatment
+                  as the staff tab bar, so the two shells read alike. */}
+              <span
+                className={cn(
+                  'flex h-7 items-center rounded-full px-4 transition-colors duration-press ease-ledger',
+                  tab === 'more' && 'bg-brand-tint',
+                )}
+              >
+                <ListIcon className="h-6 w-6" aria-hidden />
+              </span>
               <span>More</span>
             </button>
           </li>
@@ -134,19 +141,23 @@ function TabLink({ href, label, icon, active }: { href: string; label: string; i
         aria-current={active ? 'page' : undefined}
         className={cn(
           'tap relative flex min-h-16 flex-col items-center justify-center gap-1.5 px-0.5 py-2',
-          'font-mono text-[0.625rem] leading-none font-medium tracking-[0.08em] uppercase',
+          'text-[0.6875rem] leading-none font-medium',
           'transition-colors duration-press ease-ledger',
           active ? 'text-brand' : 'text-muted active:text-ink',
         )}
       >
-        {active ? (
-          <span aria-hidden className="absolute top-0 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-b-sm bg-brand" />
-        ) : null}
-        {/* The icon was accepted as a prop and never rendered — the 1.5px dot
-            that used to sit here was a placeholder standing in for it, so the
-            bar showed four unlabelled dots and every icon passed in was built
-            and discarded. */}
-        <span aria-hidden className="shrink-0">{icon}</span>
+        <span
+          className={cn(
+            'flex h-7 items-center rounded-full px-4 transition-colors duration-press ease-ledger',
+            active && 'bg-brand-tint',
+          )}
+        >
+          {/* The icon was accepted as a prop and never rendered — the 1.5px dot
+              that used to sit here was a placeholder standing in for it, so the
+              bar showed four unlabelled dots and every icon passed in was built
+              and discarded. */}
+          <span aria-hidden className="shrink-0">{icon}</span>
+        </span>
         <span>{label}</span>
       </Link>
     </li>
@@ -157,10 +168,10 @@ function SheetLink({ href, label, icon }: { href: string; label: string; icon: R
   return (
     <Link
       href={href}
-      className="tap flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium text-fg hover:bg-surface-2 active:bg-surface-2"
+      className="tap flex min-h-11 items-center gap-3 rounded-xl px-3 text-base font-medium text-ink hover:bg-surface-2 active:bg-surface-2"
     >
       <span className="shrink-0 text-muted">{icon}</span>
-      <span>{label}</span>
+      <span className="min-w-0 truncate">{label}</span>
     </Link>
   )
 }

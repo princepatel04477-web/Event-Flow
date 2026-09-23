@@ -40,23 +40,23 @@ export default async function EventLayout({ children, params }: EventLayoutProps
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-xl border border-rule bg-surface-2 px-4 py-2.5">
-        <p className="font-mono text-[0.625rem] font-bold uppercase tracking-[0.1em] text-subtle">
-          Active event
-        </p>
-        <p className="text-sm font-semibold text-fg">
-          {event.name}{' '}
-          <span className="font-mono text-xs font-normal text-muted">({event.code})</span>
-        </p>
+      {/* One compact line, not a stacked eyebrow + title block. The bar still
+          does its job — an admin three screens into the wrong wedding sees
+          the name and code above every page — but it no longer reads as a
+          second page title competing with the screen's own. */}
+      <div className="flex min-h-11 flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-xl border border-rule bg-surface-2 px-4 py-2.5">
+        <span className="eyebrow">Active event</span>
+        <span className="min-w-0 truncate text-sm font-semibold text-ink">{event.name}</span>
+        <span className="code-figure text-xs text-muted">{event.code}</span>
       </div>
 
       {!isLive ? (
         <div
           role="alert"
-          className="rounded-xl border border-rule bg-tint-warning px-4 py-3 text-sm font-medium text-warning"
+          className="rounded-xl border border-ledger-amber/40 bg-amber-tint px-4 py-3 text-sm font-medium text-ledger-amber"
         >
-          This is not the live event. You are viewing {event.name} ({event.code}) — confirm
-          before writing anything.
+          Not the live event — you are viewing {event.name} ({event.code}). Confirm before
+          writing.
         </div>
       ) : null}
 
