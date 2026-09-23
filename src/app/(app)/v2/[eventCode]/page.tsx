@@ -10,7 +10,7 @@ import { StaffWelcomeBanner } from '@/components/nav/StaffWelcomeBanner'
 import { readBoard } from '@/lib/actions/dashboard'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
-import { departmentHomePath } from '@/lib/departments'
+import { v2DepartmentHome } from '@/lib/departments'
 import { queryKeys } from '@/lib/query/keys'
 import {
   requireStaff,
@@ -74,7 +74,8 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
   ])
 
   if (access === 'event_team' && viewerCtx?.department) {
-    redirect(departmentHomePath(event.code, viewerCtx.department))
+    const dest = v2DepartmentHome(event.code, viewerCtx.department)
+    if (dest) redirect(dest)
   }
 
   // Pre-warm the TanStack Query cache on the server (V2 fast path).

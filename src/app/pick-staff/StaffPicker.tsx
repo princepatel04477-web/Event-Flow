@@ -11,9 +11,10 @@ import { cn } from '@/lib/utils'
 
 import {
   DEPARTMENT_LABELS,
-  departmentHomePath,
+  postLoginHome,
   type StaffDepartment,
 } from '@/lib/departments'
+import { getUiVersion } from '@/lib/ui-version'
 
 interface StaffMember {
   id: string
@@ -31,6 +32,11 @@ interface StaffMember {
  * event and is active, and returns a new JWT carrying `staff_member_id`.
  * The new token replaces the durable session AND the httpOnly cookie, then
  * routes into the event. No selection = no writes (enforced in RLS).
+ *
+ * The landing path is the shell's, not this component's: `postLoginHome`
+ * refuses to guess which UI is rendering and asks `getUiVersion()`. Under v2
+ * an event lead lands on the dashboard; under v1 they keep landing on
+ * Auto-call. Hardcoding either one here is how this hop was left behind.
  */
 export function StaffPicker({ members, eventCode }: { members: StaffMember[]; eventCode: string }) {
   const [pending, setPending] = useState<string | null>(null)
@@ -79,8 +85,15 @@ export function StaffPicker({ members, eventCode }: { members: StaffMember[]; ev
 
       // 4. Enter the event. A full navigation (not client router.push) so the
       // fresh httpOnly cookie is sent on the request.
+      //
+      // The destination is resolved by UI version, not by
+      // `departmentHomePath` alone: v2's department home and v1's disagree for
+      // `management` and `hamper` (see `postLoginHome`). Using the shared v1
+      // answer here sent every event lead straight to Auto-call on the hop
+      // immediately after login — the one landing `v2DepartmentHome` cannot
+      // cover, because it only runs once a page is already rendering.
       const dept = member?.department ?? 'management'
-      router.replace(departmentHomePath(eventCode, dept))
+      router.replace(postLoginHome(getUiVersion(), eventCode, dept))
       router.refresh()
     } catch {
       setError('Could not reach the server. Check your connection and try again.')
