@@ -123,6 +123,19 @@ ownership.
 4. **Preserve cache and database schemas**: All changes use existing mutations (`saveRsvpLog`, `submitCallOutcome`), existing DB schema (`v_rsvp_queue`, `guest_groups`), and standard query keys without migrations.
 
 ---
+## 23 September 2026 — feat(rooms): rooms board with auto-allocate and review
+
+### What changed
+- `src/app/(app)/v2/[eventCode]/hospitality/rooms/RoomsBoard.tsx`: Replaced GiveRoom (40 identical buttons) with the Rooms Board. Summary line of state ("312 of 465 guests have a bed · 41 beds free · 14 families waiting"), Segmented control Waiting (N) | Rooms (N), unified search, and single primary button: "Auto-allocate N families".
+- `src/app/(app)/v2/[eventCode]/hospitality/rooms/_components/Segmented.tsx`: Segmented tab switch for Waiting / Rooms with badge counts.
+- `src/app/(app)/v2/[eventCode]/hospitality/rooms/_components/AllocateReview.tsx`: Auto-allocate proposal review screen. Per-family rows with accept (default on), skip, and room-picker change, plain-language placement reasons, unplaced warnings, and sticky Confirm button.
+- `src/app/(app)/v2/[eventCode]/hospitality/rooms/_components/PlaceFamilySheet.tsx`: BottomSheet for placing a single family with best engine recommendation on top, guest count stepper, hotel filter chips, and fitting rooms list.
+- `src/app/(app)/v2/[eventCode]/hospitality/rooms/_components/RoomSheet.tsx`: Room details sheet showing occupants, Move / Remove (releases with history preserved, never deletes), Add a guest search, and for a lonely single, "Share with another single..." (same side).
+- `src/lib/allocate/allocator.ts`: 4-guest-type deterministic allocator (family, couple, friends, single). Handles same hotel, floor adjacency, couple 2-bed preference, singles sharing same side, capacity guards, and human-readable reasons.
+- `src/lib/actions/rooms.ts`: Integrated allocator with `planRoomAllocation`, per-row `commitRoomPlan` with optimistic writes and room guard error translation, and top-up of guest members.
+- `src/lib/rooms/board.ts`: Pure helpers for summary line, search matching, and natural hotel/floor grouping.
+- `tests/allocator.test.ts`: 28 unit tests covering all pure allocation rules, hard capacity limits, determinism, and plain reasons.
+- `tests/rooms-board.test.ts`: 13 unit tests covering board summary lines, natural room sorting, and search matching.
 
 ## 22 September 2026 — V11: teach on the screen, once, and never twice
 
