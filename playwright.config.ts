@@ -121,5 +121,34 @@ export default defineConfig({
       },
       testMatch: /feel\.spec\.ts/,
     },
+    {
+      /**
+       * The end-to-end FLOW specs (`e2e/flows/`): one file per real job, each
+       * one driving the workflow through the UI, counting the taps it took and
+       * asserting the job actually happened.
+       *
+       * ITS OWN PROJECT, for three reasons:
+       *  - `phone`'s testMatch is the scored acceptance set; folding the flows
+       *    into it would put workflow regressions into the 100-point
+       *    scoreboard, and a flow is not a tier.
+       *  - the flows RESOLVE the test event from the access codes rather than
+       *    from `E2E_EVENT_ID` (which names a different event — see
+       *    `e2e/flows/_lib.ts`), so they are not interchangeable with the
+       *    tiers.
+       *  - THE FLOWS TARGET THE v2/v3 SHELL. They must be run with
+       *    `NEXT_PUBLIC_UI=v2`, which is the gate `.brain/SPEC-V3.md` already
+       *    sets for reviewing this UI. `openSession` fails with that sentence
+       *    rather than reporting eight missing elements when the variable is
+       *    unset.
+       *
+       *   $env:NEXT_PUBLIC_UI='v2'; npx playwright test --project=flows
+       */
+      name: 'flows',
+      use: {
+        ...devices['Pixel 5'],
+        viewport: { width: 360, height: 800 },
+      },
+      testMatch: /flows\/.*\.spec\.ts/,
+    },
   ],
 })
