@@ -5,10 +5,10 @@ import { requireSection } from '@/lib/auth/section-guard'
 import { sectionAllowedForDepartment } from '@/lib/departments'
 import { getEventAccess, resolveEventByCode } from '@/lib/supabase/queries'
 
-import { GiveRoom } from './GiveRoom'
+import { RoomsBoard } from './RoomsBoard'
 
 export const metadata: Metadata = {
-  title: 'Give a family a room',
+  title: 'Rooms',
 }
 
 type PageProps = {
@@ -16,7 +16,7 @@ type PageProps = {
 }
 
 /**
- * Job 2 of the v2 rebuild: give a family a room.
+ * Job 2 of the v2 rebuild: the Rooms board.
  *
  * The section guard is run here rather than inherited, because it CANNOT be
  * inherited: `(staff)/[eventCode]/hospitality/layout.tsx` calls
@@ -25,7 +25,7 @@ type PageProps = {
  * standing between a travel runner and the room register would be the shell's
  * `requireStaff`.
  */
-export default async function GiveRoomPage({ params }: PageProps) {
+export default async function RoomsPage({ params }: PageProps) {
   const { eventCode } = await params
 
   const event = await resolveEventByCode(eventCode)
@@ -48,6 +48,6 @@ export default async function GiveRoomPage({ params }: PageProps) {
     access === 'admin' || sectionAllowedForDepartment('rsvp', ctx.department)
 
   return (
-    <GiveRoom eventId={event.id} eventCode={event.code} canOpenCallList={canOpenCallList} />
+    <RoomsBoard eventId={event.id} eventCode={event.code} canOpenCallList={canOpenCallList} />
   )
 }

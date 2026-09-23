@@ -299,8 +299,11 @@ export async function task4GiveRoom(page, code, familyName) {
   await tapTab(page, 'Rooms')
   await waitForScreen(page)
 
+  // The Rooms board's waiting entry is the ROW ITSELF, not a "Give a room"
+  // button inside a card: the board replaced forty identical full-width
+  // buttons with compact tappable rows. Same tap count, different selector.
   const card = page.locator('li', { hasText: familyName }).first()
-  await tapElement(page, card.getByRole('button', { name: 'Give a room' }))
+  await tapElement(page, card.getByRole('button').first())
 
   const room = page.locator('button', { hasText: /^V12-/ }).first()
   await room.waitFor({ state: 'visible', timeout: 30_000 })

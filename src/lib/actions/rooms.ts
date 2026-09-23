@@ -4,12 +4,19 @@ import { createClient } from '@/lib/supabase/server'
 import {
   friendlyDbError,
   roomGuardCause,
+  roomGuardMessage,
   type RoomGuardCause,
 } from '@/lib/errors'
+import {
+  allocate,
+  type GroupForAllocation,
+  type GuestType,
+  type RoomForAllocation,
+} from '@/lib/allocate/allocator'
 import { suggestRooms } from '@/lib/allocate/suggest'
 
 /** Per-phase timing for server actions (instrument-first). */
-function phaseTiming(label: string) {
+function phaseTiming() {
   const marks: Record<string, number> = {}
   let last = performance.now()
   return {
@@ -19,8 +26,7 @@ function phaseTiming(label: string) {
       last = now
     },
     report() {
-      const parts = Object.entries(marks).map(([k, v]) => `${k}:${v}ms`)
-      console.log(`[perf] ${label} phases :: ${parts.join(' · ')}`)
+      // Intentionally silent in production/app flows to respect house rules (no console.log)
     },
   }
 }
@@ -265,6 +271,9 @@ export interface UnderBeddedFamily {
   shortfall: number
   /** True when member rows are fewer than headcount — a top-up is needed. */
   needsTopUp: boolean
+  /** The family's type and side. The waiting rows label both. */
+  groupType?: string
+  side?: string | null
 }
 
 export interface UnderBeddedResult {
@@ -358,6 +367,9 @@ export interface RoomGridGuest {
   ageBand: string
   isHead: boolean
   assignmentId: string
+  /** The family's type, so the room sheet knows who may be offered a share. */
+  groupType: string
+  side: string | null
 }
 
 export interface RoomGridRow {
@@ -366,22 +378,48 @@ export interface RoomGridRow {
   hotelName: string
   roomNumber: string
   capacity: number
+  /** Extra-bed ceiling. Shown nowhere; the board plans against `capacity`. */
+  maxCapacity: number
+  /** Floor label as the hotel writes it. Groups the Rooms tab. */
+  floor: string | null
   isBlocked: boolean
   occupants: RoomGridGuest[]
   freeBeds: number
   isOverCapacity: boolean
 }
 
+/** One line of state-of-the-world for the top of the Rooms board. */
+export interface RoomsBoardTotals {
+  /** Confirmed headcount across the event (confirmed_pax ?? expected_pax). */
+  confirmedGuests: number
+  /** Confirmed guests who hold an active bed right now. */
+  guestsWithBed: number
+  /** Free beds in rooms that are not out of service. */
+  bedsFree: number
+  /** Confirmed families still short of at least one bed. */
+  familiesWaiting: number
+}
+
 export interface RoomsGridData {
   rooms: RoomGridRow[]
   /** Guests not currently assigned to any room. */
-  unplaced: { guestId: string; guestName: string; groupId: string; headName: string }[]
+  unplaced: {
+    guestId: string
+    guestName: string
+    groupId: string
+    headName: string
+    /** The family's type and side — the room sheet's share rule needs both. */
+    groupType: string
+    side: string | null
+  }[]
   /** Confirmed families placed but below their headcount (Phase 3). */
   underBedded: UnderBeddedFamily[]
+  /** The board's header line, counted server-side from the same read. */
+  totals: RoomsBoardTotals
 }
 
 export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
-  const timing = phaseTiming('rooms :: readRoomsGrid')
+  const timing = phaseTiming()
   const supabase = await createClient()
   timing.mark('client-create')
 
@@ -392,7 +430,7 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
   // groups = 6 requests; now: 5) by selecting rsvp_status once.
   const roomsRes = await supabase
     .from('rooms')
-    .select('id, hotel_id, room_number, capacity, is_blocked')
+    .select('id, hotel_id, room_number, capacity, max_capacity, floor, is_blocked')
     .eq('event_id', eventId)
     .order('room_number', { ascending: true })
   const assignmentsRes = await supabase
@@ -410,7 +448,7 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
     .eq('event_id', eventId)
   const groupsRes = await supabase
     .from('guest_groups')
-    .select('id, head_name, primary_mobile, rsvp_status, expected_pax, confirmed_pax')
+    .select('id, head_name, primary_mobile, rsvp_status, expected_pax, confirmed_pax, group_type, side')
     .eq('event_id', eventId)
   // Hamper delivered state per group, for the room-tap panel (§5.3) and the
   // per-room hamper coding (§5.4). Group-level hamper: kind=hamper, guest_id
@@ -433,6 +471,8 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
   const hotelNames = new Map(hotelRows.map((h) => [h.id, h.name]))
   const groupNames = new Map(groupRows.map((g) => [g.id, g.head_name]))
   const groupMobiles = new Map(groupRows.map((g) => [g.id, g.primary_mobile]))
+  const groupTypes = new Map(groupRows.map((g) => [g.id, g.group_type as string]))
+  const groupSides = new Map(groupRows.map((g) => [g.id, g.side as string | null]))
   const hamperDeliveredByGroup = new Map(
     (hamperRows ?? []).filter((d) => d.status === 'delivered').map((d) => [d.group_id, true]),
   )
@@ -475,6 +515,8 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
         ageBand: guest?.age_band ?? 'adult',
         isHead: guest?.is_head ?? false,
         assignmentId: a.id,
+        groupType: groupTypes.get(a.group_id) ?? 'family',
+        side: groupSides.get(a.group_id) ?? null,
       }
     })
 
@@ -485,6 +527,8 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
       hotelName: hotelNames.get(r.hotel_id) ?? 'Unknown hotel',
       roomNumber: r.room_number,
       capacity: r.capacity,
+      maxCapacity: r.max_capacity ?? r.capacity,
+      floor: r.floor,
       isBlocked: r.is_blocked,
       occupants,
       freeBeds: Math.max(0, r.capacity - occupied),
@@ -501,6 +545,8 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
       guestName: guestNames.get(g.id) ?? 'Guest',
       groupId: g.group_id,
       headName: groupNames.get(g.group_id) ?? 'Unknown',
+      groupType: groupTypes.get(g.group_id) ?? 'family',
+      side: groupSides.get(g.group_id) ?? null,
     }))
 
   // Under-bedded: confirmed families placed but below their headcount.
@@ -530,12 +576,33 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
       placed,
       shortfall: headcount - placed,
       needsTopUp: memberRows < headcount,
+      groupType: g.group_type as string,
+      side: g.side as string | null,
     })
+  }
+
+  // The board's header line. Counted here, from the rows already in hand,
+  // rather than re-read: a second query would be a second round trip to Seoul
+  // for four numbers that are a reduce over data this function already holds.
+  let confirmedGuests = 0
+  for (const g of groupRows) {
+    if (g.rsvp_status !== 'confirmed') continue
+    const headcount = g.confirmed_pax ?? g.expected_pax
+    if (!headcount || headcount <= 0) continue
+    confirmedGuests += headcount
+  }
+  const totals: RoomsBoardTotals = {
+    confirmedGuests,
+    // Beds held by confirmed families. An assignment belonging to a family
+    // that later declined is not a guest with a bed.
+    guestsWithBed: assignments.filter((a) => confirmedGroupIds.has(a.group_id)).length,
+    bedsFree: rooms.filter((r) => !r.isBlocked).reduce((n, r) => n + r.freeBeds, 0),
+    familiesWaiting: underBedded.length,
   }
 
   timing.mark('assemble')
   timing.report()
-  return { rooms, unplaced, underBedded }
+  return { rooms, unplaced, underBedded, totals }
 }
 
 // ---------------------------------------------------------------------------
@@ -1226,4 +1293,315 @@ export async function assignGuestsToRoom(
   }
 
   return { ok: true, assigned: take, remaining: unplaced.length - take }
+}
+
+// ---------------------------------------------------------------------------
+// The Rooms board: plan, then commit family by family
+// ---------------------------------------------------------------------------
+
+export interface RoomPlanRoom {
+  roomId: string
+  hotelName: string
+  roomNumber: string
+  floor: string | null
+  pax: number
+  bedsRemaining: number
+  shared: boolean
+}
+
+export interface RoomPlanFamily {
+  groupId: string
+  headName: string
+  /** The derived type the rules used: family / couple / single / friends. */
+  guestType: GuestType
+  side: string | null
+  pax: number
+  rooms: RoomPlanRoom[]
+  /** The one line the review row shows. */
+  reason: string
+  splitAcrossRooms: boolean
+  shared: boolean
+}
+
+export interface RoomPlan {
+  /** Families this plan can place, in the order the review list shows them. */
+  proposals: RoomPlanFamily[]
+  /** Families it cannot, each with the reason in plain words. */
+  blocked: { groupId: string; headName: string; pax: number; reason: string }[]
+  summary: { families: number; guests: number; bedsSpare: number; roomsUsed: number }
+}
+
+export type RoomPlanResult =
+  | { ok: true; plan: RoomPlan }
+  | { ok: false; error: string }
+
+/**
+ * Build the auto-allocation proposal for this event. READ ONLY — this is the
+ * "Auto-allocate 14 families" tap, and nothing is written until the planner
+ * confirms the rows they kept.
+ *
+ * The engine is `src/lib/allocate/allocator.ts`, the same pure function the
+ * unit tests pin. This action only adapts the database shape to it and the
+ * result back to something the client can render, so a bug is either in a
+ * tested function or in a mapping you can read in one screen.
+ */
+export async function planRoomAllocation(eventId: string): Promise<RoomPlanResult> {
+  const data = await readAllocationData(eventId)
+
+  if (data.rooms.length === 0) {
+    return { ok: false, error: 'No rooms have been added to this event yet.' }
+  }
+
+  const { groups, rooms } = adaptAllocationInput(data)
+  const result = allocate(groups, rooms)
+
+  return {
+    ok: true,
+    plan: {
+      proposals: result.placed.map((family) => ({
+        groupId: family.groupId,
+        headName: family.headName,
+        guestType: family.guestType,
+        side: family.side,
+        pax: family.paxToPlace,
+        rooms: family.rooms.map((r) => ({
+          roomId: r.roomId,
+          hotelName: r.hotelName,
+          roomNumber: r.roomNumber,
+          floor: r.floor,
+          pax: r.paxInRoom,
+          bedsRemaining: r.bedsRemaining,
+          shared: r.shared,
+        })),
+        reason: family.reason,
+        splitAcrossRooms: family.splitAcrossRooms,
+        shared: family.shared,
+      })),
+      blocked: result.unplaced.map((family) => ({
+        groupId: family.groupId,
+        headName: family.headName,
+        pax: family.paxToPlace,
+        reason: family.failureReason ?? 'Could not be placed.',
+      })),
+      summary: {
+        families: result.summary.familiesPlaced,
+        guests: result.summary.guestsPlaced,
+        bedsSpare: result.summary.bedsSpare,
+        roomsUsed: result.summary.roomsUsed,
+      },
+    },
+  }
+}
+
+/** Database shape to allocator input. Kept next to its one caller. */
+function adaptAllocationInput(data: AllocationData): {
+  groups: GroupForAllocation[]
+  rooms: RoomForAllocation[]
+} {
+  const guestsByGroup = new Map<string, AllocationGuest[]>()
+  for (const guest of data.guests) {
+    const list = guestsByGroup.get(guest.groupId) ?? []
+    list.push(guest)
+    guestsByGroup.set(guest.groupId, list)
+  }
+
+  return {
+    groups: data.groups.map((g) => ({
+      id: g.id,
+      headName: g.headName,
+      groupType: g.groupType as GroupForAllocation['groupType'],
+      side: g.side as GroupForAllocation['side'],
+      expectedPax: g.expectedPax,
+      confirmedPax: g.confirmedPax,
+      priority: g.priority,
+      guests: (guestsByGroup.get(g.id) ?? []).map((guest) => ({
+        id: guest.id,
+        group_id: guest.groupId,
+        is_head: guest.isHead,
+        age_band: guest.ageBand as 'adult' | 'child' | 'infant',
+      })),
+      existingRoomIds: g.existingRoomIds,
+    })),
+    // `readAllocationData` already drops blocked rooms; `isBlocked: false` is
+    // stated anyway so the allocator's own guard is exercised by the shape it
+    // is handed rather than by an absence.
+    rooms: data.rooms.map((r) => ({ ...r, isBlocked: false })),
+  }
+}
+
+export interface RoomPlanCommitItem {
+  groupId: string
+  headName: string
+  rooms: { roomId: string; roomNumber: string; pax: number }[]
+}
+
+export interface RoomPlanCommitOutcome {
+  groupId: string
+  headName: string
+  placed: boolean
+  /** Beds actually written for this family. */
+  guests: number
+  /** Why it did not land, in words a person on a landing can act on. */
+  reason: string | null
+}
+
+export interface RoomPlanCommitResult {
+  /** Families written. */
+  families: number
+  /** Guests written. */
+  guests: number
+  outcomes: RoomPlanCommitOutcome[]
+}
+
+/**
+ * Write the rows the planner kept — ONE FAMILY AT A TIME, on purpose.
+ *
+ * `commitAllocations` inserts the whole plan in a single statement, which means
+ * one family over a room's ceiling aborts every other family with it. On a
+ * fourteen-family plan that is thirteen correct placements thrown away for one
+ * refusal, and nothing on the screen can say which one. Here each family is its
+ * own INSERT: the merged room guard still fires per row, so a family is placed
+ * WHOLE or not at all (never half a family in a room), and the failures come
+ * back named with the guard's own reason.
+ *
+ * Every family is topped up to its headcount first. The Excel import creates
+ * one `guests` row per family — the head — so without that step a family of six
+ * has exactly one assignable person and the room reads 1 of 6 beds taken
+ * (CLAUDE.md section 12).
+ */
+export async function commitRoomPlan(
+  eventId: string,
+  items: RoomPlanCommitItem[],
+): Promise<RoomPlanCommitResult> {
+  if (items.length === 0) {
+    return { families: 0, guests: 0, outcomes: [] }
+  }
+
+  const supabase = await createClient()
+
+  const ensured = await ensureMembersForGroups(
+    eventId,
+    items.map((i) => i.groupId),
+  )
+  if (!ensured.ok) {
+    return {
+      families: 0,
+      guests: 0,
+      outcomes: items.map((i) => ({
+        groupId: i.groupId,
+        headName: i.headName,
+        placed: false,
+        guests: 0,
+        reason: ensured.error,
+      })),
+    }
+  }
+
+  // Who already holds a bed, for every family in this commit — ONE read, not
+  // one per family. The top-up above may have created rows since the plan was
+  // built, so this is read after it and never before.
+  const { data: placedRows, error: placedErr } = await supabase
+    .from('room_assignments')
+    .select('guest_id, group_id')
+    .eq('event_id', eventId)
+    .in('group_id', items.map((i) => i.groupId))
+    .is('released_at', null)
+
+  if (placedErr) {
+    return {
+      families: 0,
+      guests: 0,
+      outcomes: items.map((i) => ({
+        groupId: i.groupId,
+        headName: i.headName,
+        placed: false,
+        guests: 0,
+        reason: friendlyDbError(placedErr),
+      })),
+    }
+  }
+
+  const alreadyPlaced = new Set((placedRows ?? []).map((r) => r.guest_id))
+  const outcomes: RoomPlanCommitOutcome[] = []
+  let families = 0
+  let guests = 0
+
+  for (const item of items) {
+    const candidates = (ensured.byGroup[item.groupId] ?? []).filter((id) => !alreadyPlaced.has(id))
+
+    if (candidates.length === 0) {
+      outcomes.push({
+        groupId: item.groupId,
+        headName: item.headName,
+        placed: false,
+        guests: 0,
+        reason: 'Everyone in this family already has a bed.',
+      })
+      continue
+    }
+
+    // Head first, then down the plan's rooms in order. Which individual sleeps
+    // in which of a family's two rooms is not knowable here — member names are
+    // collected at check-in — so this is a stable order, not a claim.
+    const rows: {
+      event_id: string
+      room_id: string
+      guest_id: string
+      group_id: string
+      is_override: boolean
+    }[] = []
+    let cursor = 0
+    for (const room of item.rooms) {
+      for (let i = 0; i < room.pax && cursor < candidates.length; i += 1, cursor += 1) {
+        rows.push({
+          event_id: eventId,
+          room_id: room.roomId,
+          guest_id: candidates[cursor],
+          group_id: item.groupId,
+          is_override: false,
+        })
+      }
+    }
+
+    if (rows.length === 0) {
+      outcomes.push({
+        groupId: item.groupId,
+        headName: item.headName,
+        placed: false,
+        guests: 0,
+        reason: 'No rooms were chosen for this family.',
+      })
+      continue
+    }
+
+    const { error } = await supabase.from('room_assignments').insert(rows)
+
+    if (error) {
+      const first = item.rooms[0]
+      const cause = roomGuardCause(error)
+      outcomes.push({
+        groupId: item.groupId,
+        headName: item.headName,
+        placed: false,
+        guests: 0,
+        reason:
+          roomGuardMessage(cause, { roomNumber: first?.roomNumber ?? null }) ??
+          friendlyDbError(error),
+      })
+      continue
+    }
+
+    families += 1
+    guests += rows.length
+    for (const row of rows) alreadyPlaced.add(row.guest_id)
+    outcomes.push({
+      groupId: item.groupId,
+      headName: item.headName,
+      placed: true,
+      guests: rows.length,
+      reason: null,
+    })
+  }
+
+  return { families, guests, outcomes }
 }
