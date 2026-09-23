@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
 import { requireSection } from '@/lib/auth/section-guard'
-import { resolveEventByCode } from '@/lib/supabase/queries'
+import { getViewer, resolveEventByCode } from '@/lib/supabase/queries'
 
 import { CallNext } from './CallNext'
 
@@ -36,11 +36,22 @@ type PageProps = {
 export default async function CallNextPage({ params }: PageProps) {
   const { eventCode } = await params
 
-  const event = await resolveEventByCode(eventCode)
+  const [event, viewer] = await Promise.all([
+    resolveEventByCode(eventCode),
+    getViewer(),
+  ])
   if (!event) notFound()
 
   // Staff on this event AND a department allowed into the RSVP section.
   await requireSection(event.id, event.code, 'rsvp')
 
-  return <CallNext eventId={event.id} eventCode={event.code} />
+  return (
+    <CallNext
+      eventId={event.id}
+      eventCode={event.code}
+      startsOn={event.starts_on}
+      endsOn={event.ends_on}
+      isAdmin={viewer?.isAdmin ?? false}
+    />
+  )
 }

@@ -94,6 +94,33 @@ subsequent visit to Home (including every tap of the Home tab) — the
 dominant, recurring instance of the bug — but not that one-time post-login
 hop. Fixing it means editing `StaffPicker.tsx`, out of this session's file
 ownership.
+## 23 September 2026 — RSVP Calling: Fast inline capture, clean family names, and neutral outcome flow (SPEC §B)
+
+### What changed
+
+| file | change |
+|---|---|
+| `src/lib/rsvp-log.ts` | Pure functions for arrival date chips (-2...+1 around event start), arrival time-of-day slots, travel mode mappings, callback reminder chip calculators, and `extractCallName` (fixes "Call 0") |
+| `src/app/(app)/v2/[eventCode]/rsvp/page.tsx` | Updated default redirect to point directly to `/[eventCode]/rsvp/queue` rather than auto-call campaigns |
+| `src/app/(app)/v2/[eventCode]/rsvp/queue/page.tsx` | Passes `starts_on`, `ends_on`, and `isAdmin` to `CallNext` |
+| `src/app/(app)/v2/[eventCode]/rsvp/queue/types.ts` | Extracted TypeScript types for queue rows, family rows, outcomes, filters, and component props |
+| `src/app/(app)/v2/[eventCode]/rsvp/queue/ProgressAndFilters.tsx` | Top progress counter line ("X of Y families called · A coming · B call back") and horizontal scrollable filter chips |
+| `src/app/(app)/v2/[eventCode]/rsvp/queue/CurrentFamilyCard.tsx` | Family details (head name, mobile, expected pax, side, relation, attempts) and single filled primary button "Call <name>" fixing "Call 0" |
+| `src/app/(app)/v2/[eventCode]/rsvp/queue/OutcomeButtons.tsx` | Neutral segmented buttons (Coming, Maybe, Call back, No answer, Not coming) without harsh red/pink walls |
+| `src/app/(app)/v2/[eventCode]/rsvp/queue/InlineCaptureStep.tsx` | Inline capture step for Coming / Maybe: adults + children steppers, arrival date chips, arrival time slots, 4 travel mode icons, pickup switch, departure default with edit, optional notes, single primary save button |
+| `src/app/(app)/v2/[eventCode]/rsvp/queue/CallbackCaptureStep.tsx` | Inline callback time picker: "In 1 hour", "This evening", "Tomorrow morning", "Pick time" |
+| `src/app/(app)/v2/[eventCode]/rsvp/queue/FamilyQueueList.tsx` | Compact tappable list of families with status pills and active highlight; tapping switches current family |
+| `src/app/(app)/v2/[eventCode]/rsvp/queue/AdminCampaignsLink.tsx` | Discreet admin-only link to auto-call campaigns, removing campaigns from callers' critical path |
+| `src/app/(app)/v2/[eventCode]/rsvp/queue/TravelIcons.tsx` | Lucide-compatible icons for Train, Bus, and checkmarks |
+| `src/app/(app)/v2/[eventCode]/rsvp/queue/CallNext.tsx` | Decomposed coordinator component wired to existing `saveRsvpLog`, `submitCallOutcome`, `startCallAttempt`, and `useOptimisticAction` with auto-advance |
+| `tests/rsvp-capture.test.ts` | Vitest unit tests (15 test cases) covering name extraction, date chips, time slots, travel mode mapping, callback calculations, and schema validation |
+
+### Why
+
+1. **Fast, inline capture without screen hops**: Untrained callers on bad venue Wi-Fi lose state and momentum when pushed through multi-step modal dialogs or route navigation. Expanding inline capture directly below the family card keeps the context visible while steppers and chips enable logging in ≤ 6 taps.
+2. **Fix "Call 0" bug**: Seed data and contact lists often include row numbering or prefix tokens (e.g. "0 V12-Call Next"). Previous naive whitespace splitting took the first token ("0"). `extractCallName` strips leading indices, honorifics, and extracts the family surname.
+3. **Move auto-call out of callers' way**: Callers need to focus on calling the next family. Auto-call campaign triggers are restricted to an admin-only link in the header.
+4. **Preserve cache and database schemas**: All changes use existing mutations (`saveRsvpLog`, `submitCallOutcome`), existing DB schema (`v_rsvp_queue`, `guest_groups`), and standard query keys without migrations.
 
 ---
 
