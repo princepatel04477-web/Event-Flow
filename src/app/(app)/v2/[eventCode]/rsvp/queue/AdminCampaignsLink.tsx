@@ -11,13 +11,11 @@ export function AdminCampaignsLink({ eventCode, isAdmin }: AdminCampaignsLinkPro
   if (!isAdmin) return null
 
   return (
-    <div className="flex justify-end pt-1">
-      <Link
-        href={`/${eventCode}/rsvp/campaigns`}
-        className="text-xs font-medium text-muted underline hover:text-ink active:text-brand"
-      >
-        Auto-call rounds (admin)
-      </Link>
-    </div>
+    <Link
+      href={`/${eventCode}/rsvp/campaigns`}
+      className="tap inline-flex min-h-11 items-center px-2 text-sm font-medium text-muted underline-offset-2 hover:text-ink hover:underline"
+    >
+      Auto-call rounds
+    </Link>
   )
 }

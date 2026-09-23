@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
+import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
-import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Row } from '@/components/ui/Row'
 import { Select } from '@/components/ui/Select'
 import { MicIcon } from '@/components/icons'
 import { formatDateTime } from '@/lib/utils'
-import { getLedgerEntries, markMatched, type HarvestLedgerEntry } from '@/lib/harvest-ledger'
+import { getLedgerEntries, markMatched } from '@/lib/harvest-ledger'
 import { matchRecording } from '@/lib/harvest-match'
 
 interface Group {
@@ -24,12 +24,25 @@ interface UnmatchedFile {
   firstSeenAt: number
 }
 
+/**
+ * Recordings the auto-match could not place, one row each, one sheet to fix.
+ *
+ * WHY A SHEET AND NOT A CARD PER FILE. The v2 tray put a family picker, a
+ * retry button and an attach button on every card, so a tray of eight
+ * recordings was 24 controls long and the floor never reached the ones at the
+ * bottom. The list is now scannable (how many are there, how old), and the
+ * work happens one file at a time in a sheet with the screen's single primary.
+ *
+ * EVERYTHING UNDERNEATH IS UNCHANGED: the same `getLedgerEntries` read, the
+ * same `matchRecording` retry, the same `markMatched` write with the
+ * `manual:<groupId>` sentinel. This screen is presentation only.
+ */
 export function UnmatchedTrayClient({
   eventId,
-  eventCode,
   groups,
 }: {
   eventId: string
+  /** Kept on the props: the route passes it and the ledger may need it again. */
   eventCode: string
   groups: Group[]
 }) {
@@ -37,6 +50,7 @@ export function UnmatchedTrayClient({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [attaching, setAttaching] = useState<string | null>(null)
+  const [openPath, setOpenPath] = useState<string | null>(null)
   const [selectedGroup, setSelectedGroup] = useState<Map<string, string>>(new Map())
   const [retryErrors, setRetryErrors] = useState<Map<string, string>>(new Map())
 
@@ -58,7 +72,9 @@ export function UnmatchedTrayClient({
     }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+  }, [load])
 
   async function handleRetryMatch(filePath: string) {
     setRetryErrors((prev) => {
@@ -80,6 +96,7 @@ export function UnmatchedTrayClient({
 
       if (result.kind === 'matched') {
         await markMatched(filePath, result.callAttemptId)
+        setOpenPath(null)
         await load()
         return
       }
@@ -110,6 +127,7 @@ export function UnmatchedTrayClient({
         next.delete(filePath)
         return next
       })
+      setOpenPath(null)
       await load()
     } catch (e) {
       setRetryErrors((prev) =>
@@ -128,89 +146,115 @@ export function UnmatchedTrayClient({
     })),
   ]
 
+  const openEntry = entries.find((e) => e.path === openPath) ?? null
+
   return (
-    <div className="flex flex-col gap-4 pb-4">
-      <h2 className="text-lg font-semibold text-fg">Recordings with no family</h2>
+    <div className="flex flex-col gap-4 pb-nav">
       <p className="text-sm text-muted">
-        These recordings were detected but could not be automatically matched to a call.
-        Attach each one to the correct family or try re-matching.
+        {loading
+          ? 'Loading…'
+          : entries.length === 0
+            ? 'Nothing to fix.'
+            : `${entries.length} recording${entries.length === 1 ? '' : 's'} with no family.`}
       </p>
 
       {error ? (
-        <p className="text-sm text-danger">{error}</p>
+        <p role="alert" className="text-sm font-medium text-ledger-red">
+          {error}
+        </p>
       ) : null}
 
-      {loading ? (
-        <p className="text-sm text-muted">Loading…</p>
-      ) : entries.length === 0 ? (
+      {!loading && entries.length === 0 ? (
         <EmptyState
           icon={<MicIcon className="h-7 w-7" />}
           title="Every recording has a family"
-          description="Every detected recording was matched automatically."
+          description="Everything detected was matched automatically."
         />
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {entries.map((entry) => (
-            <li key={entry.path}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    <div className="flex items-center gap-2">
-                      <MicIcon className="h-5 w-5 shrink-0 text-muted" />
-                      <span className="truncate font-mono text-sm text-fg">{entry.name}</span>
-                    </div>
-                  </CardTitle>
-                  <Badge tone="warning" size="sm">No family yet</Badge>
-                </CardHeader>
-                <CardBody className="flex flex-col gap-2">
-                  <p className="text-xs text-subtle truncate">{entry.path}</p>
-                  <p className="text-xs text-muted">
-                    Detected {formatDateTime(new Date(entry.firstSeenAt).toISOString())}
-                  </p>
+      ) : null}
 
-                  {retryErrors.get(entry.path) ? (
-                    <p className="text-xs text-danger">{retryErrors.get(entry.path)}</p>
-                  ) : null}
-
-                  <div className="flex flex-col gap-2 mt-1">
-                    <Select
-                      label="Attach to"
-                      value={selectedGroup.get(entry.path) ?? ''}
-                      onChange={(e) =>
-                        setSelectedGroup((prev) =>
-                          new Map(prev).set(entry.path, e.target.value),
-                        )
-                      }
-                      options={groupOptions}
-                      placeholder="Pick a family…"
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        variant="secondary"
-                        size="md"
-                        fullWidth
-                        onClick={() => handleRetryMatch(entry.path)}
-                      >
-                        Retry auto-match
-                      </Button>
-                      <Button
-                        variant="primary"
-                        size="md"
-                        fullWidth
-                        disabled={!selectedGroup.get(entry.path)}
-                        loading={attaching === entry.path}
-                        onClick={() => handleManualAttach(entry.path)}
-                      >
-                        Attach
-                      </Button>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-            </li>
-          ))}
+      {entries.length > 0 ? (
+        <ul
+          className="flex flex-col overflow-hidden rounded-2xl border border-rule bg-surface"
+          role="list"
+        >
+          {entries.map((entry) => {
+            const failure = retryErrors.get(entry.path)
+            return (
+              <li key={entry.path}>
+                <Row
+                  heading={entry.name}
+                  meta={
+                    failure
+                      ? failure.split('\n')[0]
+                      : `Detected ${formatDateTime(new Date(entry.firstSeenAt).toISOString())}`
+                  }
+                  badge={
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-tint text-ledger-amber">
+                      <MicIcon className="h-5 w-5" />
+                    </span>
+                  }
+                  status="Unmatched"
+                  tone="waiting"
+                  onPress={() => setOpenPath(entry.path)}
+                />
+              </li>
+            )
+          })}
         </ul>
-      )}
+      ) : null}
+
+      <BottomSheet
+        open={openEntry !== null}
+        onClose={() => setOpenPath(null)}
+        label={openEntry ? `Attach ${openEntry.name}` : 'Attach recording'}
+      >
+        {openEntry ? (
+          <div className="flex flex-col gap-4 pb-2">
+            <div className="min-w-0">
+              <p className="truncate font-mono text-sm text-ink">{openEntry.name}</p>
+              <p className="mt-0.5 text-sm text-muted">
+                Detected {formatDateTime(new Date(openEntry.firstSeenAt).toISOString())}
+              </p>
+            </div>
+
+            {retryErrors.get(openEntry.path) ? (
+              <p role="alert" className="text-sm font-medium text-ledger-red">
+                {retryErrors.get(openEntry.path)}
+              </p>
+            ) : null}
+
+            <Select
+              label="Family"
+              value={selectedGroup.get(openEntry.path) ?? ''}
+              onChange={(e) =>
+                setSelectedGroup((prev) => new Map(prev).set(openEntry.path, e.target.value))
+              }
+              options={groupOptions}
+              placeholder="Pick a family…"
+            />
+
+            <Button
+              variant="primary"
+              fullWidth
+              disabled={!selectedGroup.get(openEntry.path)}
+              loading={attaching === openEntry.path}
+              onClick={() => void handleManualAttach(openEntry.path)}
+            >
+              Attach to this family
+            </Button>
+
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => void handleRetryMatch(openEntry.path)}
+            >
+              Try auto-match again
+            </Button>
+          </div>
+        ) : null}
+      </BottomSheet>
     </div>
   )
 }
+
+export default UnmatchedTrayClient

@@ -1,15 +1,13 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { BackRow } from '@/components/ui/BackRow'
-import { Card, CardBody } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { ShieldAlertIcon, ClockIcon } from '@/components/icons'
+import { ChevronLeftIcon, ShieldAlertIcon, ClockIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
 import { getSessionClaims } from '@/lib/auth/server'
 import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import { claimGroupForCall } from '@/lib/actions/call'
-import { formatMobile } from '@/lib/phone'
 import { formatDateTime } from '@/lib/utils'
 import { RsvpLogForm } from './RsvpLogForm'
 import { buildInitialFormValues } from '@/lib/rsvp-log'
@@ -22,6 +20,19 @@ type PageProps = {
   // outcome into this same form. The form itself is unchanged — the manual
   // path is the manual path.
   searchParams: Promise<{ recording?: string; from?: string }>
+}
+
+/** The one in-body way back. The shell's header has no back arrow on a tab-level route. */
+function BackToCalls({ href }: { href: string }) {
+  return (
+    <Link
+      href={href}
+      className="tap -ml-2 inline-flex min-h-11 w-fit items-center gap-1 rounded-xl px-2 text-sm font-medium text-muted hover:text-ink"
+    >
+      <ChevronLeftIcon className="h-5 w-5" aria-hidden />
+      Call list
+    </Link>
+  )
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -55,7 +66,7 @@ export default async function RsvpLogPage({ params, searchParams }: PageProps) {
   if (claim.ok === false && claim.reason === 'error') {
     return (
       <div className="flex flex-col gap-4">
-        <BackRow href={`/${event.code}/rsvp/queue`} title="Could not open" backLabel="the call list" />
+        <BackToCalls href={`/${event.code}/rsvp/queue`} />
         <EmptyState
           icon={<ShieldAlertIcon className="h-7 w-7" />}
           title="Could not open this family"
@@ -73,19 +84,14 @@ export default async function RsvpLogPage({ params, searchParams }: PageProps) {
 
     return (
       <div className="flex flex-col gap-4">
-        <BackRow
-          href={`/${event.code}/rsvp/queue`}
-          backLabel="the call list"
-          title={group?.head_name ?? 'Locked'}
-          subtitle={group ? formatMobile(group.primary_mobile) : undefined}
-        />
+        <BackToCalls href={`/${event.code}/rsvp/queue`} />
         <EmptyState
           icon={<ClockIcon className="h-7 w-7" />}
-          title="Someone else is already logging this family"
+          title={group?.head_name ?? 'Locked'}
           description={
             untilLabel
-              ? `The lock releases automatically by ${untilLabel}. Try another family from the queue in the meantime.`
-              : 'The lock releases automatically. Try another family from the queue in the meantime.'
+              ? `Someone else is logging this family. The lock clears by ${untilLabel}.`
+              : 'Someone else is logging this family. The lock clears automatically.'
           }
         />
       </div>
@@ -179,27 +185,22 @@ export default async function RsvpLogPage({ params, searchParams }: PageProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="border-warning/50 bg-tint-warning">
-        <CardBody className="flex flex-col gap-2 py-3">
-          <p className="text-sm font-semibold text-warning">
-            Transcription failed — enter manually
+      <BackToCalls href={`/${event.code}/rsvp/review`} />
+      <div className="flex flex-col gap-2 rounded-2xl border border-ledger-amber/40 bg-amber-tint p-4">
+        <p className="text-sm font-semibold text-ledger-amber">
+          Transcription failed — enter manually
+        </p>
+        {manualAudioUrl ? (
+          <>
+            <audio controls src={manualAudioUrl} className="w-full" preload="metadata" />
+            <p className="text-sm text-muted">Listen, then log the outcome below.</p>
+          </>
+        ) : (
+          <p className="text-sm text-muted">
+            The recording could not be loaded. Log the outcome from memory or call back.
           </p>
-          {manualAudioUrl ? (
-            <>
-              <p className="text-sm text-muted">
-                Listen to the call and type the outcome below. Nothing was transcribed, so
-                the form starts from this family&apos;s existing record.
-              </p>
-              <audio controls src={manualAudioUrl} className="w-full" preload="metadata" />
-            </>
-          ) : (
-            <p className="text-sm text-muted">
-              The recording could not be loaded. Log the outcome from memory or call the
-              family back — do not leave this call unlogged.
-            </p>
-          )}
-        </CardBody>
-      </Card>
+        )}
+      </div>
       {form}
     </div>
   )
