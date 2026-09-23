@@ -1,13 +1,10 @@
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
 
-import { requireSection } from '@/lib/auth/section-guard'
-import { resolveEventByCode } from '@/lib/supabase/queries'
-
-import { MeetArrivals } from './MeetArrivals'
+import { TravelBoard } from '../_components/TravelBoard'
+import { requireTravelScreen } from '../_guard'
 
 export const metadata: Metadata = {
-  title: 'Meet an arrival',
+  title: 'Arrivals',
 }
 
 type PageProps = {
@@ -15,22 +12,30 @@ type PageProps = {
 }
 
 /**
- * Job 4 of the v2 rebuild: meet an arrival.
+ * Meet an arrival — the board of families still expected.
  *
- * The section guard is run here because this page does NOT sit under
- * `(staff)/[eventCode]/logistics/layout.tsx` — it is in the other route group,
- * and a route group's layouts apply only within that group. Without this line
- * the page would be guarded by the shell's `requireStaff` alone, which is a
- * wider door than the v1 arrivals board (a hospitality runner and a hamper
- * runner are both staff).
+ * The guard is `requireTravelScreen`, which is the same `requireSection(...,
+ * 'logistics')` call the legacy section layout makes: a travel runner and an
+ * event lead get in, a hospitality or hamper runner is bounced to their own
+ * home with `?denied=section`, exactly as they were before this section was
+ * rebuilt.
+ *
+ * The board is loaded with `direction="arrival"` and is handed the departures
+ * address for its Segmented switch. The switch navigates rather than holding
+ * both directions in local state, because the v3 bar highlights whichever of
+ * these two addresses the runner tapped — a local switch would leave the tapped
+ * tab lit and the visible board disagreeing with it.
  */
 export default async function ArrivalsPage({ params }: PageProps) {
   const { eventCode } = await params
+  const { event } = await requireTravelScreen(eventCode)
 
-  const event = await resolveEventByCode(eventCode)
-  if (!event) notFound()
-
-  await requireSection(event.id, event.code, 'logistics')
-
-  return <MeetArrivals eventId={event.id} eventCode={event.code} />
+  return (
+    <TravelBoard
+      eventId={event.id}
+      eventCode={event.code}
+      direction="arrival"
+      otherHref={`/${event.code}/logistics/departures`}
+    />
+  )
 }

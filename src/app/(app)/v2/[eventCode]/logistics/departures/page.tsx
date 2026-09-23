@@ -1,8 +1,41 @@
-// Legacy route, served under the new shell until its own session converts it.
-// The v1 group is untouched; this is a re-export, not a copy.
-//
-// Both lines are required: `export *` does not carry the default export, and
-// the default export is the screen. `export *` DOES carry the named extras -
-// `metadata`, `generateMetadata`, `dynamic` - which is what we want.
-export * from '@/app/(staff)/[eventCode]/logistics/departures/page'
-export { default } from '@/app/(staff)/[eventCode]/logistics/departures/page'
+import type { Metadata } from 'next'
+
+import { TravelBoard } from '../_components/TravelBoard'
+import { requireTravelScreen } from '../_guard'
+
+export const metadata: Metadata = {
+  title: 'Departures',
+}
+
+type PageProps = {
+  params: Promise<{ eventCode: string }>
+}
+
+/**
+ * Who is leaving — the departures side of the Travel board.
+ *
+ * The same component as `/logistics/arrivals` with `direction="departure"`, so
+ * the two boards cannot drift apart in a fix: there is one grouping rule, one
+ * status vocabulary and one sheet. The write is `markDeparted`, the same RPC
+ * the v1 board calls, through the same optimistic path.
+ *
+ * Recording a walk-up departure — a family who tells the desk they are leaving
+ * and was never called about it — stays its own screen at
+ * `logistics/departures/new`, which is where a staff member who has just been
+ * told a flight time needs to be. It is reachable from the empty state here
+ * rather than from a permanent button on the board: a board that has rows on it
+ * is a board someone is working, not a form.
+ */
+export default async function DeparturesPage({ params }: PageProps) {
+  const { eventCode } = await params
+  const { event } = await requireTravelScreen(eventCode)
+
+  return (
+    <TravelBoard
+      eventId={event.id}
+      eventCode={event.code}
+      direction="departure"
+      otherHref={`/${event.code}/logistics/arrivals`}
+    />
+  )
+}

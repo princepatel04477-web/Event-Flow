@@ -1,35 +1,30 @@
-import type { Metadata } from 'next'
-
-import { requireHamperScreen } from './_guard'
-import { HamperRun } from './HamperRun'
-
-export const metadata: Metadata = {
-  title: 'Deliver a hamper',
-}
+import { redirect } from 'next/navigation'
 
 type PageProps = {
   params: Promise<{ eventCode: string }>
 }
 
-/**
- * Job 3 of the v2 rebuild: deliver a hamper — the list of families still owed
- * something, each one tap from the camera.
- *
- * The guard is `requireHamperScreen` (see `_guard.ts`): staff, and either the
- * hospitality or the hamper department. It is run here rather than inherited,
- * because the v1 section layouts that enforce it are in the other route group
- * and inject nothing into `(app)/v2/`.
- */
-export default async function HampersPage({ params }: PageProps) {
-  const { eventCode } = await params
-  const { event, canGenerate, canOpenGuestList } = await requireHamperScreen(eventCode)
+export const metadata = {
+  title: 'Hampers',
+}
 
-  return (
-    <HamperRun
-      eventId={event.id}
-      eventCode={event.code}
-      canGenerate={canGenerate}
-      canOpenGuestList={canOpenGuestList}
-    />
-  )
+/**
+ * The v2-era address for the hamper run, now a door to the Hampers tab.
+ *
+ * WHY A REDIRECT AND NOT A SECOND LIST. `HamperRun` used to be mounted here and
+ * at `/{event}/hamper` was a re-export of the v1 `DeliveryList` — two screens
+ * for one job, one of them the oldest build in the repo, and the tab named for
+ * the job pointed at the old one. The fix is one run screen at one address, so
+ * this route keeps working (bookmarks, `departmentHomePath` for the hamper
+ * department, the Today card's `AttentionPanel` link) without a second copy of
+ * the list to keep in step.
+ *
+ * NO GUARD HERE, DELIBERATELY. The destination runs `requireHamperScreen`,
+ * which is the union of the hospitality and hamper departments; running a
+ * narrower gate on a redirect would turn a link that lands correctly into a
+ * bounce before the destination ever got to decide.
+ */
+export default async function HampersRedirectPage({ params }: PageProps) {
+  const { eventCode } = await params
+  redirect(`/${eventCode}/hamper`)
 }

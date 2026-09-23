@@ -1,8 +1,28 @@
-// Legacy route, served under the new shell until its own session converts it.
-// The v1 group is untouched; this is a re-export, not a copy.
-//
-// Both lines are required: `export *` does not carry the default export, and
-// the default export is the screen. `export *` DOES carry the named extras -
-// `metadata`, `generateMetadata`, `dynamic` - which is what we want.
-export * from '@/app/(staff)/[eventCode]/logistics/sheets/page'
-export { default } from '@/app/(staff)/[eventCode]/logistics/sheets/page'
+import type { Metadata } from 'next'
+
+import { requireTravelScreen } from '../_guard'
+
+import { DriverSheetsBoard } from './DriverSheetsBoard'
+
+export const metadata: Metadata = {
+  title: 'Driver sheets',
+}
+
+type PageProps = {
+  params: Promise<{ eventCode: string }>
+}
+
+/**
+ * Driver sheets — one sheet per committed trip.
+ *
+ * Not a tab in either nav model (it is reached from the trip planner), but a
+ * real screen a logistics runner opens on departure day, so it is guarded and
+ * rebuilt with the rest of Travel rather than left as a v1 re-export under a v3
+ * shell — which would have shown a v2-era card wall inside the new look.
+ */
+export default async function DriverSheetsPage({ params }: PageProps) {
+  const { eventCode } = await params
+  const { event } = await requireTravelScreen(eventCode)
+
+  return <DriverSheetsBoard eventId={event.id} eventCode={event.code} />
+}
