@@ -6,6 +6,7 @@ import { ChevronRightIcon, SearchIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { listGuests, searchGuests, type GuestSearchRow } from '@/lib/actions/search-guests'
+import { searchIndicator } from '@/lib/guests/search-view'
 import { traceFetch } from '@/lib/perf'
 import { useStableData } from '@/lib/use-stable-data'
 import { cn } from '@/lib/utils'
@@ -107,7 +108,17 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
   }, [search, searchActive, q, eventId])
 
   // A non-empty search with no results yet and no error is "in flight".
-  const isSearching = searching || (searchActive && searchRows === null && !searchError)
+  //
+  // `searching` is what marks a REQUEST in flight; on its own it says nothing
+  // about what to paint. `searchIndicator` turns the pair into the screen's
+  // busy state — and it is the reason `setSearching(true)` below is load
+  // bearing rather than decorative (`docs/BUGS.md` m12): without it a second
+  // search had no signal at all while the PREVIOUS term's rows stayed put.
+  const indicator = searchActive
+    ? searchIndicator(searching, (searchRows?.length ?? 0) > 0)
+    : 'none'
+  const isSearching = indicator === 'skeleton'
+  const searchStale = indicator === 'stale'
 
   // The windowed slice: which rows are near the viewport right now.
   const list = useMemo(() => (searchActive ? searchRows ?? [] : rows ?? []), [searchActive, searchRows, rows])
@@ -161,13 +172,19 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
               setSearchRows(null)
               setSearchError(null)
               setSearching(false)
+            } else {
+              // A new term is now in flight. Without this line the flag was
+              // only ever cleared, so a second search showed no busy signal
+              // (`docs/BUGS.md` m12).
+              setSearching(true)
+              setSearchError(null)
             }
           }}
           placeholder="Search by name or mobile"
           aria-label="Search guests"
           className="min-h-12 w-full bg-transparent text-base text-fg placeholder:text-subtle focus:outline-none"
         />
-        {isSearching ? (
+        {indicator !== 'none' ? (
           <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-rule-strong border-t-brand" aria-hidden />
         ) : null}
       </div>
@@ -219,10 +236,23 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
             <p className="text-sm text-muted">{shownTotal} match{shownTotal === 1 ? '' : 'es'}</p>
           ) : null}
 
+          {/* A newer term is loading over these rows. Keep them (T4) and say
+              they are old, rather than dropping back to a skeleton. */}
+          {searchStale ? (
+            <p role="status" className="text-xs text-muted">
+              Updating…
+            </p>
+          ) : null}
+
           {/* The windowed list: a full-height scroll container holding a
               positioned window of rows. Only `windowRows` are mounted. */}
           <div
-            className="relative overflow-hidden rounded-2xl border border-border bg-surface"
+            aria-busy={searchStale || undefined}
+            className={cn(
+              'relative overflow-hidden rounded-2xl border border-border bg-surface',
+              'transition-opacity duration-press ease-ledger',
+              searchStale && 'opacity-60',
+            )}
             style={{ height: list.length * ROW_HEIGHT }}
             role="list"
             aria-label="Guests"

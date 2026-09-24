@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 
+import { friendlyDbError, type MaybePostgrestError } from '@/lib/errors'
 import { createClient } from '@/lib/supabase/server'
 import { requireStaff } from '@/lib/supabase/queries'
 
@@ -56,6 +57,16 @@ export type CampaignActionResult =
   | { ok: true }
   | { ok: false; error: string }
 
+/**
+ * `ensureCampaigns` reads AND, on a brand-new event, writes — so a failure is
+ * not an empty event. Returning `[]` for a refused read or a refused insert
+ * made the board render no round card at all, with no message and no way to
+ * create one. The page turns `{ ok: false }` into the error face with a retry.
+ */
+export type CampaignsResult =
+  | { ok: true; campaigns: CampaignRow[] }
+  | { ok: false; error: string }
+
 async function assertManagement(eventId: string, eventCode: string) {
   await requireStaff(eventId, eventCode)
 }
@@ -65,14 +76,16 @@ export async function ensureCampaigns(
   eventId: string,
   eventCode: string,
   weddingDate: string | null,
-): Promise<CampaignRow[]> {
+): Promise<CampaignsResult> {
   await assertManagement(eventId, eventCode)
   const supabase = await createClient()
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('rsvp_campaigns')
     .select('id')
     .eq('event_id', eventId)
+
+  if (existingError) return { ok: false, error: friendlyDbError(existingError) }
 
   if (!existing?.length) {
     const startsOn = weddingDate ? new Date(weddingDate) : null
@@ -92,22 +105,36 @@ export async function ensureCampaigns(
         status: 'draft' as CampaignStatus,
       }
     })
-    await supabase.from('rsvp_campaigns').insert(rows)
+    const { error: insertError } = await supabase.from('rsvp_campaigns').insert(rows)
+    // This error used to be ignored: the insert failed, the function returned
+    // [], and the screen rendered nothing at all — no "Start calling", no
+    // explanation, no way for a lead to create the rounds.
+    if (insertError) return { ok: false, error: friendlyDbError(insertError) }
   }
 
-  const { data: campaigns } = await supabase
+  const { data: campaigns, error: campaignsError } = (await supabase
     .from('rsvp_campaigns')
     .select('id, wave, label, scheduled_for, status, days_before, max_concurrent')
     .eq('event_id', eventId)
-    .order('days_before', { ascending: false }) as { data: CampaignDbRow[] | null }
+    .order('days_before', { ascending: false })) as unknown as {
+    data: CampaignDbRow[] | null
+    error: MaybePostgrestError
+  }
 
-  if (!campaigns?.length) return []
+  if (campaignsError) return { ok: false, error: friendlyDbError(campaignsError) }
+
+  if (!campaigns?.length) return { ok: true, campaigns: [] }
 
   const campaignIds = campaigns.map((c) => c.id)
-  const { data: jobs } = await supabase
+  const { data: jobs, error: jobsError } = (await supabase
     .from('rsvp_campaign_jobs')
     .select('campaign_id, status')
-    .in('campaign_id', campaignIds) as { data: JobDbRow[] | null }
+    .in('campaign_id', campaignIds)) as unknown as {
+    data: JobDbRow[] | null
+    error: MaybePostgrestError
+  }
+
+  if (jobsError) return { ok: false, error: friendlyDbError(jobsError) }
 
   const counts = new Map<string, { pending: number; completed: number; total: number }>()
   for (const id of campaignIds) {
@@ -138,21 +165,24 @@ export async function ensureCampaigns(
   // follow it are part of the same render — so the page already shows the rows
   // it just created. The two `revalidatePath` calls that remain in this file are
   // in server-action bodies, where revalidating is both legal and wanted.
-  return campaigns.map((c) => {
-    const n = counts.get(c.id) ?? { pending: 0, completed: 0, total: 0 }
-    return {
-      id: c.id,
-      wave: c.wave as CampaignWave,
-      label: c.label,
-      scheduledFor: c.scheduled_for,
-      status: c.status as CampaignStatus,
-      daysBefore: c.days_before,
-      maxConcurrent: c.max_concurrent,
-      pending: n.pending,
-      completed: n.completed,
-      total: n.total,
-    }
-  })
+  return {
+    ok: true,
+    campaigns: campaigns.map((c) => {
+      const n = counts.get(c.id) ?? { pending: 0, completed: 0, total: 0 }
+      return {
+        id: c.id,
+        wave: c.wave as CampaignWave,
+        label: c.label,
+        scheduledFor: c.scheduled_for,
+        status: c.status as CampaignStatus,
+        daysBefore: c.days_before,
+        maxConcurrent: c.max_concurrent,
+        pending: n.pending,
+        completed: n.completed,
+        total: n.total,
+      }
+    }),
+  }
 }
 
 /** Populate jobs for a campaign from guest groups not yet confirmed. */

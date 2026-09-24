@@ -14,6 +14,7 @@ import {
   type DepartureGroup,
   type DepartureInput,
 } from '@/lib/actions/departures'
+import { noMatchMessage } from '@/lib/departures/search-copy'
 
 interface Props {
   eventId: string
@@ -23,6 +24,7 @@ interface Props {
 type Phase =
   | { stage: 'idle' }
   | { stage: 'searching' }
+  | { stage: 'noMatch'; term: string }
   | { stage: 'results'; groups: DepartureGroup[] }
   | { stage: 'form'; group: DepartureGroup; error: string | null; saving: boolean; saved: boolean }
   | { stage: 'error'; message: string }
@@ -71,21 +73,32 @@ export function DeparturesClient({ eventId, eventCode }: Props) {
   }, [])
 
   const handleSearch = useCallback(async () => {
-    if (!searchTerm.trim()) return
+    const term = searchTerm.trim()
+    if (!term) return
     setPhase({ stage: 'searching' })
     try {
-      const groups = await searchDepartureGroups(eventId, searchTerm.trim())
-      if (groups.length === 0) {
-        setPhase({ stage: 'idle' })
+      const result = await searchDepartureGroups(eventId, term)
+      if (!result.ok) {
+        setPhase({ stage: 'error', message: result.error })
         return
       }
-      if (groups.length === 1) {
-        openForm(groups[0])
+      if (result.groups.length === 0) {
+        // Say nobody matched, and keep the search box on screen. Silently
+        // resetting to an empty box is indistinguishable from a tap that
+        // never registered, so staff tap Search again and again.
+        setPhase({ stage: 'noMatch', term })
         return
       }
-      setPhase({ stage: 'results', groups })
+      if (result.groups.length === 1) {
+        openForm(result.groups[0])
+        return
+      }
+      setPhase({ stage: 'results', groups: result.groups })
     } catch {
-      setPhase({ stage: 'error', message: 'Search failed.' })
+      setPhase({
+        stage: 'error',
+        message: 'Could not search just now. Check your connection and try again.',
+      })
     }
   }, [eventId, searchTerm, openForm])
 
@@ -102,7 +115,7 @@ export function DeparturesClient({ eventId, eventCode }: Props) {
       return
     }
     if (pax <= 0) {
-      setPhase({ ...phase, error: 'PAX must be positive.' })
+      setPhase({ ...phase, error: 'Number of guests must be at least 1.' })
       return
     }
 
@@ -150,8 +163,9 @@ export function DeparturesClient({ eventId, eventCode }: Props) {
         </p>
       </div>
 
-      {/* Search bar */}
-      {phase.stage === 'idle' && (
+      {/* Search bar — kept on screen after a no-match so the term can be
+          corrected without hunting for the field again. */}
+      {phase.stage === 'idle' || phase.stage === 'noMatch' ? (
         <div className="flex gap-2">
           <input
             ref={searchRef}
@@ -167,7 +181,16 @@ export function DeparturesClient({ eventId, eventCode }: Props) {
             Search
           </Button>
         </div>
-      )}
+      ) : null}
+
+      {phase.stage === 'noMatch' ? (
+        <p
+          role="alert"
+          className="rounded-xl border border-tint-warning bg-tint-warning px-4 py-3 text-sm text-warning"
+        >
+          {noMatchMessage(phase.term)}
+        </p>
+      ) : null}
 
       {phase.stage === 'searching' && (
         <div className="flex min-h-[30vh] items-center justify-center">
@@ -191,7 +214,7 @@ export function DeparturesClient({ eventId, eventCode }: Props) {
                 {g.roomNumber
                   ? `Room ${g.roomNumber}${g.hotelName ? ` · ${g.hotelName}` : ''} · `
                   : ''}
-                {g.pax} PAX
+                {g.pax} {g.pax === 1 ? 'guest' : 'guests'}
                 {g.existingLeg ? ` · ${SOURCE_LABELS[g.existingLeg.source] ?? g.existingLeg.source}` : ''}
               </p>
             </button>

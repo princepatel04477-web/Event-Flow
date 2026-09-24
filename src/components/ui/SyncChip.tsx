@@ -28,7 +28,7 @@ export function SyncChip({ count, what, onPress, className, ...props }: SyncChip
       type="button"
       onClick={onPress}
       className={cn(
-        'tap inline-flex min-h-9 items-center gap-1.5 rounded-md border border-rule-strong bg-surface px-2.5 text-sm text-muted',
+        'tap inline-flex min-h-11 items-center gap-1.5 rounded-md border border-rule-strong bg-surface px-2.5 text-sm text-muted',
         'transition-colors duration-100 hover:bg-surface-2 active:bg-surface-2',
         className,
       )}

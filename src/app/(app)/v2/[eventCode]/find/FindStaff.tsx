@@ -5,6 +5,12 @@ import { StaffGuestDirectory } from '../guests/_components/StaffGuestDirectory'
 export interface FindStaffProps {
   eventId: string
   eventCode: string
+  /**
+   * Whether this viewer may open a family's RSVP record. Resolved on the
+   * server, because Find is reachable from the search button in EVERY header —
+   * including the four departments the record's own guard turns away.
+   */
+  canOpenFamilyRecord: boolean
 }
 
 /**
@@ -24,8 +30,15 @@ export interface FindStaffProps {
  * failure the old shared `FindParts` existed to prevent and this removes the
  * possibility of.
  */
-export function FindStaff({ eventId, eventCode }: FindStaffProps) {
-  return <StaffGuestDirectory eventId={eventId} eventCode={eventCode} from="find" />
+export function FindStaff({ eventId, eventCode, canOpenFamilyRecord }: FindStaffProps) {
+  return (
+    <StaffGuestDirectory
+      eventId={eventId}
+      eventCode={eventCode}
+      from="find"
+      canOpenFamilyRecord={canOpenFamilyRecord}
+    />
+  )
 }
 
 export default FindStaff

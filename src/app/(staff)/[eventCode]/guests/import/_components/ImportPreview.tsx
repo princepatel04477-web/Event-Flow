@@ -1,14 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 import { ShieldAlertIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { LinkButton } from '@/components/ui/LinkButton'
-import type { ImportContext } from '@/lib/actions/import'
+import type { CommitResult, ImportContext } from '@/lib/actions/import'
 import type { ImportOutcome, KnownSheetFailure } from '@/lib/import/knownSheet'
 
+import { CommitSummary } from './CommitSummary'
 import { PreviewStep } from './PreviewStep'
 import { UploadStep } from './UploadStep'
 
@@ -39,17 +41,52 @@ export function ImportPreview({
   eventEndsOn,
   context,
 }: ImportPreviewProps) {
+  const pathname = usePathname()
   const [fileName, setFileName] = useState('')
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const [error, setError] = useState<string | null>(null)
+  /**
+   * The last commit's counts, kept AFTER the preview is thrown away.
+   *
+   * This is the whole of the M34 fix. `PreviewStep` is unmounted the moment an
+   * import succeeds — the preview holds every parsed family and the screen
+   * deliberately drops them once they are written — so a summary it rendered
+   * itself was set and destroyed in the same React commit and the operator
+   * landed back on "Choose the calling list" with no idea whether 238 families
+   * had been written or none. Holding it one level up is what lets it survive
+   * the reset that follows it.
+   */
+  const [summary, setSummary] = useState<CommitResult['summary']>(null)
+
+  /**
+   * `…/guests/import` → `…/guests`. The screen is also reachable through the
+   * `/:eventCode/import` redirect, so the event code is not a prop here; the
+   * pathname is the one place it is certain. When it cannot be worked out the
+   * link is simply not offered — the Done button below it always is.
+   */
+  const guestListHref = pathname.endsWith('/import')
+    ? pathname.slice(0, -'/import'.length)
+    : null
 
   function handleResult(name: string, next: ImportOutcome) {
     setFileName(name)
     setOutcome(next)
     setError(null)
+    // A new file replaces whatever the last one did. The summary is a record
+    // of an import, and it stops being that the moment the operator moves on.
+    setSummary(null)
   }
 
   function handleStartOver() {
+    setFileName('')
+    setOutcome(null)
+    setError(null)
+    setSummary(null)
+  }
+
+  /** A commit landed: drop the preview, KEEP the counts. */
+  function handleCommitted(next: CommitResult['summary']) {
+    setSummary(next)
     setFileName('')
     setOutcome(null)
     setError(null)
@@ -92,6 +129,17 @@ export function ImportPreview({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Top of the screen, above the upload step it resets to. The counts are
+          the answer to "did my import land?", and they stay until the operator
+          either opens the guest list or deliberately starts another file. */}
+      {summary ? (
+        <CommitSummary
+          counts={summary}
+          guestListHref={guestListHref}
+          onDone={() => setSummary(null)}
+        />
+      ) : null}
+
       {!context.ok && context.error && !outcome ? (
         <p
           role="alert"
@@ -129,7 +177,9 @@ export function ImportPreview({
             // fallback was invisible.
             outcome={{ ...outcome, contactsFallback: !('layout' in outcome) }}
             context={context}
-            onCommitted={handleStartOver}
+            // Hands the counts up before the preview is dropped — see
+            // `handleCommitted`. NOT `handleStartOver`, which discards them.
+            onCommitted={handleCommitted}
           />
           <Button variant="secondary" fullWidth onClick={handleStartOver}>
             Choose a different file

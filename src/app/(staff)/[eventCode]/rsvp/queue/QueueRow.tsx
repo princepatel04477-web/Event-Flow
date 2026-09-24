@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton'
 import { rsvpStatusLabel } from '@/lib/rsvp'
+import { formatMobile } from '@/lib/phone'
 import { statusTone, type StatusTone } from '@/lib/status'
 import { cn } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/database.types'
@@ -101,7 +102,7 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
               </span>
               {mobile ? (
                 <span className="mt-0.5 block font-mono text-sm text-muted tabular-nums">
-                  {mobile}
+                  {formatMobile(mobile)}
                 </span>
               ) : null}
             </div>
@@ -109,7 +110,9 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
 
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {side ? <Badge>{side}</Badge> : null}
-            <span className="figure text-sm text-ink">{pax} pax</span>
+            <span className="figure text-sm text-ink">
+              {pax} {pax === 1 ? 'guest' : 'guests'}
+            </span>
             <span className="figure text-sm text-muted">
               · {attemptCount} {attemptCount === 1 ? 'attempt' : 'attempts'}
             </span>

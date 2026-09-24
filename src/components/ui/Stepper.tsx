@@ -50,10 +50,13 @@ export function Stepper({
     if (next !== value) onChange(next)
   }
 
+  // A control at its range end is greyed to a neutral surface, not faded:
+  // `disabled:opacity-40` composited the round button to ~2:1 and read as a
+  // rendering glitch (m5).
   const buttonClass =
     'tap flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-rule-strong ' +
     'bg-surface text-ink transition-colors duration-press ease-ledger ' +
-    'active:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed'
+    'active:bg-surface-2 disabled:cursor-not-allowed disabled:border-rule disabled:bg-surface-2 disabled:text-muted'
 
   return (
     <div

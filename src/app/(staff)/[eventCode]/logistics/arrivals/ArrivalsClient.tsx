@@ -538,9 +538,11 @@ function ArrivalRowCard({
             {row.group.head_name}
           </p>
           <p className="mt-1 text-sm text-muted">
+            {/* "pax" is banned on staff screens (UX-RULES R2, docs/BUGS.md m1) —
+                the bug hunt's list missed this one, but it is the same defect. */}
             {adults + children > 0
-              ? `${adults + children} pax`
-              : `${row.group.expected_pax} expected pax`}
+              ? `${adults + children} ${adults + children === 1 ? 'guest' : 'guests'}`
+              : `${row.group.expected_pax ?? 0} expected guest${row.group.expected_pax === 1 ? '' : 's'}`}
             {row.leg.point ? ` · ${row.leg.point}` : ''}
           </p>
           {row.roomLabel ? (

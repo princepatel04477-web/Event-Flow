@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query'
 
-import { ChevronRightIcon, ShieldAlertIcon, UsersIcon } from '@/components/icons'
+import { ChevronRightIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LinkButton } from '@/components/ui/LinkButton'
 import { NowCard } from '@/components/ui/NowCard'
@@ -13,7 +13,7 @@ import { readBoard } from '@/lib/actions/dashboard'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { v2DepartmentHome } from '@/lib/departments'
 import { queryKeys } from '@/lib/query/keys'
-import { requireStaff, resolveEventByCode, type DeniedReason } from '@/lib/supabase/queries'
+import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import { traceFetch } from '@/lib/perf'
 
 import {
@@ -32,31 +32,8 @@ export const metadata: Metadata = {
   title: 'Today',
 }
 
-const DENIED_MESSAGES: Record<DeniedReason | 'section', string> = {
-  import:
-    'Importing the guest list is an admin job, so we brought you back here. Ask your event admin to run the import.',
-  admin: 'That screen is admin-only, so we brought you back here.',
-  section: 'That screen is for another team. Use the tabs at the bottom for your department.',
-}
-
-function deniedMessage(value: string | undefined): string | null {
-  if (!value) return null
-  return DENIED_MESSAGES[value as DeniedReason | 'section'] ?? null
-}
-
-function DeniedNote({ note }: { note: string | null }) {
-  if (!note) return null
-  return (
-    <div className="flex items-start gap-2.5 rounded-xl border border-rule-strong bg-surface px-3.5 py-3">
-      <ShieldAlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-muted" />
-      <p className="text-sm leading-snug text-ink">{note}</p>
-    </div>
-  )
-}
-
 type PageProps = {
   params: Promise<{ eventCode: string }>
-  searchParams: Promise<{ denied?: string }>
 }
 
 /**
@@ -95,10 +72,8 @@ type PageProps = {
  * screen can stop claiming a zero count means "an empty event", which is the
  * one thing a fallback must never do.
  */
-export default async function AppHomePage({ params, searchParams }: PageProps) {
+export default async function AppHomePage({ params }: PageProps) {
   const { eventCode } = await params
-  const { denied } = await searchParams
-  const deniedNote = deniedMessage(denied)
 
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
@@ -140,8 +115,6 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
   if (board && board.totalGroups === 0) {
     return (
       <div className="flex flex-col gap-4">
-        <DeniedNote note={deniedNote} />
-
         <EmptyState
           icon={<UsersIcon className="h-7 w-7" />}
           title="No guests on this event yet"
@@ -175,7 +148,6 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
     const job = departmentJob(focus, event.code)
     return (
       <div className="flex flex-col gap-5">
-        <DeniedNote note={deniedNote} />
         <NowCard
           eyebrow="Right now"
           headline={job.headline}
@@ -199,8 +171,6 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <div className="flex flex-col gap-5">
-        <DeniedNote note={deniedNote} />
-
         <NowCard
           eyebrow="Right now"
           headline={now.headline}

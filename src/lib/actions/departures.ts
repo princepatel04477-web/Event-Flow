@@ -32,15 +32,21 @@ export interface ExistingDeparture {
 // Search
 // ---------------------------------------------------------------------------
 
+export type DepartureSearchResult =
+  | { ok: true; groups: DepartureGroup[] }
+  | { ok: false; error: string }
+
+const SEARCH_FAILED = 'Could not search just now. Check your connection and try again.'
+
 export async function searchDepartureGroups(
   eventId: string,
   query: string,
-): Promise<DepartureGroup[]> {
+): Promise<DepartureSearchResult> {
   const supabase = await createClient()
   const term = `%${query}%`
 
   // Search by head name or room number
-  const { data: groups } = await supabase
+  const { data: groups, error: groupsError } = await supabase
     .from('guest_groups')
     .select(
       'id, head_name, coalesce(confirmed_pax, expected_pax) as pax',
@@ -51,19 +57,25 @@ export async function searchDepartureGroups(
     .limit(20)
     .returns<{ id: string; head_name: string; pax: number }[]>()
 
-  const { data: roomed } = await supabase
+  if (groupsError) return { ok: false, error: SEARCH_FAILED }
+
+  const { data: roomed, error: roomedError } = await supabase
     .from('room_assignments')
     .select('group_id, rooms!inner(room_number, hotels!inner(name))')
     .eq('event_id', eventId)
     .is('released_at', null)
     .ilike('rooms.room_number', term)
 
-  const { data: existingLegs } = await supabase
+  if (roomedError) return { ok: false, error: SEARCH_FAILED }
+
+  const { data: existingLegs, error: legsError } = await supabase
     .from('travel_legs')
     .select('id, group_id, mode, travel_date, travel_time, point, reference, pax_on_leg, source')
     .eq('event_id', eventId)
     .eq('direction', 'departure')
     .order('travel_date', { ascending: true })
+
+  if (legsError) return { ok: false, error: SEARCH_FAILED }
 
   const legByGroup = new Map<string, ExistingDeparture>()
   for (const leg of (existingLegs ?? [])) {
@@ -100,27 +112,31 @@ export async function searchDepartureGroups(
   const extraIds = [...roomMatchedGroupIds].filter((id) => !nameMatchedIds.has(id))
   let extraGroups: { id: string; head_name: string; pax: number }[] = []
   if (extraIds.length > 0) {
-    const { data: extras } = await supabase
+    const { data: extras, error: extrasError } = await supabase
       .from('guest_groups')
       .select('id, head_name, coalesce(confirmed_pax, expected_pax) as pax')
       .in('id', extraIds)
       .returns<{ id: string; head_name: string; pax: number }[]>()
+    if (extrasError) return { ok: false, error: SEARCH_FAILED }
     extraGroups = extras ?? []
   }
 
   const allGroups = [...(groups ?? []), ...extraGroups]
 
-  return allGroups.map((g) => {
-    const room = roomByGroup.get(g.id as string)
-    return {
-      groupId: g.id as string,
-      headName: g.head_name as string,
-      roomNumber: room?.roomNumber ?? null,
-      hotelName: room?.hotelName ?? null,
-      pax: (g.pax as number) ?? 0,
-      existingLeg: legByGroup.get(g.id as string) ?? null,
-    }
-  })
+  return {
+    ok: true,
+    groups: allGroups.map((g) => {
+      const room = roomByGroup.get(g.id as string)
+      return {
+        groupId: g.id as string,
+        headName: g.head_name as string,
+        roomNumber: room?.roomNumber ?? null,
+        hotelName: room?.hotelName ?? null,
+        pax: (g.pax as number) ?? 0,
+        existingLeg: legByGroup.get(g.id as string) ?? null,
+      }
+    }),
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +151,7 @@ const departureSchema = z.object({
   mode: z.enum(['air', 'train', 'bus', 'cab', 'self_drive']),
   reference: z.string().optional(),
   dropPoint: z.string().optional(),
-  paxOnLeg: z.number().int().positive('PAX must be positive'),
+  paxOnLeg: z.number().int().positive('Number of guests must be at least 1'),
   expenseAmount: z.number().positive().nullable().optional(),
   expenseMode: z.enum(['cash', 'upi', 'vendor_bill']).nullable().optional(),
   expenseNotes: z.string().optional(),

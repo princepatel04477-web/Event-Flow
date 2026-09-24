@@ -108,35 +108,17 @@ const NEW_IN_V11 = new Set([
 const NEW_ROUTES = new Set([...NEW_IN_V8, ...NEW_IN_V11])
 
 /**
- * The one legacy section layout with no v2 shim, and it is deliberate.
+ * FIX-UI took the hospitality layout exception away.
  *
- * `hospitality/layout.tsx` guards with `requireSection(..., 'hospitality')`,
- * which resolves to `sectionAllowedForDepartment('hospitality', department)`.
- * `getEventAccess` answers `'event_team'` for ANY team access code — the
- * department lives in the claims, not in the access level — so for a
- * `hamper` runner that guard is false, and `requireSection` redirects to
- * `departmentHomePath(...)` with `?denied=section`.
- *
- * The v2 hamper screens are reached by the hamper team THROUGH the hospitality
- * URL (`/EVENT/hospitality/deliveries`), and `v2/.../deliveries/_guard.ts`
- * exists precisely to allow the union of the two departments and keep that team
- * on the screen that is their whole job. Shim the hospitality layout and that
- * union is overridden by the strict hospitality guard: the hamper team would be
- * bounced off their own screen — a regression visible only on a handset.
- *
- * The cost of leaving it out is bounded. Every v2 page under `hospitality/`
- * except the two deliveries routes already runs `requireSection`/its own guard
- * itself, and the broader `hamper` and `hospitality` section layouts (both
- * shimmed) still gate the borrowed-child routes. What is genuinely given up is
- * the extra layout-level gate on `hospitality/checkin` and the legacy
- * `rooms/allocate` / `rooms/new` screens — all of which remain guarded by
- * `requireStaff` in the shell, and none of which RLS would let leak: a staff
- * redirect here is a UX affordance, and the fence is row-level security.
- *
- * If a future session wants it back, the fix is a v2 layout whose guard allows
- * the UNION of the two departments — not a re-export of the legacy one.
+ * It used to be the one legacy section layout with no v2 counterpart, because a
+ * strict `requireSection(..., 'hospitality')` shim would lock the hamper team out
+ * of `hospitality/deliveries` — their copy of the hamper run. The fix is the one
+ * this file's comment recommended: a REAL v2 layout whose guard is the UNION of
+ * the hospitality and hamper departments (`requireAnySection`). That keeps the
+ * hamper team in, keeps travel/production/client out, and restores the
+ * section-level gate the three re-exported screens (`checkin`, `rooms/new`,
+ * `rooms/allocate`) had lost — `docs/BUGS.md` M2 and M7.
  */
-const DELIBERATELY_NO_V2_LAYOUT = new Set(['hospitality'])
 
 /**
  * A shim re-exports a legacy PAGE or LAYOUT — nothing else.
@@ -243,7 +225,6 @@ describe('every legacy screen is reachable under the new shell', () => {
 
     const missing = legacyLayouts
       .filter((route) => !present.has(route) && !REPLACED_BY_V7.layout.has(route))
-      .filter((route) => !DELIBERATELY_NO_V2_LAYOUT.has(route))
 
     expect(
       missing,
@@ -254,10 +235,17 @@ describe('every legacy screen is reachable under the new shell', () => {
     ).toEqual([])
   })
 
-  it('keeps the deliberate hospitality exception honest', () => {
-    // If a session ever adds the shim, this test should be updated on purpose
-    // rather than silently becoming a stale comment.
-    expect(v2LayoutRoutes()).not.toContain('hospitality')
+  it('keeps the hospitality union guard in place, and hand-written', () => {
+    // The v2 hospitality layout is the ONE section layout that is not a shim,
+    // because its audience is the union of two departments (the hamper run at
+    // `hospitality/deliveries`). Replacing it with a re-export of the legacy
+    // layout would reinstate the strict hospitality gate and bounce the hamper
+    // team off their own screen — the reason it was omitted in the first place.
+    expect(v2LayoutRoutes()).toContain('hospitality')
+    const layout = path.join(V2_ROOT, 'hospitality', 'layout.tsx')
+    expect(fs.existsSync(layout)).toBe(true)
+    expect(isShim(layout), 'the hospitality layout must not be a legacy re-export').toBe(false)
+    expect(read(layout)).toContain('requireAnySection')
   })
 })
 

@@ -71,7 +71,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       </div>
 
       {/* Bottom nav — visible on mobile only */}
-      <AdminMobileNav />
+      <AdminMobileNav memberships={viewer.memberships} isAdmin={viewer.isAdmin} />
     </div>
   )
 }

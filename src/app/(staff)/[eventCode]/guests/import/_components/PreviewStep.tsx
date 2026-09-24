@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 
-import { CalendarIcon, CheckCircleIcon, ShieldAlertIcon } from '@/components/icons'
+import { CalendarIcon, ShieldAlertIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import type { CommitResult } from '@/lib/actions/import'
 import { commitImport } from '@/lib/actions/import'
 import type { ImportContext } from '@/lib/actions/import'
+import { lostResponseMessage } from '@/lib/errors'
 import type { ParsedFamilySheet } from '@/lib/import/families'
 import type { LayoutNote } from '@/lib/import/layout'
 
@@ -44,7 +45,12 @@ export interface PreviewStepProps {
   fileName: string
   outcome: PreviewOutcome
   context: ImportContext
-  onCommitted: () => void
+  /**
+   * The commit landed. The counts are handed UP rather than rendered here,
+   * because a successful import unmounts this component in the same commit —
+   * see `CommitSummary`. The parent resets the preview and keeps showing them.
+   */
+  onCommitted: (summary: CommitResult['summary']) => void
 }
 
 /**
@@ -66,7 +72,6 @@ export function PreviewStep({
 
   const [busy, setBusy] = useState(false)
   const [commitError, setCommitError] = useState<string | null>(null)
-  const [commitSummary, setCommitSummary] = useState<CommitResult['summary']>(null)
 
   const blocked = result.families.filter((f) => !f.canImport).length
 
@@ -92,10 +97,14 @@ export function PreviewStep({
         setCommitError(res.error ?? 'The import did not land.')
         return
       }
-      setCommitSummary(res.summary)
-      onCommitted()
-    } catch (e) {
-      setCommitError(e instanceof Error ? e.message : 'The import did not land.')
+      // Hand the counts up. The parent resets the preview and renders them
+      // above the upload step; setting them here would be destroyed by that
+      // same reset, which is exactly how the summary went missing (M34).
+      onCommitted(res.summary)
+    } catch {
+      // The action can REJECT rather than return — a dropped connection is the
+      // ordinary cause. It may still have committed, so never say it failed.
+      setCommitError(lostResponseMessage('the guest list'))
     } finally {
       setBusy(false)
     }
@@ -208,7 +217,14 @@ export function PreviewStep({
 
       <FamilyList families={result.families} />
 
-      {commitSummary ? <CommitSummary summary={commitSummary} /> : <ConfirmImportBar busy={busy} blocked={blocked} total={result.families.length} onConfirm={handleCommit} />}
+      {/* No summary branch here: a successful commit unmounts this component,
+          so the counts are rendered by `ImportPreview` (see CommitSummary). */}
+      <ConfirmImportBar
+        busy={busy}
+        blocked={blocked}
+        total={result.families.length}
+        onConfirm={handleCommit}
+      />
     </div>
   )
 }
@@ -231,7 +247,21 @@ function ConfirmImportBar({
 }) {
   const commitable = total - blocked
   return (
-    <div className="sticky bottom-0 -mx-4 border-t border-border bg-bg/95 px-4 py-3 pb-safe backdrop-blur-sm">
+    // `bottom-nav`, NOT `bottom-0`. The tab bar is `fixed … z-40` pinned to the
+    // viewport bottom, so a bar stuck to `bottom-0` sits UNDER it: the button
+    // renders, `toBeVisible()` passes, and the tap lands on the tab bar — the
+    // import could never be committed (B10). `bottom-nav` is the same offset
+    // `BottomBar` computes (`--ef-tabbar-h` + the gesture inset), so the two
+    // cannot drift apart. `z-40` keeps this above the tab bar on the off chance
+    // they ever do overlap, and `md:bottom-0 md:pb-safe` drops the offset on
+    // desktop, where the tab bar is `md:hidden`.
+    //
+    // Sticky rather than fixed on purpose: it stays in the flow, so it reserves
+    // its own height and the summary row above the button stays readable even
+    // next to the bottom of a 238-row list. No `pb-nav-bottombar` clearance is
+    // needed for the same reason — that is for a FIXED bar, which reserves
+    // nothing and would cover the last families.
+    <div className="sticky bottom-nav z-40 -mx-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur-sm md:bottom-0 md:pb-safe">
       <p className="text-sm text-muted">
         {commitable} of {total} famil{total === 1 ? 'y' : 'ies'} will be written.
         {blocked > 0 ? ` ${blocked} blocked famil${blocked === 1 ? 'y' : 'ies'} will be recorded as failed.` : ''}{' '}
@@ -247,25 +277,6 @@ function ConfirmImportBar({
       >
         Confirm import
       </Button>
-    </div>
-  )
-}
-
-function CommitSummary({ summary }: { summary: NonNullable<CommitResult['summary']> }) {
-  return (
-    <div className="rounded-xl border border-border bg-tint-ok px-4 py-3 text-sm">
-      <p className="flex items-center gap-2 font-semibold text-fg">
-        <CheckCircleIcon className="h-4 w-4 shrink-0 text-ok" aria-hidden />
-        Import complete
-      </p>
-      <p className="mt-1 text-muted">
-        {summary.inserted} inserted · {summary.updated} updated · {summary.skipped} skipped ·{' '}
-        {summary.failed} failed — {summary.total} total.
-      </p>
-      <p className="mt-1 text-xs text-subtle">
-        Batch {summary.batchId?.slice(0, 8)}. Refresh the queue or dashboard to see the
-        families.
-      </p>
     </div>
   )
 }

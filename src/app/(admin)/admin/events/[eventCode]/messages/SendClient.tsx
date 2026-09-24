@@ -19,6 +19,7 @@ import {
   type RecipientFilter,
   type SendResult,
 } from '@/lib/actions/messages'
+import { lostResponseMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -84,15 +85,24 @@ export function SendClient({ eventId, eventCode }: Props) {
   const handleSend = async () => {
     if (phase.stage !== 'preview') return
     setPhase({ stage: 'sending' })
-    const result = await sendMessages(
-      eventId,
-      phase.template.key,
-      phase.filter,
-      testMode,
-      testMode ? testNumber : undefined,
-      phase.overwrite,
-    )
-    setPhase({ stage: 'result', result })
+    // Both paths leave 'sending', so there is no pending flag to clear in a
+    // `finally` — but the catch is not optional: a dropped connection makes the
+    // action REJECT, and the screen used to sit on the "Sending messages…"
+    // spinner for good with no way back. Some of the batch may have gone out,
+    // so the sentence says so and points at the log.
+    try {
+      const result = await sendMessages(
+        eventId,
+        phase.template.key,
+        phase.filter,
+        testMode,
+        testMode ? testNumber : undefined,
+        phase.overwrite,
+      )
+      setPhase({ stage: 'result', result })
+    } catch {
+      setPhase({ stage: 'error', message: lostResponseMessage('the message log') })
+    }
   }
 
   if (phase.stage === 'loading') {

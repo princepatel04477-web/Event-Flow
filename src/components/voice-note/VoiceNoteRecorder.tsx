@@ -335,8 +335,9 @@ export function VoiceNoteRecorder({
       <div className={`${shell} border-brand/40 bg-tint-brand`}>
         <p className="text-center text-sm font-medium text-fg">Record what the guest said?</p>
         <p className="text-center text-xs text-muted">
-          Summarise the call out loud — travel details, pax, special requests. It is transcribed and
-          extracted for you, and a human still reviews it before anything is saved to the family.
+          Summarise the call out loud — travel details, the number of guests, special requests. It
+          is transcribed and extracted for you, and a human still reviews it before anything is
+          saved to the family.
         </p>
         <div className="flex gap-2">
           <Button

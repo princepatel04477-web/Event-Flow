@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import type { HotelImportContext } from '@/lib/actions/import-hotels'
 import { commitHotelImport, readHotelImportContext } from '@/lib/actions/import-hotels'
+import { lostResponseMessage } from '@/lib/errors'
 import { parseHotelWorkbook, type HotelParseResult } from '@/lib/import/hotelSheet'
 
 interface Props {
@@ -53,15 +54,24 @@ export function HotelImporter({ eventId, context: initialContext }: Props) {
     setCommitting(true)
     setError(null)
 
-    const result = await commitHotelImport(eventId, fileName, parseResult.rows)
+    try {
+      const result = await commitHotelImport(eventId, fileName, parseResult.rows)
 
-    if (result.ok && result.summary) {
-      setCommitResult(result.summary)
-      setPhase('done')
-    } else {
-      setError(result.error ?? 'Import failed.')
+      if (result.ok && result.summary) {
+        setCommitResult(result.summary)
+        setPhase('done')
+      } else {
+        setError(result.error ?? 'Import failed.')
+      }
+    } catch {
+      // The action can REJECT rather than return (a dropped connection), which
+      // used to leave "Confirm import" spinning for good. Some or all of the
+      // rows may still have been written, so the sentence says so and names the
+      // place that answers it.
+      setError(lostResponseMessage('the hotel list'))
+    } finally {
+      setCommitting(false)
     }
-    setCommitting(false)
   }
 
   // ---- Template download --------------------------------------------------

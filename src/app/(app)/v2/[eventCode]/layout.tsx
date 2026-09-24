@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
-import type { ReactNode } from 'react'
+import { Suspense, type ReactNode } from 'react'
 
 import { UndoBar } from '@/components/ui/UndoBar'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 
 import { AppHeader } from './_components/AppHeader'
 import { AppTabs } from './_components/AppTabs'
+import { DeniedNote } from './_components/DeniedNote'
 
 /* The offline training line that used to live here as a constant now lives in
    `src/lib/offline-note.ts`, because the banner that renders it is mounted by
@@ -128,6 +129,12 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
         // (SPEC-V3 §3) rather than in the header; this prop carries the
         // server's answer about whether the viewer is staff.
         showHelp={access !== 'client'}
+        // The guest list, import and export have no tab in the v3 bar — Find
+        // replaced it — and the only other door was Today's empty-state card,
+        // which stops rendering the moment the event has guests. This is the
+        // reachable door (`docs/BUGS.md` M33), offered to the two roles
+        // `SECTIONS.guests` admits.
+        showGuests={access === 'admin' || department === 'management'}
       />
 
       {/* Content column: safe-area insets, max 480px, single nav row at bottom */}
@@ -138,10 +145,17 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
             contentBottom,
           )}
         >
+          {/* A refused tap lands on the viewer's OWN department home, and says
+              why. Rendered by the shell so every screen inherits it — the note
+              used to live only inside Today, which a department runner never
+              sees (`docs/BUGS.md` M3, M7). Suspense because it reads a query
+              parameter. */}
+          <Suspense fallback={null}>
+            <DeniedNote />
+          </Suspense>
           {children}
         </div>
       </main>
-
       <AppTabs tabs={tabs} model="v3" />
 
       {/* Undo bar mounted in the shell for global 7-second cross-screen undo capability */}

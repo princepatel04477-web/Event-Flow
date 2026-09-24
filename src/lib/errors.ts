@@ -184,6 +184,34 @@ export function reportConstraintViolation(
   })
 }
 
+/**
+ * What to say when a write's REQUEST died rather than being refused.
+ *
+ * A server action can REJECT instead of returning a result — a connection
+ * dropped mid-flight, a handset that walked out of Wi-Fi range — and the
+ * insert may still have committed server-side before the response was lost.
+ * So the honest sentence has three jobs and no more: say what happened, say
+ * that we do NOT know whether it landed, and name the screen that can answer
+ * that question. Saying "it failed" would be a lie half the time, and the
+ * natural response to a stuck button — press it again — is how the same
+ * family gets written twice.
+ *
+ * NEVER the raw failure. "Failed to fetch", "TypeError: Load failed" and
+ * "PGRST301" are not sentences a staff member in a corridor can act on, and
+ * one of them on a wedding morning reads as "the app is broken" rather than
+ * "check the list".
+ *
+ * `check` names the place that answers the question, in the app's own words
+ * ("the room list", "the message log"), so this module never has to know
+ * which screen is asking.
+ */
+export function lostResponseMessage(check: string): string {
+  return (
+    `The connection dropped before we heard back, so this may or may not have ` +
+    `gone through. Check ${check} before trying again.`
+  )
+}
+
 /** Generic, honest fallback for a failed write. */
 export function friendlyDbError(
   error: MaybePostgrestError,

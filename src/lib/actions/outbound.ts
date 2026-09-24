@@ -1,5 +1,6 @@
 'use server'
 
+import { callStartNotice } from '@/lib/outbound/call-notice'
 import { createClient } from '@/lib/supabase/server'
 import { requireStaff } from '@/lib/supabase/queries'
 
@@ -50,6 +51,6 @@ export async function dialNextCampaignJob(
 
   return {
     ok: true,
-    message: body.message ?? body.started ? 'Call started' : 'Job queued',
+    message: callStartNotice(body),
   }
 }

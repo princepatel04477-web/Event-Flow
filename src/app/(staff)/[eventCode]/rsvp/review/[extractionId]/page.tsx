@@ -69,7 +69,7 @@ function buildFieldDefs(
       case 'rsvpStatus':
         return 'RSVP status'
       case 'confirmedPax':
-        return 'Confirmed pax'
+        return 'Confirmed guests'
       case 'side':
         return 'Side'
       case 'remarks':
@@ -84,7 +84,7 @@ function buildFieldDefs(
           time: 'Time',
           reference: 'Flight / train no',
           point: 'Point',
-          pax: 'Pax',
+          pax: 'Guests',
         }
         return `${dir} ${names[field] ?? field}`
       }

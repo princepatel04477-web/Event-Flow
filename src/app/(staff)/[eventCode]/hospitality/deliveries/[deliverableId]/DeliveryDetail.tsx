@@ -7,6 +7,7 @@ import { BoxIcon, GiftIcon, ShieldAlertIcon, UploadIcon } from '@/components/ico
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { LinkButton } from '@/components/ui/LinkButton'
+import { friendlyDbError } from '@/lib/errors'
 import { formatDateTime } from '@/lib/utils'
 import { captureProofPhoto, compressDataUrl, submitProof, type ProofRow } from '@/lib/proof'
 import { queueProof, queuedProofCount, type QueuedProof } from '@/lib/proof-queue'
@@ -142,7 +143,10 @@ export function DeliveryDetail({
       .maybeSingle()
       .then(({ data, error: err }) => {
         if (err || !data) {
-          setPhase({ name: 'error', message: err?.message ?? 'Could not load this delivery.' })
+          // Never the Postgres text: a runner may be reading this in a
+          // corridor, and `friendlyDbError` is the house sentence for a read
+          // that failed (M47/M53). The raw `err` stays out of the UI.
+          setPhase({ name: 'error', message: friendlyDbError(err) })
           return
         }
         setDetail({
@@ -168,9 +172,10 @@ export function DeliveryDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deliverableId])
 
-  if (phase.name === 'loading' || !detail) {
-    return <Card><CardBody className="py-10 text-center text-muted">Loading…</CardBody></Card>
-  }
+  // The error phase is tested FIRST. `load()` sets `phase = { name: 'error' }`
+  // and leaves `detail` null, so a `!detail` check placed above this branch
+  // swallowed the failure and left the spinner up forever with no message and
+  // no retry — the only way out was a reload, which §11b forbids (M52).
   if (phase.name === 'error') {
     return (
       <Card>
@@ -183,6 +188,9 @@ export function DeliveryDetail({
         </CardBody>
       </Card>
     )
+  }
+  if (phase.name === 'loading' || !detail) {
+    return <Card><CardBody className="py-10 text-center text-muted">Loading…</CardBody></Card>
   }
 
   // Already delivered — nothing more to do here.
@@ -251,8 +259,11 @@ export function DeliveryDetail({
       const shot = await captureProofPhoto()
       setPreviewDataUrl(shot.dataUrl)
       setPhase({ name: 'preview' })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not open the camera.')
+    } catch {
+      // A native camera failure is not a database error, so there is no house
+      // sentence to reuse — but the plugin's own `message` must never reach a
+      // runner (M53), so the copy is fixed.
+      setError('Could not open the camera. Tap “Take photo” to try again, or use “Choose photo”.')
       setPhase({ name: 'ready' })
     }
   }
@@ -281,7 +292,10 @@ export function DeliveryDetail({
         setPhase({ name: 'queued', entry })
         setQueuedCount((n) => n + 1)
       } catch (qe) {
-        setError(qe instanceof Error ? qe.message : 'Could not save the photo.')
+        // A queue write failed, so the photo could not be saved on this phone.
+        // Route the failure through the shared helper so the runner gets a
+        // sentence, never the IndexedDB/Postgres text (M53).
+        setError(friendlyDbError(qe instanceof Error ? { message: qe.message } : null))
         setPhase({ name: 'preview' })
       }
     }
@@ -421,7 +435,7 @@ export function DeliveryDetail({
               SEALED
             </span>
             <span className="mt-2 h-px w-8 bg-brand/50" />
-            <span className="figure mt-2 text-[0.625rem] text-ink">
+            <span className="figure mt-2 text-xs text-ink">
               {phase.proof ? phase.proof.id.slice(0, 8).toUpperCase() : '—'}
             </span>
           </div>
@@ -444,10 +458,9 @@ export function DeliveryDetail({
                 tone="ink"
               />
               <StubRow
-                label="Device claim"
-                value={`${formatDateTime(new Date())} · recorded, untrusted`}
+                label="Phone's clock (not trusted)"
+                value={formatDateTime(new Date())}
               />
-              <StubRow label="Storage" value={phase.proof?.storage_path ?? '—'} />
             </dl>
 
             <p className="bg-green-tint px-4 py-3 text-sm leading-snug text-ink">

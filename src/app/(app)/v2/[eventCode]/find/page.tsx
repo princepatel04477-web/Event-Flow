@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
+import { getStaffViewerContext } from '@/lib/auth/section-guard'
+import { mayOpenCallRecords } from '@/lib/departments'
 import { getEventAccess, resolveEventByCode } from '@/lib/supabase/queries'
 
 import { FindStaff } from './FindStaff'
@@ -67,5 +69,23 @@ export default async function FindPage({ params }: PageProps) {
     return <FindClient eventId={event.id} eventCode={event.code} />
   }
 
-  return <FindStaff eventId={event.id} eventCode={event.code} />
+  // Whether the guest sheet may offer "Open the family record".
+  //
+  // Answered HERE because only the guard knows: the record is behind
+  // `requireSection(..., 'rsvp')` (management and admins), while this screen is
+  // reached from the search button in every department's header. Offering the
+  // button to a hospitality runner bounced them to their own board with a
+  // `?denied=section` marker that board does not render — a silent bounce on a
+  // maroon primary button (`docs/BUGS.md` M3). Both reads are memoised per
+  // request, so this costs nothing the shell has not already paid.
+  const department = (await getStaffViewerContext(event.id))?.department ?? null
+  const canOpenFamilyRecord = mayOpenCallRecords(access, department)
+
+  return (
+    <FindStaff
+      eventId={event.id}
+      eventCode={event.code}
+      canOpenFamilyRecord={canOpenFamilyRecord}
+    />
+  )
 }

@@ -189,7 +189,9 @@ export default async function ReviewListPage({ params, searchParams }: PageProps
             const meta = [
               formatDateTime(ex.created_at),
               guess,
-              typeof parsed.confirmed_pax === 'number' ? `${parsed.confirmed_pax} pax` : null,
+              typeof parsed.confirmed_pax === 'number'
+                ? `${parsed.confirmed_pax} ${parsed.confirmed_pax === 1 ? 'guest' : 'guests'}`
+                : null,
             ]
               .filter(Boolean)
               .join(' · ')

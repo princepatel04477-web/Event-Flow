@@ -15,7 +15,12 @@ import { KmDashboard } from '@/components/fleet/KmDashboard'
 import { OdometerEntry, OdometerRecent } from '@/components/fleet/OdometerEntry'
 import { QuickAddVehicles } from '@/components/fleet/QuickAddVehicles'
 import { VehicleAvailabilityPanel } from '@/components/fleet/VehicleAvailability'
-import { deleteVehicle, readFleet, type VehicleRow } from '@/lib/actions/fleet'
+import { deleteVehicle, readFleet, setVehicleAvailability, type VehicleRow } from '@/lib/actions/fleet'
+import {
+  availabilityActionLabel,
+  removeVehicleConsequence,
+  removeVehicleQuestion,
+} from '@/lib/fleet/remove-vehicle-copy'
 import { traceFetch } from '@/lib/perf'
 import { useStableData } from '@/lib/use-stable-data'
 
@@ -49,16 +54,20 @@ export interface FleetBoardProps {
  *   - `PageTitle` is gone. The shell already renders a `ScreenHeader` for
  *     `/logistics/fleet`, so the screen used to say "Fleet" twice.
  *
- * REMOVAL IS STILL A HARD DELETE. `deleteVehicle` is the existing action and it
- * is offered from the vehicle's own sheet, where the registration number is on
- * screen — this app has repeatedly paid for undo-able destructive controls.
+ * REMOVAL IS NO LONGER A ONE-TAP HARD DELETE. `deleteVehicle` destroys the
+ * vehicle and its odometer, driver and trip history, and nothing can restore
+ * it. The sheet's default quiet action is now the reversible one — marking the
+ * vehicle unavailable — and the delete sits behind a confirmation that names
+ * the vehicle and its registration number.
  */
 export function FleetBoard({ eventId, eventCode }: FleetBoardProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
   const [openVehicleId, setOpenVehicleId] = useState<string | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [removing, setRemoving] = useState(false)
+  const [availabilityBusy, setAvailabilityBusy] = useState(false)
 
   const { data, loading, error, reload } = useStableData(
     `fleet:${eventId}`,
@@ -70,12 +79,31 @@ export function FleetBoard({ eventId, eventCode }: FleetBoardProps) {
     ? ((data?.vehicles ?? []).find((v) => v.id === openVehicleId) ?? null)
     : null
 
+  function closeVehicle() {
+    setOpenVehicleId(null)
+    setConfirmRemove(false)
+  }
+
+  /** The reversible move: take the vehicle out of service, or put it back. */
+  async function handleToggleAvailability(vehicle: VehicleRow) {
+    setAvailabilityBusy(true)
+    setActionError(null)
+    const next = vehicle.status === 'unavailable' ? 'available' : 'unavailable'
+    const result = await setVehicleAvailability(vehicle.id, next)
+    setAvailabilityBusy(false)
+    if (result.ok) {
+      await reload()
+    } else {
+      setActionError(result.error)
+    }
+  }
+
   async function handleRemove(vehicleId: string) {
     setRemoving(true)
     const result = await deleteVehicle(vehicleId)
     setRemoving(false)
     if (result.ok) {
-      setOpenVehicleId(null)
+      closeVehicle()
       await reload()
     } else {
       setActionError(result.error)
@@ -195,61 +223,107 @@ export function FleetBoard({ eventId, eventCode }: FleetBoardProps) {
         </div>
       </BottomSheet>
 
-      {/* One vehicle: what it is, who drives it, and the one destructive act. */}
+      {/* One vehicle: what it is, who drives it, and the two ways out — the
+          reversible one first, the irreversible one behind a confirmation. */}
       <BottomSheet
         open={openVehicle !== null}
-        onClose={() => setOpenVehicleId(null)}
+        onClose={closeVehicle}
         label={openVehicle ? (openVehicle.label ?? 'Vehicle') : 'Vehicle'}
       >
         {openVehicle ? (
-          <div className="flex flex-col gap-5">
-            <div className="min-w-0">
-              <h2 className="font-display text-2xl leading-tight font-semibold text-ink">
-                {openVehicle.label ?? 'Unnamed vehicle'}
-              </h2>
-              <p className="mt-1 text-sm text-muted">{vehicleMeta(openVehicle)}</p>
-            </div>
+          confirmRemove ? (
+            <div className="flex flex-col gap-5">
+              <div className="min-w-0">
+                <h2 className="font-display text-2xl leading-tight font-semibold text-ink">
+                  {removeVehicleQuestion(openVehicle)}
+                </h2>
+                <p className="mt-2 text-sm text-muted">{removeVehicleConsequence()}</p>
+              </div>
 
-            <dl className="flex flex-col">
-              <SheetRow label="Capacity" value={`${openVehicle.capacity} with luggage`} mono />
-              {openVehicle.seatLabel ? (
-                <SheetRow label="Sticker" value={openVehicle.seatLabel} />
+              {actionError ? (
+                <p
+                  role="alert"
+                  className="rounded-xl bg-red-tint px-3.5 py-3 text-sm font-medium text-ledger-red"
+                >
+                  {actionError}
+                </p>
               ) : null}
-              <SheetRow label="Status" value={statusMeta(openVehicle.status).label} />
-              {openVehicle.driverName ? (
-                <SheetRow label="Driver" value={openVehicle.driverName} />
-              ) : null}
-              {openVehicle.vendorName ? (
-                <SheetRow label="Vendor" value={openVehicle.vendorName} />
-              ) : null}
-              {openVehicle.rateNote ? (
-                <SheetRow label="Rate" value={openVehicle.rateNote} />
-              ) : null}
-            </dl>
 
-            {openVehicle.driverMobile ? (
-              <a
-                href={`tel:${openVehicle.driverMobile}`}
-                className="tap flex min-h-12 items-center gap-2 font-mono text-base font-medium text-brand active:opacity-70"
+              <Button
+                variant="danger"
+                size="lg"
+                fullWidth
+                disabled={removing}
+                onClick={() => void handleRemove(openVehicle.id)}
               >
-                {openVehicle.driverMobile}
-              </a>
-            ) : null}
+                {removing ? 'Removing…' : 'Remove for good'}
+              </Button>
+              <Button variant="ghost" size="lg" fullWidth onClick={() => setConfirmRemove(false)}>
+                Keep it
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-5">
+              <div className="min-w-0">
+                <h2 className="font-display text-2xl leading-tight font-semibold text-ink">
+                  {openVehicle.label ?? 'Unnamed vehicle'}
+                </h2>
+                <p className="mt-1 text-sm text-muted">{vehicleMeta(openVehicle)}</p>
+              </div>
 
-            <LinkButton href={`/${eventCode}/logistics/trips`} variant="secondary" fullWidth>
-              Plan trips with this fleet
-            </LinkButton>
+              <dl className="flex flex-col">
+                <SheetRow label="Capacity" value={`${openVehicle.capacity} with luggage`} mono />
+                {openVehicle.seatLabel ? (
+                  <SheetRow label="Sticker" value={openVehicle.seatLabel} />
+                ) : null}
+                <SheetRow label="Status" value={statusMeta(openVehicle.status).label} />
+                {openVehicle.driverName ? (
+                  <SheetRow label="Driver" value={openVehicle.driverName} />
+                ) : null}
+                {openVehicle.vendorName ? (
+                  <SheetRow label="Vendor" value={openVehicle.vendorName} />
+                ) : null}
+                {openVehicle.rateNote ? (
+                  <SheetRow label="Rate" value={openVehicle.rateNote} />
+                ) : null}
+              </dl>
 
-            <Button
-              variant="secondary"
-              size="lg"
-              fullWidth
-              disabled={removing}
-              onClick={() => void handleRemove(openVehicle.id)}
-            >
-              {removing ? 'Removing…' : 'Remove from the fleet'}
-            </Button>
-          </div>
+              {openVehicle.driverMobile ? (
+                <a
+                  href={`tel:${openVehicle.driverMobile}`}
+                  className="tap flex min-h-12 items-center gap-2 font-mono text-base font-medium text-brand active:opacity-70"
+                >
+                  {openVehicle.driverMobile}
+                </a>
+              ) : null}
+
+              <LinkButton href={`/${eventCode}/logistics/trips`} variant="secondary" fullWidth>
+                Plan trips with this fleet
+              </LinkButton>
+
+              {/* The quiet default: reversible, and it keeps every reading and
+                  trip the vehicle already has. */}
+              <Button
+                variant="secondary"
+                size="lg"
+                fullWidth
+                disabled={availabilityBusy}
+                onClick={() => void handleToggleAvailability(openVehicle)}
+              >
+                {availabilityBusy ? 'Saving…' : availabilityActionLabel(openVehicle.status)}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="md"
+                fullWidth
+                className="border border-rule-strong"
+                onClick={() => setConfirmRemove(true)}
+              >
+                Remove from the fleet…
+              </Button>
+            </div>
+          )
         ) : null}
       </BottomSheet>
     </div>

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { notFound } from 'next/navigation'
 
-import { requireSection } from '@/lib/auth/section-guard'
+import { requireAnySection } from '@/lib/auth/section-guard'
 import { resolveEventByCode } from '@/lib/supabase/queries'
 
 type Props = {
@@ -21,24 +21,26 @@ type Props = {
  * `hospitality/deliveries`, so this gate was rarely reached; now it is on the
  * path of every hamper runner's first tap.
  *
- * The guard is the same call, made here: a hamper runner and an event lead get
- * in, a hospitality, travel or production runner is bounced to their own home
- * with `?denied=section`. `management` passes because `sectionAllowedForDepartment`
- * treats it as staff everywhere — which is what makes the Rooms → Hampers
- * borrowed link work for an event lead.
+ * WHY THE GUARD IS THE UNION OF TWO SECTIONS, NOT `hamper` ALONE. This is the
+ * screen the hamper RUN lives at, and the run has two audiences: the hamper
+ * team, whose whole job it is, and the hospitality team, whose copy of it is
+ * `hospitality/deliveries`. That second address redirects here, so gating this
+ * layout with `hamper` alone turned a hospitality runner's bookmark into a
+ * silent teleport to the Rooms board with `?denied=section` — a marker only the
+ * dashboard renders, so the bounce read as a broken link (`docs/BUGS.md` M7).
+ * `mayOpenHamperRun` is the one predicate for that union, shared with the
+ * hospitality layout and the `deliveries` guard.
  *
- * The page underneath calls `requireHamperScreen` as well, which admits the
- * UNION of the hamper and hospitality departments. That is not a contradiction:
- * this layout is the narrow door for the section's own route, and the guard on
- * the page is the wider one the shared `HamperRun` needs. A hospitality runner
- * reaching `/{event}/hamper` directly is bounced here, which is correct — their
- * copy of the run is `/hospitality/deliveries`, and that is where the Rooms tab
- * points.
+ * Everyone who does not belong here still gets the same redirect:
+ * travel, production and client are bounced to their own home with
+ * `?denied=section`. `management` passes because
+ * `sectionAllowedForDepartment` treats it as staff everywhere — which is what
+ * makes the Rooms → Hampers borrowed link work for an event lead.
  */
 export default async function HamperSectionLayout({ children, params }: Props) {
   const { eventCode } = await params
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
-  await requireSection(event.id, event.code, 'hamper')
+  await requireAnySection(event.id, event.code, ['hamper', 'hospitality'])
   return children
 }

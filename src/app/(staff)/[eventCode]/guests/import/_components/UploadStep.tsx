@@ -68,7 +68,7 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
           <p className="mt-1 text-sm text-muted">
             .xlsx or .xls. A full CALLING MASTER LIST (the{' '}
             <span className="font-medium text-fg">{KNOWN_SHEET_NAME}</span> tab) is read in full —
-            travel, rooms, pax. A plain list with just{' '}
+            travel, rooms, guest counts. A plain list with just{' '}
             <span className="font-medium text-fg">Name</span> and{' '}
             <span className="font-medium text-fg">Contact</span> columns works too — each row
             becomes one guest to call.

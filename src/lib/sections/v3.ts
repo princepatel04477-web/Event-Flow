@@ -89,6 +89,16 @@ function v3SectionTab(
   access: TabAccess,
   department: StaffDepartment | null,
 ): V3Tab | null {
+  // The section-level department gate, FIRST. `visibleChildren` below filters
+  // the children of a section the viewer may open; it has never filtered the
+  // SECTION itself, and `requireSection` gates the section. Without this line a
+  // name-skipping team session (`department === null`) was handed all five tabs
+  // while only `dashboard` was open to it, so four taps bounced straight back
+  // with `?denied=section` — live-looking controls that cannot work
+  // (`docs/BUGS.md` M1). Management passes for every section and an admin is
+  // exempt outright, so this only ever removes a tab that would bounce.
+  if (access !== 'admin' && !sectionAllowedForDepartment(section, department)) return null
+
   // `visibleChildren` is reused rather than re-derived: it already encodes
   // the role check AND the department check for a borrowed child, and the
   // departments in question are only ever a subset of the parent's.
@@ -118,6 +128,13 @@ function v3SectionTab(
  *   in `V3_BAR` order.
  * - A runner gets their own section's screens as tabs. Two or more screens
  *   earns a bar; one screen does not.
+ *
+ * A TEAM SESSION WITH NO PICKED NAME IS NOT A LEAD. It used to be treated as
+ * one (`department === null` was in `isLead`), which handed it five tabs while
+ * `sectionAllowedForDepartment` admits it to `dashboard` alone — four taps that
+ * only bounce back. It now falls through to the section filter and gets Today
+ * alone, which is what v1 renders for the same session and the one screen it can
+ * actually open (`docs/BUGS.md` M1).
  */
 export function v3TabsFor(
   eventCode: string,
@@ -126,7 +143,7 @@ export function v3TabsFor(
 ): V3Tab[] {
   if (access === 'client') return []
 
-  const isLead = access === 'admin' || department === 'management' || department === null
+  const isLead = access === 'admin' || department === 'management'
 
   if (!isLead && department) {
     // A runner's bar is their section's real screens. `sectionAllowedForDepartment`

@@ -556,7 +556,7 @@ export function CallScreen({
                     screen that updates it was not reachable from here. */}
                 <p className="mt-2 max-w-xs text-sm text-muted">
                   {outcome === 'connected' || outcome === 'declined'
-                    ? 'The family record still says what it said before. Update the RSVP to record pax and travel.'
+                    ? 'The family record still says what it said before. Update the RSVP to record guests and travel.'
                     : 'Update the RSVP if anything about the family changed on this call.'}
                 </p>
               </CardBody>
@@ -947,8 +947,9 @@ function OutcomeCard({
 
 function formatPax(group: GuestGroupRow): string {
   const confirmed = group.confirmed_pax
-  if (confirmed !== null) return `${confirmed} confirmed pax`
-  return `${group.expected_pax} expected pax`
+  if (confirmed !== null) return `${confirmed} confirmed ${confirmed === 1 ? 'guest' : 'guests'}`
+  const expected = group.expected_pax
+  return `${expected} expected ${expected === 1 ? 'guest' : 'guests'}`
 }
 
 export default CallScreen

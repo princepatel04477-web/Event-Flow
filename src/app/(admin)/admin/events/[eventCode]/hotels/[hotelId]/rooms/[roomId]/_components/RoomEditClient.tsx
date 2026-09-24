@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { updateRoom } from '@/lib/actions/hotels'
+import { lostResponseMessage } from '@/lib/errors'
 
 interface Props {
   roomId: string; eventId: string; eventCode: string; hotelId: string
@@ -27,10 +28,18 @@ export function RoomEditClient({ roomId, eventId, eventCode, hotelId, initial }:
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError(null); setSubmitting(true)
-    const result = await updateRoom(roomId, eventId, { roomNumber, roomType: roomType || null, floor: floor || null, capacity: parseInt(capacity, 10) || 2, notes: notes || null, isBlocked })
-    if (result.ok) { router.push(`/admin/events/${eventCode}/hotels/${hotelId}`); router.refresh() }
-    else setError(result.error ?? 'Failed')
-    setSubmitting(false)
+    try {
+      const result = await updateRoom(roomId, eventId, { roomNumber, roomType: roomType || null, floor: floor || null, capacity: parseInt(capacity, 10) || 2, notes: notes || null, isBlocked })
+      if (result.ok) { router.push(`/admin/events/${eventCode}/hotels/${hotelId}`); router.refresh() }
+      else setError(result.error ?? 'Failed')
+    } catch {
+      // The action can REJECT rather than return (a dropped connection), which
+      // used to leave the button on "Saving…" for good. The edit may still have
+      // landed, so say that and point at the room list.
+      setError(lostResponseMessage('the room list'))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (

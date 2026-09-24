@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Segmented } from '@/components/ui/Segmented'
 import { Textarea } from '@/components/ui/Textarea'
 import { createRooms } from '@/lib/actions/hotels'
+import { lostResponseMessage } from '@/lib/errors'
 
 interface Props {
   eventId: string
@@ -47,13 +48,23 @@ export function RoomCreateForm({ eventId, hotelId, eventCode, hotelName, backHre
     e.preventDefault()
     setError(null)
     setSubmitting(true)
-    const res = await createRooms(eventId, hotelId, mode,
-      mode === 'range'
-        ? { prefix, start: parseInt(start, 10), end: parseInt(end, 10), roomType: roomType || null, floor: floor || null, capacity: parseInt(capacity, 10) || 2, notes: notes || null }
-        : { roomNumber, roomType: roomType || null, floor: floor || null, capacity: parseInt(capacity, 10) || 2, notes: notes || null })
-    if (res.ok) setResult({ created: res.created, skipped: res.skipped })
-    else setError(res.error ?? 'Failed to create rooms.')
-    setSubmitting(false)
+    try {
+      const res = await createRooms(eventId, hotelId, mode,
+        mode === 'range'
+          ? { prefix, start: parseInt(start, 10), end: parseInt(end, 10), roomType: roomType || null, floor: floor || null, capacity: parseInt(capacity, 10) || 2, notes: notes || null }
+          : { roomNumber, roomType: roomType || null, floor: floor || null, capacity: parseInt(capacity, 10) || 2, notes: notes || null })
+      if (res.ok) setResult({ created: res.created, skipped: res.skipped })
+      else setError(res.error ?? 'Failed to create rooms.')
+    } catch {
+      // A server action can REJECT rather than return — a dropped connection
+      // mid-flight is the ordinary cause on venue Wi-Fi. Without this catch the
+      // rejection escaped, `setSubmitting(false)` never ran, and the button sat
+      // on "Creating…" forever with nothing on screen. The rows may still have
+      // been written, so the sentence says so and names the room list.
+      setError(lostResponseMessage('the room list'))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (result) {

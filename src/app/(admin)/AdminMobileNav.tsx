@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
 import { cn } from '@/lib/utils'
+import { type Membership } from '@/lib/events/paths'
 import {
   GridIcon,
   LockIcon,
@@ -13,14 +14,22 @@ import {
   SearchIcon,
   SlidersIcon,
 } from '@/components/icons'
+import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+
+export interface AdminMobileNavProps {
+  /** Every event this admin belongs to, for the switcher in the More sheet. */
+  memberships: Membership[]
+  /** Admin-ness is global, not per-event. */
+  isAdmin: boolean
+}
 
 /**
  * Mobile bottom nav for admin screens. Three-tab bar + More sheet.
  * Fixed to the bottom with safe-area inset. Visible on md- only —
  * desktop gets the sidebar.
  */
-export function AdminMobileNav() {
+export function AdminMobileNav({ memberships, isAdmin }: AdminMobileNavProps) {
   const pathname = usePathname()
   const [moreOpen, setMoreOpen] = useState(false)
 
@@ -115,6 +124,23 @@ export function AdminMobileNav() {
 
       <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} label="More admin pages">
         <div className="flex flex-col gap-1 px-2">
+          {/* The event switcher, which was the one control the admin layout's
+              own comment promised everywhere and the phone did not have: the
+              sidebar is `hidden md:flex`, and this sheet had no event control
+              at all (`docs/BUGS.md` m11). Editing the wrong wedding is the
+              most dangerous mistake on this panel, so the phone gets the same
+              control the desktop has. */}
+          {eventCode ? (
+            <div className="flex min-h-11 items-center justify-between gap-2 rounded-xl px-3">
+              <span className="text-sm font-medium text-muted">Switch event</span>
+              <EventSwitcher
+                events={memberships}
+                currentCode={eventCode}
+                isAdmin={isAdmin}
+              />
+            </div>
+          ) : null}
+
           {segments[1] === 'events' && segments[2] ? (
             <>
               <SheetLink href={`/admin/events/${segments[2]}/codes`} label="Access codes" icon={<LockIcon className="h-5 w-5" />} />

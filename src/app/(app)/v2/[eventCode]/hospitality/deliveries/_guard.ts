@@ -3,7 +3,7 @@ import 'server-only'
 import { notFound, redirect } from 'next/navigation'
 
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
-import { departmentHomePath, sectionAllowedForDepartment } from '@/lib/departments'
+import { departmentHomePath, mayOpenHamperRun, sectionAllowedForDepartment } from '@/lib/departments'
 import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 
 /**
@@ -49,9 +49,7 @@ export async function requireHamperScreen(eventCode: string) {
     }
   }
 
-  const allowed =
-    sectionAllowedForDepartment('hospitality', ctx.department) ||
-    sectionAllowedForDepartment('hamper', ctx.department)
+  const allowed = mayOpenHamperRun(ctx.department)
 
   if (!allowed) {
     const home = ctx.department ? departmentHomePath(eventCode, ctx.department) : `/${eventCode}`

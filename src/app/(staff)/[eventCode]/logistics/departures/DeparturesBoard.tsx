@@ -47,6 +47,7 @@ export function DeparturesBoard({ eventId, eventCode }: DeparturesBoardProps) {
   const [notDepartedOnly, setNotDepartedOnly] = useState(false)
   const [modeFilter, setModeFilter] = useState('')
   const [pendingGroup, setPendingGroup] = useState<string | null>(null)
+  const [departError, setDepartError] = useState<string | null>(null)
 
   const { data: rows, loading, error, reload } = useStableData<DepartureRow[] | null>(
     `departures:${eventId}`,
@@ -131,11 +132,14 @@ export function DeparturesBoard({ eventId, eventCode }: DeparturesBoardProps) {
   async function handleDepart(row: DepartureRow) {
     if (pendingGroup) return
     setPendingGroup(row.group.id)
+    setDepartError(null)
     const result = await markDeparted(eventId, eventCode, row.group.id)
     setPendingGroup(null)
     if (!result.ok) {
-       
-      console.error(result.message)
+      // On a handset there is no console to open, so the failure has to be on
+      // the screen. The row stays undeparted and the button comes back — the
+      // runner needs to know why the tap changed nothing.
+      setDepartError(result.message)
       return
     }
     await reload()
@@ -200,6 +204,15 @@ export function DeparturesBoard({ eventId, eventCode }: DeparturesBoardProps) {
           Record walk-up
         </LinkButton>
       </div>
+
+      {departError ? (
+        <p
+          role="alert"
+          className="rounded-xl border border-tint-danger bg-tint-danger px-4 py-3 text-sm font-medium text-danger"
+        >
+          {departError}
+        </p>
+      ) : null}
 
       {/* Counts */}
       <Card className="border-border-strong bg-surface-2">
