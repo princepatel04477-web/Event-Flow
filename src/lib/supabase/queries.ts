@@ -163,10 +163,15 @@ async function getViewerUncached(): Promise<Viewer | null> {
   // Code-auth session (team/client): no GoTrue user exists, but the claims
   // ARE the identity. Build the viewer from them so team/client pages that
   // call getViewer() (RSVP, call, review) do not bounce to /login.
-  const claims = await getSessionClaims()
-  timing.mark('claims')
+  //
+  // The client is built alongside the claims rather than after them. It is a
+  // cookie read and an object construction — no network — so overlapping it with
+  // the session read costs nothing and removes a sequential hop from every
+  // navigation. A GoTrue session pays for one unused client, which is cheaper
+  // than the await it replaces.
+  const [claims, supabase] = await Promise.all([getSessionClaims(), createClient()])
+  timing.mark('claims+client')
   if (claims) {
-    const supabase = await createClient()
     const { data: event } = await supabase
       .from('events')
       .select('name, code')
@@ -189,9 +194,6 @@ async function getViewerUncached(): Promise<Viewer | null> {
       ],
     }
   }
-
-  const supabase = await createClient()
-  timing.mark('client-create')
 
   // Signature-verified locally against the ES256 JWKS — see verifiedUser().
   const user = await verifiedUser(supabase)
@@ -341,17 +343,17 @@ export async function getEventAccess(eventId: string): Promise<EventAccess> {
 async function getEventAccessUncached(eventId: string): Promise<EventAccess> {
   const timing = phaseTiming('route :: getEventAccess')
   // Code-auth session (team/client) — the claims carry the role and event.
-  const claims = await getSessionClaims()
-  timing.mark('claims')
+  // Resolved together with the client for the same reason as getViewer(): the
+  // client is a cookie read, and the session read is the one that can cost a
+  // round trip.
+  const [claims, supabase] = await Promise.all([getSessionClaims(), createClient()])
+  timing.mark('claims+client')
   if (claims) {
     if (claims.eventId !== eventId) return 'none'
     return claims.appRole === 'team' ? 'event_team' : 'client'
   }
 
   // GoTrue session (admin) — resolve via profiles/event_members.
-  const supabase = await createClient()
-  timing.mark('client-create')
-
   const user = await verifiedUser(supabase)
   timing.mark('getClaims')
   if (!user) return 'none'
