@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { LinkButton } from '@/components/ui/LinkButton'
 import { TravelBoard } from '../_components/TravelBoard'
 import { requireTravelScreen } from '../_guard'
 
@@ -21,21 +22,35 @@ type PageProps = {
  *
  * Recording a walk-up departure — a family who tells the desk they are leaving
  * and was never called about it — stays its own screen at
- * `logistics/departures/new`, which is where a staff member who has just been
- * told a flight time needs to be. It is reachable from the empty state here
- * rather than from a permanent button on the board: a board that has rows on it
- * is a board someone is working, not a form.
+ * `logistics/departures/new`. It used to be reachable ONLY from the empty
+ * state, which meant the moment the event had one departure on file the form
+ * could only be reached by typing the URL — and inside the APK there is no URL
+ * bar. The permanent ghost link below is the fix: quiet, never the primary,
+ * and always present. The empty-state link stays where it is.
  */
 export default async function DeparturesPage({ params }: PageProps) {
   const { eventCode } = await params
   const { event } = await requireTravelScreen(eventCode)
 
   return (
-    <TravelBoard
-      eventId={event.id}
-      eventCode={event.code}
-      direction="departure"
-      otherHref={`/${event.code}/logistics/arrivals`}
-    />
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-end">
+        <LinkButton
+          href={`/${event.code}/logistics/departures/new`}
+          variant="ghost"
+          size="sm"
+          className="border border-rule-strong"
+        >
+          Record a walk-up
+        </LinkButton>
+      </div>
+
+      <TravelBoard
+        eventId={event.id}
+        eventCode={event.code}
+        direction="departure"
+        otherHref={`/${event.code}/logistics/arrivals`}
+      />
+    </div>
   )
 }

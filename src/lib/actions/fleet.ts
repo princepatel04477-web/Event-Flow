@@ -114,10 +114,44 @@ export type VehicleResult =
   | { ok: true; id: string }
   | { ok: false; error: string }
 
+/**
+ * The REVERSIBLE way to take a vehicle off the road.
+ *
+ * `delete from vehicles` destroys the row and, with it, the odometer readings,
+ * driver pairings and trip history that point at it — nothing can restore any
+ * of that. "Remove from the fleet" used to run that delete on one tap with no
+ * confirmation. The default action is now this status change; the delete is
+ * still available, but only behind a confirmation that names the vehicle.
+ */
+export async function setVehicleAvailability(
+  vehicleId: string,
+  status: 'available' | 'unavailable',
+): Promise<VehicleResult> {
+  const supabase = await createClient()
+  // `.select()` so a refused UPDATE (RLS filters the row out and returns no
+  // error) cannot be reported as a success that changed nothing.
+  const { data, error } = await supabase
+    .from('vehicles')
+    .update({ status })
+    .eq('id', vehicleId)
+    .select('id')
+    .maybeSingle()
+
+  if (error) return { ok: false, error: friendlyDbError(error) }
+  if (!data) return { ok: false, error: 'That vehicle is no longer on this event.' }
+  return { ok: true, id: vehicleId }
+}
+
 export async function deleteVehicle(vehicleId: string): Promise<VehicleResult> {
   const supabase = await createClient()
-  const { error } = await supabase.from('vehicles').delete().eq('id', vehicleId)
+  const { data, error } = await supabase
+    .from('vehicles')
+    .delete()
+    .eq('id', vehicleId)
+    .select('id')
+    .maybeSingle()
   if (error) return { ok: false, error: friendlyDbError(error) }
+  if (!data) return { ok: false, error: 'That vehicle is no longer on this event.' }
   return { ok: true, id: vehicleId }
 }
 

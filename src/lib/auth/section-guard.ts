@@ -79,3 +79,36 @@ export async function requireSectionFromPath(
   }
   return requireSection(eventId, eventCode, sectionId)
 }
+
+/**
+ * Page guard: staff on this event AND allowed into AT LEAST ONE of these
+ * sections.
+ *
+ * The one screen that needs it is the hamper run, which two departments reach
+ * through two different sections (see `mayOpenHamperRun`). `requireSection`
+ * takes one id; the hamper run's callers need the union, and writing that union
+ * three times is how the hospitality copy of the run ended up gated by the
+ * hamper section alone and bounced (`docs/BUGS.md` M7). Everything else about
+ * the deny path is identical to `requireSection`, including the
+ * `?denied=section` marker.
+ */
+export async function requireAnySection(
+  eventId: string,
+  eventCode: string,
+  sectionIds: SectionId[],
+): Promise<StaffViewerContext> {
+  const access = await requireStaff(eventId, eventCode)
+  const ctx = await getStaffViewerContext(eventId)
+  if (!ctx) redirect(`/${eventCode}`)
+
+  if (access === 'admin' || ctx.department === 'management') return ctx
+
+  if (!sectionIds.some((id) => sectionAllowedForDepartment(id, ctx.department))) {
+    const home = ctx.department
+      ? departmentHomePath(eventCode, ctx.department)
+      : `/${eventCode}`
+    redirect(`${home}?denied=section`)
+  }
+
+  return ctx
+}

@@ -9,10 +9,10 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { readBoard } from '@/lib/actions/dashboard'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { departmentHomePath } from '@/lib/departments'
+import { deniedMessage } from '@/lib/sections/denied'
 import {
   requireStaff,
   resolveEventByCode,
-  type DeniedReason,
 } from '@/lib/supabase/queries'
 import { traceFetch } from '@/lib/perf'
 import { count, formatCount } from '@/lib/utils'
@@ -22,26 +22,13 @@ export const metadata: Metadata = {
 }
 
 /**
- * Messages for `?denied=`, looked up rather than read out of the URL.
+ * The `?denied=` note, rendered above whatever the page shows next.
  *
- * `requireAdmin` bounces an event_team member here, and a bounce with no
- * explanation reads as a broken link. The query string only ever selects a
- * key — the sentence itself is ours, so a crafted URL cannot put words in
- * the app's mouth.
+ * The SENTENCES live in `src/lib/sections/denied.ts`, which the v2 shell's own
+ * note reads too: `requireSection` bounces a denied viewer to their department
+ * home in both shells, and two copies of these sentences is how one shell ends
+ * up explaining a bounce the other does not (`docs/BUGS.md` M3, M7).
  */
-const DENIED_MESSAGES: Record<DeniedReason | 'section', string> = {
-  import:
-    'Importing the guest list is an admin job, so we brought you back here. Ask your event admin to run the import.',
-  admin: 'That screen is admin-only, so we brought you back here.',
-  section: 'That screen is for another team. Use the tabs at the bottom for your department.',
-}
-
-function deniedMessage(value: string | undefined): string | null {
-  if (!value) return null
-  return DENIED_MESSAGES[value as DeniedReason | 'section'] ?? null
-}
-
-/** The `?denied=` note, rendered above whatever the page shows next. */
 function DeniedNote({ note }: { note: string | null }) {
   if (!note) return null
   return (

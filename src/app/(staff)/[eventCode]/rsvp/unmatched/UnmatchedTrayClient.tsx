@@ -9,6 +9,7 @@ import { Row } from '@/components/ui/Row'
 import { Select } from '@/components/ui/Select'
 import { MicIcon } from '@/components/icons'
 import { formatDateTime } from '@/lib/utils'
+import { formatMobile } from '@/lib/phone'
 import { getLedgerEntries, markMatched } from '@/lib/harvest-ledger'
 import { matchRecording } from '@/lib/harvest-match'
 
@@ -142,7 +143,7 @@ export function UnmatchedTrayClient({
     { value: '', label: 'Pick a family…' },
     ...groups.map((g) => ({
       value: g.id,
-      label: `${g.head_name}${g.primary_mobile ? ` · ${g.primary_mobile}` : ''}`,
+      label: `${g.head_name}${g.primary_mobile ? ` · ${formatMobile(g.primary_mobile)}` : ''}`,
     })),
   ]
 

@@ -15,6 +15,7 @@ import { PlusIcon, BuildingIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
 import { updateHotel } from '@/lib/actions/hotels'
 import { deleteRoom } from '@/lib/actions/hotels'
+import { lostResponseMessage } from '@/lib/errors'
 
 interface Props {
   hotelId: string
@@ -84,19 +85,34 @@ export function HotelDetailClient({ hotelId, eventId, eventCode, initial }: Prop
 
   async function handleSave() {
     setSubmitting(true)
-    const result = await updateHotel(hotelId, eventId, { name, address: address || null, contactName: contactName || null, contactMobile: contactMobile || null, notes: notes || null })
-    if (result.ok) { setEditing(false); router.refresh() }
-    else setError(result.error ?? 'Failed')
-    setSubmitting(false)
+    setError(null)
+    try {
+      const result = await updateHotel(hotelId, eventId, { name, address: address || null, contactName: contactName || null, contactMobile: contactMobile || null, notes: notes || null })
+      if (result.ok) { setEditing(false); router.refresh() }
+      else setError(result.error ?? 'Failed')
+    } catch {
+      // The action can REJECT rather than return (a dropped connection), which
+      // used to leave "Saving…" on the button forever. The update may still
+      // have landed, so the sentence says so and names the hotel list.
+      setError(lostResponseMessage('the hotel list'))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   async function handleDeleteRoom(roomId: string, roomNumber: string) {
     // Deleting a room is not undoable and the control sits next to Edit, one
     // thumb-width away. It asked nothing before.
     if (!window.confirm(`Delete room ${roomNumber}?\n\nThis cannot be undone.`)) return
-    const result = await deleteRoom(roomId, eventId)
-    if (result.ok) setRooms(r => r.filter(r => r.id !== roomId))
-    else alert(result.error)
+    try {
+      const result = await deleteRoom(roomId, eventId)
+      if (result.ok) setRooms(r => r.filter(r => r.id !== roomId))
+      else setError(result.error ?? 'The room was not deleted.')
+    } catch {
+      // Same rejection shape as the save above, and the delete may have gone
+      // through — so never claim it did not.
+      setError(lostResponseMessage('the room list'))
+    }
   }
 
   return (

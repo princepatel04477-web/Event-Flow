@@ -32,10 +32,10 @@ const SELECTED: Record<StatusTone, string> = {
  * that shape belongs to buttons and segments, and the whole point is that a
  * chip and a commit button never look alike.
  *
- * 40px tall, which is the v3 chip height. That is under the 44px tap
- * minimum on purpose: a chip is a wide target (a short label plus `px-3.5`
- * either side puts the smallest of them past 44px across) and a 40px pill
- * is what lets a five-chip filter row sit on one line at 360px.
+ * 44px tall, the app's tap floor. It used to be 40px on the theory that a
+ * wide pill is a large enough target on its own, but `.tap` only sets
+ * `touch-action` — it carries no minimum height — so the smallest chips sat
+ * under 44px with nothing enforcing the floor (m4).
  */
 export function Chip({ selected, children, tone = 'active', className, ...props }: ChipProps) {
   return (
@@ -43,7 +43,7 @@ export function Chip({ selected, children, tone = 'active', className, ...props 
       type="button"
       aria-pressed={selected}
       className={cn(
-        'tap inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border px-4',
+        'tap inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border px-4',
         'text-sm leading-none font-medium whitespace-nowrap',
         'transition-colors duration-press ease-ledger',
         selected

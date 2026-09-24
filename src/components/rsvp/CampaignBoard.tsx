@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { LinkButton } from '@/components/ui/LinkButton'
 import { Progress } from '@/components/ui/Progress'
 import {
@@ -12,6 +14,7 @@ import {
   startCampaign,
 } from '@/lib/actions/campaigns'
 import { dialNextCampaignJob } from '@/lib/actions/outbound'
+import { campaignBoardFace } from '@/lib/rsvp/campaign-board'
 import { formatCount } from '@/lib/utils'
 import { GrokTestCall } from '@/components/rsvp/GrokTestCall'
 import { PhoneIcon } from '@/components/icons'
@@ -44,6 +47,7 @@ export function CampaignBoard({
   campaigns,
   guestCount,
   staffCount,
+  loadError = null,
   grokConfigured,
 }: {
   eventId: string
@@ -51,8 +55,14 @@ export function CampaignBoard({
   campaigns: CampaignRow[]
   guestCount: number
   staffCount: number
+  /**
+   * Set when the server could not read the counts or could not create/read the
+   * rounds. A reported failure — NEVER rendered as "import the guest list".
+   */
+  loadError?: string | null
   grokConfigured: boolean
 }) {
+  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -74,7 +84,25 @@ export function CampaignBoard({
     })
   }
 
-  if (guestCount === 0) {
+  const face = campaignBoardFace({
+    loadError,
+    guestCount,
+    campaignCount: campaigns.length,
+  })
+
+  if (face === 'load-error') {
+    return (
+      <div className="flex flex-col gap-4 pb-nav">
+        <ErrorState
+          title={loadError ?? 'Could not load the calling board.'}
+          description="Nothing was lost. Try again in a moment."
+          onRetry={() => router.refresh()}
+        />
+      </div>
+    )
+  }
+
+  if (face === 'no-families') {
     return (
       <div className="flex flex-col gap-4 pb-nav">
         <EmptyState

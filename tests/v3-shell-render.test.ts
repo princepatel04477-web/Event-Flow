@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
+import { SyncChip } from '@/components/ui/SyncChip'
 import { BottomBar } from '@/components/ui/BottomBar'
 import { Initials, StatusDot } from '@/components/ui/RowParts'
 import { NowCard } from '@/components/ui/NowCard'
@@ -230,10 +231,43 @@ describe('Chip', () => {
     expect(off).not.toContain('bg-brand-tint')
   })
 
-  it('stays a pill and keeps 40px of height', () => {
+  it('stays a pill and keeps the 44px tap floor', () => {
     const html = render(h(Chip, { selected: true, children: 'All' }))
     expect(html).toContain('rounded-full')
-    expect(html).toContain('min-h-10')
+    expect(html).toContain('min-h-11')
+  })
+})
+
+describe('SyncChip', () => {
+  it('meets the 44px tap floor — `.tap` sets no minimum height on its own', () => {
+    const html = render(h(SyncChip, { count: 3, what: 'delivery' }))
+    expect(html).toContain('min-h-11')
+  })
+
+  it('renders nothing when there is nothing queued', () => {
+    expect(render(h(SyncChip, { count: 0, what: 'delivery' }))).toBe('')
+  })
+})
+
+describe('disabled controls', () => {
+  it('a disabled button greys to a neutral surface instead of fading', () => {
+    // m5: `disabled:opacity-55` composited the control to ~2:1 and read as a
+    // rendering glitch. The replacement is a real surface + `text-muted`, with
+    // no opacity anywhere in the class list.
+    const html = render(h(Button, { disabled: true }, 'Save'))
+    // Read the class ATTRIBUTE, not the first quoted attribute (`type`).
+    const classes = (/class="([^"]*)"/.exec(html)?.[1] ?? '').split(/\s+/)
+    expect(classes).toContain('disabled:bg-surface-2')
+    expect(classes).toContain('disabled:text-muted')
+    expect(classes).toContain('disabled:border-rule')
+    expect(classes.filter((c) => c.includes('opacity'))).toEqual([])
+  })
+
+  it('a stepper button at its range end greys rather than fades', () => {
+    const html = render(h(Stepper, { label: 'Kids', value: 0, onChange: () => {} }))
+    expect(html).toContain('disabled:bg-surface-2')
+    expect(html).toContain('disabled:text-muted')
+    expect(html).not.toContain('opacity-40')
   })
 })
 

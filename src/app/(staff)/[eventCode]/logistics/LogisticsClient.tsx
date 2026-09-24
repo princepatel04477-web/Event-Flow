@@ -335,7 +335,7 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
                   {proposal.unplaced.map((u) => (
                     <li key={u.travelLegId} className="rounded-lg border border-tint-danger bg-surface-2 px-3 py-2 text-sm">
                       <p className="font-medium text-fg">
-                        {u.headName} ({u.pax} PAX)
+                        {u.headName} ({u.pax} {u.pax === 1 ? 'guest' : 'guests'})
                       </p>
                       {u.date && u.time && (
                         <p className="text-xs text-muted">

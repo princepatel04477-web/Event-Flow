@@ -22,6 +22,7 @@ import {
   type ReviewFormValues,
 } from '@/lib/review/payload'
 import { getConfidence, LOW_CONFIDENCE_THRESHOLD } from '@/lib/review/confidence'
+import { invalidNumberMessage } from '@/lib/review/invalid-number-copy'
 /**
  * A single field the AI extracted, presented as a review decision.
  * `path` is the FORM key (matches fieldValueMap / buildRpcPayload); `label`
@@ -397,6 +398,24 @@ export function ReviewPanel({
         </div>
       ) : null}
 
+      {/* The reason the primary is disabled when a guest count is not a whole
+          number. Without this the summary read "Every field decided" and the
+          reviewer had nothing to act on. */}
+      {invalidNumbers.length > 0 ? (
+        <div className="rounded-xl border border-ledger-red/40 bg-red-tint px-3.5 py-3 text-sm text-ledger-red">
+          <p className="font-semibold">
+            {invalidNumbers.length === 1
+              ? 'One field needs a whole number.'
+              : `${invalidNumbers.length} fields need whole numbers.`}
+          </p>
+          <ul className="mt-0.5 flex flex-col gap-0.5" role="list">
+            {invalidNumbers.map((n) => (
+              <li key={n.field}>{invalidNumberMessage(n.label)}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {summaryOpen ? (
         <CommitSummary fields={fields} decisions={decisions} values={values} />
       ) : null}
@@ -418,7 +437,7 @@ export function ReviewPanel({
         summary={
           unresolved.length > 0
             ? `${unresolved.length} of ${fields.length} still need a decision`
-            : clearAttempts.length > 0
+            : clearAttempts.length > 0 || invalidNumbers.length > 0
               ? 'Fix the flagged fields before committing'
               : 'Every field decided'
         }

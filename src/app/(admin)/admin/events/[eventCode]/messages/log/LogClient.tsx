@@ -16,6 +16,7 @@ import {
   type MessageLogRow,
   type MessageLogFilter,
 } from '@/lib/actions/messages'
+import { lostResponseMessage } from '@/lib/errors'
 
 interface Props {
   eventId: string
@@ -56,17 +57,29 @@ export function LogClient({ eventId }: Props) {
 
   const handleRetry = async (messageId: string) => {
     setRetrying(messageId)
-    const result = await retryMessage(messageId)
-    if (result.ok) {
-      await load(filter)
-    } else {
+    try {
+      const result = await retryMessage(messageId)
+      if (result.ok) {
+        await load(filter)
+      } else {
+        setPhase((prev) =>
+          prev.stage === 'ready'
+            ? { ...prev, actionError: result.error ?? 'Retry failed.' }
+            : prev,
+        )
+      }
+    } catch {
+      // The action can REJECT rather than return (a dropped connection). With
+      // no catch the whole handler rejected, `setRetrying(null)` never ran, and
+      // that row's button read "Retrying…" for the rest of the session.
       setPhase((prev) =>
         prev.stage === 'ready'
-          ? { ...prev, actionError: result.error ?? 'Retry failed.' }
+          ? { ...prev, actionError: lostResponseMessage('the message log') }
           : prev,
       )
+    } finally {
+      setRetrying(null)
     }
-    setRetrying(null)
   }
 
   if (phase.stage === 'loading') {

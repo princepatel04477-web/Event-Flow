@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
 import { readImportContext } from '@/lib/actions/import'
-import { requireAdmin, resolveEventByCode } from '@/lib/supabase/queries'
+import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 
 import { ImportPreview } from './_components/ImportPreview'
 
@@ -33,20 +33,24 @@ export default async function ImportPage({ params }: PageProps) {
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
 
-  // Import is admin-only. Two separate reasons, worth keeping apart:
+  // NOT admin-only any more, and the nav no longer claims it is.
   //
-  // 1. Honesty. The (staff) layout only proves membership, and
-  //    `app.is_member()` is true for a client-role account. Left alone, a
-  //    client would get an import screen whose "already in this event" counts
-  //    read zero — because RLS hands them zero rows with no error. A
-  //    fabricated preview is worse than a locked door.
-  // 2. Product. RLS would in fact let an `event_team` member run the import;
-  //    the human decided one admin owns the file that turns an empty database
-  //    into 238 families. That is a restriction layered above the database,
-  //    not a security boundary — RLS remains the fence. To relax it, swap this
-  //    one call for `requireStaff` and add the Import tab back in BottomTabs.
-  //    No migration.
-  await requireAdmin(event.id, event.code, 'import')
+  // It WAS `requireAdmin(..., 'import')` while `SECTIONS.guests` advertised the
+  // Import child to `event_team` — so the tab rendered for a management lead on
+  // a code session and the page bounced them to Today with "Importing the guest
+  // list is an admin job". A tab that can only bounce is worse than no tab
+  // (`docs/BUGS.md` M5).
+  //
+  // The two things that make this safe are unchanged, and neither was ever the
+  // role gate:
+  //
+  // 1. The section layout above already runs `requireSection(..., 'guests')`, so
+  //    only management and admins reach this page at all — a client and every
+  //    other department are turned away one level up.
+  // 2. The screenshot review before the write is the protection (CLAUDE.md §5.6,
+  //    §15's "never cut: import preview"), not the role. `commitImport` has
+  //    always accepted `event_team`; RLS remains the fence.
+  await requireStaff(event.id, event.code)
 
   const context = await readImportContext(event.id)
 

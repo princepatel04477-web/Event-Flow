@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { archiveEvent, unarchiveEvent } from '@/lib/actions/events'
+import { lostResponseMessage } from '@/lib/errors'
 
 /**
  * Archive an event, or restore an archived one.
@@ -49,28 +50,41 @@ export function ArchiveEventCard({
   async function handleArchive() {
     setPending(true)
     setError(null)
-    const res = await archiveEvent(eventId, typed)
-    setPending(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const res = await archiveEvent(eventId, typed)
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setOpen(false)
+      setTyped('')
+      router.push('/admin/events')
+      router.refresh()
+    } catch {
+      // The action can REJECT rather than return (a dropped connection), which
+      // used to leave the button spinning for good. The archive may still have
+      // landed, so say so and point at the events list.
+      setError(lostResponseMessage('the events list'))
+    } finally {
+      setPending(false)
     }
-    setOpen(false)
-    setTyped('')
-    router.push('/admin/events')
-    router.refresh()
   }
 
   async function handleRestore() {
     setPending(true)
     setError(null)
-    const res = await unarchiveEvent(eventId)
-    setPending(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    try {
+      const res = await unarchiveEvent(eventId)
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      router.refresh()
+    } catch {
+      setError(lostResponseMessage('the events list'))
+    } finally {
+      setPending(false)
     }
-    router.refresh()
   }
 
   if (archivedAt) {

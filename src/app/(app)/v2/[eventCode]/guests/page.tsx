@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
+import { getStaffViewerContext } from '@/lib/auth/section-guard'
+import { mayOpenCallRecords } from '@/lib/departments'
 import { getEventAccess, resolveEventByCode } from '@/lib/supabase/queries'
 
 import { ClientGuestDirectory } from './_components/ClientGuestDirectory'
@@ -54,5 +56,17 @@ export default async function GuestsPage({ params }: PageProps) {
     return <ClientGuestDirectory eventId={event.id} />
   }
 
-  return <StaffGuestDirectory eventId={event.id} eventCode={event.code} from="guests" />
+  // Same server-side answer Find gets: this screen is reached from the header's
+  // search button by every department, and the record it can open is not open to
+  // all of them (`docs/BUGS.md` M3).
+  const department = (await getStaffViewerContext(event.id))?.department ?? null
+
+  return (
+    <StaffGuestDirectory
+      eventId={event.id}
+      eventCode={event.code}
+      from="guests"
+      canOpenFamilyRecord={mayOpenCallRecords(access, department)}
+    />
+  )
 }

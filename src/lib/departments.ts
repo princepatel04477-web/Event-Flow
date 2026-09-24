@@ -131,6 +131,50 @@ export function sectionAllowedForDepartment(
 }
 
 /**
+ * May this department open the hamper run?
+ *
+ * The hamper run is the ONE screen in v2 whose audience is the union of two
+ * departments: the hamper team, whose whole job it is, and the hospitality
+ * team, whose copy of it lives under the hospitality section
+ * (`/hospitality/deliveries`, and the `?denied=section` tunnel it shares with
+ * Rooms). Every other screen belongs to exactly one department.
+ *
+ * A pure predicate, deliberately: the hospitality section layout, the hamper
+ * section layout and the `deliveries` page guard all ask the same question, and
+ * three copies of `sectionAllowedForDepartment(...) || ...` is how one of them
+ * ends up narrower than the others — which is exactly the bug this replaces
+ * (a hospitality runner bounced off the hamper run, `docs/BUGS.md` M7).
+ */
+export function mayOpenHamperRun(department: StaffDepartment | null): boolean {
+  return (
+    sectionAllowedForDepartment('hospitality', department) ||
+    sectionAllowedForDepartment('hamper', department)
+  )
+}
+
+/**
+ * May this viewer open a family's RSVP record (`/{event}/rsvp/status/{id}`)?
+ *
+ * That record is behind `requireSection(..., 'rsvp')`, which admits management
+ * and admins only. The search button is in EVERY header, so every department
+ * reaches Find and its guest sheet — and the sheet's maroon "Open the family
+ * record" button used to be offered to all of them, bouncing hospitality,
+ * travel, hamper and production runners back to their own section with a
+ * `?denied=section` marker their home screen does not render (a silent bounce,
+ * `docs/BUGS.md` M3).
+ *
+ * Answered server-side, where the department is known, and passed down as a
+ * prop: a client-side guess would put the button back the moment the props
+ * changed.
+ */
+export function mayOpenCallRecords(
+  access: 'admin' | 'event_team',
+  department: StaffDepartment | null,
+): boolean {
+  return access === 'admin' || sectionAllowedForDepartment('rsvp', department)
+}
+
+/**
  * Map the first URL segment under the event code to the section that guards it.
  *
  * Only real routes appear here. This used to also carry aliases for the flat

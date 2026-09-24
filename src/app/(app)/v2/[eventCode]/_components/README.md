@@ -170,9 +170,10 @@ options maximum. For a multi-select filter use `Chip` instead.
 </Chip>
 ```
 
-A filter or a choice, 40px, maroon when selected (`tone` defaults to
+A filter or a choice, 44px (`min-h-11`), maroon when selected (`tone` defaults to
 `active`; pass a `StatusTone` when the chip *is* the status, e.g. the RSVP
-outcome picker).
+outcome picker). The height is the 44px tap floor, not the 40px it used to be —
+a chip is hit with a thumb like everything else here.
 
 ## `Stepper` — `@/components/ui/Stepper`
 

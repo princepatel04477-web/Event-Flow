@@ -23,7 +23,10 @@ export default async function CampaignsPage({ params }: PageProps) {
   await requireSection(event.id, event.code, 'rsvp')
 
   const supabase = await createClient()
-  const [{ count: guestCount }, { count: staffCount }] = await Promise.all([
+  const [
+    { count: guestCount, error: guestError },
+    { count: staffCount, error: staffError },
+  ] = await Promise.all([
     supabase
       .from('guest_groups')
       .select('id', { count: 'exact', head: true })
@@ -35,7 +38,20 @@ export default async function CampaignsPage({ params }: PageProps) {
       .eq('is_active', true),
   ])
 
-  const campaigns = await ensureCampaigns(event.id, event.code, event.starts_on)
+  const campaignsResult = await ensureCampaigns(event.id, event.code, event.starts_on)
+
+  // A failed read is NOT an empty event. Both counters are load-bearing — the
+  // guest count drives the empty-state sentence and the staff count drives the
+  // "add staff names" warning — so a refusal on either one must reach the
+  // screen as a load failure, never as `0` and a confident instruction.
+  const countsError = guestError ?? staffError
+  const loadError = countsError
+    ? 'Could not load the calling board. Check your connection and try again.'
+    : campaignsResult.ok
+      ? null
+      : campaignsResult.error
+
+  const campaigns = campaignsResult.ok ? campaignsResult.campaigns : []
 
   const grokConfigured = Boolean(process.env.XAI_API_KEY)
 
@@ -46,6 +62,7 @@ export default async function CampaignsPage({ params }: PageProps) {
       campaigns={campaigns}
       guestCount={guestCount ?? 0}
       staffCount={staffCount ?? 0}
+      loadError={loadError}
       grokConfigured={grokConfigured}
     />
   )

@@ -20,6 +20,10 @@ import {
   ShieldAlertIcon,
   UsersIcon,
 } from '@/components/icons'
+// The single side/group-type label map in the app. Reusing it keeps this
+// screen from printing the raw enum values (`bride`, `couple`, …) to staff —
+// and from inventing a second, drifting map (m8).
+import { groupTypeLabel, sideLabel } from '../../../guests/_components/format'
 
 import { RoomSuggestPanel } from './RoomSuggestPanel'
 
@@ -191,7 +195,8 @@ export function AllocateClient({ eventId, eventCode, data }: Props) {
                 >
                   <span className="font-medium">{share.hotelName} · Room {share.roomNumber}</span>
                   {' — '}
-                  {share.headNames.join(' + ')} ({share.side})
+                  {share.headNames.join(' + ')}
+                  {share.side ? ` (${sideLabel(share.side)})` : ''}
                 </li>
               ))}
             </ul>
@@ -214,14 +219,19 @@ export function AllocateClient({ eventId, eventCode, data }: Props) {
 
       {/* Placed families */}
       <div className="flex flex-col gap-3">
-        {result.placed.map((pg) => (
+        {result.placed.map((pg) => {
+          const side = sideLabel(pg.side)
+          const groupType = groupTypeLabel(pg.groupType)
+          return (
           <Card key={pg.groupId}>
             <CardBody>
               <div className="mb-2 flex items-center gap-2">
                 <h3 className="font-semibold text-fg">{pg.headName}</h3>
-                <Badge tone="info" size="sm">{pg.side}</Badge>
-                <Badge tone="neutral" size="sm">{pg.groupType}</Badge>
-                <Badge tone="neutral" size="sm">{pg.paxToPlace} PAX</Badge>
+                {side ? <Badge tone="info" size="sm">{side}</Badge> : null}
+                {groupType ? <Badge tone="neutral" size="sm">{groupType}</Badge> : null}
+                <Badge tone="neutral" size="sm">
+                  {pg.paxToPlace} {pg.paxToPlace === 1 ? 'guest' : 'guests'}
+                </Badge>
                 <CheckCircleIcon className="ml-auto h-5 w-5 text-success" />
               </div>
               {pg.rooms.length === 0 ? (
@@ -253,22 +263,29 @@ export function AllocateClient({ eventId, eventCode, data }: Props) {
               )}
             </CardBody>
           </Card>
-        ))}
+          )
+        })}
 
         {/* Unplaced families */}
-        {result.unplaced.map((pg) => (
+        {result.unplaced.map((pg) => {
+          const side = sideLabel(pg.side)
+          const groupType = groupTypeLabel(pg.groupType)
+          return (
           <Card key={pg.groupId}>
             <CardBody>
               <div className="mb-2 flex items-center gap-2">
                 <h3 className="font-semibold text-fg">{pg.headName}</h3>
-                <Badge tone="info" size="sm">{pg.side}</Badge>
-                <Badge tone="neutral" size="sm">{pg.groupType}</Badge>
-                <Badge tone="neutral" size="sm">{pg.paxToPlace} PAX</Badge>
+                {side ? <Badge tone="info" size="sm">{side}</Badge> : null}
+                {groupType ? <Badge tone="neutral" size="sm">{groupType}</Badge> : null}
+                <Badge tone="neutral" size="sm">
+                  {pg.paxToPlace} {pg.paxToPlace === 1 ? 'guest' : 'guests'}
+                </Badge>
               </div>
               <p className="text-sm text-danger">{pg.failureReason}</p>
             </CardBody>
           </Card>
-        ))}
+          )
+        })}
       </div>
 
       {result.placed.length === 0 && result.unplaced.length === 0 && (

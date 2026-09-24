@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import { SignOutButton } from '@/components/auth/SignOutButton'
@@ -27,13 +28,25 @@ interface AppHeaderProps {
     memberships: Membership[]
   }
   /**
-   * Rendered for every staff viewer; unused by the header itself now that
-   * Help moved into the Today screen (SPEC-V3 §3). Kept on the props so the
-   * shell keeps passing the server's answer about whether this viewer is
-   * staff, and so restoring a help affordance here is a one-line change
-   * rather than a plumbing change.
+   * Rendered for every staff viewer. Help also has a small link at the foot of
+   * Today, but Today is not a screen a department runner ever sees — the v2 home
+   * redirects them to their own section — so the cheat sheet that carries
+   * CLAUDE.md §11b's "do not reload" line was unreachable for exactly the people
+   * it is written for. One row here is the reachable copy (`docs/BUGS.md` M35).
    */
   showHelp: boolean
+  /**
+   * Whether this viewer may open the guests section.
+   *
+   * The guests screens (list, import, export) are NOT in the v3 bottom bar —
+   * Find replaced the tab — and the only other door was Today's empty-state card,
+   * which renders only while the event has no guests. So on a live event the
+   * Excel export job could not be started at all; inside the APK there is no URL
+   * bar to type it into (`docs/BUGS.md` M33). This row is the door, and the
+   * guests section layout renders the list | import | export strip once it is
+   * open.
+   */
+  showGuests: boolean
 }
 
 /**
@@ -61,7 +74,7 @@ interface AppHeaderProps {
  * WHAT STAYED: the search button, which is now the ONLY way into Find — and
  * therefore the only way to reach Guests, which is no longer a tab.
  */
-export function AppHeader({ event, viewer }: AppHeaderProps) {
+export function AppHeader({ event, viewer, showHelp, showGuests }: AppHeaderProps) {
   const pathname = usePathname()
   const { rest } = splitEventPath(pathname)
 
@@ -100,6 +113,28 @@ export function AppHeader({ event, viewer }: AppHeaderProps) {
               <span className="text-sm font-medium text-ink">Admin</span>
               <AdminLink show />
             </div>
+          ) : null}
+
+          {/* The two secondary jobs that have no home in the v3 bar:
+              the guest list with its import/export screens, and Help. Both are
+              about the SESSION rather than this screen, which is what this menu
+              is for. */}
+          {showGuests ? (
+            <Link
+              href={`/${event.code}/guests`}
+              className="tap flex min-h-11 items-center rounded-xl px-1 text-sm font-medium text-ink hover:bg-surface-2 active:bg-surface-2"
+            >
+              Guest list · import · export
+            </Link>
+          ) : null}
+
+          {showHelp ? (
+            <Link
+              href={`/${event.code}/help`}
+              className="tap flex min-h-11 items-center rounded-xl px-1 text-sm font-medium text-ink hover:bg-surface-2 active:bg-surface-2"
+            >
+              How this app works
+            </Link>
           ) : null}
 
           <div className="mt-1 flex min-h-11 items-center border-t border-rule pt-2">

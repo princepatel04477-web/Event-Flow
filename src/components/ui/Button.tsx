@@ -52,17 +52,19 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * and a chip is not pressable-to-commit. Keeping the two shapes apart means a
  * caller can tell what a control does before reading it.
  *
- * NEVER FADED AT REST (v3 rule). `disabled:opacity-55` survives because a
- * genuinely disabled control must look inert, but nothing here dims a
- * button that is merely sitting on a screen — there is no `opacity` on the
- * base, and no variant washes its own colour out.
+ * NEVER FADED AT REST (v3 rule). There is no `opacity` on the base and no
+ * variant washes its own colour out, so a button merely sitting on a screen is
+ * at full strength. A genuinely DISABLED button is not faded either: it drops
+ * to a neutral surface with `text-muted` instead of `disabled:opacity-55`,
+ * which composited to ~2:1 and read as a rendering glitch rather than a
+ * control in a bright lobby (m5).
  */
 const BASE =
   'tap inline-flex items-center justify-center gap-2 rounded-xl border font-semibold ' +
   'leading-none whitespace-nowrap select-none ' +
   'transition-[background-color,border-color,color] duration-press ease-ledger ' +
-  'disabled:cursor-not-allowed disabled:opacity-55 ' +
-  'aria-disabled:opacity-55'
+  'disabled:cursor-not-allowed disabled:border-rule disabled:bg-surface-2 disabled:text-muted ' +
+  'aria-disabled:border-rule aria-disabled:bg-surface-2 aria-disabled:text-muted'
 
 const VARIANTS: Record<ButtonVariant, string> = {
   // Maroon fill, white text (10.0:1), and the only solid maroon fill on any

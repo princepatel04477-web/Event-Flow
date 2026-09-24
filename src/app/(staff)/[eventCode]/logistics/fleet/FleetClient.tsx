@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/Button'
+import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { PageTitle } from '@/components/ui/PageTitle'
 import { StatusPill } from '@/components/ui/StatusPill'
@@ -11,9 +12,15 @@ import { CarIcon, PlusIcon, ShieldAlertIcon } from '@/components/icons'
 import {
   readFleet,
   deleteVehicle,
+  setVehicleAvailability,
   type FleetData,
   type VehicleRow,
 } from '@/lib/actions/fleet'
+import {
+  availabilityActionLabel,
+  removeVehicleConsequence,
+  removeVehicleQuestion,
+} from '@/lib/fleet/remove-vehicle-copy'
 import { QuickAddVehicles } from '@/components/fleet/QuickAddVehicles'
 import { DriverRoster } from '@/components/fleet/DriverRoster'
 import { OdometerEntry, OdometerRecent } from '@/components/fleet/OdometerEntry'
@@ -42,15 +49,33 @@ export function FleetClient({ eventId }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [confirmVehicle, setConfirmVehicle] = useState<VehicleRow | null>(null)
 
   const { data, loading, error, reload } = useStableData<FleetData>(
     `fleet:${eventId}`,
     () => traceFetch('fleet :: readFleet', () => readFleet(eventId)),
   )
 
+  /** Irreversible — only ever called from the confirmation sheet. */
   const handleRemove = async (vehicleId: string) => {
     setSaving(true)
+    setActionError(null)
     const result = await deleteVehicle(vehicleId)
+    if (result.ok) {
+      setConfirmVehicle(null)
+      await reload()
+    } else {
+      setActionError(result.error)
+    }
+    setSaving(false)
+  }
+
+  /** The reversible move: out of service, or back in it. */
+  const handleToggleAvailability = async (vehicle: VehicleRow) => {
+    setSaving(true)
+    setActionError(null)
+    const next = vehicle.status === 'unavailable' ? 'available' : 'unavailable'
+    const result = await setVehicleAvailability(vehicle.id, next)
     if (result.ok) {
       await reload()
     } else {
@@ -168,12 +193,57 @@ export function FleetClient({ eventId }: Props) {
               key={v.id}
               vehicle={v}
               index={i}
-              onRemove={() => handleRemove(v.id)}
-              removing={saving}
+              onToggleAvailability={() => void handleToggleAvailability(v)}
+              onRequestRemove={() => {
+                setActionError(null)
+                setConfirmVehicle(v)
+              }}
+              busy={saving}
             />
           ))}
         </div>
       )}
+
+      {/* The confirmation for the ONE irreversible act on this screen. It names
+          the vehicle and its registration number before anything is deleted. */}
+      <BottomSheet
+        open={confirmVehicle !== null}
+        onClose={() => setConfirmVehicle(null)}
+        label={confirmVehicle ? removeVehicleQuestion(confirmVehicle) : 'Remove vehicle'}
+      >
+        {confirmVehicle ? (
+          <div className="flex flex-col gap-5">
+            <div className="min-w-0">
+              <h2 className="font-display text-2xl leading-tight font-semibold text-ink">
+                {removeVehicleQuestion(confirmVehicle)}
+              </h2>
+              <p className="mt-2 text-sm text-muted">{removeVehicleConsequence()}</p>
+            </div>
+
+            {actionError ? (
+              <p
+                role="alert"
+                className="rounded-xl border border-ledger-red/40 bg-red-tint px-3.5 py-3 text-sm font-medium text-ledger-red"
+              >
+                {actionError}
+              </p>
+            ) : null}
+
+            <Button
+              variant="danger"
+              size="lg"
+              fullWidth
+              disabled={saving}
+              onClick={() => void handleRemove(confirmVehicle.id)}
+            >
+              {saving ? 'Removing…' : 'Remove for good'}
+            </Button>
+            <Button variant="ghost" size="lg" fullWidth onClick={() => setConfirmVehicle(null)}>
+              Keep it
+            </Button>
+          </div>
+        ) : null}
+      </BottomSheet>
     </div>
   )
 }
@@ -191,13 +261,15 @@ export function FleetClient({ eventId }: Props) {
 function VehicleCard({
   vehicle,
   index,
-  onRemove,
-  removing,
+  onToggleAvailability,
+  onRequestRemove,
+  busy,
 }: {
   vehicle: VehicleRow
   index: number
-  onRemove: () => void
-  removing: boolean
+  onToggleAvailability: () => void
+  onRequestRemove: () => void
+  busy: boolean
 }) {
   const status = STATUS_META[vehicle.status] ?? STATUS_META.available
 
@@ -268,14 +340,27 @@ function VehicleCard({
         </dl>
       ) : null}
 
-      <button
-        type="button"
-        disabled={removing}
-        onClick={onRemove}
-        className="tap mt-3 flex min-h-11 w-full items-center justify-center rounded-lg border border-rule-strong font-mono text-xs tracking-eyebrow text-muted uppercase active:bg-surface-2 active:text-ledger-red disabled:opacity-55"
-      >
-        Remove
-      </button>
+      <div className="mt-3 flex flex-col gap-2">
+        {/* The quiet default is the reversible one: taking the vehicle out of
+            service keeps its odometer readings and trip history. */}
+        <Button
+          variant="secondary"
+          size="md"
+          fullWidth
+          disabled={busy}
+          onClick={onToggleAvailability}
+        >
+          {availabilityActionLabel(vehicle.status)}
+        </Button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onRequestRemove}
+          className="tap flex min-h-11 w-full items-center justify-center rounded-lg border border-rule-strong font-mono text-xs tracking-eyebrow text-muted uppercase active:bg-surface-2 active:text-ledger-red disabled:opacity-55"
+        >
+          Remove…
+        </button>
+      </div>
     </div>
   )
 }

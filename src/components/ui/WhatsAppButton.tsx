@@ -43,8 +43,8 @@ export function WhatsAppButton({ mobile, name, className }: WhatsAppButtonProps)
         aria-label={who ? `WhatsApp ${who} — number unusable` : 'WhatsApp — number unusable'}
         title="No usable WhatsApp number on file"
         className={cn(
-          'tap inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2',
-          'text-muted/40',
+          'tap inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg bg-surface-2 px-2',
+          'text-muted',
           className,
         )}
       >

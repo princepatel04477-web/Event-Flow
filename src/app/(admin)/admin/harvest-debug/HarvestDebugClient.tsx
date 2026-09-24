@@ -17,19 +17,16 @@ import {
   stopWatching,
   onRecordingDetected,
   isHarvestAvailable,
-  type RecordingFile,
 } from '@/lib/harvest'
 import {
   getLedgerEntries,
   type HarvestLedgerEntry,
 } from '@/lib/harvest-ledger'
-
-interface FolderListing {
-  path: string
-  files: RecordingFile[]
-  loading: boolean
-  error?: string
-}
+import {
+  discoveredListings,
+  listingView,
+  type FolderListing,
+} from '@/lib/harvest-listings'
 
 interface DetectedLog {
   at: number
@@ -81,9 +78,8 @@ export function HarvestDebugClient() {
     try {
       const found = await discoverFolders()
       setFolders(found)
-      setFolderListings(
-        found.map((p) => ({ path: p, files: [], loading: true })),
-      )
+      // Found, not read. Each row starts unlisted — see `discoveredListing`.
+      setFolderListings(discoveredListings(found))
     } catch (e) {
       setError(`Discover failed: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
@@ -211,6 +207,7 @@ export function HarvestDebugClient() {
           ) : (
             folders.map((folder) => {
               const listing = folderListings.find((f) => f.path === folder)
+              const view = listingView(listing)
               return (
                 <div key={folder} className="rounded-xl bg-surface-2 p-3">
                   <p className="mb-2 text-xs break-all text-subtle">{folder}</p>
@@ -225,31 +222,37 @@ export function HarvestDebugClient() {
                       Stop
                     </Button>
                   </div>
-                  {listing?.loading ? (
+                  {/* One branch per honest state. "Loading…" is only ever
+                      rendered while a `listFiles` call is actually in flight,
+                      and an unlisted folder says so instead of implying it is
+                      empty or still working. */}
+                  {view.kind === 'loading' ? (
                     <p className="text-xs text-muted">Loading…</p>
-                  ) : listing?.error ? (
-                    <p className="text-xs text-ledger-red">{listing.error}</p>
-                  ) : listing?.files ? (
-                    listing.files.length === 0 ? (
-                      <p className="text-xs text-muted">Empty folder</p>
-                    ) : (
-                      <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto">
-                        {listing.files.map((f) => (
-                          <li key={f.path} className="flex items-center gap-2 text-xs">
-                            <span className="figure shrink-0 text-muted">
-                              {durLabel(durationResults.get(f.path))}
-                            </span>
-                            <span className="min-w-0 flex-1 truncate text-ink">{f.name}</span>
-                            <span className="figure shrink-0 text-subtle">{formatBytes(f.size)}</span>
-                            <span className="figure shrink-0 text-subtle">{formatAge(f.ageSec)}</span>
-                            <Button variant="ghost" size="sm" onClick={() => handleGetDuration(f.path)}>
-                              Duration
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    )
-                  ) : null}
+                  ) : view.kind === 'error' ? (
+                    <p className="text-xs text-ledger-red">{view.message}</p>
+                  ) : view.kind === 'unlisted' ? (
+                    <p className="text-xs text-muted">
+                      Not listed yet. Press List files to read this folder.
+                    </p>
+                  ) : view.kind === 'empty' ? (
+                    <p className="text-xs text-muted">Empty folder</p>
+                  ) : (
+                    <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto">
+                      {view.files.map((f) => (
+                        <li key={f.path} className="flex items-center gap-2 text-xs">
+                          <span className="figure shrink-0 text-muted">
+                            {durLabel(durationResults.get(f.path))}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-ink">{f.name}</span>
+                          <span className="figure shrink-0 text-subtle">{formatBytes(f.size)}</span>
+                          <span className="figure shrink-0 text-subtle">{formatAge(f.ageSec)}</span>
+                          <Button variant="ghost" size="sm" onClick={() => handleGetDuration(f.path)}>
+                            Duration
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )
             })

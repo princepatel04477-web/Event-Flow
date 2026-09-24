@@ -13,6 +13,7 @@ import {
   readDriverSheets,
   type DriverSheetTrip,
 } from '@/lib/actions/departures'
+import { copyText } from '@/lib/ui/copyText'
 
 interface Props {
   eventId: string
@@ -26,6 +27,8 @@ type Phase =
 export function DriverSheetsClient({ eventId }: Props) {
   const [phase, setPhase] = useState<Phase>({ stage: 'loading' })
   const [expandedTrip, setExpandedTrip] = useState<string | null>(null)
+  const [copiedTrip, setCopiedTrip] = useState<string | null>(null)
+  const [copyError, setCopyError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -48,7 +51,13 @@ export function DriverSheetsClient({ eventId }: Props) {
   // too, which desynced the SSR markup from the first client render and
   // produced a hydration mismatch on every visit. Fetching is a side effect
   // and belongs in an effect.
+  //
+  // The rule this disables is about setState in an effect body causing
+  // cascading renders; here the effect is the mount fetch and the state it
+  // sets is the fetch's result, which is the same mount-load shape the other
+  // seven screens in this repo disable the rule for (e.g. `LogClient.tsx:55`).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
   }, [load])
 
@@ -71,8 +80,15 @@ export function DriverSheetsClient({ eventId }: Props) {
     return lines.filter(Boolean).join('\n')
   }
 
-  const handleCopy = (trip: DriverSheetTrip) => {
-    navigator.clipboard.writeText(formatWhatsApp(trip))
+  const handleCopy = async (trip: DriverSheetTrip) => {
+    // Same treatment as the v3 screen: `writeText` rejects on an http origin
+    // or an unfocused WebView, so the label flips only when the write landed,
+    // and a failure tells the runner to copy by hand (m6).
+    setCopyError(null)
+    setCopiedTrip(null)
+    const result = await copyText(formatWhatsApp(trip))
+    if (result.ok) setCopiedTrip(trip.tripId)
+    else setCopyError(result.message)
   }
 
   const handleExportAll = () => {
@@ -144,7 +160,11 @@ export function DriverSheetsClient({ eventId }: Props) {
             <Card key={trip.tripId}>
               <button
                 type="button"
-                onClick={() => setExpandedTrip(isExpanded ? null : trip.tripId)}
+                onClick={() => {
+                  setExpandedTrip(isExpanded ? null : trip.tripId)
+                  setCopiedTrip(null)
+                  setCopyError(null)
+                }}
                 className="tap w-full text-left"
               >
                 <CardHeader>
@@ -203,7 +223,7 @@ export function DriverSheetsClient({ eventId }: Props) {
                           {f.headName}
                         </span>
                         <Badge tone="neutral" size="sm">
-                          {f.pax} PAX
+                          {f.pax} {f.pax === 1 ? 'guest' : 'guests'}
                         </Badge>
                         {f.contactNumber && (
                           <span className="text-xs text-muted">{f.contactNumber}</span>
@@ -217,11 +237,17 @@ export function DriverSheetsClient({ eventId }: Props) {
                     variant="secondary"
                     onClick={(e) => {
                       e.stopPropagation()
-                      handleCopy(trip)
+                      void handleCopy(trip)
                     }}
                   >
-                    Copy for WhatsApp
+                    {copiedTrip === trip.tripId ? 'Copied' : 'Copy for WhatsApp'}
                   </Button>
+
+                  {copyError ? (
+                    <p role="alert" className="mt-2 text-sm font-medium text-ledger-red">
+                      {copyError}
+                    </p>
+                  ) : null}
                 </CardBody>
               )}
             </Card>

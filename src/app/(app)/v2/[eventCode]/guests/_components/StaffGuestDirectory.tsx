@@ -33,6 +33,16 @@ export interface StaffGuestDirectoryProps {
    * empty state, and they differ because the reader arrived differently.
    */
   from?: 'find' | 'guests'
+  /**
+   * Whether this viewer may open a family's RSVP record.
+   *
+   * Resolved SERVER-SIDE (see `mayOpenCallRecords`) and required rather than
+   * defaulted: the destination is behind `requireSection(..., 'rsvp')`, which
+   * admits management and admins only, while the search button that reaches
+   * this screen is in every header. A default here would silently re-offer a
+   * button that bounces four of the five departments (`docs/BUGS.md` M3).
+   */
+  canOpenFamilyRecord: boolean
 }
 
 /**
@@ -62,7 +72,12 @@ export interface StaffGuestDirectoryProps {
  * failure as a load error — and the screen says, in one line, that search
  * needs a signal and offers the list that is already on the phone.
  */
-export function StaffGuestDirectory({ eventId, eventCode, from = 'find' }: StaffGuestDirectoryProps) {
+export function StaffGuestDirectory({
+  eventId,
+  eventCode,
+  from = 'find',
+  canOpenFamilyRecord,
+}: StaffGuestDirectoryProps) {
   const [term, setTerm] = useState('')
   const [debounced, setDebounced] = useState('')
   const [openIndex, setOpenIndex] = useState<number | null>(null)
@@ -218,11 +233,16 @@ export function StaffGuestDirectory({ eventId, eventCode, from = 'find' }: Staff
         guest={(open?.profile as GuestSheetData | undefined) ?? null}
         open={open !== null}
         onClose={() => setOpenIndex(null)}
-        // A result can open the family's record only when the read that found
-        // it knew the family id — the phone/name RPC does, the view's room
-        // match does not. A row without one opens the sheet read-only rather
-        // than linking to an empty path segment.
-        familyHref={open?.groupId ? `/${eventCode}/rsvp/status/${open.groupId}` : null}
+        // A result can open the family's record only when BOTH are true: the
+        // read that found it knew the family id (the phone/name RPC does, the
+        // view's room match does not) AND this viewer may open the record.
+        // A row with no id, or a viewer the RSVP guard would bounce, opens the
+        // sheet without the button rather than linking to a dead end.
+        familyHref={
+          canOpenFamilyRecord && open?.groupId
+            ? `/${eventCode}/rsvp/status/${open.groupId}`
+            : null
+        }
       />
     </div>
   )

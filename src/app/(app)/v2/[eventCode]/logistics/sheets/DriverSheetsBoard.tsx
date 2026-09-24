@@ -13,6 +13,7 @@ import { LinkButton } from '@/components/ui/LinkButton'
 import { LoadingRows } from '@/components/ui/LoadingRows'
 import { Row } from '@/components/ui/Row'
 import { readDriverSheets, type DriverSheetTrip } from '@/lib/actions/departures'
+import { copyText } from '@/lib/ui/copyText'
 
 export interface DriverSheetsBoardProps {
   eventId: string
@@ -41,6 +42,7 @@ export interface DriverSheetsBoardProps {
 export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps) {
   const [openTripId, setOpenTripId] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [copyError, setCopyError] = useState<string | null>(null)
 
   /**
    * The read, through TanStack Query rather than a `useEffect` + `useState`
@@ -72,9 +74,15 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
   const trips = data ?? null
   const openTrip = openTripId ? (trips ?? []).find((t) => t.tripId === openTripId) ?? null : null
 
-  function handleCopy(trip: DriverSheetTrip) {
-    void navigator.clipboard.writeText(formatWhatsApp(trip))
-    setCopied(trip.tripId)
+  async function handleCopy(trip: DriverSheetTrip) {
+    // `writeText` rejects on an http origin or an unfocused WebView. The label
+    // only flips once the write has actually landed, and a failure says so out
+    // loud — otherwise the runner pastes an empty clipboard into WhatsApp (m6).
+    setCopyError(null)
+    setCopied(null)
+    const result = await copyText(formatWhatsApp(trip))
+    if (result.ok) setCopied(trip.tripId)
+    else setCopyError(result.message)
   }
 
   function handleExport(tripsToWrite: readonly DriverSheetTrip[]) {
@@ -154,6 +162,7 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
               tone="neutral"
               onPress={() => {
                 setCopied(null)
+                setCopyError(null)
                 setOpenTripId(trip.tripId)
               }}
             />
@@ -212,7 +221,7 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
                     <Row
                       heading={family.headName}
                       meta={family.contactNumber ?? undefined}
-                      status={`${family.pax} pax`}
+                      status={`${family.pax} ${family.pax === 1 ? 'guest' : 'guests'}`}
                       tone="neutral"
                     />
                   </li>
@@ -220,9 +229,15 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
               </ul>
             </section>
 
-            <Button variant="secondary" size="lg" fullWidth onClick={() => handleCopy(openTrip)}>
+            <Button variant="secondary" size="lg" fullWidth onClick={() => void handleCopy(openTrip)}>
               {copied === openTrip.tripId ? 'Copied' : 'Copy for WhatsApp'}
             </Button>
+
+            {copyError ? (
+              <p role="alert" className="text-sm font-medium text-ledger-red">
+                {copyError}
+              </p>
+            ) : null}
 
             <Button
               variant="ghost"

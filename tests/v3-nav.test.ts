@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { SECTIONS, type TabAccess } from '@/lib/sections/config'
 import { v3ActiveChild, v3ActiveSection, v3ScreenTitle, v3TabsFor } from '@/lib/sections/v3'
-import type { StaffDepartment } from '@/lib/departments'
+import { STAFF_DEPARTMENTS, sectionAllowedForDepartment, type StaffDepartment } from '@/lib/departments'
 
 /**
  * The v3 bottom bar is **Today · Calls · Rooms · Hampers · Travel** and it is
@@ -68,13 +68,32 @@ describe('v3TabsFor — event lead', () => {
     }
   })
 
-  it('shows a full readable bar before a team member has picked their name', () => {
-    // No department on the JWT yet. The picker is what moves them on, but a
-    // runner who skips it must still be able to READ — the same reason the
-    // attribution CHECK was softened (CLAUDE.md §6). A bar that rendered
-    // nothing here would leave them on an empty dashboard with no way out.
+  it('gives a session that skipped the name picker Today alone', () => {
+    // A skipped-name team session has `department === null`, and
+    // `sectionAllowedForDepartment` admits that to `dashboard` only. It used to
+    // be treated as a lead and handed all five tabs, four of which bounced the
+    // tap straight back with `?denied=section` — controls that cannot work
+    // (docs/BUGS.md M1). v1 renders Home alone for this session; this matches it.
     const tabs = v3TabsFor(EV, 'event_team', null)
-    expect(labels(tabs)).toEqual(['Today', 'Calls', 'Rooms', 'Hampers', 'Travel'])
+    expect(labels(tabs)).toEqual(['Today'])
+    expect(hrefs(tabs)).toEqual([`/${EV}`])
+  })
+
+  it('never emits a tab the department would be bounced off', () => {
+    // The invariant behind M1, asserted across every viewer shape: a tab is a
+    // promise that tapping it opens something. `sectionAllowedForDepartment` is
+    // the same predicate `requireSection` gates on, so this is the nav's own
+    // copy of the guard's answer.
+    for (const access of ['admin', 'event_team'] as TabAccess[]) {
+      for (const department of [...STAFF_DEPARTMENTS, null]) {
+        for (const tab of v3TabsFor(EV, access, department)) {
+          expect(
+            access === 'admin' || sectionAllowedForDepartment(tab.sectionId, department),
+            `${access}/${department}: ${tab.label} → ${tab.href}`,
+          ).toBe(true)
+        }
+      }
+    }
   })
 })
 
