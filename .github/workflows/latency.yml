@@ -1,0 +1,178 @@
+# The latency gate — SPEC-PERF §Measurement, enforced on every pull request.
+#
+# WHAT THIS DOES
+#
+#   1. builds the v2 UI for production (the gate must measure what ships, never
+#      `next dev`: Turbopack's first compile of a route costs seconds and would
+#      land inside whichever screen is timed first),
+#   2. starts `next start` and waits for it to answer,
+#   3. runs `npm run latency:gate` — `scripts/latency.mjs` against `$BASE` — which
+#      exits non-zero when a GATED budget is missed:
+#          tap → first visual change  ≤ 120 ms
+#          tap → content (warm)       ≤ 120 ms
+#          save → shown done          ≤ 120 ms
+#      A cold first load is measured and reported but does NOT fail the gate:
+#      SPEC-PERF calls that budget informational (2500 ms on 4g).
+#   4. uploads `docs/LATENCY.md` (the generated table) as an artifact, always —
+#      a report you only get when the gate passes is a report nobody can read
+#      when it matters.
+#
+# THE SECRETS. The harness signs in through the real UI and seeds a few fixtures
+# with the service role, exactly as `e2e/helpers/auth.ts` and `e2e/v12-seed.mjs`
+# do. Repository secrets required:
+#
+#   E2E_TEAM_CODE, E2E_TEAM_STAFF, E2E_CLIENT_CODE, E2E_EVENT_ID,
+#   E2E_USER_A_EMAIL, E2E_USER_A_PASSWORD, E2E_USER_B_EMAIL, E2E_USER_B_PASSWORD,
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+#
+# THEY MUST BE THE **TEST PROJECT'S** VALUES, NEVER PRODUCTION'S. This job runs
+# on pull-request code, so anything it can read is a secret any PR author could
+# print. `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS completely; if it ever points
+# at the live event, this workflow is a data-exfiltration path. Use a scratch
+# project and a scratch event.
+#
+# A pull request from a FORK gets no secrets, so the credentials check below
+# fails with a message naming what is missing rather than letting Playwright
+# time out somewhere inside the login screen.
+#
+# The job's own cost: ~7 screens × 2 network profiles × 5 runs, so give it room.
+name: latency
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: latency-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: tap ≤120 ms
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      # Baked into the client bundle at build time, so it must be here and not
+      # only on the `next start` step.
+      NEXT_PUBLIC_UI: v2
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      # `scripts/latency.mjs` reads BASE — the one input SPEC-PERF names.
+      BASE: http://127.0.0.1:3000
+      NEXT_TELEMETRY_DISABLED: '1'
+      # Vitest/Vite are not used here, but Next's build is less chatty in CI.
+      CI: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22.6+ is REQUIRED: `scripts/latency.mjs` reuses
+      # `e2e/helpers/auth.ts` and runs the `.ts` file by type stripping.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Check the test credentials are present
+        env:
+          E2E_TEAM_CODE: ${{ secrets.E2E_TEAM_CODE }}
+          E2E_TEAM_STAFF: ${{ secrets.E2E_TEAM_STAFF }}
+          E2E_CLIENT_CODE: ${{ secrets.E2E_CLIENT_CODE }}
+          E2E_USER_A_EMAIL: ${{ secrets.E2E_USER_A_EMAIL }}
+          E2E_USER_A_PASSWORD: ${{ secrets.E2E_USER_A_PASSWORD }}
+          E2E_USER_B_EMAIL: ${{ secrets.E2E_USER_B_EMAIL }}
+          E2E_USER_B_PASSWORD: ${{ secrets.E2E_USER_B_PASSWORD }}
+          E2E_EVENT_ID: ${{ secrets.E2E_EVENT_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        # Names only — never a value. A fork PR has none of these.
+        run: |
+          missing=""
+          for key in E2E_TEAM_CODE E2E_TEAM_STAFF E2E_CLIENT_CODE \
+                     E2E_USER_A_EMAIL E2E_USER_A_PASSWORD \
+                     E2E_USER_B_EMAIL E2E_USER_B_PASSWORD \
+                     E2E_EVENT_ID SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!key}" ]; then missing="$missing $key"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::The latency gate needs these repository secrets:$missing (fork PRs cannot have them)."
+            exit 1
+          fi
+          echo "test credentials present"
+
+      # `.env.test` is what `e2e/helpers/env.ts` and `e2e/v12-seed.mjs` read.
+      # Values live in repository secrets and are only ever written to the
+      # runner's filesystem for the length of this job.
+      - name: Write .env.test from repository secrets
+        env:
+          E2E_TEAM_CODE: ${{ secrets.E2E_TEAM_CODE }}
+          E2E_TEAM_STAFF: ${{ secrets.E2E_TEAM_STAFF }}
+          E2E_CLIENT_CODE: ${{ secrets.E2E_CLIENT_CODE }}
+          E2E_USER_A_EMAIL: ${{ secrets.E2E_USER_A_EMAIL }}
+          E2E_USER_A_PASSWORD: ${{ secrets.E2E_USER_A_PASSWORD }}
+          E2E_USER_B_EMAIL: ${{ secrets.E2E_USER_B_EMAIL }}
+          E2E_USER_B_PASSWORD: ${{ secrets.E2E_USER_B_PASSWORD }}
+          E2E_EVENT_ID: ${{ secrets.E2E_EVENT_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          cat > .env.test <<EOF
+          E2E_BASE_URL=http://127.0.0.1:3000
+          E2E_TEAM_CODE=$E2E_TEAM_CODE
+          E2E_TEAM_STAFF=$E2E_TEAM_STAFF
+          E2E_CLIENT_CODE=$E2E_CLIENT_CODE
+          E2E_USER_A_EMAIL=$E2E_USER_A_EMAIL
+          E2E_USER_A_PASSWORD=$E2E_USER_A_PASSWORD
+          E2E_USER_B_EMAIL=$E2E_USER_B_EMAIL
+          E2E_USER_B_PASSWORD=$E2E_USER_B_PASSWORD
+          E2E_EVENT_ID=$E2E_EVENT_ID
+          SUPABASE_URL=$SUPABASE_URL
+          SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
+          EOF
+          echo "wrote .env.test ($(wc -l < .env.test) lines)"
+
+      - name: Build (NEXT_PUBLIC_UI=v2)
+        run: npm run build
+
+      - name: Start the production server
+        run: |
+          nohup npx next start -p 3000 > next-server.log 2>&1 &
+          echo "started next start (pid $!)"
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://127.0.0.1:3000/login; then
+              echo "server answered after ${i} polls"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::next start never answered on http://127.0.0.1:3000"
+          tail -n 80 next-server.log
+          exit 1
+
+      # The gate. Non-zero when a gated budget is missed, or when the run
+      # produced no numbers at all (a broken login must not read as a pass).
+      # Extra flags pass through: `npm run latency:gate -- --runs 3 --profile 4g`
+      - name: Run the latency gate
+        run: npm run latency:gate
+
+      - name: Upload the latency report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: latency-report
+          if-no-files-found: warn
+          path: |
+            docs/LATENCY.md
+            e2e/latency-results.json
+            next-server.log

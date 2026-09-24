@@ -20,6 +20,7 @@ import {
   slotKey,
   statusLabel,
   type TravelRow,
+  walkUpDoor,
 } from '@/app/(app)/v2/[eventCode]/logistics/_components/_travel'
 
 /**
@@ -293,5 +294,30 @@ describe('the lines a runner reads', () => {
     expect(nowContext(row({ roomLabel: '' }), 'departure', { todayKey: today, dayLabel })).toBe(
       'Ravi Kumar · 6 guests · Today · 10:30 · no room yet',
     )
+  })
+})
+
+describe('walkUpDoor', () => {
+  it('puts ONE door on a departure board, and moves it as the board fills', () => {
+    // Empty board: the empty state carries the button, and there is no header
+    // link to duplicate it. This is the state the bug report named.
+    expect(walkUpDoor('departure', 0)).toBe('empty-state')
+    // Anything on file: the link above the board is the door, because the empty
+    // state is gone and a form reachable only by URL is unreachable in the APK
+    // (docs/BUGS.md M30).
+    expect(walkUpDoor('departure', 1)).toBe('header')
+    expect(walkUpDoor('departure', 19)).toBe('header')
+  })
+
+  it('never offers a walk-up on arrivals — an arrival is not a walk-up', () => {
+    expect(walkUpDoor('arrival', 0)).toBe('none')
+    expect(walkUpDoor('arrival', 19)).toBe('none')
+  })
+
+  it('answers with exactly one door for every count, so the two can never both show', () => {
+    for (const count of [0, 1, 2, 50]) {
+      const door = walkUpDoor('departure', count)
+      expect(['header', 'empty-state'], `count ${count}`).toContain(door)
+    }
   })
 })

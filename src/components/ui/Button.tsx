@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import { cn } from '@/lib/utils'
 import { Spinner } from './Spinner'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
+export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost'
 /**
  * - `sm` 44px — the floor. An icon button, or a control inside a row.
  * - `md` 52px — the v3 secondary height, and the default for a secondary.
@@ -75,6 +75,31 @@ const VARIANTS: Record<ButtonVariant, string> = {
   // a fill is what keeps a secondary off the same visual plane as a primary.
   secondary:
     'border-[1.5px] border-rule-strong bg-surface text-ink hover:bg-surface-2 active:bg-surface-2',
+  /**
+   * The dial button on Calls, and the only solid green fill in the app.
+   *
+   * IT IS A VARIANT AND NOT A CALLER'S `className`, which is the whole point.
+   * `cn()` concatenates; it does not resolve Tailwind conflicts. Passing
+   * `bg-ledger-green text-paper` over `variant="secondary"` therefore left BOTH
+   * fills in the class attribute, and which one won was decided by the order the
+   * utilities land in the generated stylesheet — where `.bg-surface` is emitted
+   * AFTER `.bg-ledger-green`. The green lost, the fill stayed white, the text
+   * went `text-paper`, and the "Call" button rendered as off-white on white.
+   * A variant owns its colours, so there is nothing left to fight.
+   *
+   * Green is the palette's DONE/COMING colour; the Calls screen spends it on the
+   * one action that is "go" — dialling the family in front of you.
+   *
+   * White on `--ef-ledger-green` (#1E7A4F) is 5.3:1: AA for body text and
+   * unambiguous for a 44px control. `disabled:` wins back a neutral surface and
+   * muted ink — a disabled control must not still look like a green "go"
+   * (`:disabled` carries a pseudo-class, so it outranks the bare `bg-*` and
+   * `text-*` above whatever order the stylesheet emits them in).
+   */
+  success:
+    'border-transparent bg-ledger-green text-white ' +
+    'hover:bg-ledger-green-strong active:bg-ledger-green-strong ' +
+    'disabled:bg-surface-2 disabled:text-muted disabled:border-rule',
   danger:
     'border-transparent bg-ledger-red text-paper hover:bg-ledger-red-strong active:bg-ledger-red-strong',
   ghost: 'border-transparent bg-transparent text-ink hover:bg-surface-2 active:bg-surface-2',

@@ -59,6 +59,17 @@
  *
  *   npm run latency -- --runs 3 --profile 4g --screens "Rooms,Hampers"
  *   npm run latency -- --base https://nuvent-five.vercel.app --no-seed
+ *
+ * EXIT CODES — the contract CI depends on:
+ *
+ *   0  every GATED budget is inside its limit
+ *   1  a gated budget was missed, or the run produced no numbers at all
+ *   2  this environment could not start a browser, so no number exists
+ *
+ * `npm run latency:gate` is this script run as the gate: same defaults, `$BASE`
+ * as the base URL, non-zero on a missed gated budget. `.github/workflows/
+ * latency.yml` is the caller. A cold-load miss is a warning and does NOT fail
+ * the gate — SPEC-PERF calls that budget informational.
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
@@ -71,6 +82,7 @@ import {
   VIEWPORT,
   failures,
   formatMs,
+  gateExitCode,
   gradeRun,
   parseArgs,
   profilesFor,
@@ -764,10 +776,19 @@ async function main() {
       )
     }
 
-    // Exit 1 on a missed GATE only. A cold-load warning does not fail the
-    // command: SPEC-PERF calls that budget informational, and a command that goes
-    // red on an informational number stops being run at all.
-    return failed.length > 0 ? 1 : 0
+    // Exit 1 on a missed GATE only, plus the one case that must never read as a
+    // pass: a run that produced no numbers at all. The rule lives in
+    // `perf-core.mjs` so `tests/perf-core.test.ts` can hold it to both answers
+    // without a browser — this file only reports it. A cold-load warning does
+    // NOT fail the command: SPEC-PERF calls that budget informational, and a
+    // command that goes red on an informational number stops being run at all.
+    const code = gateExitCode(rows)
+    process.stdout.write(
+      code === 0
+        ? 'latency: gate PASS\n'
+        : 'latency: gate FAIL — a gated budget was missed, or nothing was measured\n',
+    )
+    return code
   } finally {
     await browser.close().catch(() => {})
     if (seeded) await unseed().catch(() => {})

@@ -28,6 +28,7 @@
     "test:all-feel": "npx playwright test --project=feel --project=phone",
     "tap-budget": "node scripts/tap-budget.mjs",
     "latency": "node scripts/latency.mjs",
+    "latency:gate": "node scripts/latency.mjs",
     "bundle-size": "node scripts/bundle-size.mjs"
   },
   "dependencies": {

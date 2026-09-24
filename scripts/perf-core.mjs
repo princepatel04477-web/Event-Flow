@@ -230,6 +230,36 @@ export function warnings(rows) {
   return rows.filter((r) => r.verdict === 'warn')
 }
 
+/**
+ * THE GATE — the exit code `npm run latency:gate` ends on.
+ *
+ * `0` means every GATED budget is inside its limit. `1` means the run is not
+ * allowed to pass, for one of exactly two reasons:
+ *
+ *   1. At least one gated budget was missed. The gate budgets are
+ *      tapToFirstChange, tapToContent and saveToShownDone, all ≤120 ms. A missed
+ *      COLD LOAD is a `warn`, not a failure: SPEC-PERF calls that budget
+ *      informational, and a command that goes red on an informational number
+ *      stops being run at all.
+ *   2. Nothing was measured. Every row `not measured` has zero failures, so the
+ *      naive "are there any failures?" check answers "all good" about a run that
+ *      produced no numbers whatsoever — a broken login, an unreachable screen, a
+ *      harness that never got a sample. `renderMarkdown` already refuses to print
+ *      that as a pass ("**Nothing was measured.**"); this is the same refusal in
+ *      the one place it can stop a merge.
+ *
+ * Pure, so `tests/perf-core.test.ts` can hold it to both answers without a
+ * browser.
+ *
+ * @param {GradeRow[]} rows
+ * @returns {0|1}
+ */
+export function gateExitCode(rows) {
+  if (failures(rows).length > 0) return 1
+  const measured = rows.some((row) => row.verdict !== 'not-measured')
+  return measured ? 0 : 1
+}
+
 /** `1234` → `1.23 s`; under a second stays in ms. For the columns a human reads.
  * @param {number|null|undefined} ms
  * @returns {string} */

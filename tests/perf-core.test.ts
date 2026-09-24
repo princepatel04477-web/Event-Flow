@@ -10,6 +10,7 @@ import {
   failures,
   formatBytes,
   formatMs,
+  gateExitCode,
   grade,
   gradeRun,
   gradeScreen,
@@ -199,6 +200,83 @@ describe('gradeRun', () => {
 
   it('grades a screen alone with gradeScreen', () => {
     expect(gradeScreen(screens[0])).toHaveLength(METRICS.length)
+  })
+})
+
+describe('gateExitCode', () => {
+  const screen = (
+    label: string,
+    metrics: Record<string, ReturnType<typeof summarize>>,
+  ) => ({ label, profile: '4g', metrics })
+
+  it('exits 0 when every gated budget is inside its limit', () => {
+    const rows = gradeRun([
+      screen('Rooms', {
+        tapToFirstChange: summarize([40, 50]),
+        tapToContent: summarize([80, 90]),
+        saveToShownDone: summarize([100, 110]),
+        coldFirstLoad: summarize([2100]),
+      }),
+    ])
+    expect(rows.every((r) => r.verdict === 'pass')).toBe(true)
+    expect(gateExitCode(rows)).toBe(0)
+  })
+
+  it.each(['tapToFirstChange', 'tapToContent', 'saveToShownDone'])(
+    'exits 1 when %s misses its 120 ms budget',
+    (metric) => {
+      const rows = gradeRun([screen('Rooms', { [metric]: summarize([121]) })])
+      expect(failures(rows).map((r) => r.metric)).toEqual([metric])
+      expect(gateExitCode(rows)).toBe(1)
+    },
+  )
+
+  it('exits 0 when only the cold load is over budget — that one is informational', () => {
+    const rows = gradeRun([
+      screen('Rooms', {
+        coldFirstLoad: summarize([4000]),
+        tapToFirstChange: summarize([30]),
+        tapToContent: summarize([40]),
+        saveToShownDone: summarize([50]),
+      }),
+    ])
+    expect(warnings(rows).map((r) => r.metric)).toEqual(['coldFirstLoad'])
+    expect(failures(rows)).toEqual([])
+    expect(gateExitCode(rows)).toBe(0)
+  })
+
+  it('exits 1 when nothing was measured, because no failures is not a pass', () => {
+    // The failure mode: a broken login or an unreachable screen produces a table
+    // of `not measured` rows with zero failures, and a naive gate calls that
+    // green about a run that produced no numbers at all.
+    const rows = gradeRun([
+      screen('Today', {}),
+      screen('Rooms', {}),
+    ])
+    expect(rows.every((r) => r.verdict === 'not-measured')).toBe(true)
+    expect(failures(rows)).toEqual([])
+    expect(gateExitCode(rows)).toBe(1)
+  })
+
+  it('exits 0 when at least one metric was measured and none failed', () => {
+    // One measured, several not: a real number exists, so the gate reports on
+    // the budgets it could see. Only a run with NO numbers at all is the false
+    // pass this refuses.
+    const rows = gradeRun([screen('Rooms', { tapToFirstChange: summarize([60]) })])
+    expect(rows.some((r) => r.verdict === 'not-measured')).toBe(true)
+    expect(gateExitCode(rows)).toBe(0)
+  })
+
+  it('exits 1 for an empty run, which measured nothing by definition', () => {
+    expect(gateExitCode([])).toBe(1)
+  })
+
+  it('takes the p50, so a single slow tail run does not fail a screen that is fast', () => {
+    const rows = gradeRun([
+      screen('Rooms', { tapToFirstChange: summarize([50, 60, 70, 80, 900]) }),
+    ])
+    expect(rows.find((r) => r.metric === 'tapToFirstChange')?.p95).toBe(900)
+    expect(gateExitCode(rows)).toBe(0)
   })
 })
 

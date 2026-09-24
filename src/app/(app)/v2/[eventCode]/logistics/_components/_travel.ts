@@ -250,3 +250,38 @@ export function nowHeadline(
 export function progressLabel(direction: TravelDirection): string {
   return direction === 'arrival' ? 'Arrivals met' : 'Departures gone'
 }
+
+/** Which of the board's two walk-up doors is the live one. */
+export type WalkUpDoor = 'header' | 'empty-state' | 'none'
+
+/**
+ * WHERE THE WALK-UP FORM IS REACHED FROM — exactly ONE door, never two.
+ *
+ * Recording a walk-up departure (a family who tells the desk they are leaving
+ * and was never called about it) is its own screen. It is a real screen on a day
+ * when nobody phoned ahead, so it must always be reachable; and it is not the
+ * board's job, so it must never be the loudest thing on it.
+ *
+ * BOTH facts have been got wrong here, in opposite directions:
+ *
+ *   - "only from the empty state" meant that the moment the event had a single
+ *     departure on file, the form could only be opened by typing its URL — and
+ *     inside the APK there is no URL bar (docs/BUGS.md M30).
+ *   - "a permanent link as well" then showed the same control TWICE on an empty
+ *     board: the header link and the empty state's button, one above the other.
+ *
+ * So the choice is a single value read by both call sites, rather than two
+ * independent conditions that can (and did) disagree:
+ *
+ *   'empty-state'  nothing on file — the empty state carries the button
+ *   'header'       there are rows — a quiet link above the board
+ *   'none'         arrivals have no walk-up form; an arrival is not a walk-up
+ *
+ * The count is the number of ROWS, not the number of rows after filtering: a
+ * filter that matches nothing is not an empty event, and hiding the door then
+ * would strand the walk-up exactly as M30 did.
+ */
+export function walkUpDoor(direction: TravelDirection, rowCount: number): WalkUpDoor {
+  if (direction !== 'departure') return 'none'
+  return rowCount > 0 ? 'header' : 'empty-state'
+}

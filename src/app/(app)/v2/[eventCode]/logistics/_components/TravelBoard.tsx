@@ -46,6 +46,7 @@ import {
   type TravelGroupLike,
   type TravelLegLike,
   type TravelRow,
+  walkUpDoor,
 } from './_travel'
 
 /** The columns this board paints. Listed so a rename still fails the build. */
@@ -285,6 +286,17 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
   const filtered = mode !== null || pickupOnly
   const anyPickup = rows.some((r) => r.group.needs_pickup)
 
+  /**
+   * The ONE live door to the walk-up form, or none.
+   *
+   * Read here and used by both call sites below — the header link and the empty
+   * state's button — so the two cannot both be live on an empty board, and the
+   * form cannot be unreachable on a full one. The rule itself is pure and lives
+   * in `_travel.ts`; see the doc there for why it is one value and not two
+   * conditions.
+   */
+  const walkUp = walkUpDoor(direction, rows.length)
+
   const next = toGo[0] ?? null
   const active = activeId ? (board.find((row) => row.leg.id === activeId) ?? null) : null
   const afterThat = next ? board.filter((row) => row !== next) : board
@@ -305,6 +317,26 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
 
   return (
     <div className="flex flex-col gap-5">
+      {/* ONE way to the walk-up form, never two.
+          This link is the door for a board that has rows on it; the empty state
+          below carries the other face of the same control. Both read `walkUp`,
+          so exactly one of them can be live:
+
+            'header'       →  the link, and no empty state to duplicate it
+            'empty-state'  →  the button, and no link above it
+
+          `secondary`, not `ghost` + a `border-*` class: `cn()` concatenates and
+          does not resolve Tailwind conflicts, so a second border colour would be
+          a coin-flip decided by stylesheet order (the `Call` button on Calls was
+          white-on-white for exactly that reason). The variant owns its look. */}
+      {walkUp === 'header' ? (
+        <div className="flex justify-end">
+          <LinkButton href={`/${eventCode}/logistics/departures/new`} variant="secondary" size="sm">
+            Record a walk-up
+          </LinkButton>
+        </div>
+      ) : null}
+
       {/* The switch between the two views of the same ledger. Both directions
           are their own address (the v3 bar highlights them), so this navigates
           rather than holding a second copy of the board in local state. */}
@@ -370,7 +402,7 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
               : 'Departures appear once the calling team has logged a return.'
           }
           action={
-            direction === 'departure' ? (
+            walkUp === 'empty-state' ? (
               <LinkButton
                 href={`/${eventCode}/logistics/departures/new`}
                 variant="secondary"
