@@ -73,12 +73,12 @@ export function CurrentFamilyCard({
         </div>
 
         <Button
-          variant="secondary"
+          variant="success"
           size="sm"
           disabled={!canDial || dialling}
           leadingIcon={<PhoneIcon className="h-5 w-5" aria-hidden />}
           onClick={onCall}
-          className="shrink-0 border-transparent bg-ledger-green text-paper hover:bg-ledger-green-strong active:bg-ledger-green-strong"
+          className="shrink-0"
           aria-label={`Call ${headName}`}
         >
           {dialling ? 'Calling…' : 'Call'}
