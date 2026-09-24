@@ -36,6 +36,7 @@ import { AdminCampaignsLink } from './AdminCampaignsLink'
 import { AlternateOutcomeSheet } from './AlternateOutcomeSheet'
 import { CurrentFamilyCard } from './CurrentFamilyCard'
 import { FamilyQueueSheet } from './FamilyQueueSheet'
+import { AllContacts } from './AllContacts'
 import { InlineCaptureStep } from './InlineCaptureStep'
 import { OutcomeButtons } from './OutcomeButtons'
 import type { CallNextProps, FamilyRow, FilterChipId, OutcomeStatus, QueueRow } from './types'
@@ -563,6 +564,19 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
           </button>
         </>
       )}
+
+      {!isPending ? (
+        <AllContacts
+          rows={allRows}
+          currentGroupId={currentId}
+          onSelectFamily={(gid) => {
+            if (!callable.some((r) => r.group_id === gid)) setActiveFilter('all')
+            setSelectedGroupId(gid)
+            setActiveInlineOutcome(null)
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }}
+        />
+      ) : null}
 
       <FamilyQueueSheet
         open={queueSheetOpen}

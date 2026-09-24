@@ -196,6 +196,9 @@ export function HamperRun({
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
 
   const delivered = rows.length - pending.length
+  const deliveredRows = rows
+    .filter((r) => r.status === 'delivered' && (hotel === null || (r.hotel_name ?? '(no hotel)') === hotel) && (kind === null || r.kind === kind))
+    .sort((a, b) => (a.room_number ?? '').localeCompare(b.room_number ?? ''))
   const next = visible[0] ?? null
   const rest = visible.slice(1)
 
@@ -326,6 +329,28 @@ export function HamperRun({
           ) : null}
         </>
       )}
+
+      {deliveredRows.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <h2 className="eyebrow">Delivered · {deliveredRows.length}</h2>
+          <ul className="overflow-hidden rounded-2xl border border-rule bg-surface">
+            {deliveredRows.map((row) => (
+              <li key={row.id}>
+                <Row
+                  heading={displayName(row)}
+                  meta={rowMeta(row)}
+                  badge={<RoomBadge roomNumber={row.room_number} />}
+                  status="Delivered"
+                  tone="done"
+                  onPress={() => {
+                    router.push(detailHref(row))
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* The bar's summary and its two controls all describe the SAME door, so
           a runner never has to work out which family the buttons apply to.

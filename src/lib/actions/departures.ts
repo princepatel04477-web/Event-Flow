@@ -43,42 +43,95 @@ export async function searchDepartureGroups(
   query: string,
 ): Promise<DepartureSearchResult> {
   const supabase = await createClient()
-  const term = `%${query}%`
+  const raw = query.trim()
+  if (!raw) return { ok: true, groups: [] }
+  // PostgREST pattern: escape the LIKE wildcards the user may type.
+  const term = `%${raw.replace(/[%_\\]/g, (c) => `\\${c}`)}%`
 
-  // Search by head name or room number
-  const { data: groups, error: groupsError } = await supabase
+  type GroupRow = { id: string; head_name: string; confirmed_pax: number | null; expected_pax: number | null }
+
+  // 1. Families whose head name matches.
+  const byName = await supabase
     .from('guest_groups')
-    .select(
-      'id, head_name, coalesce(confirmed_pax, expected_pax) as pax',
-    )
+    .select('id, head_name, confirmed_pax, expected_pax')
     .eq('event_id', eventId)
     .ilike('head_name', term)
     .order('head_name', { ascending: true })
     .limit(20)
-    .returns<{ id: string; head_name: string; pax: number }[]>()
+    .returns<GroupRow[]>()
+  if (byName.error) return { ok: false, error: SEARCH_FAILED }
 
-  if (groupsError) return { ok: false, error: SEARCH_FAILED }
-
-  const { data: roomed, error: roomedError } = await supabase
-    .from('room_assignments')
-    .select('group_id, rooms!inner(room_number, hotels!inner(name))')
+  // 2. Rooms whose number matches ("705", "7", "g3-"), then the families in them.
+  const matchedRooms = await supabase
+    .from('rooms')
+    .select('id')
     .eq('event_id', eventId)
-    .is('released_at', null)
-    .ilike('rooms.room_number', term)
+    .ilike('room_number', term)
+    .limit(50)
+  if (matchedRooms.error) return { ok: false, error: SEARCH_FAILED }
+  const matchedRoomIds = (matchedRooms.data ?? []).map((r) => r.id as string)
 
-  if (roomedError) return { ok: false, error: SEARCH_FAILED }
+  let roomGroupIds: string[] = []
+  if (matchedRoomIds.length > 0) {
+    const inRooms = await supabase
+      .from('room_assignments')
+      .select('group_id')
+      .eq('event_id', eventId)
+      .is('released_at', null)
+      .in('room_id', matchedRoomIds)
+    if (inRooms.error) return { ok: false, error: SEARCH_FAILED }
+    roomGroupIds = [...new Set((inRooms.data ?? []).map((r) => r.group_id as string).filter(Boolean))]
+  }
 
-  const { data: existingLegs, error: legsError } = await supabase
-    .from('travel_legs')
-    .select('id, group_id, mode, travel_date, travel_time, point, reference, pax_on_leg, source')
-    .eq('event_id', eventId)
-    .eq('direction', 'departure')
-    .order('travel_date', { ascending: true })
+  const nameIds = new Set((byName.data ?? []).map((g) => g.id))
+  const extraIds = roomGroupIds.filter((id) => !nameIds.has(id))
+  let extraGroups: GroupRow[] = []
+  if (extraIds.length > 0) {
+    const extras = await supabase
+      .from('guest_groups')
+      .select('id, head_name, confirmed_pax, expected_pax')
+      .in('id', extraIds)
+      .returns<GroupRow[]>()
+    if (extras.error) return { ok: false, error: SEARCH_FAILED }
+    extraGroups = extras.data ?? []
+  }
 
-  if (legsError) return { ok: false, error: SEARCH_FAILED }
+  // Room-number matches first: a runner who typed "705" wants room 705.
+  const allGroups = [...extraGroups, ...(byName.data ?? [])]
+  const allIds = allGroups.map((g) => g.id)
+  if (allIds.length === 0) return { ok: true, groups: [] }
+
+  // 3. Room + hotel for every result (name matches included), and any departure.
+  const [roomed, legs] = await Promise.all([
+    supabase
+      .from('room_assignments')
+      .select('group_id, rooms(room_number, hotels(name))')
+      .eq('event_id', eventId)
+      .is('released_at', null)
+      .in('group_id', allIds),
+    supabase
+      .from('travel_legs')
+      .select('id, group_id, mode, travel_date, travel_time, point, reference, pax_on_leg, source')
+      .eq('event_id', eventId)
+      .eq('direction', 'departure')
+      .in('group_id', allIds)
+      .order('travel_date', { ascending: true }),
+  ])
+  if (roomed.error || legs.error) return { ok: false, error: SEARCH_FAILED }
+
+  const roomByGroup = new Map<string, { roomNumber: string; hotelName: string }>()
+  for (const r of roomed.data ?? []) {
+    const room = r.rooms as unknown as { room_number: string; hotels: { name: string } | null } | null
+    if (room && !roomByGroup.has(r.group_id as string)) {
+      roomByGroup.set(r.group_id as string, {
+        roomNumber: room.room_number,
+        hotelName: room.hotels?.name ?? 'Unknown',
+      })
+    }
+  }
 
   const legByGroup = new Map<string, ExistingDeparture>()
-  for (const leg of (existingLegs ?? [])) {
+  for (const leg of legs.data ?? []) {
     if (!legByGroup.has(leg.group_id)) {
       legByGroup.set(leg.group_id, {
         id: leg.id,
@@ -93,47 +146,17 @@ export async function searchDepartureGroups(
     }
   }
 
-  // Merge room info
-  const roomByGroup = new Map<string, { roomNumber: string; hotelName: string }>()
-  for (const r of (roomed ?? [])) {
-    const rooms = r.rooms as { room_number: string; hotels: { name: string } } | null
-    if (rooms && !roomByGroup.has(r.group_id)) {
-      roomByGroup.set(r.group_id, {
-        roomNumber: rooms.room_number,
-        hotelName: rooms.hotels?.name ?? 'Unknown',
-      })
-    }
-  }
-
-  // Also include room-matched groups that didn't match by name
-  const roomMatchedGroupIds = new Set((roomed ?? []).map((r) => r.group_id))
-  const nameMatchedIds = new Set((groups ?? []).map((g) => g.id))
-
-  const extraIds = [...roomMatchedGroupIds].filter((id) => !nameMatchedIds.has(id))
-  let extraGroups: { id: string; head_name: string; pax: number }[] = []
-  if (extraIds.length > 0) {
-    const { data: extras, error: extrasError } = await supabase
-      .from('guest_groups')
-      .select('id, head_name, coalesce(confirmed_pax, expected_pax) as pax')
-      .in('id', extraIds)
-      .returns<{ id: string; head_name: string; pax: number }[]>()
-    if (extrasError) return { ok: false, error: SEARCH_FAILED }
-    extraGroups = extras ?? []
-  }
-
-  const allGroups = [...(groups ?? []), ...extraGroups]
-
   return {
     ok: true,
     groups: allGroups.map((g) => {
-      const room = roomByGroup.get(g.id as string)
+      const room = roomByGroup.get(g.id)
       return {
-        groupId: g.id as string,
-        headName: g.head_name as string,
+        groupId: g.id,
+        headName: g.head_name,
         roomNumber: room?.roomNumber ?? null,
         hotelName: room?.hotelName ?? null,
-        pax: (g.pax as number) ?? 0,
-        existingLeg: legByGroup.get(g.id as string) ?? null,
+        pax: g.confirmed_pax ?? g.expected_pax ?? 0,
+        existingLeg: legByGroup.get(g.id) ?? null,
       }
     }),
   }
