@@ -27,6 +27,7 @@ import {
 import { traceFetch } from '@/lib/perf'
 import { ROOM_STATUS_LABELS, ROOM_STATUS_TONES, type RoomStatus } from '@/lib/status'
 import { cn } from '@/lib/utils'
+import { formatMobile, telHref } from '@/lib/phone'
 import type { TabAccess } from '@/components/nav/BottomTabs'
 
 interface Props {
@@ -194,6 +195,7 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
   }, [eventId])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
   }, [load])
 
@@ -955,13 +957,13 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
                             <Badge className="ml-2">{groupInTray ? 'Group' : 'Picked'}</Badge>
                           ) : null}
                           <span className="mt-0.5 block text-sm text-muted">{occ.headName}</span>
-                          {/* §5.3: mobile + hamper status on the room-tap panel. */}
-                          {occ.primaryMobile ? (
+                          {telHref(occ.primaryMobile) ? (
                             <a
-                              href={`tel:${occ.primaryMobile}`}
+                              href={telHref(occ.primaryMobile)!}
+                              onClick={(e) => e.stopPropagation()}
                               className="tap mt-0.5 inline-block font-mono text-sm text-brand active:opacity-70"
                             >
-                              {occ.primaryMobile}
+                              {formatMobile(occ.primaryMobile)}
                             </a>
                           ) : null}
                           <span

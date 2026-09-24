@@ -11,6 +11,7 @@ import { formatDateTime } from '@/lib/utils'
 import { captureProofPhoto, compressDataUrl, submitProof, type ProofRow } from '@/lib/proof'
 import { queueProof, queuedProofCount, type QueuedProof } from '@/lib/proof-queue'
 import { createClient } from '@/lib/supabase/client'
+import { friendlyDbError } from '@/lib/errors'
 import { useOnline } from '@/lib/useOnline'
 
 /**
@@ -124,7 +125,6 @@ export function DeliveryDetail({
   const [detail, setDetail] = useState<DeliveryDetailData | null>(null)
   const [phase, setPhase] = useState<Phase>({ name: 'loading' })
   const [previewDataUrl, setPreviewDataUrl] = useState('')
-  const [receivedBy, setReceivedBy] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [queuedCount, setQueuedCount] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -142,7 +142,7 @@ export function DeliveryDetail({
       .maybeSingle()
       .then(({ data, error: err }) => {
         if (err || !data) {
-          setPhase({ name: 'error', message: err?.message ?? 'Could not load this delivery.' })
+          setPhase({ name: 'error', message: err ? friendlyDbError(err) : 'Could not load this delivery.' })
           return
         }
         setDetail({
@@ -351,13 +351,6 @@ export function DeliveryDetail({
               {detail.headName ?? 'This family'} · {detail.roomNumber ? `Room ${detail.roomNumber}` : 'No room'} ·{' '}
               {detail.kind === 'hamper' ? 'Hamper' : 'Return gift'}
             </p>
-            <input
-              type="text"
-              value={receivedBy}
-              onChange={(e) => setReceivedBy(e.target.value)}
-              placeholder="Received by (name) — optional"
-              className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-base"
-            />
             {/* The one place in the app where a confirmation is right rather
                 than a nuisance, so it has to say WHY. `delivery_proofs` has no
                 update policy and no delete policy, and two unconditional

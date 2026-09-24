@@ -97,9 +97,13 @@ interface BspResponse {
   error?: { message: string; code?: number }
 }
 
-function parsePhone(to: string): { countryCode: string; phoneNumber: string } | null {
-  // Accept +91XXXXXXXXXX or 91XXXXXXXXXX
-  const match = to.match(/^\+?(\d{1,3})(\d{10})$/)
+export function parsePhone(to: string): { countryCode: string; phoneNumber: string } | null {
+  const cleaned = to.replace(/[\s\-()]/g, '')
+  if (/^\d{10}$/.test(cleaned)) {
+    return { countryCode: '91', phoneNumber: cleaned }
+  }
+  // Accept +91XXXXXXXXXX or 91XXXXXXXXXX or other 1-3 digit country codes + 10 digits
+  const match = cleaned.match(/^\+?(\d{1,3})(\d{10})$/)
   if (!match) return null
   return { countryCode: match[1], phoneNumber: match[2] }
 }

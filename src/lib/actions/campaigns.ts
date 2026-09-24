@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 
 import { createClient } from '@/lib/supabase/server'
 import { requireStaff } from '@/lib/supabase/queries'
+import { friendlyDbError } from '@/lib/errors'
 
 export type CampaignWave = 'wave_1' | 'wave_2' | 'wave_3'
 export type CampaignStatus = 'draft' | 'scheduled' | 'running' | 'paused' | 'completed'
@@ -185,7 +186,7 @@ export async function populateCampaignJobs(
     .from('rsvp_campaign_jobs')
     .upsert(rows, { onConflict: 'campaign_id,group_id', ignoreDuplicates: true })
 
-  if (error) return { ok: false, error: error.message }
+  if (error) return { ok: false, error: friendlyDbError(error) }
 
   revalidatePath(`/${eventCode}/rsvp/campaigns`)
   return { ok: true }
@@ -206,7 +207,7 @@ export async function setCampaignStatus(
     .eq('id', campaignId)
     .eq('event_id', eventId)
 
-  if (error) return { ok: false, error: error.message }
+  if (error) return { ok: false, error: friendlyDbError(error) }
 
   revalidatePath(`/${eventCode}/rsvp/campaigns`)
   return { ok: true }

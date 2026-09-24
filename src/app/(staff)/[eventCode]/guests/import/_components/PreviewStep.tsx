@@ -82,6 +82,8 @@ export function PreviewStep({
         primaryMobile: f.primaryMobile,
         place: f.place,
         expectedPax: f.expectedPax,
+        remark: f.remark,
+        rsvpStatus: f.rsvpStatus,
         canImport: f.canImport,
         blockReason: f.blockReason,
         arrival: f.arrival,

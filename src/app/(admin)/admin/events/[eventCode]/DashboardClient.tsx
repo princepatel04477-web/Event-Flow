@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { ChevronRightIcon, ShieldAlertIcon } from '@/components/icons'
 import { readDashboard, readTodayLegs, readAttention, type DashboardRow, type TodayLeg, type AttentionRow } from '@/lib/actions/dashboard'
+import { getTodayDateIST } from '@/lib/utils'
 
 import { TodayPanel } from './TodayPanel'
 import { AttentionPanel } from '@/components/dashboard/AttentionPanel'
@@ -38,7 +39,7 @@ export function DashboardClient({ eventId, eventCode }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const todayStr = new Date().toISOString().slice(0, 10)
+      const todayStr = getTodayDateIST()
       setTodayDate(todayStr)
 
       const [d, t, a] = await Promise.all([

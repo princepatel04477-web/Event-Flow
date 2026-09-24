@@ -19,7 +19,7 @@ import { Segmented } from '@/components/ui/Segmented'
 import { markArrived, markDeparted } from '@/lib/actions/event-day'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { traceFetch } from '@/lib/perf'
-import { formatMobile } from '@/lib/phone'
+import { formatMobile, telHref } from '@/lib/phone'
 import { queryKeys } from '@/lib/query/keys'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/utils'
@@ -510,9 +510,9 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
               <SheetRow label="Pickup needed" value={active.group.needs_pickup ? 'Yes' : 'No'} />
             </dl>
 
-            {active.group.primary_mobile ? (
+            {telHref(active.group.primary_mobile) ? (
               <a
-                href={`tel:${active.group.primary_mobile}`}
+                href={telHref(active.group.primary_mobile)!}
                 className="tap flex min-h-12 items-center gap-2 font-mono text-base font-medium text-brand active:opacity-70"
               >
                 <PhoneIcon className="h-5 w-5" aria-hidden />

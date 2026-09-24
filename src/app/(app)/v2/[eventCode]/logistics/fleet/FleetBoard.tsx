@@ -17,6 +17,7 @@ import { QuickAddVehicles } from '@/components/fleet/QuickAddVehicles'
 import { VehicleAvailabilityPanel } from '@/components/fleet/VehicleAvailability'
 import { deleteVehicle, readFleet, type VehicleRow } from '@/lib/actions/fleet'
 import { traceFetch } from '@/lib/perf'
+import { formatMobile, telHref } from '@/lib/phone'
 import { useStableData } from '@/lib/use-stable-data'
 
 export interface FleetBoardProps {
@@ -227,12 +228,12 @@ export function FleetBoard({ eventId, eventCode }: FleetBoardProps) {
               ) : null}
             </dl>
 
-            {openVehicle.driverMobile ? (
+            {telHref(openVehicle.driverMobile) ? (
               <a
-                href={`tel:${openVehicle.driverMobile}`}
+                href={telHref(openVehicle.driverMobile)!}
                 className="tap flex min-h-12 items-center gap-2 font-mono text-base font-medium text-brand active:opacity-70"
               >
-                {openVehicle.driverMobile}
+                {formatMobile(openVehicle.driverMobile)}
               </a>
             ) : null}
 

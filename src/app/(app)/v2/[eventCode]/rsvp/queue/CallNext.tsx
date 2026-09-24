@@ -267,10 +267,10 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
           eventId,
           groupId: v.groupId,
         })
-      } else {
-        clearStoredAttempt(v.groupId)
+        return { ok: false, message: call.message || 'Call outcome could not be recorded.' }
       }
 
+      clearStoredAttempt(v.groupId)
       return { ok: true, data: rsvp.group }
     },
     queue: { eventId, kind: 'v2-rsvp-outcome', what: 'call outcome' },

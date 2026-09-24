@@ -125,20 +125,41 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
         pendingByGroup.set(d.group_id, list)
       }
 
-      return (assignments ?? [])
-        .filter((a) => groupById.has(a.group_id))
-        .map((a) => {
+      // Group assignments by family so each family has one check-in row
+      const assignmentsByGroup = new Map<string, typeof assignments>()
+      for (const a of assignments ?? []) {
+        if (!groupById.has(a.group_id)) continue
+        const list = assignmentsByGroup.get(a.group_id) ?? []
+        list.push(a)
+        assignmentsByGroup.set(a.group_id, list)
+      }
+
+      const rows: CheckInRow[] = []
+      for (const [groupId, groupAssignments] of assignmentsByGroup.entries()) {
+        const group = groupById.get(groupId)!
+        // Use earliest assignment as primary identity and timestamp anchor
+        const primary = groupAssignments[0]
+        let otherOccupant: string | null = null
+        for (const a of groupAssignments) {
           const occupant = occupantByRoom.get(a.room_id)
-          const otherOccupant =
-            occupant && occupant.assignmentId !== a.id ? occupant.headName : null
-          return {
-            assignment: a,
-            group: groupById.get(a.group_id)!,
-            roomLabel: roomLabel(a.room_id),
-            occupiedByOther: otherOccupant,
-            pendingDeliverables: pendingByGroup.get(a.group_id) ?? [],
+          if (occupant && occupant.assignmentId !== a.id) {
+            otherOccupant = occupant.headName
+            break
           }
+        }
+        const roomLabels = groupAssignments.map((a) => roomLabel(a.room_id))
+        const combinedRoomLabel = roomLabels.join(' · ')
+
+        rows.push({
+          assignment: primary,
+          group,
+          roomLabel: combinedRoomLabel,
+          occupiedByOther: otherOccupant,
+          pendingDeliverables: pendingByGroup.get(groupId) ?? [],
         })
+      }
+
+      return rows
     },
   })
 

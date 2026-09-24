@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 
 import { createClient } from '@/lib/supabase/server'
 import { getSessionClaims } from '@/lib/auth/server'
+import { friendlyDbError } from '@/lib/errors'
 
 export type RegisterVoiceNoteResult =
   | { ok: true; recordingId: string }
@@ -88,14 +89,7 @@ export async function registerVoiceNote(input: {
     const diagnostic =
       `step=registerVoiceNote code=${insertError.code ?? 'unknown'} ` +
       `event=${input.eventId.slice(0, 8)} group=${input.groupId.slice(0, 8)} at=${new Date().toISOString()}`
-    console.error('[registerVoiceNote] insert failed', {
-      sqlstate: insertError.code,
-      message: insertError.message?.slice(0, 200),
-      eventId: input.eventId,
-      groupId: input.groupId,
-      storagePath: input.storagePath,
-    })
-    return { ok: false, error: `Could not save recording: ${insertError.message}`, diagnostic }
+    return { ok: false, error: friendlyDbError(insertError), diagnostic }
   }
 
   // The review queue is fed by this row's downstream transcript/extraction, and

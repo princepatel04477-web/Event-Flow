@@ -3,6 +3,7 @@
 import { LinkButton } from '@/components/ui/LinkButton'
 import { ArrowDownCircleIcon, ArrowUpCircleIcon, CarIcon } from '@/components/icons'
 import type { TodayLeg } from '@/lib/actions/dashboard'
+import { getTodayDateIST } from '@/lib/utils'
 
 interface Props {
   arrivals: TodayLeg[]
@@ -41,7 +42,7 @@ function LegRow({ leg }: { leg: TodayLeg }) {
 }
 
 export function TodayPanel({ arrivals, departures, date, eventCode }: Props) {
-  const dateLabel = date === new Date().toISOString().slice(0, 10) ? 'Today' : date
+  const dateLabel = date === getTodayDateIST() ? 'Today' : date
 
   return (
     <section className="flex flex-col gap-3">

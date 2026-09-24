@@ -22,7 +22,7 @@ import {
   sendDriverPickupSummary,
   type DriverPickupSummary,
 } from '@/lib/actions/messages'
-import { formatMobile } from '@/lib/phone'
+import { formatMobile, telHref } from '@/lib/phone'
 import { useStableData } from '@/lib/use-stable-data'
 
 interface Props {
@@ -304,15 +304,15 @@ export function DriverRoster({ eventId, vehicles }: Props) {
                       <p className="font-medium text-ink">
                         {a.vehicleLabel ?? 'Unnamed'} · {a.driverName}
                       </p>
-                      {a.driverMobile ? (
+                      {telHref(a.driverMobile) ? (
                         <a
-                          href={`tel:${a.driverMobile}`}
+                          href={telHref(a.driverMobile)!}
                           className="tap font-mono text-brand active:opacity-70"
                         >
                           {formatMobile(a.driverMobile)}
                         </a>
                       ) : (
-                        <span className="text-muted">No mobile on file</span>
+                        <span className="text-muted">{a.driverMobile ? formatMobile(a.driverMobile) : 'No mobile on file'}</span>
                       )}
                     </div>
                     <div className="flex shrink-0 gap-2">

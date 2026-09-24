@@ -243,7 +243,7 @@ export function ReviewPanel({
     setPendingAction('accept')
     setError(null)
 
-    const payload = buildRpcPayload(values)
+    const payload = buildRpcPayload(values, decisions)
 
     // The audit trail: every field's AI value and the final value that
     // actually entered guest data. The form values ARE the final values

@@ -13,6 +13,7 @@ import { LinkButton } from '@/components/ui/LinkButton'
 import { LoadingRows } from '@/components/ui/LoadingRows'
 import { Row } from '@/components/ui/Row'
 import { readDriverSheets, type DriverSheetTrip } from '@/lib/actions/departures'
+import { formatMobile, telHref } from '@/lib/phone'
 
 export interface DriverSheetsBoardProps {
   eventId: string
@@ -194,13 +195,13 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
               {openTrip.dropPoint ? <SheetRow label="Drop" value={openTrip.dropPoint} /> : null}
             </dl>
 
-            {openTrip.driverMobile ? (
+            {telHref(openTrip.driverMobile) ? (
               <a
-                href={`tel:${openTrip.driverMobile}`}
+                href={telHref(openTrip.driverMobile)!}
                 className="tap flex min-h-12 items-center gap-2 font-mono text-base font-medium text-brand active:opacity-70"
               >
                 <PhoneIcon className="h-5 w-5" aria-hidden />
-                {openTrip.driverMobile}
+                {formatMobile(openTrip.driverMobile)}
               </a>
             ) : null}
 

@@ -25,7 +25,7 @@ import {
   type RoomPlanCommitItem,
   type RoomPlanCommitResult,
 } from '@/lib/actions/rooms'
-import { roomGuardMessage } from '@/lib/errors'
+import { friendlyDbError, roomGuardMessage } from '@/lib/errors'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { queryKeys } from '@/lib/query/keys'
 import { groupRoomsByHotelFloor, matchesTerm, waitingLabel } from '@/lib/rooms/board'
@@ -418,7 +418,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
 
   const openRoom = openRoomId ? (sheetRooms.find((r) => r.roomId === openRoomId) ?? null) : null
 
-  const loadError = error instanceof Error ? error.message : error ? String(error) : null
+  const loadError = error ? friendlyDbError(error) : null
   const stale = isFetching && data !== undefined
   const lastError = place.lastError ?? move.lastError ?? remove.lastError ?? add.lastError
   const queuedCount = place.queuedCount + move.queuedCount + remove.queuedCount + add.queuedCount

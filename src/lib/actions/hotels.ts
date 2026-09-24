@@ -4,6 +4,9 @@ import { z } from 'zod'
 
 import { createClient } from '@/lib/supabase/server'
 import { getEventAccess } from '@/lib/supabase/queries'
+import { MAX_RANGE_SIZE } from '@/lib/rooms/parse'
+import { friendlyDbError } from '@/lib/errors'
+import type { Database } from '@/lib/supabase/database.types'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,7 +53,7 @@ const createHotelSchema = z.object({
  * pretend to catch misspellings: "Mariott" and "Marriott" are different
  * strings and no normaliser should be deciding otherwise.
  */
-function normaliseHotelName(name: string): string {
+export function normaliseHotelName(name: string): string {
   return name.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
@@ -126,7 +129,7 @@ export async function updateHotel(
   if (block) return { ok: false as const, error: block }
 
   const supabase = await createClient()
-  const db: Record<string, string | null> = {}
+  const db: Database['public']['Tables']['hotels']['Update'] = {}
   if (patch.name !== undefined) db.name = patch.name
   if (patch.address !== undefined) db.address = patch.address ?? null
   if (patch.contactName !== undefined) db.contact_name = patch.contactName ?? null
@@ -137,7 +140,7 @@ export async function updateHotel(
 
   const { error } = await supabase
     .from('hotels')
-    .update(db as any)
+    .update(db)
     .eq('id', hotelId)
     .eq('event_id', eventId)
 
@@ -165,7 +168,11 @@ export async function deleteHotel(hotelId: string, eventId: string) {
   if (occupants && occupants.length > 0) {
     const names = occupants
       .slice(0, 5)
-      .map((o: any) => `${o.guests?.full_name ?? 'Unknown'} (room ${o.rooms?.room_number ?? '?'})`)
+      .map((o) => {
+        const guest = o.guests as { full_name?: string | null } | null
+        const room = o.rooms as unknown as { room_number?: string | null } | null
+        return `${guest?.full_name ?? 'Unknown'} (room ${room?.room_number ?? '?'})`
+      })
     return {
       ok: false as const,
       error: `Cannot delete this hotel — ${occupants.length} active room assignment${occupants.length === 1 ? '' : 's'}.`,
@@ -237,6 +244,16 @@ export async function createRooms(
     }
 
     const digits = String(end).length
+    const count = end - start + 1
+    if (count > MAX_RANGE_SIZE) {
+      return {
+        ok: false,
+        error: `That range is too large (${count} rooms, maximum ${MAX_RANGE_SIZE} at a time). Split it, or paste the list.`,
+        created: 0,
+        skipped: 0,
+      }
+    }
+
     const rows = []
     for (let n = start; n <= end; n++) {
       rows.push({
@@ -246,7 +263,7 @@ export async function createRooms(
         room_type: roomType ?? null,
         floor: floor ?? null,
         capacity,
-        max_capacity: capacity + 1,
+        max_capacity: capacity,
         notes: notes ?? null,
       })
     }
@@ -261,7 +278,11 @@ export async function createRooms(
           skipped++
           continue
         }
-        return { ok: false, error: `Room ${row.room_number}: ${error.message}`, created, skipped }
+        const friendly = friendlyDbError(error)
+        const errorMsg = created > 0
+          ? `${created} rooms were added before this failed. Room ${row.room_number}: ${friendly}`
+          : `Room ${row.room_number}: ${friendly}`
+        return { ok: false, error: errorMsg, created, skipped }
       }
       created++
     }
@@ -285,7 +306,7 @@ export async function createRooms(
     room_type: roomType ?? null,
     floor: floor ?? null,
     capacity,
-    max_capacity: capacity + 1,
+    max_capacity: capacity,
     notes: notes ?? null,
   }).select('id').single()
 
@@ -293,7 +314,7 @@ export async function createRooms(
     if (error.code === '23505') {
       return { ok: true, created: 0, skipped: 1 }
     }
-    return { ok: false, error: error.message, created: 0, skipped: 0 }
+    return { ok: false, error: friendlyDbError(error), created: 0, skipped: 0 }
   }
 
   return { ok: true, created: 1, skipped: 0 }
@@ -316,13 +337,13 @@ export async function updateRoom(
   if (block) return { ok: false as const, error: block }
 
   const supabase = await createClient()
-  const db: Record<string, boolean | string | number | null> = {}
+  const db: Database['public']['Tables']['rooms']['Update'] = {}
   if (patch.roomNumber !== undefined) db.room_number = patch.roomNumber
   if (patch.roomType !== undefined) db.room_type = patch.roomType ?? null
   if (patch.floor !== undefined) db.floor = patch.floor ?? null
   if (patch.capacity !== undefined) {
     db.capacity = patch.capacity
-    db.max_capacity = patch.capacity + 1
+    db.max_capacity = patch.capacity
   }
   if (patch.notes !== undefined) db.notes = patch.notes ?? null
   if (patch.isBlocked !== undefined) db.is_blocked = patch.isBlocked
@@ -331,7 +352,7 @@ export async function updateRoom(
 
   const { error } = await supabase
     .from('rooms')
-    .update(db as any)
+    .update(db)
     .eq('id', roomId)
     .eq('event_id', eventId)
 
@@ -366,7 +387,11 @@ export async function deleteRoom(roomId: string, eventId: string) {
   if (occupants && occupants.length > 0) {
     const names = occupants
       .slice(0, 5)
-      .map((o: any) => `${o.guests?.full_name ?? 'Unknown'} (${o.guest_groups?.head_name ?? '?'})`)
+      .map((o) => {
+        const guest = o.guests as { full_name?: string | null } | null
+        const group = o.guest_groups as { head_name?: string | null } | null
+        return `${guest?.full_name ?? 'Unknown'} (${group?.head_name ?? '?'})`
+      })
     return {
       ok: false as const,
       error: `Cannot delete — ${occupants.length} occupant${occupants.length === 1 ? '' : 's'} still assigned.`,

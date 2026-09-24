@@ -5,6 +5,8 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getEventAccess } from '@/lib/supabase/queries'
 import type { Json } from '@/lib/supabase/database.types'
+import { normaliseHotelName } from '@/lib/actions/hotels'
+import { friendlyDbError } from '@/lib/errors'
 
 const NOT_STAFF_MESSAGE =
   'You are not staff on this event, so its data is invisible to your account. ' +
@@ -115,56 +117,71 @@ export async function commitHotelImport(
   const supabase = await createClient()
   const failures: { rowNumber: number; reason: string }[] = []
 
-  // Hotel dedupe map: hotel name → id
+  // Hotel dedupe map: normalised hotel name → id
   const hotelCache = new Map<string, string>()
+
+  const { data: existingHotels, error: fetchHotelsErr } = await supabase
+    .from('hotels')
+    .select('id, name')
+    .eq('event_id', eventId)
+
+  if (fetchHotelsErr) {
+    return {
+      ok: false,
+      error: `Could not check existing hotels: ${friendlyDbError(fetchHotelsErr)}`,
+      summary: null,
+      failures: [],
+    }
+  }
+
+  for (const h of existingHotels ?? []) {
+    hotelCache.set(normaliseHotelName(h.name), h.id)
+  }
 
   let inserted = 0
   let skipped = 0
 
   for (const row of parsed.data) {
-    const hotelKey = row.hotelName.trim()
+    const normKey = normaliseHotelName(row.hotelName)
+    if (!normKey) {
+      failures.push({
+        rowNumber: row.rowNumber,
+        reason: 'Hotel name is required.',
+      })
+      continue
+    }
 
     // Get or create the hotel
-    let hotelId = hotelCache.get(hotelKey)
+    let hotelId = hotelCache.get(normKey)
     if (!hotelId) {
-      const { data: existing } = await supabase
+      const cleanName = row.hotelName.trim().replace(/\s+/g, ' ')
+      const { data: insertedHotel, error: hotelErr } = await supabase
         .from('hotels')
+        .insert({
+          event_id: eventId,
+          name: cleanName,
+          address: row.hotelAddress || null,
+          contact_name: row.contactPerson || null,
+          contact_mobile: row.contactNumber || null,
+          notes: row.notes || null,
+        })
         .select('id')
-        .eq('event_id', eventId)
-        .eq('name', hotelKey)
-        .maybeSingle()
+        .single()
 
-      if (existing) {
-        hotelId = existing.id
-        hotelCache.set(hotelKey, hotelId)
-      } else {
-        const { data: insertedHotel, error: hotelErr } = await supabase
-          .from('hotels')
-          .insert({
-            event_id: eventId,
-            name: hotelKey,
-            address: row.hotelAddress || null,
-            contact_name: row.contactPerson || null,
-            contact_mobile: row.contactNumber || null,
-            notes: row.notes || null,
-          })
-          .select('id')
-          .single()
-
-        if (hotelErr || !insertedHotel) {
-          failures.push({
-            rowNumber: row.rowNumber,
-            reason: `Could not create hotel "${hotelKey}": ${hotelErr?.message ?? 'unknown'}`,
-          })
-          continue
-        }
-        hotelId = insertedHotel.id
-        hotelCache.set(hotelKey, hotelId)
+      if (hotelErr || !insertedHotel) {
+        failures.push({
+          rowNumber: row.rowNumber,
+          reason: `Could not create hotel "${cleanName}": ${friendlyDbError(hotelErr)}`,
+        })
+        continue
       }
+      hotelId = insertedHotel.id
+      hotelCache.set(normKey, hotelId)
     }
 
     // Insert the room
-    const { error: roomErr, data: insertedRoom } = await supabase
+    const roomCapacity = row.capacity ?? 2
+    const { error: roomErr } = await supabase
       .from('rooms')
       .insert({
         event_id: eventId,
@@ -172,8 +189,8 @@ export async function commitHotelImport(
         room_number: row.roomNumber.trim() || `R${row.rowNumber}`,
         room_type: row.roomType || null,
         floor: row.floor || null,
-        capacity: row.capacity ?? 2,
-        max_capacity: (row.capacity ?? 2) + 1,
+        capacity: roomCapacity,
+        max_capacity: roomCapacity,
         notes: row.notes || null,
       })
       .select('id')
@@ -187,7 +204,7 @@ export async function commitHotelImport(
       }
       failures.push({
         rowNumber: row.rowNumber,
-        reason: `Could not create room ${row.roomNumber}: ${roomErr.message}`,
+        reason: `Could not create room ${row.roomNumber}: ${friendlyDbError(roomErr)}`,
       })
       continue
     }
@@ -195,9 +212,11 @@ export async function commitHotelImport(
     inserted++
   }
 
+  const allFailed = inserted === 0 && failures.length > 0
+
   return {
-    ok: true,
-    error: null,
+    ok: !allFailed,
+    error: allFailed ? 'All rows in the hotel import failed.' : null,
     summary: {
       inserted,
       skipped,

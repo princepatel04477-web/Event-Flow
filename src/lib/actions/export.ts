@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getEventAccess } from '@/lib/supabase/queries'
+import { friendlyDbError } from '@/lib/errors'
 import type { ExportData } from '@/lib/export/sheets'
 
 export type ExportDataResult =
@@ -50,7 +51,7 @@ export async function readExportData(eventId: string): Promise<ExportDataResult>
 
   const failure = rest.find((r) => r.error)
   if (failure?.error) {
-    return { ok: false, message: `Could not read export data: ${failure.error.message}` }
+    return { ok: false, message: friendlyDbError(failure.error) }
   }
 
   const [groups, guests, legs, deliverables, proofs, assignments, rooms, hotels, profiles, staffMembers, callAttempts, extractions] = rest

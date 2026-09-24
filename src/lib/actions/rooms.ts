@@ -1224,6 +1224,7 @@ export async function assignGuestsToRoom(
   groupId: string,
   roomId: string,
   count: number,
+  overrideReason?: string | null,
 ): Promise<AssignGuestsResult> {
   const wanted = Math.floor(count)
   if (!Number.isFinite(wanted) || wanted < 1) {
@@ -1262,12 +1263,14 @@ export async function assignGuestsToRoom(
   // asking for all of them, and the answer the caller wants is "three placed",
   // not an error to decode.
   const take = Math.min(wanted, unplaced.length)
+  const isOverride = !!overrideReason && overrideReason.trim().length > 0
   const rows = unplaced.slice(0, take).map((guestId) => ({
     event_id: eventId,
     room_id: roomId,
     guest_id: guestId,
     group_id: groupId,
-    is_override: false,
+    is_override: isOverride,
+    override_reason: isOverride ? overrideReason!.trim() : null,
   }))
 
   const { error } = await supabase.from('room_assignments').insert(rows)

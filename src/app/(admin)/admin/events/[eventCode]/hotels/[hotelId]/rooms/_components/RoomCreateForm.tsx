@@ -47,13 +47,18 @@ export function RoomCreateForm({ eventId, hotelId, eventCode, hotelName, backHre
     e.preventDefault()
     setError(null)
     setSubmitting(true)
-    const res = await createRooms(eventId, hotelId, mode,
-      mode === 'range'
-        ? { prefix, start: parseInt(start, 10), end: parseInt(end, 10), roomType: roomType || null, floor: floor || null, capacity: parseInt(capacity, 10) || 2, notes: notes || null }
-        : { roomNumber, roomType: roomType || null, floor: floor || null, capacity: parseInt(capacity, 10) || 2, notes: notes || null })
-    if (res.ok) setResult({ created: res.created, skipped: res.skipped })
-    else setError(res.error ?? 'Failed to create rooms.')
-    setSubmitting(false)
+    try {
+      const res = await createRooms(eventId, hotelId, mode,
+        mode === 'range'
+          ? { prefix, start: parseInt(start, 10), end: parseInt(end, 10), roomType: roomType || null, floor: floor || null, capacity: parseInt(capacity, 10) || 2, notes: notes || null }
+          : { roomNumber, roomType: roomType || null, floor: floor || null, capacity: parseInt(capacity, 10) || 2, notes: notes || null })
+      if (res.ok) setResult({ created: res.created, skipped: res.skipped })
+      else setError(res.error ?? 'Failed to create rooms.')
+    } catch {
+      setError('Connection interrupted. Some rooms may have been created — check the hotel before trying again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (result) {

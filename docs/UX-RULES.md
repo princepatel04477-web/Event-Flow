@@ -1,4 +1,4 @@
-﻿# EventFlow UX Rules
+# EventFlow UX Rules
 
 These eight rules govern every screen in EventFlow. The standard: **a 14-year-old handed the phone with no explanation can do the job on the screen.** If they have to ask what a word means, or cannot tell what to tap, the screen has failed.
 
@@ -47,7 +47,7 @@ Reversible operations must take effect immediately and offer a temporary, non-bl
 ### R6. Tell the truth about failure
 Error messages must plainly explain three things in one or two short sentences: what happened, what to do right now, and who to contact if it persists. Never display raw Postgres codes, HTTP numbers, or cryptic exceptions.
 
-- **Right:** `src/app/(staff)/[eventCode]/page.tsx` stating: *"Could not load the numbers. The counters did not come back from the database this time. This is a load failure, not an empty event — reload the page, and tell your admin if it keeps happening."*
+- **Right:** `src/app/(staff)/[eventCode]/page.tsx` stating: *"Could not load the numbers. The counters did not come back from the database this time. This is a load failure, not an empty event — wait for connection, do not reload, and tell your admin if it keeps happening."*
 - **Wrong:** Displaying unhandled runtime alerts like `"Postgres error 23514: check constraint violation"` or `"PGRST205 relation does not exist"` with no recovery action.
 
 ---

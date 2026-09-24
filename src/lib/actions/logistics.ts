@@ -288,22 +288,47 @@ export async function commitTrips(
 ): Promise<{ ok: true; tripCount: number } | { ok: false; error: string }> {
   const supabase = await createClient()
 
-  // Allocate vehicles
-  const vehicleIds = proposal.trips.map((t) => t.vehicleId)
-  const { data: vehicles } = await supabase
-    .from('vehicles')
-    .select('id, status')
-    .in('id', vehicleIds)
-  const vehicleMap = new Map<string, string>()
-  for (const v of (vehicles ?? [])) {
-    vehicleMap.set(v.id, v.status)
+  // Build RPC payload for atomic commit
+  const tripsPayload = proposal.trips.map((trip) => ({
+    vehicleId: trip.vehicleId,
+    direction: trip.direction,
+    scheduledAt:
+      trip.scheduledTime && trip.groups[0]?.travelDate
+        ? new Date(`${trip.groups[0].travelDate}T${trip.scheduledTime}`).toISOString()
+        : null,
+    pickupPoint: trip.pickupPoint,
+    dropPoint: null,
+    driverName: trip.driverName,
+    driverMobile: trip.driverMobile,
+    capacity: trip.capacity,
+    groups: trip.groups.map((g) => ({
+      groupId: g.groupId,
+      travelLegId: g.travelLegId,
+      pax: g.pax,
+    })),
+  }))
+
+  type RpcCaller = (
+    fn: string,
+    params: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { code?: string; message: string } | null }>
+
+  const { data: rpcData, error: rpcErr } = await (supabase.rpc as unknown as RpcCaller)('commit_fleet_plan', {
+    p_event_id: eventId,
+    p_trips: tripsPayload,
+  })
+
+  if (!rpcErr && rpcData && typeof rpcData === 'object' && (rpcData as { ok?: boolean }).ok) {
+    return { ok: true, tripCount: (rpcData as { tripCount?: number }).tripCount ?? proposal.trips.length }
   }
 
-  // Mark vehicles as assigned
-  await supabase
-    .from('vehicles')
-    .update({ status: 'assigned', updated_at: new Date().toISOString() })
-    .in('id', vehicleIds)
+  // If RPC failed due to anything other than missing function, return friendlyDbError
+  if (rpcErr && rpcErr.code !== '42883' && !rpcErr.message.includes('function') && !rpcErr.message.includes('does not exist')) {
+    return { ok: false, error: friendlyDbError(rpcErr) }
+  }
+
+  // Fallback if RPC is not deployed yet:
+  const vehicleIds = proposal.trips.map((t) => t.vehicleId)
 
   let tripCount = 0
   for (const trip of proposal.trips) {
@@ -346,6 +371,16 @@ export async function commitTrips(
     }
 
     tripCount++
+  }
+
+  // Mark vehicles as assigned only after all trips/passengers succeed
+  const { error: vErr } = await supabase
+    .from('vehicles')
+    .update({ status: 'assigned', updated_at: new Date().toISOString() })
+    .in('id', vehicleIds)
+
+  if (vErr) {
+    return { ok: false, error: friendlyDbError(vErr) }
   }
 
   return { ok: true, tripCount }

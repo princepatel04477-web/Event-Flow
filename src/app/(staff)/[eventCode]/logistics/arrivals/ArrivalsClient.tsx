@@ -17,7 +17,7 @@ import { traceFetch } from '@/lib/perf'
 import { queryKeys } from '@/lib/query/keys'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { cn, formatDate } from '@/lib/utils'
-import { formatMobile } from '@/lib/phone'
+import { formatMobile, telHref } from '@/lib/phone'
 import type { Database } from '@/lib/supabase/database.types'
 
 type TravelLegRow = Database['public']['Tables']['travel_legs']['Row']
@@ -549,9 +549,9 @@ function ArrivalRowCard({
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {row.group.needs_pickup ? <Badge tone="warning">Pickup</Badge> : null}
-            {row.group.primary_mobile ? (
+            {telHref(row.group.primary_mobile) ? (
               <a
-                href={`tel:${row.group.primary_mobile}`}
+                href={telHref(row.group.primary_mobile)!}
                 className="tap inline-flex min-h-11 items-center rounded-lg pr-2 font-mono text-sm font-medium text-brand active:opacity-70"
               >
                 {formatMobile(row.group.primary_mobile)}

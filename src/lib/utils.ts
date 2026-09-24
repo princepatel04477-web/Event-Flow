@@ -167,3 +167,10 @@ export function count(value: number | null | undefined): number {
 export function formatCount(value: number | null | undefined): string {
   return new Intl.NumberFormat('en-IN').format(count(value))
 }
+
+/**
+ * Return current date as YYYY-MM-DD in India Standard Time (Asia/Kolkata).
+ */
+export function getTodayDateIST(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+}

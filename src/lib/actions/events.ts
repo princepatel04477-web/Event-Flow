@@ -1,9 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase/server'
+import { getEventAccess } from '@/lib/supabase/queries'
 import { friendlyDbError } from '@/lib/errors'
 import {
   MAX_EVENT_CODE_LENGTH,
@@ -219,7 +219,7 @@ export async function createEvent(
   const teamHash = createHash('sha256').update(teamCode.replace('-', '')).digest('hex')
   const clientHash = createHash('sha256').update(clientCode.replace('-', '')).digest('hex')
 
-  const { error: codeErr } = await supabase.from('event_access_codes').insert([
+  const { data: insertedCodes, error: codeErr } = await supabase.from('event_access_codes').insert([
     {
       event_id: data!.id,
       role: 'team',
@@ -236,10 +236,20 @@ export async function createEvent(
       last_four: clientCode.slice(-4),
       created_by: user.id,
     },
-  ])
+  ]).select('id')
 
   if (codeErr) {
     return { error: 'The event was created but its access codes could not be saved. Create them in the event admin screen.', fieldErrors: {}, values }
+  }
+
+  if (insertedCodes && insertedCodes.length > 0) {
+    await supabase.from('code_reveal_log').insert(
+      insertedCodes.map((c) => ({
+        event_id: data!.id,
+        access_code_id: c.id,
+        revealed_by: user.id,
+      })),
+    )
   }
 
   // Every layout above reads the viewer's event list — the front door, the
@@ -326,16 +336,27 @@ export async function archiveEvent(
     }
   }
 
-  const { error } = await supabase
+  const access = await getEventAccess(eventId)
+  if (access !== 'admin') {
+    return { ok: false, error: 'Only an admin can archive an event.' }
+  }
+
+  const { data: updatedEvent, error } = await supabase
     .from('events')
     .update({ archived_at: new Date().toISOString() })
     .eq('id', eventId)
+    .select('id')
+    .maybeSingle()
 
   if (error) {
     if (error.code === RLS_DENIED) {
       return { ok: false, error: 'Only an admin can archive an event.' }
     }
     return { ok: false, error: friendlyDbError(error) }
+  }
+
+  if (!updatedEvent) {
+    return { ok: false, error: 'Only an admin can archive an event, or event not found.' }
   }
 
   revalidatePath('/', 'layout')
@@ -350,18 +371,29 @@ export async function archiveEvent(
  * is how a reversible action stops feeling reversible.
  */
 export async function unarchiveEvent(eventId: string): Promise<ArchiveEventResult> {
+  const access = await getEventAccess(eventId)
+  if (access !== 'admin') {
+    return { ok: false, error: 'Only an admin can restore an event.' }
+  }
+
   const supabase = await createClient()
 
-  const { error } = await supabase
+  const { data: restoredEvent, error } = await supabase
     .from('events')
     .update({ archived_at: null })
     .eq('id', eventId)
+    .select('id')
+    .maybeSingle()
 
   if (error) {
     if (error.code === RLS_DENIED) {
       return { ok: false, error: 'Only an admin can restore an event.' }
     }
     return { ok: false, error: friendlyDbError(error) }
+  }
+
+  if (!restoredEvent) {
+    return { ok: false, error: 'Only an admin can restore an event, or event not found.' }
   }
 
   revalidatePath('/', 'layout')

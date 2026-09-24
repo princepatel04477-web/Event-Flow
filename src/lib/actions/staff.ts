@@ -5,6 +5,8 @@ import { z } from 'zod'
 
 import { STAFF_DEPARTMENTS, type StaffDepartment } from '@/lib/departments'
 import { createClient } from '@/lib/supabase/server'
+import { getEventAccess } from '@/lib/supabase/queries'
+import { friendlyDbError } from '@/lib/errors'
 
 /**
  * Staff members — now attribution only, not a gate.
@@ -129,16 +131,42 @@ export async function setStaffMemberDepartment(
   }
 
   const supabase = await createClient()
-  const { error } = await supabase
+
+  const { data: member, error: readErr } = await supabase
+    .from('staff_members')
+    .select('event_id')
+    .eq('id', staffId)
+    .maybeSingle()
+
+  if (readErr) {
+    return { ok: false, error: friendlyDbError(readErr) }
+  }
+
+  if (!member) {
+    return { ok: false, error: 'Staff member not found.' }
+  }
+
+  const access = await getEventAccess(member.event_id)
+  if (access !== 'admin') {
+    return { ok: false, error: 'Only an admin can change departments.' }
+  }
+
+  const { data, error } = await supabase
     .from('staff_members')
     .update({ department: deptParsed.data })
     .eq('id', staffId)
+    .select('id')
+    .maybeSingle()
 
   if (error) {
     if (error.code === RLS_DENIED) {
       return { ok: false, error: 'Only an admin can change departments.' }
     }
-    return { ok: false, error: error.message }
+    return { ok: false, error: friendlyDbError(error) }
+  }
+
+  if (!data) {
+    return { ok: false, error: 'Only an admin can change departments.' }
   }
 
   revalidateStaff(eventCode)
@@ -152,16 +180,41 @@ export async function setStaffMemberActive(
 ): Promise<StaffActionResult> {
   const supabase = await createClient()
 
-  const { error } = await supabase
+  const { data: member, error: readErr } = await supabase
+    .from('staff_members')
+    .select('event_id')
+    .eq('id', staffId)
+    .maybeSingle()
+
+  if (readErr) {
+    return { ok: false, error: friendlyDbError(readErr) }
+  }
+
+  if (!member) {
+    return { ok: false, error: 'Staff member not found.' }
+  }
+
+  const access = await getEventAccess(member.event_id)
+  if (access !== 'admin') {
+    return { ok: false, error: 'Only an admin can change the staff list.' }
+  }
+
+  const { data, error } = await supabase
     .from('staff_members')
     .update({ is_active: isActive })
     .eq('id', staffId)
+    .select('id')
+    .maybeSingle()
 
   if (error) {
     if (error.code === RLS_DENIED) {
       return { ok: false, error: 'Only an admin can change the staff list.' }
     }
-    return { ok: false, error: error.message }
+    return { ok: false, error: friendlyDbError(error) }
+  }
+
+  if (!data) {
+    return { ok: false, error: 'Only an admin can change the staff list.' }
   }
 
   revalidateStaff(eventCode)

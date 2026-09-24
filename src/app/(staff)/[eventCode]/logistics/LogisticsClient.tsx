@@ -117,14 +117,21 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
     const data = active.data
     if (!data || 'empty' in data || !data.proposal) return
     setSaving(true)
-    const result = await commitTrips(eventId, data.proposal)
-    if (result.ok) {
-      setCommitted(true)
-      setCommitError(null)
-    } else {
-      setCommitError(result.error)
+    try {
+      const result = await commitTrips(eventId, data.proposal)
+      if (result.ok) {
+        setCommitted(true)
+        setCommitError(null)
+        arrivals.reload()
+        departures.reload()
+      } else {
+        setCommitError(result.error)
+      }
+    } catch (err) {
+      setCommitError(err instanceof Error ? err.message : 'Failed to commit trips')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   if (active.loading) {
@@ -359,7 +366,7 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
           </Button>
         )}
         {committed && (
-          <LinkButton fullWidth variant="secondary" href={`/${eventId}/logistics/fleet`}>
+          <LinkButton fullWidth variant="secondary" href={`/${eventCode}/logistics/fleet`}>
             Back to fleet
           </LinkButton>
         )}

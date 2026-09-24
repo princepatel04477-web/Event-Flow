@@ -22,6 +22,7 @@ import { VehicleAvailabilityPanel } from '@/components/fleet/VehicleAvailability
 import { useStableData } from '@/lib/use-stable-data'
 import type { StatusTone } from '@/lib/status'
 import { traceFetch } from '@/lib/perf'
+import { formatMobile, telHref } from '@/lib/phone'
 
 interface Props {
   eventId: string
@@ -243,12 +244,12 @@ function VehicleCard({
               <dt className="eyebrow w-16 shrink-0 pt-0.5">Driver</dt>
               <dd className="min-w-0 text-ink">
                 {vehicle.driverName}
-                {vehicle.driverMobile ? (
+                {telHref(vehicle.driverMobile) ? (
                   <a
-                    href={`tel:${vehicle.driverMobile}`}
+                    href={telHref(vehicle.driverMobile)!}
                     className="tap ml-2 font-mono text-brand active:opacity-70"
                   >
-                    {vehicle.driverMobile}
+                    {formatMobile(vehicle.driverMobile)}
                   </a>
                 ) : null}
               </dd>

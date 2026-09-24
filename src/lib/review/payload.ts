@@ -222,7 +222,8 @@ export function buildInitialFormValues(
 // Building the RPC payload
 // ---------------------------------------------------------------------
 
-function normalize(raw: string): string | null {
+function normalize(raw: string | null | undefined): string | null {
+  if (!raw) return null
   const trimmed = raw.trim()
   return trimmed === '' ? null : trimmed
 }
@@ -280,13 +281,24 @@ export function detectInvalidNumbers(values: ReviewFormValues): InvalidNumber[] 
  * the key (or sending JSON null) is what actually means "leave alone", so
  * every builder below normalizes blank strings to `undefined`.
  */
-function buildLegPayload(leg: LegFormValues): RpcLegPayload | undefined {
-  const mode = normalize(leg.mode)
-  const date = normalize(leg.date)
-  const time = normalize(leg.time)
-  const reference = normalize(leg.reference)
-  const point = normalize(leg.point)
-  const pax = parseIntOrNull(leg.pax)
+export type FieldDecision = 'accepted' | 'edited' | 'rejected'
+
+function isRejected(decisions: Record<string, string> | undefined, path: string, altPath?: string): boolean {
+  if (!decisions) return false
+  return decisions[path] === 'rejected' || (altPath ? decisions[altPath] === 'rejected' : false)
+}
+
+function buildLegPayload(
+  leg: LegFormValues,
+  prefix: 'arrival' | 'departure',
+  decisions?: Record<string, string>,
+): RpcLegPayload | undefined {
+  const mode = isRejected(decisions, `${prefix}.mode`) ? null : normalize(leg.mode)
+  const date = isRejected(decisions, `${prefix}.date`) ? null : normalize(leg.date)
+  const time = isRejected(decisions, `${prefix}.time`) ? null : normalize(leg.time)
+  const reference = isRejected(decisions, `${prefix}.reference`) ? null : normalize(leg.reference)
+  const point = isRejected(decisions, `${prefix}.point`) ? null : normalize(leg.point)
+  const pax = isRejected(decisions, `${prefix}.pax`) ? null : parseIntOrNull(leg.pax)
 
   if (mode === null && date === null && time === null && reference === null && point === null && pax === null) {
     // Nothing to send — omit the whole key so the RPC does not touch (or
@@ -305,27 +317,38 @@ function buildLegPayload(leg: LegFormValues): RpcLegPayload | undefined {
 }
 
 /** Translate the review form into exactly the shape apply_rsvp_extraction() reads. */
-export function buildRpcPayload(values: ReviewFormValues): RpcPayload {
+export function buildRpcPayload(
+  values: ReviewFormValues,
+  decisions?: Record<string, string>,
+): RpcPayload {
   const payload: RpcPayload = {}
 
-  const rsvpStatus = normalize(values.rsvpStatus)
-  if (rsvpStatus !== null) payload.rsvp_status = rsvpStatus as RsvpStatus
+  if (!isRejected(decisions, 'rsvpStatus', 'rsvp_status')) {
+    const rsvpStatus = normalize(values.rsvpStatus)
+    if (rsvpStatus !== null) payload.rsvp_status = rsvpStatus as RsvpStatus
+  }
 
-  const confirmedPax = parseIntOrNull(values.confirmedPax)
-  if (confirmedPax !== null) payload.confirmed_pax = confirmedPax
+  if (!isRejected(decisions, 'confirmedPax', 'confirmed_pax')) {
+    const confirmedPax = parseIntOrNull(values.confirmedPax)
+    if (confirmedPax !== null) payload.confirmed_pax = confirmedPax
+  }
 
-  const side = normalize(values.side)
-  if (side !== null) payload.side = side as Side
+  if (!isRejected(decisions, 'side')) {
+    const side = normalize(values.side)
+    if (side !== null) payload.side = side as Side
+  }
 
   // special_requests -> remarks. This is the single most likely place to
   // silently lose data if the mapping is skipped.
-  const remarks = normalize(values.remarks)
-  if (remarks !== null) payload.remarks = remarks
+  if (!isRejected(decisions, 'remarks', 'special_requests')) {
+    const remarks = normalize(values.remarks)
+    if (remarks !== null) payload.remarks = remarks
+  }
 
-  const arrival = buildLegPayload(values.arrival)
+  const arrival = buildLegPayload(values.arrival, 'arrival', decisions)
   if (arrival) payload.arrival = arrival
 
-  const departure = buildLegPayload(values.departure)
+  const departure = buildLegPayload(values.departure, 'departure', decisions)
   if (departure) payload.departure = departure
 
   return payload

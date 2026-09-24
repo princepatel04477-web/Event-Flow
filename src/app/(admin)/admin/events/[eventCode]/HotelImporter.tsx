@@ -27,6 +27,7 @@ export function HotelImporter({ eventId, context: initialContext }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [committing, setCommitting] = useState(false)
   const [commitResult, setCommitResult] = useState<{ inserted: number; skipped: number; failed: number } | null>(null)
+  const [failures, setFailures] = useState<{ rowNumber: number; reason: string }[]>([])
   const [context, setContext] = useState(initialContext)
 
   const handleFile = useCallback(async (file: File) => {
@@ -52,16 +53,23 @@ export function HotelImporter({ eventId, context: initialContext }: Props) {
     if (!parseResult || !parseResult.ok) return
     setCommitting(true)
     setError(null)
+    setFailures([])
 
-    const result = await commitHotelImport(eventId, fileName, parseResult.rows)
+    try {
+      const result = await commitHotelImport(eventId, fileName, parseResult.rows)
+      setFailures(result.failures ?? [])
 
-    if (result.ok && result.summary) {
-      setCommitResult(result.summary)
-      setPhase('done')
-    } else {
-      setError(result.error ?? 'Import failed.')
+      if (result.ok && result.summary && result.summary.inserted > 0) {
+        setCommitResult(result.summary)
+        setPhase('done')
+      } else {
+        setError(result.error ?? 'Import failed — no rooms were created.')
+      }
+    } catch {
+      setError('Connection interrupted while importing hotel data. Check existing hotels before retrying.')
+    } finally {
+      setCommitting(false)
     }
-    setCommitting(false)
   }
 
   // ---- Template download --------------------------------------------------
@@ -210,6 +218,21 @@ export function HotelImporter({ eventId, context: initialContext }: Props) {
             {error}
           </p>
         ) : null}
+
+        {failures.length > 0 ? (
+          <div className="rounded-xl border border-ledger-red/35 bg-red-tint p-4 text-left">
+            <p className="font-semibold text-ledger-red text-sm mb-2">
+              Failed rows ({failures.length}):
+            </p>
+            <ul className="max-h-48 overflow-y-auto space-y-1 text-xs text-ledger-red">
+              {failures.map((f, idx) => (
+                <li key={idx}>
+                  Row {f.rowNumber}: {f.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -231,6 +254,20 @@ export function HotelImporter({ eventId, context: initialContext }: Props) {
                 <span className="figure">{commitResult?.failed ?? 0}</span> failed.
               </p>
             </div>
+            {failures.length > 0 ? (
+              <div className="w-full text-left rounded-xl border border-rule bg-surface p-3 mt-2">
+                <p className="text-xs font-semibold text-muted mb-1">
+                  Rows that could not be imported ({failures.length}):
+                </p>
+                <ul className="max-h-36 overflow-y-auto space-y-1 text-xs text-muted">
+                  {failures.map((f, idx) => (
+                    <li key={idx}>
+                      Row {f.rowNumber}: {f.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <div className="mt-2 flex gap-3">
               <Button variant="secondary" onClick={() => setPhase('upload')}>
                 Import another file

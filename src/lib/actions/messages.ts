@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { friendlyDbError } from '@/lib/errors'
 import { provider } from '@/lib/messaging/provider'
+import type { Database } from '@/lib/supabase/database.types'
 
 // ---------------------------------------------------------------------------
 // Templates
@@ -83,13 +84,32 @@ export async function resolveRecipients(
     case 'all_confirmed':
       query = query.eq('rsvp_status', 'confirmed')
       break
-    case 'arriving_today':
-      // This needs the v_rsvp_queue join — simplified: confirmed + has arrival today
-      query = query.eq('rsvp_status', 'confirmed')
+    case 'arriving_today': {
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+      const { data: legs } = await supabase
+        .from('travel_legs')
+        .select('group_id')
+        .eq('event_id', eventId)
+        .eq('direction', 'arrival')
+        .eq('travel_date', today)
+      const groupIds = [...new Set((legs ?? []).map((l) => l.group_id).filter(Boolean))]
+      if (groupIds.length === 0) return []
+      query = query.eq('rsvp_status', 'confirmed').in('id', groupIds)
       break
-    case 'departing_today':
-      query = query.eq('rsvp_status', 'confirmed')
+    }
+    case 'departing_today': {
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+      const { data: legs } = await supabase
+        .from('travel_legs')
+        .select('group_id')
+        .eq('event_id', eventId)
+        .eq('direction', 'departure')
+        .eq('travel_date', today)
+      const groupIds = [...new Set((legs ?? []).map((l) => l.group_id).filter(Boolean))]
+      if (groupIds.length === 0) return []
+      query = query.eq('rsvp_status', 'confirmed').in('id', groupIds)
       break
+    }
     case 'room_allocated': {
       const { data: roomed } = await supabase
         .from('room_assignments')
@@ -109,6 +129,13 @@ export async function resolveRecipients(
 
   const { data } = await query.eq('event_id', eventId).order('head_name', { ascending: true })
 
+  const mapped: RecipientGroup[] = (data ?? []).map((r) => ({
+    groupId: r.id,
+    headName: r.head_name,
+    mobileNumber: r.primary_mobile ?? '',
+    rsvpStatus: r.rsvp_status,
+  }))
+
   if (filter === 'no_room') {
     const { data: roomed } = await supabase
       .from('room_assignments')
@@ -116,12 +143,12 @@ export async function resolveRecipients(
       .eq('event_id', eventId)
       .is('released_at', null)
     const roomedIds = new Set((roomed ?? []).map((r) => r.group_id))
-    return ((data ?? []) as unknown as RecipientGroup[])
+    return mapped
       .filter((g) => !roomedIds.has(g.groupId))
+      .filter((g) => g.mobileNumber && g.mobileNumber.trim().length >= 10)
   }
 
-  return ((data ?? []) as unknown as RecipientGroup[])
-    .filter((g) => g.mobileNumber && g.mobileNumber.trim().length >= 10)
+  return mapped.filter((g) => g.mobileNumber && g.mobileNumber.trim().length >= 10)
 }
 
 // ---------------------------------------------------------------------------
@@ -407,30 +434,234 @@ export async function generateMessages(
 
   if (fresh.length === 0) return []
 
-  const templateBody = template.body as string
+interface TemplateVariableContext {
+  [key: string]: string
+}
 
-  const rows = fresh.map((r) => {
+async function buildTemplateVariableMap(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  eventId: string,
+  templateBody: string,
+  fresh: RecipientGroup[],
+): Promise<Map<string, TemplateVariableContext>> {
+  const matches = templateBody.match(/\{\{(\w+)\}\}/g) ?? []
+  const requiredKeys = new Set(matches.map((m) => m.slice(2, -2)))
+
+  const result = new Map<string, TemplateVariableContext>()
+  for (const r of fresh) {
+    result.set(r.groupId, { head_name: r.headName })
+  }
+
+  if (requiredKeys.size === 1 && requiredKeys.has('head_name')) {
+    return result
+  }
+
+  const groupIds = fresh.map((r) => r.groupId).filter(Boolean)
+  if (groupIds.length === 0) return result
+
+  let eventName = ''
+  if (requiredKeys.has('event_name')) {
+    const { data: ev } = await supabase.from('events').select('name').eq('id', eventId).maybeSingle()
+    eventName = ev?.name ?? ''
+  }
+
+  const groupsMap = new Map<string, { adults_confirmed: number | null; children_confirmed: number | null; confirmed_pax: number | null; expected_pax: number | null }>()
+  if (requiredKeys.has('pax')) {
+    const { data: groups } = await supabase
+      .from('guest_groups')
+      .select('id, adults_confirmed, children_confirmed, confirmed_pax, expected_pax')
+      .in('id', groupIds)
+    if (groups) {
+      for (const g of groups) groupsMap.set(g.id, g)
+    }
+  }
+
+  const legsMap = new Map<string, {
+    arrival?: { travel_date: string | null; travel_time: string | null; mode: string | null; point: string | null }
+    departure?: { travel_date: string | null; travel_time: string | null; point: string | null }
+  }>()
+
+  const needsLegs = requiredKeys.has('arrival_date') ||
+    requiredKeys.has('arrival_time') ||
+    requiredKeys.has('arrival_mode') ||
+    requiredKeys.has('pickup_point') ||
+    requiredKeys.has('departure_date') ||
+    requiredKeys.has('departure_time') ||
+    requiredKeys.has('drop_point')
+
+  if (needsLegs) {
+    const { data: legs } = await supabase
+      .from('travel_legs')
+      .select('group_id, direction, travel_date, travel_time, mode, point')
+      .in('group_id', groupIds)
+      .eq('event_id', eventId)
+    if (legs) {
+      for (const leg of legs) {
+        if (!leg.group_id) continue
+        const current = legsMap.get(leg.group_id) ?? {}
+        if (leg.direction === 'arrival' && !current.arrival) {
+          current.arrival = {
+            travel_date: leg.travel_date,
+            travel_time: leg.travel_time,
+            mode: leg.mode,
+            point: leg.point,
+          }
+        } else if (leg.direction === 'departure' && !current.departure) {
+          current.departure = {
+            travel_date: leg.travel_date,
+            travel_time: leg.travel_time,
+            point: leg.point,
+          }
+        }
+        legsMap.set(leg.group_id, current)
+      }
+    }
+  }
+
+  const roomsMap = new Map<string, { hotel_name: string; room_number: string; check_in_time: string }>()
+  const needsRooms = requiredKeys.has('hotel_name') || requiredKeys.has('room_number') || requiredKeys.has('check_in_time')
+  if (needsRooms) {
+    const { data: assigns } = await supabase
+      .from('room_assignments')
+      .select('group_id, rooms(room_number, hotel_id, hotels(name, check_in_time))')
+      .in('group_id', groupIds)
+      .eq('event_id', eventId)
+      .is('released_at', null)
+    if (assigns) {
+      for (const a of assigns) {
+        if (!a.group_id || roomsMap.has(a.group_id)) continue
+        const room = a.rooms as unknown as { room_number: string; hotels: { name: string; check_in_time: string | null } | null } | null
+        if (room) {
+          roomsMap.set(a.group_id, {
+            hotel_name: room.hotels?.name ?? '',
+            room_number: room.room_number ?? '',
+            check_in_time: room.hotels?.check_in_time ?? '12:00 PM',
+          })
+        }
+      }
+    }
+  }
+
+  const tripsMap = new Map<string, { driver_name: string; driver_mobile: string; pickup_point: string; drop_point: string }>()
+  const needsTrips = requiredKeys.has('driver_name') || requiredKeys.has('driver_mobile')
+  if (needsTrips) {
+    const { data: passengers } = await supabase
+      .from('trip_passengers')
+      .select('group_id, trips(driver_name, driver_mobile, pickup_point, drop_point)')
+      .in('group_id', groupIds)
+      .eq('event_id', eventId)
+    if (passengers) {
+      for (const p of passengers) {
+        if (!p.group_id || tripsMap.has(p.group_id)) continue
+        const trip = p.trips as unknown as { driver_name: string | null; driver_mobile: string | null; pickup_point: string | null; drop_point: string | null } | null
+        if (trip) {
+          tripsMap.set(p.group_id, {
+            driver_name: trip.driver_name ?? '',
+            driver_mobile: trip.driver_mobile ?? '',
+            pickup_point: trip.pickup_point ?? '',
+            drop_point: trip.drop_point ?? '',
+          })
+        }
+      }
+    }
+  }
+
+  for (const r of fresh) {
+    const vars: TemplateVariableContext = { head_name: r.headName }
+    if (eventName) vars.event_name = eventName
+
+    const g = groupsMap.get(r.groupId)
+    if (g) {
+      const paxCount = g.adults_confirmed != null
+        ? (g.adults_confirmed + (g.children_confirmed ?? 0))
+        : (g.confirmed_pax ?? g.expected_pax ?? '')
+      if (paxCount !== '') vars.pax = String(paxCount)
+    }
+
+    const legInfo = legsMap.get(r.groupId)
+    if (legInfo?.arrival) {
+      if (legInfo.arrival.travel_date) vars.arrival_date = legInfo.arrival.travel_date
+      if (legInfo.arrival.travel_time) vars.arrival_time = legInfo.arrival.travel_time
+      if (legInfo.arrival.mode) vars.arrival_mode = legInfo.arrival.mode
+      if (legInfo.arrival.point) vars.pickup_point = legInfo.arrival.point
+    }
+    if (legInfo?.departure) {
+      if (legInfo.departure.travel_date) vars.departure_date = legInfo.departure.travel_date
+      if (legInfo.departure.travel_time) vars.departure_time = legInfo.departure.travel_time
+      if (legInfo.departure.point) vars.drop_point = legInfo.departure.point
+    }
+
+    const roomInfo = roomsMap.get(r.groupId)
+    if (roomInfo) {
+      if (roomInfo.hotel_name) vars.hotel_name = roomInfo.hotel_name
+      if (roomInfo.room_number) vars.room_number = roomInfo.room_number
+      if (roomInfo.check_in_time) vars.check_in_time = roomInfo.check_in_time
+    }
+
+    const tripInfo = tripsMap.get(r.groupId)
+    if (tripInfo) {
+      if (tripInfo.driver_name) vars.driver_name = tripInfo.driver_name
+      if (tripInfo.driver_mobile) vars.driver_mobile = tripInfo.driver_mobile
+      if (tripInfo.pickup_point && !vars.pickup_point) vars.pickup_point = tripInfo.pickup_point
+      if (tripInfo.drop_point && !vars.drop_point) vars.drop_point = tripInfo.drop_point
+    }
+
+    result.set(r.groupId, vars)
+  }
+
+  return result
+}
+
+  const templateBody = template.body as string
+  const varMap = await buildTemplateVariableMap(supabase, eventId, templateBody, fresh)
+
+  const candidateRows: Array<{
+    recipient: RecipientGroup
+    body: string
+    row: {
+      event_id: string
+      group_id: string | null
+      to_number: string
+      template_key: string
+      body: string
+      provider: 'manual'
+      status: 'queued'
+    }
+  }> = []
+
+  for (const r of fresh) {
+    const vars = varMap.get(r.groupId) ?? { head_name: r.headName }
     const body = templateBody.replace(
       /\{\{(\w+)\}\}/g,
-      (_, key: string) => {
-        const map: Record<string, string> = {
-          head_name: r.headName,
-        }
-        return map[key] ?? `{{${key}}}`
+      (match, key: string) => {
+        const val = vars[key]
+        return val != null && val !== '' ? val : match
       },
     )
 
-    return {
-      event_id: eventId,
-      group_id: r.groupId || null,
-      to_number: r.mobileNumber,
-      template_key: templateKey,
-      body,
-      provider: 'manual' as const,
-      status: 'queued' as const,
+    // Refuse to emit any body that still contains unresolved {{placeholders}}
+    if (/\{\{\w+\}\}/.test(body)) {
+      continue
     }
-  })
 
+    candidateRows.push({
+      recipient: r,
+      body,
+      row: {
+        event_id: eventId,
+        group_id: r.groupId || null,
+        to_number: r.mobileNumber,
+        template_key: templateKey,
+        body,
+        provider: 'manual' as const,
+        status: 'queued' as const,
+      },
+    })
+  }
+
+  if (candidateRows.length === 0) return []
+
+  const rows = candidateRows.map((c) => c.row)
   const { data: inserted } = await supabase
     .from('messages')
     .insert(rows)
@@ -438,14 +669,14 @@ export async function generateMessages(
     .order('queued_at', { ascending: true })
 
   const result: GeneratedMessage[] = []
-  for (let i = 0; i < fresh.length; i++) {
-    const r = fresh[i]
+  for (let i = 0; i < candidateRows.length; i++) {
+    const c = candidateRows[i]
     result.push({
       messageId: inserted?.[i]?.id ?? '',
-      groupId: r.groupId,
-      headName: r.headName,
-      mobileNumber: r.mobileNumber,
-      body: rows[i].body,
+      groupId: c.recipient.groupId,
+      headName: c.recipient.headName,
+      mobileNumber: c.recipient.mobileNumber,
+      body: c.body,
       templateKey,
     })
   }
@@ -702,19 +933,58 @@ export async function retryMessage(messageId: string): Promise<{ ok: boolean; er
 export async function handleWebhook(body: unknown): Promise<{ status: number }> {
   const status = provider.parseWebhook(body)
   if (!status) return { status: 200 } // Health check or irrelevant
+  if (!status.providerMessageId) return { status: 200 }
 
+  // 1. Try service role client if key is configured (bypass RLS for unauthenticated webhooks)
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    const { createClient: createServiceClient } = await import('@supabase/supabase-js')
+    const adminClient = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { persistSession: false } }
+    )
+    const { error } = await adminClient
+      .from('messages')
+      .update({
+        status: status.status,
+        ...(status.status === 'sent' ? { sent_at: status.timestamp } : {}),
+        ...(status.status === 'delivered' ? { delivered_at: status.timestamp } : {}),
+        ...(status.status === 'read' ? { read_at: status.timestamp } : {}),
+        ...(status.status === 'failed' && status.error ? { error: status.error } : {}),
+      })
+      .eq('provider_message_id', status.providerMessageId)
+
+    if (error) return { status: 500 }
+    return { status: 200 }
+  }
+
+  // 2. Definer RPC path (update_message_status)
   const supabase = await createClient()
-  const { error } = await supabase
-    .from('messages')
-    .update({
-      status: status.status,
-      ...(status.status === 'sent' ? { sent_at: status.timestamp } : {}),
-      ...(status.status === 'delivered' ? { delivered_at: status.timestamp } : {}),
-      ...(status.status === 'read' ? { read_at: status.timestamp } : {}),
-      ...(status.status === 'failed' && status.error ? { error: status.error } : {}),
-    })
-    .eq('provider_message_id', status.providerMessageId)
+  type DefinerRpc = (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>
+  const { error: rpcError } = await (supabase.rpc as unknown as DefinerRpc)('update_message_status', {
+    p_provider_message_id: status.providerMessageId,
+    p_status: status.status,
+    p_sent_at: status.status === 'sent' ? status.timestamp : null,
+    p_delivered_at: status.status === 'delivered' ? status.timestamp : null,
+    p_read_at: status.status === 'read' ? status.timestamp : null,
+    p_error: status.status === 'failed' && status.error ? status.error : null,
+  })
 
-  if (error) return { status: 500 }
+  if (rpcError) {
+    // 3. Fallback direct update
+    const { error } = await supabase
+      .from('messages')
+      .update({
+        status: status.status,
+        ...(status.status === 'sent' ? { sent_at: status.timestamp } : {}),
+        ...(status.status === 'delivered' ? { delivered_at: status.timestamp } : {}),
+        ...(status.status === 'read' ? { read_at: status.timestamp } : {}),
+        ...(status.status === 'failed' && status.error ? { error: status.error } : {}),
+      })
+      .eq('provider_message_id', status.providerMessageId)
+
+    if (error) return { status: 500 }
+  }
+
   return { status: 200 }
 }

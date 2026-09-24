@@ -36,7 +36,7 @@ export function GrokTestCall({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId, parsed }),
     })
-    const body = await res.json().catch(() => ({}))
+    await res.json().catch(() => ({}))
     if (!res.ok) {
       appendLog('Could not save — try again or use Call by hand.')
       return
@@ -50,7 +50,11 @@ export function GrokTestCall({
     setLog([])
 
     try {
-      const tokenRes = await fetch('/api/grok-voice/ephemeral', { method: 'POST' })
+      const tokenRes = await fetch('/api/grok-voice/ephemeral', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId }),
+      })
       const tokenBody = await tokenRes.json()
       if (!tokenRes.ok) {
         setState('error')

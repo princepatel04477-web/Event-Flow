@@ -43,6 +43,7 @@ import { z } from 'zod'
 import { getEventAccess } from '@/lib/supabase/queries'
 import { createClient } from '@/lib/supabase/server'
 import type { Json } from '@/lib/supabase/database.types'
+import { friendlyDbError } from '@/lib/errors'
 
 /**
  * Why this is asked at all, rather than assumed:
@@ -145,7 +146,7 @@ const legSchema = z.object({
  * force an "update" onto a family it does not own. Hash inputs match
  * src/lib/import/hash.ts.
  */
-const commitFamilySchema = z.object({
+export const commitFamilySchema = z.object({
   rowNumber: z.number(),
   raw: z.record(z.string(), z.unknown()),
   familyNumber: z.string(),
@@ -153,6 +154,8 @@ const commitFamilySchema = z.object({
   primaryMobile: z.string().nullable(),
   place: z.string().nullable(),
   expectedPax: z.number().nullable(),
+  remark: z.string().nullable().optional(),
+  rsvpStatus: z.string().nullable().optional(),
   canImport: z.boolean(),
   blockReason: z.string().nullable(),
   arrival: legSchema,
@@ -212,6 +215,8 @@ export async function commitImport(
     primaryMobile: f.primaryMobile,
     expectedPax: f.expectedPax,
     city: f.place,
+    remarks: f.remark ?? null,
+    rsvpStatus: f.rsvpStatus ?? null,
     arrival: f.arrival,
     departure: f.departure,
     rowHash: rowHashServer({
@@ -235,7 +240,7 @@ export async function commitImport(
       error:
         error.code === '42501'
           ? 'Not permitted. Only staff can import guests.'
-          : `The import did not land: ${error.message}`,
+          : friendlyDbError(error),
       summary: null,
     }
   }

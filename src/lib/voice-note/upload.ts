@@ -24,6 +24,7 @@
 
 import { supabase } from '@/lib/supabase/client'
 import { registerVoiceNote } from '@/lib/actions/voice-note'
+import { friendlyDbError } from '@/lib/errors'
 
 import {
   markVoiceNoteAttempt,
@@ -66,12 +67,13 @@ export async function commitVoiceNote(
     })
 
   if (uploadError) {
+    const friendly = friendlyDbError(uploadError)
     await queueVoiceNote(note)
-    await markVoiceNoteAttempt(note.callAttemptId, uploadError.message)
+    await markVoiceNoteAttempt(note.callAttemptId, friendly)
     return {
       ok: false,
       queued: true,
-      error: `Could not upload the recording: ${uploadError.message}`,
+      error: friendly,
     }
   }
 
