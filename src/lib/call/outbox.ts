@@ -11,6 +11,8 @@
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 
+import { isAttemptedDue } from '@/lib/outbox/schedule'
+
 import type { CallCompletionPayload } from './types'
 
 const DB_NAME = 'eventflow-call-outbox'
@@ -82,6 +84,15 @@ export async function bumpQueuedAttempt(attemptId: string): Promise<void> {
  * success, or on a definitive "already finalized" response — a row that
  * froze because it synced from another tab/device is not an error, it is
  * exactly what we wanted. Anything else is left queued for the next drain.
+ *
+ * THE BACKOFF IS REAL NOW (M24). `attempts` was incremented by
+ * `bumpQueuedAttempt` on every failure and read by NOTHING — the comment called
+ * it "for basic backoff/debugging" and the debugging half was the only half
+ * that existed. Combined with a trigger that was mount plus the `online` event,
+ * a completion queued on associated-but-dead Wi-Fi (where `online` never fires)
+ * waited for the next full app launch. Each row is now skipped until its own
+ * backoff window has passed, and the queue as a whole is driven by the shared
+ * `scheduleDrain` in `src/lib/outbox/schedule.ts`.
  */
 export async function drainOutbox(
   submit: (payload: CallCompletionPayload) => Promise<{ ok: boolean; alreadyFinalized?: boolean }>,
@@ -91,6 +102,14 @@ export async function drainOutbox(
   const stillQueued: string[] = []
 
   for (const item of items) {
+    // Still inside its backoff window: leave it completely alone. Counting this
+    // as an attempt would double-count and push the row past the "needs
+    // attention" ceiling for a retry that never happened.
+    if (!isAttemptedDue(item)) {
+      stillQueued.push(item.payload.attemptId)
+      continue
+    }
+
     try {
       const result = await submit(item.payload)
       if (result.ok || result.alreadyFinalized) {

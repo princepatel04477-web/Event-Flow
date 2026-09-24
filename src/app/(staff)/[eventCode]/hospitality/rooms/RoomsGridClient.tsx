@@ -187,6 +187,16 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
     setState({ phase: 'loading' })
     try {
       const data = await traceFetch('rooms :: readRoomsGrid', () => readRoomsGrid(eventId))
+      // A FAILED READ CAN STILL ANSWER 200 (M15). `readRoomsGrid` returns an
+      // `error` on the grid rather than throwing, because five separate reads
+      // failing is a data-shape answer, not an exception. Without this check the
+      // grid rendered empty — "No rooms on this event yet" on an event with 168
+      // of them, with the header totals agreeing because they derive from the
+      // same empty arrays.
+      if (data.error) {
+        setState({ phase: 'error', message: 'Could not load room data. Try again.' })
+        return
+      }
       setState({ phase: 'ready', data })
     } catch {
       setState({ phase: 'error', message: 'Could not load room data. Try again.' })

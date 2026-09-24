@@ -60,10 +60,19 @@ const ROSTER_STALE_MS = 5 * 60_000
  * through a server action: it would add a round trip to Seoul to a screen whose
  * whole problem is round trips to Seoul).
  */
-export function useStaffNames(eventId: string): StaffNameLookup {
+export function useStaffNames(
+  eventId: string,
+  { enabled = true }: { enabled?: boolean } = {},
+): StaffNameLookup {
   const { data } = useQuery({
     queryKey: queryKeys.staff.names(eventId),
     staleTime: ROSTER_STALE_MS,
+    // Off when the local event store is live: the roster is already in the
+    // snapshot, and leaving this query enabled would fire one more request on
+    // every mount of a screen whose whole point is that there are none. The
+    // query stays DECLARED either way, so the fallback path (no
+    // `event_snapshot` in the database) is the same read as before.
+    enabled,
     queryFn: async (): Promise<Record<string, string>> => {
       const supabase = createClient()
       const { data: rows } = await supabase

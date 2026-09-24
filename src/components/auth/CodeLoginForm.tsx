@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { setCodeAuthSession } from '@/lib/auth/session'
 import { getDeviceId } from '@/lib/device'
 import { persistClaims } from '@/lib/native/session-keeper'
+import { clearSessionRestoredMarker } from '@/components/native/SessionBridge'
 
 /**
  * Code login — the ONLY login for team and client. One large code input,
@@ -64,6 +65,19 @@ export function CodeLoginForm({ next }: { next: string }) {
     const typed = inputRef.current?.value ?? ''
     if (typed) setCode(typed.toUpperCase())
     setHydrated(true)
+
+    // THE `nuvent_session_restored` MARKER IS CLEARED HERE (M48).
+    //
+    // This form only renders when the server found NO session — the login page
+    // redirects a signed-in visitor away before it is reached. That makes this
+    // the one client-side moment that reliably means "the cookie is gone", which
+    // is exactly when the marker must stop suppressing the restore.
+    //
+    // The marker exists to stop a double-restore immediately after a fresh code
+    // login. It used to be set once and never cleared, so a session that was
+    // restored, then lost again — the Tier-0 failure the bridge is FOR — could
+    // never be restored a second time. See `SessionBridge`.
+    clearSessionRestoredMarker()
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {

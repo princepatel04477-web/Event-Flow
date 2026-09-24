@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { ChevronRightIcon, ShieldAlertIcon } from '@/components/icons'
 import { readDashboard, readTodayLegs, readAttention, type DashboardRow, type TodayLeg, type AttentionRow } from '@/lib/actions/dashboard'
+import { readErrorMessage } from '@/lib/read-failed'
 
 import { TodayPanel } from './TodayPanel'
 import { AttentionPanel } from '@/components/dashboard/AttentionPanel'
@@ -50,8 +51,12 @@ export function DashboardClient({ eventId, eventCode }: Props) {
       setToday(t)
       setAttn(a)
       setError(null)
-    } catch {
-      setError('Could not load the dashboard.')
+    } catch (e) {
+      // Name the failed read rather than swallowing it (M42). The three reads
+      // are `Promise.all`ed, so the first rejection wins; a bare "Could not load
+      // the dashboard" at least no longer sits under a Today section that
+      // silently reads "Nothing scheduled".
+      setError(readErrorMessage(e, 'the dashboard'))
     } finally {
       setLoading(false)
     }

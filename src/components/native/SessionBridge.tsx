@@ -14,6 +14,9 @@ import { isNativePlatform } from '@/lib/native/platform'
  *  login has no stored token, so the bridge no-ops. */
 const NO_RESTORE_PATHS = ['/admin/login', '/pick-staff']
 
+/** The marker that stops a double-restore inside one JS session. */
+const RESTORED_KEY = 'nuvent_session_restored'
+
 /**
  * Code-auth session survival across WebView remounts.
  *
@@ -32,64 +35,132 @@ const NO_RESTORE_PATHS = ['/admin/login', '/pick-staff']
  * keeps the httpOnly cookie, so rehydrating would only fight the login flow.
  * It DOES run on /login: a remount that lost the cookie bounces there, and
  * restoring the cookie lets the login page forward back to `next`.
+ *
+ * ── TWO ONE-SHOT MECHANISMS, AND BOTH WERE BROKEN (M48) ────────────────────
+ *
+ * ONE. The effect was keyed on `[router, pathname]`, so EVERY client-side
+ * navigation tore it down — and its cleanup removed the Capacitor
+ * `appStateChange` listener. The body then early-returned on `hydratedRef`,
+ * which is already true, so the listener was NEVER re-added. After one
+ * navigation (queue → call screen, i.e. the first family called) the resume
+ * path could not run again for the rest of the shift. It is now registered in
+ * its own effect with an empty dependency array, so it lives as long as the
+ * component does and nothing re-attaches it.
+ *
+ * TWO. The `sessionStorage` marker was SET on the first successful restore and
+ * never CLEARED, so every later restore in that JS session returned early. The
+ * marker exists for one reason — do not double-restore immediately after a
+ * fresh code login — so it is now cleared as soon as a guard confirms the
+ * cookie is gone (`clearSessionRestoredMarker`). A restore that succeeded and
+ * then lost the cookie again is exactly the case the bridge exists for, and it
+ * was the case the marker made impossible.
  */
+
+/** Called by a guard that has just observed NO session, so the next restore runs. */
+export function clearSessionRestoredMarker(): void {
+  if (typeof window === 'undefined') return
+  try {
+    sessionStorage.removeItem(RESTORED_KEY)
+  } catch {
+    // Private mode. Nothing to clear, and the marker was never readable either.
+  }
+}
+
 export function SessionBridge() {
   const router = useRouter()
   const pathname = usePathname()
-  const hydratedRef = useRef(false)
+  // Written in an effect, not during render: React forbids a ref write in the
+  // render pass, and this ref exists only to let the one-shot listener see the
+  // CURRENT path without being re-registered. The effect has no dependency array
+  // so it runs after every render, which is exactly the freshness it needs.
+  const pathRef = useRef(pathname)
+  useEffect(() => {
+    pathRef.current = pathname
+  })
 
+  /**
+   * The listener effect: registered ONCE for the life of the component.
+   *
+   * `[]` is the whole fix. It has no cleanup that would strand it — the only
+   * teardown is a real unmount.
+   */
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (!isNativePlatform()) return
 
-    const isNative = isNativePlatform()
+    let removed = false
     let appHandle: { remove: () => void } | undefined
 
-    async function rehydrate() {
-      const stored = await readStoredClaims()
-      if (!stored?.token) return
-      if (NO_RESTORE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return
-      // A sessionStorage marker set right after a fresh code login tells us
-      // the cookie was just written by the normal flow — do not double-restore.
-      // (httpOnly cookies are not visible to document.cookie, so that check
-      // cannot be used for idempotency.)
-      if (sessionStorage.getItem('nuvent_session_restored') === '1') return
-      try {
-        await restoreCodeAuthSession(stored.token, stored.staffMemberId)
-        sessionStorage.setItem('nuvent_session_restored', '1')
-        router.refresh()
-      } catch {
-        // Restore failed (network/edge) — the guard will redirect and the
-        // user signs in again; the persisted copy is still there for next time.
-      }
+    const onResume = () => {
+      void rehydrate(pathRef.current, router)
     }
 
-    async function init() {
-      // Cold mount: the WebView just remounted from scratch (app killed and
-      // relaunched, or a navigation unloaded it). Restore before guards run.
-      await rehydrate()
-
-      // Resume (native only): the app was backgrounded (dialer, camera, home)
-      // and came back. Refresh the cookie in case the backgrounded WebView
-      // lost it. On the web there is no app lifecycle to listen to.
-      if (isNative) {
-        const { App } = await import('@capacitor/app')
-        appHandle = await App.addListener('appStateChange', ({ isActive }) => {
-          if (isActive) void rehydrate()
-        })
-      }
-    }
-
-    if (!hydratedRef.current) {
-      hydratedRef.current = true
-      void init()
-    }
+    void (async () => {
+      const { App } = await import('@capacitor/app')
+      const handle = await App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) onResume()
+      })
+      // The mount can have been torn down while the dynamic import resolved;
+      // registering into that would leak a listener nothing removes.
+      if (removed) handle.remove()
+      else appHandle = handle
+    })()
 
     return () => {
+      removed = true
       appHandle?.remove()
     }
-  }, [router, pathname])
+  }, [router])
+
+  /**
+   * The cold-mount effect: restore before the first guard runs.
+   *
+   * Keyed on the router only. It does NOT depend on the pathname — this fires
+   * once, and re-running it on a navigation is what used to consume the mount
+   * without doing anything.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    void rehydrate(pathRef.current, router)
+  }, [router])
 
   return null
+}
+
+/**
+ * Restore the cookie if durable storage holds a token and this route allows it.
+ *
+ * Shared by the cold-mount and the resume paths so the two cannot drift — the
+ * original had the mount path do the work and the resume path early-return.
+ */
+async function rehydrate(
+  pathname: string,
+  router: { refresh: () => void },
+): Promise<void> {
+  const stored = await readStoredClaims()
+  if (!stored?.token) return
+  if (NO_RESTORE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return
+  // The double-restore guard for a FRESH code login only. Cleared by a guard
+  // that has seen the cookie go missing (see `clearSessionRestoredMarker`).
+  try {
+    if (sessionStorage.getItem(RESTORED_KEY) === '1') return
+  } catch {
+    // Private mode: the marker cannot be read, so every remount restores.
+    // That is the safe direction — restoring a cookie that is already there is
+    // a no-op, and the alternative is not restoring one that is gone.
+  }
+  try {
+    await restoreCodeAuthSession(stored.token, stored.staffMemberId)
+    try {
+      sessionStorage.setItem(RESTORED_KEY, '1')
+    } catch {
+      // See above.
+    }
+    router.refresh()
+  } catch {
+    // Restore failed (network/edge) — the guard will redirect and the
+    // user signs in again; the persisted copy is still there for next time.
+  }
 }
 
 export default SessionBridge

@@ -21,6 +21,12 @@ import {
   type DeliveryRunRow,
 } from '@/lib/actions/deliveries'
 import { queryKeys } from '@/lib/query/keys'
+import { selectDeliveryRun } from '@/lib/store/selectors'
+import {
+  useEventStore,
+  useEventStoreEngine,
+  useEventStoreMode,
+} from '@/lib/store/useEventStore'
 
 const KIND_LABEL: Record<string, string> = {
   hamper: 'Hamper',
@@ -119,13 +125,30 @@ export function HamperRun({
 
   const router = useRouter()
 
-  const { data, isPending, error, refetch } = useQuery({
+  /**
+   * THE STORE IS THE READ PATH; THIS QUERY IS THE FALLBACK.
+   *
+   * The one thing this screen must not lose is honesty about a hamper that has
+   * just been sealed: it used to re-read on every mount precisely so a runner
+   * would not walk back to a door already visited. The store keeps that, and
+   * gets it from a better place — the proof screen's write lands in the store
+   * (one RPC, then a catch-up), and the proof also arrives through the
+   * `delivery_proofs`/`deliverables` rows in the next delta. What changes is
+   * that "back from the proof screen" no longer costs a round trip.
+   */
+  const mode = useEventStoreMode()
+  const storeRows = useEventStore(selectDeliveryRun)
+  const engine = useEventStoreEngine()
+
+  const { data, isPending: queryPending, error, refetch } = useQuery({
     queryKey: queryKeys.deliveries.list(eventId),
     // ALWAYS STALE. This screen is what the proof screen returns to, and a
     // list cached for the default 30s would still be offering a hamper that
     // was sealed a few seconds ago — the runner would walk back to a door they
-    // have already been to. Every mount re-reads.
+    // have already been to. Every mount re-reads. (Unused in store mode, where
+    // the read is local and the freshness comes from the catch-up.)
     staleTime: 0,
+    enabled: mode === 'fallback',
     queryFn: async () => {
       const result = await readDeliveryRun(eventId)
       if (!result.ok) throw new Error(result.error ?? 'Could not load the hamper list.')
@@ -133,7 +156,11 @@ export function HamperRun({
     },
   })
 
-  const rows = useMemo(() => data ?? [], [data])
+  const rows = useMemo(
+    () => (mode === 'store' ? (storeRows as DeliveryRunRow[]) : (data ?? [])),
+    [mode, storeRows, data],
+  )
+  const isPending = mode === 'store' ? false : queryPending
 
   // A hamper is delivered because a photo exists — so a row that already has a
   // proof is finished and leaves this list entirely rather than sitting on it
@@ -187,9 +214,12 @@ export function HamperRun({
         `${s.existingReturnGifts} ${s.existingReturnGifts === 1 ? 'return gift' : 'return gifts'} ` +
         'were already there.',
     )
-    await refetch()
+    // `generateDeliverables` inserts rows this phone never held, so there is
+    // nothing to patch — it re-reads. Which read depends on where the data
+    // lives: a delta in store mode, the old query otherwise.
+    if (mode === 'store') engine?.catchUp()
+    else await refetch()
   }
-
   const filtered = hotel !== null || kind !== null
   const filterCount = (hotel !== null ? 1 : 0) + (kind !== null ? 1 : 0)
 

@@ -48,6 +48,14 @@ export interface AllocationData {
   groups: AllocationGroup[]
   rooms: AllocationRoom[]
   guests: AllocationGuest[]
+  /**
+   * Set when a read FAILED. Empty arrays plus no message is the bug M15 names:
+   * `planRoomAllocation` then answers "No rooms have been added to this event
+   * yet." with an "Add rooms" button, on an event holding 168 of them — a
+   * confident lie that invites duplicate data entry. An error field is additive,
+   * so no caller's existing shape changes; the ones on the screen path check it.
+   */
+  error?: string
 }
 
 export interface AllocationGroup {
@@ -103,6 +111,8 @@ export async function readAllocationData(eventId: string): Promise<AllocationDat
       .select('id, group_id, age_band, is_head')
       .eq('event_id', eventId),
   ])
+
+  const readError = groupsRes.error ?? roomsRes.error ?? guestsRes.error
 
   const groups = (groupsRes.data ?? []) as unknown as GroupRow[]
   const roomsRaw = (roomsRes.data ?? []) as unknown as RoomRow[]
@@ -168,6 +178,7 @@ export async function readAllocationData(eventId: string): Promise<AllocationDat
       ageBand: g.age_band,
       isHead: g.is_head,
     })),
+    ...(readError ? { error: readError.message } : {}),
   }
 }
 
@@ -203,6 +214,15 @@ export interface SuggestRoomsResult {
  */
 export async function suggestRoomAssignments(eventId: string): Promise<SuggestRoomsResult> {
   const data = await readAllocationData(eventId)
+
+  // A FAILED READ IS NOT "EVERYONE IS PLACED" (M15). With the error discarded,
+  // a failed read produced no rooms and no unplaced families, and the v1 panel
+  // rendered "Every confirmed family already has a room." — the most reassuring
+  // possible sentence to put in front of someone deciding whether the event is
+  // ready.
+  if (data.error) {
+    return { ok: false, error: `Could not read the rooms. ${data.error}`, suggestions: [] }
+  }
 
   // SuggestRoom shape the engine wants.
   const rooms = data.rooms.map((r) => ({
@@ -416,6 +436,16 @@ export interface RoomsGridData {
   underBedded: UnderBeddedFamily[]
   /** The board's header line, counted server-side from the same read. */
   totals: RoomsBoardTotals
+  /**
+   * Set when ONE OF THE FIVE READS FAILED (M15).
+   *
+   * Every read's `error` used to be discarded, so a transport failure, an RLS
+   * refusal or a timeout produced `{ rooms: [], unplaced: [], … }` and the board
+   * said "No rooms on this event yet" with an "Add rooms" button — on an event
+   * that has 168 rooms. `totals` is derived from the same empty arrays, so the
+   * header agreed with the lie. Additive field, checked by the screens.
+   */
+  error?: string
 }
 
 export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
@@ -460,6 +490,33 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
     .eq('kind', 'hamper')
     .is('guest_id', null)
   timing.mark('reads')
+
+  // EVERY READ'S ERROR IS CHECKED (M15). Five reads, five chances to hand the
+  // board an empty event. A partial failure (rooms answered, guests did not) is
+  // worse than a total one, because the board then renders real rooms with every
+  // occupant missing. So any error at all means "do not render the board".
+  const readError =
+    roomsRes.error ??
+    assignmentsRes.error ??
+    hotelsRes.error ??
+    guestsRes.error ??
+    groupsRes.error ??
+    hampersRes.error
+
+  if (readError) {
+    return {
+      rooms: [],
+      unplaced: [],
+      underBedded: [],
+      totals: {
+        confirmedGuests: 0,
+        guestsWithBed: 0,
+        bedsFree: 0,
+        familiesWaiting: 0,
+      },
+      error: readError.message,
+    }
+  }
 
   const roomsRaw = roomsRes.data ?? []
   const assignments = assignmentsRes.data ?? []
@@ -1347,6 +1404,14 @@ export type RoomPlanResult =
  */
 export async function planRoomAllocation(eventId: string): Promise<RoomPlanResult> {
   const data = await readAllocationData(eventId)
+
+  // A FAILED READ IS NOT "NO ROOMS" (M15). Without this the empty room array a
+  // transport failure produces becomes the sentence "No rooms have been added to
+  // this event yet." — an assertion about the event, made from a failure to hear
+  // about it.
+  if (data.error) {
+    return { ok: false, error: `Could not read the rooms. ${data.error}` }
+  }
 
   if (data.rooms.length === 0) {
     return { ok: false, error: 'No rooms have been added to this event yet.' }

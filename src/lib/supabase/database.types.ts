@@ -30,6 +30,11 @@ export type Database = {
       current_auth_uid: { Args: never; Returns: string }
       current_identity: { Args: never; Returns: string }
       current_staff_id: { Args: never; Returns: string }
+      event_changes_since: {
+        Args: { p_event_id: string; p_since: string }
+        Returns: Json
+      }
+      event_snapshot: { Args: { p_event_id: string }; Returns: Json }
       has_staff_identity: { Args: { p_event_id: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_member: { Args: { p_event_id: string }; Returns: boolean }
@@ -3578,6 +3583,14 @@ export type Database = {
           p_kind: string
           p_rows: Json
         }
+        Returns: Json
+      }
+      event_changes_since: {
+        Args: { p_event_id: string; p_since: string }
+        Returns: Json
+      }
+      event_snapshot: {
+        Args: { p_event_id: string }
         Returns: Json
       }
       issue_access_code: {

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { friendlyDbError } from '@/lib/errors'
+import { ReadFailedError } from '@/lib/read-failed'
 import { normalisedMobile } from '@/lib/phone'
 import { z } from 'zod'
 
@@ -56,6 +57,13 @@ export async function readFleet(eventId: string): Promise<FleetData> {
       .eq('is_active', true)
       .order('sort_order', { ascending: true }),
   ])
+
+  // A FAILED READ IS NOT AN EMPTY FLEET (M27). Both errors were discarded, so a
+  // dropped link produced `{ vehicles: [], types: [] }` and `FleetBoard` rendered
+  // "No vehicles in the fleet / Add them here" — an invitation to re-enter cars
+  // that are already on file, on the board used to dispatch them.
+  const readError = vehiclesRes.error ?? typesRes.error
+  if (readError) throw new ReadFailedError('the fleet', readError.message)
 
   const vehicles = (vehiclesRes.data ?? []).map((v: Record<string, unknown>) => {
     const typeId = v.vehicle_type_id as string | null

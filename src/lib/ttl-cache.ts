@@ -33,3 +33,28 @@ export function ttlCache<T>(ttlMs: number) {
     },
   }
 }
+
+/**
+ * A stable, opaque cache key for a value that should not be held in memory.
+ *
+ * WHY NOT THE VALUE ITSELF. A cache entry lives for its TTL, which is longer than
+ * the request that created it — so keying a cache on a session token would keep
+ * that token in a module-level Map for the whole TTL. The token is already in
+ * memory during the request; this keeps it from outliving it. It is a MAP KEY and
+ * never a security boundary: a collision would serve one session another
+ * session's *cached answer about that session's own token*, and the answer is a
+ * boolean from a security-definer RPC either way.
+ *
+ * FNV-1a, 32 bits, non-cryptographic on purpose — a hash function here is about
+ * tidiness, and a cryptographic digest per request would cost more than the
+ * lookup it saves. Same construction as `sessionScope()` in
+ * `src/lib/supabase/queries.ts`, which has the same job.
+ */
+export function fingerprint(value: string): string {
+  let h = 2166136261
+  for (let i = 0; i < value.length; i += 1) {
+    h ^= value.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return `${(h >>> 0).toString(36)}:${value.length}`
+}

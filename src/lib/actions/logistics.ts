@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { friendlyDbError } from '@/lib/errors'
+import { ReadFailedError } from '@/lib/read-failed'
 import { pack } from '@/lib/logistics/pack'
 
 // ---------------------------------------------------------------------------
@@ -78,7 +79,7 @@ export async function readUnplacedTravelLegs(
 ): Promise<TravelLegForLogistics[]> {
   const supabase = await createClient()
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('travel_legs')
     .select(
       'id, group_id, direction, mode, travel_date, travel_time, point, reference, pax_on_leg, needs_transport, guest_groups!inner(head_name)',
@@ -89,12 +90,21 @@ export async function readUnplacedTravelLegs(
     .order('travel_date', { ascending: true })
     .order('travel_time', { ascending: true })
 
+  // A FAILED READ IS NOT "NOTHING TO PLAN" (M27). Both reads here and in
+  // `readAvailableVehicles` discarded `error`, so a dropped link produced two
+  // empty arrays and the screen asserted "No vehicles in the fleet…" with a
+  // button offering to add them — an empty-state wall whose action invites
+  // duplicate data entry on an event whose fleet is already on file.
+  if (error) throw new ReadFailedError('the travel legs', error.message)
+
   // Exclude legs already on a trip
-  const { data: placed } = await supabase
+  const { data: placed, error: placedError } = await supabase
     .from('trip_passengers')
     .select('travel_leg_id')
     .eq('event_id', eventId)
     .not('travel_leg_id', 'is', null)
+
+  if (placedError) throw new ReadFailedError('the travel legs', placedError.message)
 
   const placedIds = new Set((placed ?? []).map((p: Record<string, unknown>) => p.travel_leg_id as string))
 
@@ -124,12 +134,15 @@ export async function readUnplacedTravelLegs(
 
 export async function readAvailableVehicles(eventId: string): Promise<VehicleForPacking[]> {
   const supabase = await createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('vehicles')
     .select('id, label, capacity, driver_name, driver_mobile')
     .eq('event_id', eventId)
     .neq('status', 'unavailable')
     .order('capacity', { ascending: false })
+
+  // See `readUnplacedTravelLegs`: an unanswered read is not a missing fleet.
+  if (error) throw new ReadFailedError('the fleet', error.message)
 
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((v) => ({
     id: v.id as string,

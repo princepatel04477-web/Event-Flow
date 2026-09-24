@@ -9,6 +9,12 @@ import { ErrorState } from '@/components/ui/ErrorState'
 import { LoadingRows } from '@/components/ui/LoadingRows'
 import { queryKeys } from '@/lib/query/keys'
 import { findGuests } from '@/lib/query/reads'
+import { selectFindResults } from '@/lib/store/selectors'
+import {
+  useEventStore,
+  useEventStoreEngine,
+  useEventStoreMode,
+} from '@/lib/store/useEventStore'
 import { useOnline } from '@/lib/useOnline'
 import { cn } from '@/lib/utils'
 
@@ -93,10 +99,28 @@ export function StaffGuestDirectory({ eventId, eventCode, from = 'find' }: Staff
   // so the request and the list cannot disagree about what has been asked for.
   const canSearch = debounced.length >= MIN_SEARCH && online
 
+  /**
+   * THE STORE IS THE READ PATH; THIS QUERY IS THE FALLBACK.
+   *
+   * SPEC-PERF §6: "Search runs locally over the store (no server round trip per
+   * keystroke)." The local half is `selectFindResults`, which matches the same
+   * four things the two server legs did — name, family head, room, and (staff
+   * only) the mobile — and returns the same capped, `rsvp_status`-nulled row
+   * shape the screen already renders.
+   *
+   * The debounce is KEPT even though the search is local. It is 250 ms on a
+   * cheap phone's keyboard, and it keeps the two paths identical: a search that
+   * behaved differently depending on whether a migration had been applied is a
+   * bug waiting to be reported as "search is flaky".
+   */
+  const storeMode = useEventStoreMode()
+  const storeResults = useEventStore((state) => selectFindResults(state, debounced))
+  const engine = useEventStoreEngine()
+
   const {
-    data: rows,
-    isFetching,
-    isPlaceholderData,
+    data: queryRows,
+    isFetching: queryFetching,
+    isPlaceholderData: queryPlaceholder,
     error,
     refetch,
   } = useQuery({
@@ -108,9 +132,14 @@ export function StaffGuestDirectory({ eventId, eventCode, from = 'find' }: Staff
     // treats a disabled query as one whose data is not current, which drops the
     // `keepPreviousData` rows and blanks the list on the FIRST keystroke of
     // every new term. That blink is precisely what T4 forbids.
-    enabled: canSearch,
+    enabled: storeMode === 'fallback' && canSearch,
     placeholderData: keepPreviousData,
   })
+
+  const storeLive = storeMode === 'store'
+  const rows = storeLive ? storeResults : queryRows
+  const isFetching = storeLive ? false : queryFetching
+  const isPlaceholderData = storeLive ? false : queryPlaceholder
 
   const offline = !online
   const list = canSearch && rows ? rows : []
@@ -127,7 +156,10 @@ export function StaffGuestDirectory({ eventId, eventCode, from = 'find' }: Staff
 
   async function retry() {
     setDebounced(query)
-    await refetch()
+    // The store path has nothing to re-fetch: the local search is only as stale
+    // as the last catch-up, so the honest retry is to ask for one.
+    if (storeMode === 'store') engine?.catchUp()
+    else await refetch()
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { friendlyDbError } from '@/lib/errors'
+import { ReadFailedError } from '@/lib/read-failed'
 import { provider } from '@/lib/messaging/provider'
 
 // ---------------------------------------------------------------------------
@@ -632,7 +633,14 @@ export async function readMessageLog(
     query = query.eq('status', filter)
   }
 
-  const { data } = await query
+  const { data, error } = await query
+
+  // A FAILED READ IS NOT "NO MESSAGES YET" (M42). `LogClient` rendered the empty
+  // array this used to return as the literal sentence "No messages yet." — an
+  // assertion about the event, made from a request that never answered. On a
+  // WhatsApp shift that reads as "the send did not happen", which is the one
+  // thing an admin opens this screen to find out.
+  if (error) throw new ReadFailedError('the message log', error.message)
 
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((m) => {
     const group = m.guest_groups as { head_name: string } | null

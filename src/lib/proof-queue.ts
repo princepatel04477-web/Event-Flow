@@ -1,6 +1,10 @@
 import Dexie, { type Table } from 'dexie'
 
 import { submitProof } from '@/lib/proof'
+import {
+  isCountedDue,
+  STUCK_AFTER_RETRIES as SHARED_STUCK_AFTER_RETRIES,
+} from '@/lib/outbox/schedule'
 
 /**
  * Offline proof queue (M8 step 6 / M9 write-queue principle).
@@ -50,14 +54,29 @@ class ProofQueueDb extends Dexie {
 
 const db = new ProofQueueDb()
 
-/** Enqueue a proof for later sync. */
+/**
+ * Enqueue a proof for later sync.
+ *
+ * `idempotencyKey` IS THE CALLER'S, WHEN IT HAS ONE (B6). It is embedded in the
+ * storage filename and `delivery_proofs.storage_path` is unique, so reusing the
+ * key the failed submit already used is what makes the replay recognise a proof
+ * that committed before the response was lost — the 23505 branch in
+ * `submitProof` treats it as "already synced". Minting a fresh key in here, as
+ * this function used to, guaranteed the opposite: a new path, a second row, and
+ * `delivery_proofs` cannot be corrected afterwards.
+ *
+ * The fallback stays for callers that never attempted a submit (a proof queued
+ * straight from the camera with no signal), where there is nothing to collide
+ * with and a fresh key is simply the row's identity.
+ */
 export async function queueProof(input: {
   eventId: string
   deliverableId: string
   dataUrl: string
+  idempotencyKey?: string
 }): Promise<QueuedProof> {
   const entry: QueuedProof = {
-    localId: crypto.randomUUID(),
+    localId: input.idempotencyKey ?? crypto.randomUUID(),
     eventId: input.eventId,
     deliverableId: input.deliverableId,
     dataUrl: input.dataUrl,
@@ -74,24 +93,31 @@ export async function queuedProofCount(): Promise<number> {
   return db.proofs.count()
 }
 
-/** Backoff delay in ms before retry attempt `retries+1`. Cap at 60s. */
-export function backoffMs(retries: number): number {
-  return Math.min(60_000, Math.pow(2, retries) * 2_000)
-}
+/** Backoff before retry `retries + 1`. Re-exported from the shared schedule. */
+export { backoffMs } from '@/lib/outbox/schedule'
 
 /** How many attempts before a proof is surfaced as "needs attention". */
-export const STUCK_AFTER_RETRIES = 5
+export const STUCK_AFTER_RETRIES = SHARED_STUCK_AFTER_RETRIES
 
 /**
  * Flush all queued proofs, oldest first. Each entry is attempted once,
  * independently — one failure never blocks the rest. Returns how many
- * synced. Callers (OfflineBanner) should only invoke this when online, and
- * the per-entry backoff spreads retries rather than hammering.
+ * synced.
+ *
+ * THE PER-ENTRY BACKOFF IS NOW REAL (M23/M24). The comment above used to promise
+ * one while the loop attempted every row on every call and the only caller was a
+ * single `useEffect` keyed on `online`. A proof queued by a transport failure on
+ * associated-but-dead Wi-Fi saw `online` never change, so nothing ever retried
+ * it: the photo sat in IndexedDB until the next full app launch while the banner
+ * said "will sync when online" — while online. The drain is driven by the shared
+ * `scheduleDrain` (mount, `online`, foreground, and a 15s interval) and this loop
+ * respects `isCountedDue`, so a frequent trigger cannot become a retry storm.
  */
 export async function flushProofQueue(): Promise<number> {
   const entries = await db.proofs.orderBy('createdAt').toArray()
   let synced = 0
   for (const entry of entries) {
+    if (!isCountedDue(entry)) continue
     try {
       await submitProof({
         eventId: entry.eventId,

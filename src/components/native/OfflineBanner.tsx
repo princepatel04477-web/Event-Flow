@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 
-import { queuedProofCount, flushProofQueue } from '@/lib/proof-queue'
+import { drainAllQueues, refreshPending, usePendingSummary } from '@/lib/mutate/pending'
+import { scheduleDrain } from '@/lib/outbox/schedule'
 import { useOnline } from '@/lib/useOnline'
 
 /**
@@ -10,8 +11,24 @@ import { useOnline } from '@/lib/useOnline'
  *
  * Shown whenever the device has no network: "Offline — N changes queued".
  * It must be impossible to miss — no X button, no auto-hide. When the
- * connection returns, the queued proof queue is flushed and the banner
- * clears.
+ * connection returns, the queues are flushed and the banner clears.
+ *
+ * ── THE COUNT IS NOW EVERY QUEUE, NOT THE PROOF QUEUE (M50) ────────────────
+ *
+ * This banner is the only global status surface the app has, and it used to read
+ * `queuedProofCount()` — one of four IndexedDB outboxes. Queue a call outcome
+ * with no signal and the banner said "Offline — 0 changes queued" while the
+ * outcome sat unsent in `eventflow-call-outbox`. It did not omit the backlog; it
+ * denied it, during a calling shift, which is exactly when the queue is fullest.
+ * `docs/BUGS.md` M50.
+ *
+ * It now reads the shared `pending` store, which sums writes, proofs, call
+ * completions and voice notes, and it DRAINS all four from the same trigger.
+ * Two consequences worth stating: `navigator.onLine` is a hint rather than the
+ * controller — `scheduleDrain` runs on a timer and on foreground as well, because
+ * venue Wi-Fi is associated-but-dead and no event ever fires (M23/M24) — and the
+ * banner is therefore also the surface that clears itself once the backlog has
+ * actually gone, rather than once an event happened to fire.
  *
  * ── `offlineNote`, and why v1 does not pass it ─────────────────────────────
  * An optional second line, shown ONLY while offline. It exists so the new UI
@@ -35,10 +52,11 @@ export interface OfflineBannerProps {
 
 export function OfflineBanner({ offlineNote }: OfflineBannerProps = {}) {
   const online = useOnline()
-  const [queued, setQueued] = useState(0)
+  const pending = usePendingSummary()
+  const queued = pending.total
 
   // Persistent storage (M8/offline): without it Android can evict IndexedDB
-  // under storage pressure and take the proof queue with it. Best-effort —
+  // under storage pressure and take the queues with it. Best-effort —
   // some browsers/WebViews only grant it after a user gesture, and that is
   // fine: the request is a nudge, not a hard requirement.
   useEffect(() => {
@@ -47,15 +65,15 @@ export function OfflineBanner({ offlineNote }: OfflineBannerProps = {}) {
     }
   }, [])
 
+  // Mount read, so a phone that launches holding a backlog says so immediately.
   useEffect(() => {
-    void queuedProofCount().then(setQueued)
+    void refreshPending()
   }, [])
 
-  useEffect(() => {
-    if (!online) return
-    // Reconnected — flush the write queue, then refresh the count.
-    void flushProofQueue().then(() => queuedProofCount().then(setQueued))
-  }, [online])
+  // Every trigger that could get a write through: mount, `online`,
+  // `visibilitychange`, and a timer. See `scheduleDrain` for why the timer is
+  // not optional on venue Wi-Fi.
+  useEffect(() => scheduleDrain(() => drainAllQueues()), [])
 
   if (online && queued === 0) return null
 

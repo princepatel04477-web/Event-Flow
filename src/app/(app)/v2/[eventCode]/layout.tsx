@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
+import { EventStoreProvider } from '@/lib/store/useEventStore'
 import { UndoBar } from '@/components/ui/UndoBar'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
@@ -138,7 +139,22 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
             contentBottom,
           )}
         >
-          {children}
+          {/*
+            THE LOCAL STORE LIVES HERE, ONCE PER EVENT.
+
+            In the SHELL rather than in a page, because that is what makes a tab
+            switch free: a layout is not re-mounted when a child route changes,
+            so the store — and the IndexedDB read that filled it — survives every
+            navigation inside the event. A page-level provider would re-hydrate on
+            every tab, which is the round trip this replaces.
+
+            It also means the cached data is on screen while a page's own guard
+            is still resolving: the guard decides whether the route may render,
+            and it no longer decides whether there is anything to look at.
+            `key` is on `eventId` inside the provider, so switching events gets a
+            fresh store rather than the previous event's rows under a new header.
+          */}
+          <EventStoreProvider eventId={event.id}>{children}</EventStoreProvider>
         </div>
       </main>
 

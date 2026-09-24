@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { perRequest } from '@/lib/request-cache'
+import { ReadFailedError } from '@/lib/read-failed'
 import { PERF_BASELINE } from '@/lib/supabase/queries'
 import { ttlCache } from '@/lib/ttl-cache'
 
@@ -222,7 +223,7 @@ export async function readTodayLegs(
 ): Promise<{ arrivals: TodayLeg[]; departures: TodayLeg[] }> {
   const supabase = await createClient()
 
-  const { data: legs } = await supabase
+  const { data: legs, error } = await supabase
     .from('travel_legs')
     .select(`
       id, direction, travel_time, mode, reference, point, pax_on_leg,
@@ -232,6 +233,12 @@ export async function readTodayLegs(
     .eq('event_id', eventId)
     .eq('travel_date', date)
     .order('travel_time', { ascending: true })
+
+  // A FAILED READ IS NOT "NOTHING SCHEDULED FOR TODAY" (M42). The empty pair
+  // this returned on failure rendered as that sentence — the single most
+  // reassuring thing to tell a coordinator on the morning of the event, said
+  // because a handset could not reach Seoul.
+  if (error) throw new ReadFailedError('today’s travel', error.message)
 
   const rows = (legs ?? []) as unknown as Array<{
     id: string

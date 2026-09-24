@@ -24,18 +24,24 @@ export type StaffViewerContext = {
 /**
  * Resolve staff access plus department for nav gating.
  * Admin: all sections. Code-auth without a picked name: dashboard only.
+ *
+ * ACCESS AND CLAIMS ARE RESOLVED TOGETHER. They used to be two awaited calls in
+ * sequence, and both of them read the code-auth session — `getEventAccess()`
+ * through `getSessionClaims()` and the department through `getSessionClaims()`
+ * again. With the claims memoised per request (see `src/lib/auth/server.ts`) the
+ * second read is free, so running the two together removes a sequential hop
+ * without adding a round trip. The department is only READ when access turns out
+ * to be `event_team`; resolving it for an admin is a null and costs nothing.
  */
 export async function getStaffViewerContext(eventId: string): Promise<StaffViewerContext | null> {
-  const access = await getEventAccess(eventId)
+  const [access, claims] = await Promise.all([getEventAccess(eventId), getSessionClaims()])
   if (access !== 'admin' && access !== 'event_team') return null
 
   if (access === 'admin') {
     return { access, department: 'management' }
   }
 
-  const claims = await getSessionClaims()
-  const department = claims?.department ?? null
-  return { access, department }
+  return { access, department: claims?.department ?? null }
 }
 
 /** Page guard: staff on this event AND allowed to open this section. */

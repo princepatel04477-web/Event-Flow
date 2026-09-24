@@ -29,6 +29,14 @@ import { roomGuardMessage } from '@/lib/errors'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { queryKeys } from '@/lib/query/keys'
 import { groupRoomsByHotelFloor, matchesTerm, waitingLabel } from '@/lib/rooms/board'
+import {
+  optimisticAddGuestOps,
+  optimisticMoveOps,
+  optimisticPlaceOps,
+  optimisticRemoveOps,
+  selectRoomsGrid,
+} from '@/lib/store/selectors'
+import { useEventStore, useEventStoreEngine, useEventStoreMode } from '@/lib/store/useEventStore'
 import { initials } from '@/lib/ui/metrics'
 import { cn } from '@/lib/utils'
 
@@ -91,12 +99,20 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
   const [placeFor, setPlaceFor] = useState<PlaceFamily | null>(null)
   const [openRoomId, setOpenRoomId] = useState<string | null>(null)
 
+  const mode = useEventStoreMode()
+  const storeGrid = useEventStore(selectRoomsGrid)
+  const engine = useEventStoreEngine()
+  const storeMode = mode
+
   const { data, isPending, isFetching, error, refetch } = useQuery({
     queryKey: queryKeys.rooms.grid(eventId),
     queryFn: () => readRoomsGrid(eventId),
+    // Disabled while the local store is live: one RPC on the cold start
+    // replaces six sequential round trips on every visit to this tab.
+    enabled: mode === 'fallback',
   })
 
-  const grid = data ?? EMPTY_GRID
+  const grid = mode === 'store' ? (storeGrid as GridData) : (data ?? EMPTY_GRID)
 
   // -------------------------------------------------------------------------
   // The four reversible writes this screen makes — unchanged from v2
@@ -164,6 +180,14 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
       return { ok: false, message: result.error }
     },
     queue: { eventId, kind: 'assign-guests-room', what: 'room assignment' },
+    // The store's version of the same patch. `apply` above patched a `GridData`
+    // projection; the store holds the source rows, so this adds the assignments
+    // and lets `selectRoomsGrid` recompute free beds, the unplaced list and the
+    // totals — one implementation of "how many beds are free" instead of two.
+    store: {
+      eventId,
+      ops: (v, state) => optimisticPlaceOps(state, v, new Date().toISOString()),
+    },
   })
 
   /** Move one occupant to another room. */
@@ -216,6 +240,13 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
       return { ok: false, message: result.error }
     },
     queue: { eventId, kind: 'move-guest-room', what: 'room move' },
+    store: {
+      eventId,
+      // A move is one column on one row. The board's occupancy, the unplaced
+      // list and the totals all fall out of `selectRoomsGrid` reading the new
+      // room id, so there is no second copy of that arithmetic to keep right.
+      ops: (v) => optimisticMoveOps(v),
+    },
   })
 
   /** Take one occupant out of a room. Releases; never deletes. */
@@ -264,6 +295,13 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
       return result.ok ? { ok: true, data: { ok: true } } : { ok: false, message: result.error }
     },
     queue: { eventId, kind: 'release-guest-room', what: 'room release' },
+    store: {
+      eventId,
+      // A soft release is the row leaving the ACTIVE set — the store never
+      // deletes it (`reducer.ts`), which matches the database's own rule that
+      // released history must survive.
+      ops: (v) => optimisticRemoveOps(v),
+    },
   })
 
   /** Put one waiting guest into this room — "Add a guest" and the share offer. */
@@ -324,6 +362,10 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
       }
     },
     queue: { eventId, kind: 'assign-guest-room', what: 'room assignment' },
+    store: {
+      eventId,
+      ops: (v, state) => optimisticAddGuestOps(state, v, new Date().toISOString()),
+    },
   })
 
   // -------------------------------------------------------------------------
@@ -352,14 +394,20 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
         const result = await commitRoomPlan(eventId, items)
         setCommitResult(result)
         setPlan(null)
-        await queryClient.invalidateQueries({ queryKey: queryKeys.rooms.grid(eventId) })
+        // Auto-fill commits a plan the phone never held as rows, so there is
+        // nothing to patch optimistically — it re-reads. Which read depends on
+        // where the data lives: a background catch-up in store mode, the old
+        // query invalidation otherwise. `catchUp` is a delta, not the whole
+        // event, so this stays inside the 120 ms budget the tab switch now has.
+        if (storeMode === 'store') engine?.catchUp()
+        else await queryClient.invalidateQueries({ queryKey: queryKeys.rooms.grid(eventId) })
       } catch (cause) {
         setPlanError(cause instanceof Error ? cause.message : 'Nothing was saved.')
       } finally {
         setCommitting(false)
       }
     },
-    [eventId, queryClient],
+    [eventId, queryClient, storeMode, engine],
   )
 
   // -------------------------------------------------------------------------
@@ -419,11 +467,32 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
   const openRoom = openRoomId ? (sheetRooms.find((r) => r.roomId === openRoomId) ?? null) : null
 
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
-  const stale = isFetching && data !== undefined
+  // In store mode there is nothing in flight to be stale about, and the
+  // "Counting beds…" line is replaced by whatever the cached grid already says
+  // — a skeleton over a local read that resolves in the same frame is a lie.
+  const pending = mode === 'store' ? false : isPending
+  const stale = mode === 'store' ? false : isFetching && data !== undefined
   const lastError = place.lastError ?? move.lastError ?? remove.lastError ?? add.lastError
   const queuedCount = place.queuedCount + move.queuedCount + remove.queuedCount + add.queuedCount
   const canAutoFill = waiting.length > 0 && grid.totals.bedsFree > 0
   const hasRooms = grid.rooms.length > 0
+
+  /**
+   * A FAILED READ IS NOT AN EMPTY EVENT (M15).
+   *
+   * `readRoomsGrid` used to discard all five reads' `error`s, so a transport
+   * failure produced an empty grid and this screen rendered "No rooms on this
+   * event yet" with an "Add rooms" button — on an event holding 168 rooms. The
+   * Waiting tab said "Add the rooms first" and the v1 suggest panel said "Every
+   * confirmed family already has a room." Every one of those sentences is a
+   * confident claim about the data, and every one of them was wrong in a way
+   * that stops work and invites a runner to enter the same rooms twice.
+   */
+  const gridReadError = grid.error ?? null
+
+  if (gridReadError && mode !== 'store') {
+    return <ErrorState title={gridReadError} onRetry={() => void refetch()} />
+  }
 
   if (loadError && data === undefined) {
     return <ErrorState title={loadError} onRetry={() => void refetch()} />
@@ -431,15 +500,35 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
 
   // The review takes over the screen. It is one job — look at the plan, keep or
   // skip each family, confirm — and a board underneath it would be two.
+  //
+  // THE FAILURE IS RENDERED INSIDE THE REVIEW (M17). `confirmPlan`'s catch set
+  // `planError`, but the review branch returned BEFORE the banner that renders it
+  // and — unlike the success path — did not clear `plan`. So on a failed commit
+  // the button went from "Saving…" back to "Confirm 14" and nothing else
+  // happened: no message, no change, and staff tapping again unsure whether
+  // anything had saved. The banner is now part of the review.
   if (plan !== null) {
     return (
-      <AllocateReview
-        plan={plan}
-        rooms={sheetRooms}
-        committing={committing}
-        onCancel={() => setPlan(null)}
-        onConfirm={(items) => void confirmPlan(items)}
-      />
+      <div className="flex flex-col gap-4">
+        {planError ? (
+          <p
+            role="alert"
+            className="rounded-xl border border-ledger-red/40 bg-red-tint px-3.5 py-3 text-sm font-medium text-ledger-red"
+          >
+            {planError}
+          </p>
+        ) : null}
+        <AllocateReview
+          plan={plan}
+          rooms={sheetRooms}
+          committing={committing}
+          onCancel={() => {
+            setPlan(null)
+            setPlanError(null)
+          }}
+          onConfirm={(items) => void confirmPlan(items)}
+        />
+      </div>
     )
   }
 
@@ -448,7 +537,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
       {/* The screen's state in one bar. Rooms is maroon (SPEC-V3 §2), and the
           bar is the label + done/total + a line of what is left. */}
       <section className="flex flex-col gap-3 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1">
-        {isPending ? (
+        {pending ? (
           <p role="status" className="text-base text-muted">
             Counting beds…
           </p>
@@ -531,7 +620,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
       ) : null}
 
       {tab === 'waiting' ? (
-        isPending ? (
+        pending ? (
           <LoadingRows count={5} />
         ) : (
           <WaitingList
@@ -552,7 +641,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
             }
           />
         )
-      ) : isPending ? (
+      ) : pending ? (
         <LoadingRows count={5} />
       ) : (
         <RoomsGrid hotels={hotels} hasRooms={hasRooms} onOpen={setOpenRoomId} />
@@ -577,7 +666,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
 
       <BottomBar
         summary={
-          isPending
+          pending
             ? 'Counting beds…'
             : canAutoFill
               ? // NOT the same numbers as the card above. The card already

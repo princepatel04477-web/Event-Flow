@@ -116,7 +116,33 @@ export const queryKeys = {
   },
 
   logistics: {
+    /**
+     * The v1 arrivals board's entry. Warm on purpose: the v2 Travel board's
+     * ARRIVAL direction shares it so the two screens hold one copy of the same
+     * rows. The DEPARTURE direction must NOT use it — see `legs`.
+     */
     arrivals: (eventId: string) => eventKey(eventId, 'logistics', 'arrivals'),
+
+    /**
+     * One entry PER DIRECTION (B7).
+     *
+     * `TravelBoard` is one component serving both directions, and it used to key
+     * both on `arrivals` while its `queryFn` filtered `direction = 'departure'`.
+     * TanStack identifies a query by KEY, so the second direction reused the
+     * first's cached rows and never ran its own `queryFn` while the data was
+     * fresh — the 30s default. Tapping the Arrivals|Departures switch inside 30
+     * seconds, which is the one-tap path the `Segmented` exists for, rendered the
+     * arrival families on the departures board: "Mark departed" stamped
+     * `departed_at` on a family that was still arriving, and both boards' 
+     * optimistic marks landed in the same entry.
+     *
+     * `arrival` deliberately delegates to `arrivals` so the arrival board and the
+     * v1 screen still share one entry; `departure` gets its own.
+     */
+    legs: (eventId: string, direction: 'arrival' | 'departure') =>
+      direction === 'arrival'
+        ? eventKey(eventId, 'logistics', 'arrivals')
+        : eventKey(eventId, 'logistics', 'legs', direction),
   },
 
   hospitality: {

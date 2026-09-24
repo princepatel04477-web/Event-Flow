@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
 
 import { ChevronRightIcon, ShieldAlertIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -26,6 +26,7 @@ import {
   type StaffFocus,
   type TodayNumbers,
 } from './_home/today'
+import { TodayNumbersView } from './_home/TodayNumbersView'
 import { readVisibleNumbers } from './_home/visibleNumbers'
 
 export const metadata: Metadata = {
@@ -186,116 +187,35 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
         <p className="text-sm leading-snug text-muted">
           The counters are not loading on this phone right now. Every screen still works.
         </p>
-        <HelpLink eventCode={event.code} />
+        <p className="text-sm">
+          <Link href={`/${event.code}/help`} className="text-muted underline underline-offset-4">
+            How this app works
+          </Link>
+        </p>
       </div>
     )
   }
 
-  const jobs = attentionJobs(numbers, event.code)
-  const now = nowJob(jobs, focus, event.code)
-  const rest = attentionRows(jobs, now)
-  const bars = progressBars(numbers, focus)
-
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <div className="flex flex-col gap-5">
-        <DeniedNote note={deniedNote} />
-
-        <NowCard
-          eyebrow="Right now"
-          headline={now.headline}
-          context={now.context}
-          actionLabel={now.actionLabel}
-          actionHref={now.href}
-        />
-
-        {bars.length > 0 ? (
-          <section
-            aria-label="How it is going"
-            className="flex flex-col gap-4 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1"
-          >
-            {bars.map((bar) => (
-              <Progress
-                key={bar.label}
-                label={bar.label}
-                done={bar.done}
-                total={bar.total}
-                tone={bar.tone}
-              />
-            ))}
-          </section>
-        ) : null}
-
-        {rest.length > 0 ? (
-          <section aria-labelledby="attention-heading" className="flex flex-col gap-2">
-            <h2 id="attention-heading" className="eyebrow text-muted px-1">
-              Needs attention
-            </h2>
-            {/* A Row with no `onPress` renders a div, so wrapping it in a Link
-                is valid HTML and the WHOLE row stays the tap target. */}
-            <div className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
-              {rest.map((job) => (
-                <Link key={job.id} href={job.href} className="tap block">
-                  <Row
-                    heading={job.headline}
-                    meta={job.context}
-                    status={job.status}
-                    tone="waiting"
-                    trailing={<ChevronRightIcon className="h-5 w-5" />}
-                  />
-                </Link>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {/* §4: admin-only extra counters go BELOW a "More numbers" disclosure.
-            Native <details> — no script, works before hydration, and it is the
-            one control on this screen that is allowed to be quiet. */}
-        {access === 'admin' ? (
-          <details className="rounded-2xl border border-rule-strong bg-surface">
-            <summary className="tap flex min-h-12 cursor-pointer items-center px-4 text-base font-medium text-ink">
-              More numbers
-            </summary>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-rule px-4 py-3.5">
-              {moreNumbers(numbers).map((row) => (
-                <div key={row.label} className="min-w-0">
-                  <dt className="text-sm leading-snug text-muted">{row.label}</dt>
-                  <dd className="figure mt-0.5 text-lg leading-none font-medium text-ink">
-                    {row.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </details>
-        ) : null}
-
-        {degraded ? (
-          <p className="text-xs leading-relaxed text-subtle">
-            Some counters could not be read on this phone, so they are left out rather
-            than shown as zero.
-          </p>
-        ) : null}
-
-        <HelpLink eventCode={event.code} />
-      </div>
-    </HydrationBoundary>
-  )
-}
-
-/**
- * §3: "Help = inside Today (small link), not in the header."
- *
- * Not role-gated: this page already ran `requireStaff`, so every viewer who can
- * see it is staff, and the help route runs the same guard.
- */
-function HelpLink({ eventCode }: { eventCode: string }) {
-  return (
-    <Link
-      href={`/${eventCode}/help`}
-      className="tap -mt-1 self-start py-2 text-sm font-medium text-muted underline underline-offset-4 hover:text-ink"
-    >
-      How this app works
-    </Link>
+    /*
+     * The numbers, from the local store when it has them.
+     *
+     * The server still computes `numbers` — that is the fallback for a database
+     * without `event_snapshot`, and it stays the source of truth for whether
+     * this event is empty at all. What changed is that a returning phone paints
+     * all fourteen counts from IndexedDB instead of waiting for a round trip to
+     * Seoul to render the home tab.
+     *
+     * `<HydrationBoundary>` is gone from this path: it dehydrated the board
+     * query into every response, and in store mode there is no such query.
+     */
+    <TodayNumbersView
+      numbers={numbers}
+      eventCode={event.code}
+      focus={focus}
+      isAdmin={access === 'admin'}
+      deniedNote={deniedNote}
+      degraded={degraded}
+    />
   )
 }

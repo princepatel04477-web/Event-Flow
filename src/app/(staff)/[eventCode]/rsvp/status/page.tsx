@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Progress } from '@/components/ui/Progress'
+import { ReadFailure } from '@/components/ui/ReadFailure'
 import { Row } from '@/components/ui/Row'
 import { InboxIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
@@ -39,18 +40,29 @@ export default async function RsvpIndexPage({ params }: PageProps) {
 
   const supabase = await createClient()
 
-  const [{ data: queue }, { data: groups }] = await traceFetch('rsvp :: index', () =>
-    Promise.all([
-      supabase
-        .from('v_rsvp_queue')
-        .select('*')
-        .eq('event_id', event.id)
-        .order('attempt_count', { ascending: true })
-        .order('last_attempt_at', { ascending: true })
-        .order('head_name', { ascending: true }),
-      supabase.from('guest_groups').select('id, head_name, rsvp_status').eq('event_id', event.id),
-    ]),
-  )
+  const [{ data: queue, error: queueError }, { data: groups, error: groupsError }] =
+    await traceFetch('rsvp :: index', () =>
+      Promise.all([
+        supabase
+          .from('v_rsvp_queue')
+          .select('*')
+          .eq('event_id', event.id)
+          .order('attempt_count', { ascending: true })
+          .order('last_attempt_at', { ascending: true })
+          .order('head_name', { ascending: true }),
+        supabase.from('guest_groups').select('id, head_name, rsvp_status').eq('event_id', event.id),
+      ]),
+    )
+
+  // THE ERROR IS CHECKED NOW (M11). Both reads used to discard it, so a failed
+  // request produced `[]` and the empty state below rendered "Nothing waiting to
+  // call — Every family has been called, or the list is empty." Either failing
+  // read makes BOTH the list and the progress bar untrustworthy, so both are
+  // checked: a run of 238 families must never be declared finished because a
+  // handset lost its link for one second.
+  if (queueError || groupsError) {
+    return <ReadFailure what="the calling list" />
+  }
 
   const total = groups?.length ?? 0
   const contacted = (groups ?? []).filter(

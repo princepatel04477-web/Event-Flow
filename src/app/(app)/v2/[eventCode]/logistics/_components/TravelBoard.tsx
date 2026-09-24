@@ -21,6 +21,9 @@ import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { traceFetch } from '@/lib/perf'
 import { formatMobile } from '@/lib/phone'
 import { queryKeys } from '@/lib/query/keys'
+import { ReadFailedError } from '@/lib/read-failed'
+import { legIdsFor, optimisticOps, selectTravelRows } from '@/lib/store/selectors'
+import { useEventStore, useEventStoreMode } from '@/lib/store/useEventStore'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/utils'
 
@@ -124,11 +127,28 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
 
-  const { data, isPending, error, refetch } = useQuery({
-    // SHARED WITH THE v1 ARRIVALS SCREEN: this is the key that board warms, so
-    // the two agree on one cache entry instead of holding two copies of the
-    // same rows. See the header of `src/lib/query/keys.ts`.
-    queryKey: queryKeys.logistics.arrivals(eventId),
+  /**
+   * THE STORE IS THE READ PATH; THIS QUERY IS THE FALLBACK.
+   *
+   * The five parallel reads below become one snapshot taken once per session
+   * with the store live, and this screen's own `roomLabel` join — the only
+   * three-table join on the board — is now done once per store change in
+   * `selectTravelRows` instead of once per visit.
+   *
+   * The query key stays exactly as it was: it is shared with the v1 arrivals
+   * screen, and the fallback has to be the same entry that board warms.
+   */
+  const storeMode = useEventStoreMode()
+  const storeRows = useEventStore((state) => selectTravelRows(state, direction))
+
+  const { data, isPending: queryPending, error, refetch } = useQuery({
+    // ONE ENTRY PER DIRECTION (B7). This used to be the arrival key for both
+    // directions, while the `queryFn` below filtered by direction — so the
+    // Departures tab reused the Arrivals rows for the 30s the cache stayed
+    // fresh, and "Mark departed" stamped a family that had not arrived yet.
+    // Arrivals still maps onto the v1 board's key, so the two share one entry.
+    queryKey: queryKeys.logistics.legs(eventId, direction),
+    enabled: storeMode === 'fallback',
     queryFn: async () => {
       const legDirection = direction === 'arrival' ? 'arrival' : 'departure'
       const result = await traceFetch(`travel :: load(${legDirection})`, () =>
@@ -153,14 +173,31 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
 
       const [
         { data: legs, error: legErr },
-        { data: groups },
-        { data: assignments },
-        { data: rooms },
-        { data: hotels },
+        { data: groups, error: groupErr },
+        { data: assignments, error: assignmentErr },
+        { data: rooms, error: roomErr },
+        { data: hotels, error: hotelErr },
       ] = result
 
-      if (legErr) {
-        throw new Error('Could not load travel. Check your connection and try again.')
+      /**
+       * EVERY READ'S ERROR IS CHECKED (M28).
+       *
+       * Only `legErr` used to be, so if `guest_groups` failed while
+       * `travel_legs` succeeded, `groupById` was empty and the filter below
+       * dropped every leg — and `rows.length === 0` rendered "No arrivals on
+       * file — Arrivals appear once the calling team has logged a flight or
+       * train." A confident claim that the event has no arrivals, on the board
+       * used to meet families at the airport.
+       *
+       * A partial failure is the dangerous case, not a total one: legs WITH no
+       * families is a board that looks real and is empty, and the rooms/hotels
+       * failure only degrades a label — which is why the label reads as blank
+       * rather than as a wrong room number if we ever let it through. We do not:
+       * any failure means the board is not trustworthy, so none is rendered.
+       */
+      const readError = legErr ?? groupErr ?? assignmentErr ?? roomErr ?? hotelErr
+      if (readError) {
+        throw new ReadFailedError(direction === 'arrival' ? 'the arrivals' : 'the departures')
       }
 
       // Index once, then look up in constant time. The v1 read ran
@@ -193,7 +230,11 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
     },
   })
 
-  const rows = useMemo(() => data ?? [], [data])
+  const rows = useMemo(
+    () => (storeMode === 'store' ? storeRows : (data ?? [])),
+    [storeMode, storeRows, data],
+  )
+  const isPending = storeMode === 'store' ? false : queryPending
 
   /**
    * Marking one family met or gone.
@@ -206,7 +247,11 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
    * the runner taps again.
    */
   const mark = useOptimisticAction<TravelRow[], { groupId: string; headName: string }, TravelLegLike>({
-    queryKey: queryKeys.logistics.arrivals(eventId),
+    // The SAME direction-scoped key the read uses (B7). Left on the arrival key,
+    // an optimistic mark made from the Departures board patched a cache entry
+    // nothing on this screen renders — so the row would not move on the tap, and
+    // the arrival board would show a departure stamp.
+    queryKey: queryKeys.logistics.legs(eventId, direction),
     callSite: direction === 'arrival' ? 'v3-travel-arrived' : 'v3-travel-departed',
     deferUntilCommit: true,
     message: (v) =>
@@ -251,6 +296,27 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
       eventId,
       kind: direction === 'arrival' ? 'mark-arrived' : 'mark-departed',
       what: direction === 'arrival' ? 'arrival' : 'departure',
+    },
+    /**
+     * The same stamp, on the store.
+     *
+     * EVERY leg this family has on this board, not only the tapped row — the
+     * RPC does the same (`mark_arrived` stamps all of a family's arrival legs),
+     * and leaving a second leg reading "Expected" for a family standing in the
+     * lobby is the contradiction the `apply` above already avoids. The leg ids
+     * come from the state, because the tapped row is a projection and the store
+     * holds the rows.
+     */
+    store: {
+      eventId,
+      ops: (v, state) => {
+        const ids = legIdsFor(state, v.groupId, direction)
+        return optimisticOps.legStamped({
+          legIds: ids.length > 0 ? ids : [],
+          direction,
+          at: new Date().toISOString(),
+        })
+      },
     },
   })
 

@@ -24,6 +24,7 @@
 
 import { supabase } from '@/lib/supabase/client'
 import { registerVoiceNote } from '@/lib/actions/voice-note'
+import { isAttemptedDue } from '@/lib/outbox/schedule'
 
 import {
   markVoiceNoteAttempt,
@@ -96,9 +97,18 @@ export async function commitVoiceNote(
 }
 
 /**
- * Drain every queued note. Called on mount and on `online`. Failures stay
- * queued for the next drain — nothing is ever dropped to make the count go
- * down.
+ * Drain every queued note. Called on mount, on `online`, on foreground and on
+ * the shared drain interval (M23/M24).
+ *
+ * EVERY ROW CARRIES ITS OWN BACKOFF NOW. The docstring above used to say it was
+ * retried "on mount and on `online`" while a separate comment claimed a backoff
+ * — and neither was true in the code: `attempts` was incremented on every
+ * failure and read by nothing, so every trigger re-attempted every note at once
+ * against a link that had just failed. A note recorded in a hotel basement was
+ * therefore retried only at the next full launch, because on venue Wi-Fi
+ * `navigator.onLine` never changes and no event ever fires (M24).
+ *
+ * Failures stay queued — nothing is ever dropped to make the count go down.
  */
 export async function drainVoiceNotes(): Promise<{ synced: number; stillQueued: number }> {
   const items = await listQueuedVoiceNotes()
@@ -106,6 +116,14 @@ export async function drainVoiceNotes(): Promise<{ synced: number; stillQueued: 
   let stillQueued = 0
 
   for (const item of items) {
+    // Skip a note that is still inside its backoff window. It stays queued and
+    // is picked up by a later drain; a note that fails immediately after every
+    // trigger would otherwise re-upload a multi-megabyte blob every 15s.
+    if (!isAttemptedDue(item)) {
+      stillQueued += 1
+      continue
+    }
+
     try {
       const result = await commitVoiceNote(item, { isRetry: true })
       if (result.ok) synced += 1

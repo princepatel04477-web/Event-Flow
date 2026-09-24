@@ -24,6 +24,7 @@ import {
 } from '@/lib/actions/logistics'
 import { traceFetch } from '@/lib/perf'
 import { useStableData } from '@/lib/use-stable-data'
+import { readErrorMessage } from '@/lib/read-failed'
 import { mapsDirectionsHref } from '@/lib/phone'
 import { openExternalAppUrl } from '@/lib/native/navigation'
 import { cn } from '@/lib/utils'
@@ -162,11 +163,15 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
   const data = active.data
 
   if (active.error) {
+    // The read itself threw (`ReadFailedError`), so its message is the honest
+    // one. The generic "Could not load logistics" was rendered here before the
+    // reads checked their `error` at all, which is why this branch was
+    // unreachable and the empty state below did the talking (M27).
     return (
       <EmptyState
         icon={<ShieldAlertIcon className="h-7 w-7" />}
-        title="Could not load logistics"
-        description="Could not load logistics data."
+        title="Could not load the fleet"
+        description={readErrorMessage(active.error, 'the fleet and travel legs')}
         action={<Button onClick={active.reload}>Retry</Button>}
       />
     )

@@ -10,6 +10,7 @@ import { LinkButton } from '@/components/ui/LinkButton'
 import { formatDateTime } from '@/lib/utils'
 import { captureProofPhoto, compressDataUrl, submitProof, type ProofRow } from '@/lib/proof'
 import { queueProof, queuedProofCount, type QueuedProof } from '@/lib/proof-queue'
+import { refreshPending } from '@/lib/mutate/pending'
 import { createClient } from '@/lib/supabase/client'
 import { useOnline } from '@/lib/useOnline'
 
@@ -260,26 +261,70 @@ export function DeliveryDetail({
   async function handleConfirm() {
     if (!detail) return
     const dataUrl = previewDataUrl
+    /**
+     * THE IDEMPOTENCY KEY IS MINTED HERE, BEFORE THE FIRST ATTEMPT (B6).
+     *
+     * It used to be minted inside `submitProof` as `crypto.randomUUID()`, which
+     * meant every attempt produced a NEW key — and therefore a new storage path,
+     * because the path is derived from the key. `delivery_proofs.storage_path` is
+     * unique and the 23505 branch in `submitProof` exists to make a retry
+     * idempotent, but that branch could never fire for a retry whose key had
+     * changed. So a response lost AFTER the row committed (Wi-Fi associated and
+     * carrying nothing, `navigator.onLine` still true) fell into the catch,
+     * queued a second proof, and the replay uploaded to a DIFFERENT path and
+     * inserted a SECOND row.
+     *
+     * Two rows for one hamper, forever: `delivery_proofs` is insert-only with
+     * `app.block_mutation()` triggers, so nothing can delete, correct or dispute
+     * them — not an admin, not the service role (CLAUDE.md §5.2). And the screen
+     * told the runner "This is NOT marked delivered yet" while the row already
+     * was.
+     *
+     * One key for the attempt, handed to `submitProof` AND to `queueProof`, so
+     * the retry re-uploads onto the path the first attempt already owns and the
+     * unique index recognises it as the same proof.
+     */
+    const proofKey = crypto.randomUUID()
     setPhase({ name: 'uploading' })
     setError(null)
     try {
       // Offline: queue immediately — the banner + reconnect flush handle sync.
       if (!online) {
-        const entry = await queueProof({ eventId, deliverableId, dataUrl })
+        const entry = await queueProof({
+          eventId,
+          deliverableId,
+          dataUrl,
+          idempotencyKey: proofKey,
+        })
         setPhase({ name: 'queued', entry })
         setQueuedCount((n) => n + 1)
+        void refreshPending()
         return
       }
-      const row = await submitProof({ eventId, deliverableId, dataUrl })
+      const row = await submitProof({
+        eventId,
+        deliverableId,
+        dataUrl,
+        idempotencyKey: proofKey,
+      })
       if (row) {
         setPhase({ name: 'done', proof: row })
       }
     } catch {
-      // Failed while online — queue for retry rather than lose the photo.
+      // Failed while online — queue for retry rather than lose the photo. The
+      // SAME key goes with it, so if the failure happened after the row
+      // committed the replay is recognised as already-synced instead of
+      // creating a second unrecoverable proof.
       try {
-        const entry = await queueProof({ eventId, deliverableId, dataUrl })
+        const entry = await queueProof({
+          eventId,
+          deliverableId,
+          dataUrl,
+          idempotencyKey: proofKey,
+        })
         setPhase({ name: 'queued', entry })
         setQueuedCount((n) => n + 1)
+        void refreshPending()
       } catch (qe) {
         setError(qe instanceof Error ? qe.message : 'Could not save the photo.')
         setPhase({ name: 'preview' })

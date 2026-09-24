@@ -1,5 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 
+import { isCountedDue, STUCK_AFTER_RETRIES as SHARED_STUCK_AFTER_RETRIES } from '@/lib/outbox/schedule'
+
 /**
  * Offline queue for reversible writes (V3).
  *
@@ -76,9 +78,36 @@ export async function listQueuedWrites(): Promise<QueuedWrite[]> {
   return db.writes.orderBy('createdAt').toArray()
 }
 
-/** How many writes are waiting. Drives the SyncChip count. */
-export async function queuedWriteCount(): Promise<number> {
-  return db.writes.count()
+/**
+ * How many writes are waiting, optionally narrowed to what a screen queued (M49).
+ *
+ * WHY THE ARGUMENT EXISTS. This used to be `db.writes.count()` — the WHOLE
+ * queue, every kind, every event — and every screen rendered that number as if
+ * it were its own. `RoomsBoard` adds the counts of the four hooks it mounts, so
+ * one room change on a dead link rendered "4 room changes are saved on this
+ * phone"; `CheckInClient` adds two and rendered "(2 waiting)" for one check-in.
+ * Both numbers are false in the direction that erodes trust: a runner who is
+ * told they have four changes waiting when they made one stops believing the
+ * banner. `docs/BUGS.md` M49.
+ *
+ * A screen that wants the global total should read the shared `pending` store
+ * (`src/lib/mutate/pending.ts`), which sums all four queues and exists precisely
+ * so the number is stated once, honestly, in one place.
+ */
+export async function queuedWriteCount(filter?: {
+  kind?: string
+  eventId?: string
+}): Promise<number> {
+  if (!filter || (filter.kind === undefined && filter.eventId === undefined)) {
+    return db.writes.count()
+  }
+  return db.writes
+    .filter(
+      (row) =>
+        (filter.kind === undefined || row.kind === filter.kind) &&
+        (filter.eventId === undefined || row.eventId === filter.eventId),
+    )
+    .count()
 }
 
 /** Record a failed replay attempt. Past the ceiling the row stays for review. */
@@ -93,13 +122,21 @@ export async function dropQueuedWrite(localId: string): Promise<void> {
   await db.writes.delete(localId)
 }
 
-/** Backoff before retry attempt `retries + 1`. Doubles from 2s, capped at 60s. */
-export function backoffMs(retries: number): number {
-  return Math.min(60_000, Math.pow(2, retries) * 2_000)
-}
+/**
+ * Backoff before retry attempt `retries + 1`. Doubles from 2s, capped at 60s.
+ *
+ * Re-exported from the shared schedule so the four queues cannot drift apart
+ * again — see `src/lib/outbox/schedule.ts` for why that mattered (M24).
+ */
+export { backoffMs } from '@/lib/outbox/schedule'
 
 /** How many attempts before a write is surfaced as needing attention. */
-export const STUCK_AFTER_RETRIES = 5
+export const STUCK_AFTER_RETRIES = SHARED_STUCK_AFTER_RETRIES
+
+/** Is this row past its backoff? Both shapes live in the shared schedule. */
+function isWriteDue(entry: { retries: number; createdAt: number }): boolean {
+  return isCountedDue(entry)
+}
 
 /**
  * How to replay a queued write, by `kind`.
@@ -117,6 +154,19 @@ export const STUCK_AFTER_RETRIES = 5
 export type WriteReplay = (
   eventId: string,
   payload: unknown,
+  /**
+   * The row's `localId`, so a replay can be idempotent where the action supports it.
+   *
+   * WHY THIS ARGUMENT EXISTS (B8). It was documented as the idempotency key and
+   * never passed to anything, which made the claim false: the replay signature
+   * was `(eventId, payload)` only. `assign-guests-room` places "the next
+   * unplaced guests of this family", so a second replay of the SAME row is not a
+   * duplicate of the first — it is a second placement, of different people, into
+   * whichever room the payload names. Actions that can honour a key now get one;
+   * `flushWriteQueue` also serialises itself (below), so the ordinary
+   * double-flush is prevented before idempotency is even needed.
+   */
+  localId: string,
 ) => Promise<
   | { ok: true }
   | {
@@ -152,14 +202,47 @@ export function __clearWriteReplaysForTests(): void {
 }
 
 /**
+ * THE IN-FLIGHT GUARD (B8).
+ *
+ * Without it, `flushWriteQueue()` read the whole table into `entries` and then
+ * awaited each replay, while every mounted `useOptimisticAction` installed its
+ * OWN unconditional drain effect. On the offline→online transition all sibling
+ * hooks fire in the same commit, read the same rows before any is deleted, and
+ * each row is sent once per hook — four times on the Rooms board, where four
+ * hooks are mounted. The row's `localId` was never passed downstream, so nothing
+ * could dedupe the result; `assign-guests-room` replayed four times places four
+ * different sets of a family's guests.
+ *
+ * A module-level promise is the right shape for this and a module-level BOOLEAN
+ * is not: a second caller must be able to await the run already in progress (so
+ * its `.then()` refreshes the count afterwards) rather than being told "no" and
+ * reporting a backlog that no one is draining.
+ */
+let inFlightFlush: Promise<number> | null = null
+
+/**
  * Attempt every queued write, oldest first, once each.
  *
  * Per-entry independence, exactly as `flushProofQueue` does: one poison row must
  * not starve the entries behind it. A row with no registered replay is left
  * alone rather than dropped — dropping it would discard the only record that the
  * user's write happened.
+ *
+ * CONCURRENT CALLERS SHARE ONE RUN. See `inFlightFlush`.
  */
-export async function flushWriteQueue(): Promise<number> {
+export function flushWriteQueue(): Promise<number> {
+  if (inFlightFlush) return inFlightFlush
+  const run = drainWriteQueue().finally(() => {
+    // Cleared before the callers' `.then()` handlers run, so the next drain
+    // triggered by those handlers is a new run rather than a stale resolved
+    // promise that would skip it.
+    inFlightFlush = null
+  })
+  inFlightFlush = run
+  return run
+}
+
+async function drainWriteQueue(): Promise<number> {
   const entries = await db.writes.orderBy('createdAt').toArray()
   let sent = 0
 
@@ -169,13 +252,10 @@ export async function flushWriteQueue(): Promise<number> {
 
     // Respect the backoff: without this, every reconnect event re-attempts every
     // row at once against a link that has just proved it cannot carry them.
-    if (entry.retries > 0) {
-      const dueAt = entry.createdAt + backoffMs(entry.retries - 1)
-      if (Date.now() < dueAt) continue
-    }
+    if (!isWriteDue(entry)) continue
 
     try {
-      const result = await replay(entry.eventId, JSON.parse(entry.payload))
+      const result = await replay(entry.eventId, JSON.parse(entry.payload), entry.localId)
       if (result.ok) {
         await db.writes.delete(entry.localId)
         sent++
@@ -195,6 +275,11 @@ export async function flushWriteQueue(): Promise<number> {
   }
 
   return sent
+}
+
+/** Test-only: forget an in-flight drain so a suite starts clean. */
+export function __resetWriteFlushForTests(): void {
+  inFlightFlush = null
 }
 
 /** Rows that have failed repeatedly, for a "needs attention" surface. */

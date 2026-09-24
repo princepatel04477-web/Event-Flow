@@ -49,8 +49,19 @@ export interface OptimisticWriteOptions<TData, TVars, TResult> {
    * Must be pure — it can run twice.
    */
   apply: (previous: TData | undefined, vars: TVars) => TData
-  /** The server write, adapted to `ActionResult`. */
-  action: (vars: TVars) => Promise<ActionResult<TResult>>
+  /**
+   * Per-attempt context that is NOT part of the payload.
+   *
+   * `localId` is the outbox row's idempotency key (B8). It travels beside the
+   * variables rather than inside them because an action's variables are
+   * schema-validated on arrival, and a key merged into a payload that zod strips
+   * is a key the action never sees — which is the bug this argument exists to
+   * fix, not a way to fix it.
+   */
+  action: (
+    vars: TVars,
+    context?: { localId?: string },
+  ) => Promise<ActionResult<TResult>>
   /**
    * Replace the optimistic guess with what the server actually returned.
    * Omit it and the query is invalidated instead, which costs a round trip but
@@ -69,6 +80,31 @@ export interface OptimisticWriteOptions<TData, TVars, TResult> {
    * identically, so it always rolls back.
    */
   holdOnNetworkFailure?: boolean
+  /**
+   * Patch the EVENT STORE instead of the query cache.
+   *
+   * WHY THIS IS A FIELD RATHER THAN A SECOND HOOK. The orchestration around a
+   * write — defer the send for an undo window, queue on a transport failure,
+   * report the refusal, offer the reverse — is identical whichever local copy
+   * of the data is patched. Forking the hook would mean two copies of that
+   * logic, and the one that is not exercised on the day is the one that is
+   * wrong. So the *target* is injected and everything else is shared.
+   *
+   * The callbacks are lazy because the patch has to be applied AFTER the caller
+   * has had a chance to capture the un-patched state, and `revert` must undo
+   * exactly the ops that were applied (see `src/lib/store/reducer.ts`
+   * `invertOps`). `refresh` is the store's equivalent of the query
+   * invalidation `settle` already performs: a background catch-up, never a wait.
+   *
+   * `reconcile` is IGNORED when this is present. It patches the query cache,
+   * which nothing renders in store mode; the catch-up is authoritative and
+   * arrives on the same connection.
+   */
+  storeTarget?: {
+    apply: (vars: TVars) => void
+    revert: () => void
+    refresh: () => void
+  }
 }
 
 export type WriteOutcome =
@@ -105,7 +141,42 @@ async function settle<TData, TVars, TResult>(
   opts: OptimisticWriteOptions<TData, TVars, TResult>,
   previous: TData | undefined,
 ): Promise<WriteOutcome> {
-  const { queryClient, queryKey, vars, action, reconcile } = opts
+  const { queryClient, queryKey, vars, action, reconcile, storeTarget } = opts
+
+  // STORE MODE. Same three outcomes as below — refused, rolled back, accepted —
+  // against the event store rather than a cache entry. `previous` is unused
+  // here on purpose: the store's undo is the inverted op list the caller
+  // staged, which undoes only the rows this write touched (see
+  // `src/lib/store/reducer.ts`).
+  if (storeTarget) {
+    try {
+      const result = await action(vars)
+      if (!result.ok) {
+        storeTarget.revert()
+        storeTarget.refresh()
+        return { status: 'rolled-back', message: result.message, network: false }
+      }
+      // Always refresh, even though the screen already looks right. The RPC
+      // writes more than the fields the caller guessed at — `check_in_room`
+      // picks the family's OLDEST unrealised assignment, `mark_arrived` stamps
+      // every arrival leg — so the phone's guess can be right about the row
+      // that was tapped and wrong about its siblings.
+      storeTarget.refresh()
+      return { status: 'ok' }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      const network = isNetworkError({ message })
+      if (!(network && opts.holdOnNetworkFailure)) storeTarget.revert()
+      // Refresh either way: an inversion is a reconstruction of old values,
+      // and only the server can say what the row actually holds now.
+      storeTarget.refresh()
+      return {
+        status: 'rolled-back',
+        message: friendlyDbError({ message }, undefined, opts.callSite),
+        network,
+      }
+    }
+  }
 
   try {
     const result = await action(vars)
@@ -173,7 +244,27 @@ async function settle<TData, TVars, TResult>(
 export async function stageOptimisticWrite<TData, TVars, TResult>(
   opts: OptimisticWriteOptions<TData, TVars, TResult>,
 ): Promise<StagedWrite> {
-  const { queryClient, queryKey, vars, apply } = opts
+  const { queryClient, queryKey, vars, apply, storeTarget } = opts
+
+  // STORE MODE: the patch goes to the event store, and the "previous" value to
+  // restore is the inverted op list the store hands back. Nothing here touches
+  // the query cache — in store mode there is no observer on `queryKey`, so a
+  // cancel/snapshot/restore would be three no-ops and one lie.
+  if (storeTarget) {
+    storeTarget.apply(vars)
+    let sent = false
+    return {
+      revert: () => {
+        if (sent) return
+        storeTarget.revert()
+      },
+      send: async () => {
+        if (sent) return { status: 'ok' }
+        sent = true
+        return settle(opts, undefined)
+      },
+    }
+  }
 
   // A read already in flight could land AFTER the optimistic patch and clobber
   // it with pre-tap data. Cancel first, then snapshot, then patch.

@@ -16,6 +16,8 @@ import { createClient } from '@/lib/supabase/client'
 import { checkInRoom, checkOutRoom } from '@/lib/actions/event-day'
 import { traceFetch } from '@/lib/perf'
 import { queryKeys } from '@/lib/query/keys'
+import { optimisticOps, selectCheckInRows } from '@/lib/store/selectors'
+import { useEventStore, useEventStoreMode } from '@/lib/store/useEventStore'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { initials } from '@/lib/ui/metrics'
 import { formatDateTime } from '@/lib/utils'
@@ -71,13 +73,26 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
   const [view, setView] = useState<'to_check_in' | 'checked_out'>('to_check_in')
   const [openRowId, setOpenRowId] = useState<string | null>(null)
 
+  /**
+   * THE STORE IS THE READ PATH; THIS QUERY IS THE FALLBACK.
+   *
+   * `event_snapshot` is applied separately from this deploy, so a phone can
+   * meet a database without the RPC. Both sources are wired and exactly one is
+   * used: with the store live this query is DISABLED — the five parallel reads
+   * become one snapshot taken once, on the cold start — and with no store the
+   * screen is byte-for-byte what it was.
+   */
+  const mode = useEventStoreMode()
+  const storeRows = useEventStore(selectCheckInRows)
+
   const {
-    data: rows,
-    isPending: loading,
+    data: queryRows,
+    isPending: queryLoading,
     error,
     refetch,
   } = useQuery({
     queryKey: queryKeys.hospitality.checkIn(eventId),
+    enabled: mode === 'fallback',
     queryFn: async () => {
       const result = await traceFetch('checkin :: load', () =>
         Promise.all([
@@ -142,6 +157,9 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
     },
   })
 
+  const rows = mode === 'store' ? storeRows : queryRows
+  const loading = mode === 'store' ? false : queryLoading
+
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
 
   /**
@@ -195,6 +213,13 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
     reconcile: (server, optimistic) =>
       optimistic.map((r) => (r.assignment.id === server.id ? { ...r, assignment: server } : r)),
     queue: { eventId, kind: 'room-check-in', what: 'check-ins' },
+    // The store's copy of the patch: one timestamp on one assignment. The
+    // server's clock arrives with the next catch-up (or with `reconcile`, which
+    // the store path ignores and replaces with a refresh).
+    store: {
+      eventId,
+      ops: (v) => optimisticOps.stayStamped({ assignmentIds: [v.assignmentId], at: new Date().toISOString() }),
+    },
   })
 
   const checkOut = useOptimisticAction<CheckInRow[], CheckVars, RoomAssignmentRow>({
@@ -222,6 +247,15 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
     reconcile: (server, optimistic) =>
       optimistic.map((r) => (r.assignment.id === server.id ? { ...r, assignment: server } : r)),
     queue: { eventId, kind: 'room-check-out', what: 'check-outs' },
+    store: {
+      eventId,
+      ops: (v) =>
+        optimisticOps.stayStamped({
+          assignmentIds: [v.assignmentId],
+          at: new Date().toISOString(),
+          out: true,
+        }),
+    },
   })
 
   // The first failed write wins the banner. Two errors at once is possible in

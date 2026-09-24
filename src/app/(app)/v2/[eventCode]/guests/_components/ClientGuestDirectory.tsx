@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { listClientGuests, type ClientGuestRow } from '@/lib/actions/client-guests'
 import { traceFetch } from '@/lib/perf'
+import { selectClientRows } from '@/lib/store/selectors'
+import { useEventStore, useEventStoreMode } from '@/lib/store/useEventStore'
 import { useStableData } from '@/lib/use-stable-data'
 
 import {
@@ -55,7 +57,22 @@ export function ClientGuestDirectory({ eventId }: ClientGuestDirectoryProps) {
   const [page, setPage] = useState(1)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
-  const { data: rows, loading, error, reload } = useStableData<ClientGuestRow[]>(
+  /**
+   * THE STORE FIRST, `useStableData` AS THE FALLBACK.
+   *
+   * A client's whole event is one row per guest from `client_guest_profiles`,
+   * which the snapshot ships verbatim under its own key — the migration sends it
+   * for clients AND for staff precisely so this screen and the staff directory
+   * cannot drift apart. With the store live this screen touches the network
+   * once, on the cold start, and then never again: the TTL cache it used to
+   * depend on was already an attempt at the same idea, kept in a module Map
+   * instead of IndexedDB and lost on every app restart.
+   */
+  const storeMode = useEventStoreMode()
+  const storeRows = useEventStore(selectClientRows)
+  const storeLive = storeMode === 'store'
+
+  const { data: cachedRows, loading, error, reload } = useStableData<ClientGuestRow[]>(
     // The SAME cache key the staff-side client list used, deliberately: a
     // client who has opened this screen once can search it with no network.
     `client-guests:${eventId}`,
@@ -64,7 +81,15 @@ export function ClientGuestDirectory({ eventId }: ClientGuestDirectoryProps) {
       if (!result.ok) throw new Error(result.message)
       return result.rows
     },
+    // Nothing to fetch while the store is live — and nothing during the
+    // 'loading' window either, which is why this is `!== 'fallback'` rather
+    // than `=== 'store'`: the mode is unknown for the first frames, and firing
+    // the request there would spend exactly the round trip the store is about
+    // to make unnecessary.
+    { disabled: storeMode !== 'fallback' },
   )
+
+  const rows = storeLive ? storeRows : cachedRows
 
   const q = search.trim().toLocaleLowerCase()
   const searchActive = q.length >= MIN_SEARCH
