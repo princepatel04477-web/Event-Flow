@@ -256,8 +256,6 @@ export function moreNumbers(n: TodayNumbers): Array<{ label: string; value: numb
   return [
     { label: 'Guests expected', value: n.totalPax },
     { label: 'Families', value: n.totalGroups },
-    { label: 'Arriving today', value: n.arrivalsToday },
-    { label: 'Leaving today', value: n.departuresToday },
     { label: 'Confirmed', value: n.rsvpConfirmed },
     { label: 'Still to call', value: n.rsvpPending },
   ]

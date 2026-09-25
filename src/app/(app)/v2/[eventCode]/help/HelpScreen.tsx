@@ -23,8 +23,8 @@ const WHAT_IT_IS_FOR: Record<string, string> = {
   // The v3 labels (src/lib/sections/v3.ts, `V3_TAB_LABEL`) come first.
   Today: 'What needs you right now.',
   Calls: 'Call the next family and log it.',
-  Travel: 'Who is arriving, and their car.',
-  Rooms: 'Families still waiting for a room.',
+  Logistics: 'Who is arriving, and their car.',
+  Hospitality: 'Families still waiting for a room.',
   Hampers: 'Hampers left to deliver.',
   // The v1 labels, kept because the v1 shell renders this file's sibling
   // screens and a missing key would print the fallback line there.

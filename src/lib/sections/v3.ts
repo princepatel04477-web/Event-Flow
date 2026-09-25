@@ -11,11 +11,11 @@ import type { StaffDepartment } from '@/lib/departments'
 import { sectionAllowedForDepartment } from '@/lib/departments'
 
 /**
- * The v3 bottom bar: **Today · Calls · Rooms · Hampers · Travel**.
+ * The v3 bottom bar: **Today · Calls · Hospitality · Hampers · Logistics**.
  *
  * WHY THIS IS NOT IN `config.tsx`. That module is shared with the v1 shell
  * (`(staff)/[eventCode]/layout.tsx` → `BottomTabs`), and its five tabs —
- * Home, Guests, Calls, Travel, Rooms — are pinned by `tests/nav-model.test.ts`
+ * Home, Guests, Calls, Logistics, Hospitality — are pinned by `tests/nav-model.test.ts`
  * and `tests/v2-route-parity.test.ts` as v1's contract. v3 changes the SET,
  * the ORDER and two destinations, so the two models cannot share one
  * function without one of them becoming wrong. They DO share everything
@@ -27,10 +27,10 @@ import { sectionAllowedForDepartment } from '@/lib/departments'
  * - `Guests` leaves the bar. It is reached through the search button in
  *   every `ScreenHeader` (see SPEC-V3 §3), which is also where a runner
  *   looks for a person. That frees the fifth slot.
- * - `Hampers` takes it, as a TAB rather than a borrowed child of Rooms.
- *   A hamper runner's whole job was one level down behind a Rooms tab they
+ * - `Hampers` takes it, as a TAB rather than a borrowed child of Hospitality.
+ *   A hamper runner's whole job was one level down behind a Hospitality tab they
  *   could not open — the tab is now named for the work.
- * - `Travel` moves above `Rooms`, so the bar reads in the order of the
+ * - `Logistics` keeps the last slot, after `Hospitality`, so the bar reads in the order of the
  *   event: who is coming, where they sleep, what they get, how they leave.
  *
  * WHAT DID NOT CHANGE: who may see what. `management` sees all five; a
@@ -62,9 +62,9 @@ const V3_BAR: readonly SectionId[] = [
 const V3_TAB_LABEL: Partial<Record<SectionId, string>> = {
   dashboard: 'Today',
   rsvp: 'Calls',
-  hospitality: 'Rooms',
+  hospitality: 'Hospitality',
   hamper: 'Hampers',
-  logistics: 'Travel',
+  logistics: 'Logistics',
 }
 
 /**
@@ -183,7 +183,7 @@ export function v3TabsFor(
  *
  * A BORROWED CHILD RESOLVES TO ITS HOST (`/{event}/hamper` → `hospitality`),
  * exactly as `resolveActive` does, and for the same reason: without it the
- * Rooms tab goes dark on a screen reached from it and the strip that leads
+ * Hospitality tab goes dark on a screen reached from it and the strip that leads
  * back out renders nothing.
  *
  * UNLIKE `resolveActive`, a section that is no longer IN the v3 bar
@@ -201,7 +201,7 @@ export function v3ActiveSection(rest: string): SectionId | null {
   if (segment in SECTIONS) return segment as SectionId
 
   // Only for a section that is still borrowed: `/{event}/production` is
-  // shown as a child of Rooms, so Rooms has to light.
+  // shown as a child of Hospitality, so Hospitality has to light.
   for (const section of Object.values(SECTIONS)) {
     for (const child of section.children) {
       if (child.href && child.href === segment) return section.id
@@ -230,7 +230,7 @@ export function v3ActiveChild(rest: string): string | null {
  * `/{event}/hospitality/deliveries` has no matching child in
  * `SECTIONS.hospitality` (its children are `rooms`, `checkin`, and the
  * borrowed `hamper` / `production`), so without the override map the one
- * screen in Rooms that is not about rooms would title itself "Rooms".
+ * screen in Hospitality that is not about rooms would title itself "Hospitality".
  */
 const V3_TITLE_OVERRIDES: Record<string, string> = {
   'hospitality/deliveries': 'Hampers',
@@ -259,7 +259,7 @@ export function v3ScreenTitle(rest: string): string {
     if (child) return child.label
   }
 
-  // A detail screen (…/rooms/abc-123) keeps its section's name: "Rooms" is
+  // A detail screen (…/rooms/abc-123) keeps its section's name: "Hospitality" is
   // the right header for a single room, and the record's own identity is the
   // first thing in the body.
   return V3_TAB_LABEL[sectionId] ?? SECTIONS[sectionId].label

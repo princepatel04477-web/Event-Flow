@@ -103,19 +103,12 @@ export function DashboardClient({ eventId, eventCode }: Props) {
         </div>
       </section>
 
-      <section>
-        <h2 className="eyebrow mb-3">Today</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Arrivals today" value={dash.arrivalsToday} tone="info" />
-          <StatCard label="Departures today" value={dash.departuresToday} tone="info" />
-        </div>
-      </section>
 
       <section>
-        <h2 className="eyebrow mb-3">Rooms</h2>
+        <h2 className="eyebrow mb-3">Hospitality</h2>
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Guests roomed" value={dash.guestsRoomed} tone="info" />
-          <StatCard label="Rooms available" value={null} tone="neutral" note="see Rooms screen" />
+          <StatCard label="Rooms available" value={null} tone="neutral" note="see Hospitality screen" />
         </div>
       </section>
 

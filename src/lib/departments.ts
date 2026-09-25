@@ -20,8 +20,8 @@ export const STAFF_DEPARTMENTS: StaffDepartment[] = [
 /** Plain labels for runners — not org-chart jargon. */
 export const DEPARTMENT_LABELS: Record<StaffDepartment, string> = {
   management: 'Event lead',
-  logistics: 'Travel',
-  hospitality: 'Rooms',
+  logistics: 'Logistics',
+  hospitality: 'Hospitality',
   hamper: 'Hampers',
   production: 'Setup',
 }

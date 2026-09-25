@@ -5,7 +5,7 @@ import { resolveEventByCode } from '@/lib/supabase/queries'
 import { LedgerClient } from './LedgerClient'
 
 export const metadata: Metadata = {
-  title: 'Travel ledger',
+  title: 'Logistics ledger',
 }
 
 type PageProps = {

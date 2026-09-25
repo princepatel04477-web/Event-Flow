@@ -71,7 +71,7 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
   // so this cannot fire. It documents the invariant rather than assuming it.
   if (access === 'none') notFound()
 
-  // The v3 bar: Today · Calls · Rooms · Hampers · Travel, per-department
+  // The v3 bar: Today · Calls · Hospitality · Hampers · Logistics, per-department
   // filtering intact. This is deliberately NOT `bottomTabsFor`, which still
   // serves the v1 shell (`(staff)/[eventCode]/layout.tsx`) and its pinned
   // tests; the two models share the `SECTIONS` table underneath. See

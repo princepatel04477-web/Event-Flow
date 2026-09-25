@@ -72,7 +72,7 @@ export function LedgerClient({ eventId, eventCode, eventName }: Props) {
       })),
     )
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Travel Ledger')
+    XLSX.utils.book_append_sheet(wb, ws, 'Logistics Ledger')
     XLSX.writeFile(wb, `${eventCode}_travel_ledger.xlsx`)
   }
 
@@ -99,7 +99,7 @@ export function LedgerClient({ eventId, eventCode, eventName }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <AdminPageTitle context={eventName}>Travel ledger</AdminPageTitle>
+      <AdminPageTitle context={eventName}>Logistics ledger</AdminPageTitle>
 
       {/* The headline is a bar now, not a three-line paragraph: the same
           balanced/total figures, read at a glance. */}

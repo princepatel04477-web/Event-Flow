@@ -8,7 +8,7 @@ import { resolveEventByCode, requireStaff, getEventAccess } from '@/lib/supabase
 import { RoomsGridClient } from './RoomsGridClient'
 
 export const metadata: Metadata = {
-  title: 'Rooms',
+  title: 'Hospitality',
 }
 
 type PageProps = {

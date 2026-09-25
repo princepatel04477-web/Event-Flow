@@ -185,8 +185,7 @@ describe('moreNumbers', () => {
     expect(rows.map((r) => r.label)).toEqual([
       'Guests expected',
       'Families',
-      'Arriving today',
-      'Leaving today',
+
       'Confirmed',
       'Still to call',
     ])
