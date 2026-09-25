@@ -177,34 +177,15 @@ export function resolveContactsSheet(headers: (string | null)[]): ContactsColumn
  *
  * Throws `SheetNotFoundError` when the tab is missing — same contract as
  * `readSheetGrid`, so the caller can distinguish "wrong tab" from "not a
- * contacts sheet".
+ * contacts sheet". `parseImportFile` does not use this path: it reads every
+ * sheet once and calls `contactsSheetFromGrid` instead.
  */
 export async function readContactsSheet(
   file: File,
   sheetName: string = KNOWN_SHEET_NAME,
 ): Promise<ContactsSheetResult> {
   const { sheetName: resolvedName, grid } = await readSheetGrid(file, sheetName)
-
-  // The header is the first row that has any non-blank cell.
-  const headerRowIndex = grid.findIndex((row) => (row ?? []).some((c) => !isBlankCell(c)))
-  if (headerRowIndex < 0) {
-    return { ok: false, reason: `"${resolvedName}" is empty — there is no header row to read.` }
-  }
-
-  const headers = (grid[headerRowIndex] ?? []).map((h) => (isBlankCell(h) ? null : String(h)))
-
-  const resolved = resolveContactsSheet(headers)
-  if (!resolved.ok) return resolved
-
-  const rows: RawSheetRow[] = []
-  for (let i = headerRowIndex + 1; i < grid.length; i++) {
-    const cells = grid[i] ?? []
-    if (!cells.some((c) => !isBlankCell(c))) continue
-    rows.push({ sheetRowNumber: i + 1, cells })
-  }
-
-  const sheet: ContactsSheet = { sheetName: resolvedName, ...resolved.sheet, rows }
-  return { ok: true, sheet }
+  return contactsSheetFromGrid(resolvedName, grid)
 }
 
 export interface ContactsParseFailure {
@@ -411,3 +392,39 @@ export function parseContactsSheet(
 }
 
 export { KNOWN_SHEET_NAME, SheetNotFoundError } from './parse'
+
+/**
+ * Resolves a contacts sheet from a grid that has ALREADY been read.
+ *
+ * Split out for `parseImportFile`, which reads every sheet of a workbook once
+ * (`readWorkbookSheets`) so it can find the calling-list layout on whichever
+ * tab carries it — the app's export names that tab "Guest Master", not
+ * "Sheet1". The fallback then asks each tab in turn whether it is the simple
+ * Name/Contact shape, using this same function, so both entry points agree on
+ * what a contacts sheet is.
+ */
+export function contactsSheetFromGrid(
+  sheetName: string,
+  grid: unknown[][],
+): ContactsSheetResult {
+  // The header is the first row that has any non-blank cell.
+  const headerRowIndex = grid.findIndex((row) => (row ?? []).some((c) => !isBlankCell(c)))
+  if (headerRowIndex < 0) {
+    return { ok: false, reason: `"${sheetName}" is empty — there is no header row to read.` }
+  }
+
+  const headers = (grid[headerRowIndex] ?? []).map((h) => (isBlankCell(h) ? null : String(h)))
+
+  const resolved = resolveContactsSheet(headers)
+  if (!resolved.ok) return resolved
+
+  const rows: RawSheetRow[] = []
+  for (let i = headerRowIndex + 1; i < grid.length; i++) {
+    const cells = grid[i] ?? []
+    if (!cells.some((c) => !isBlankCell(c))) continue
+    rows.push({ sheetRowNumber: i + 1, cells })
+  }
+
+  const sheet: ContactsSheet = { sheetName, ...resolved.sheet, rows }
+  return { ok: true, sheet }
+}

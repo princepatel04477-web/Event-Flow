@@ -104,7 +104,7 @@ const ALIASES: Record<Exclude<KnownColumnKey, 'name'>, string[]> = {
   id: ['id', 'id no', 'id proof'],
   room: ['romm', 'room', 'romm no', 'room no'],
   bed: ['bed', 'beds', 'bed no'],
-  pax: ['pax', 'no of pax', 'total pax'],
+  pax: ['pax', 'no of pax', 'total pax', 'guests', 'no of guests', 'total guests', 'number of guests', 'headcount'],
   arrivalDate: ['arrival date', 'arrival dt', 'date of arrival', 'arrival'],
   arrivalTime: ['time'],
   arrivalMode: ['mode'],
@@ -123,7 +123,7 @@ const ALIASES: Record<Exclude<KnownColumnKey, 'name'>, string[]> = {
 }
 
 /** Aliases accepted for the name column when its header is NOT blank. */
-const NAME_ALIASES = ['name', 'names', 'guest name', 'full name', 'guest']
+const NAME_ALIASES = ['name', 'names', 'guest name', 'full name', 'guest', 'head name', 'head of family', 'family head']
 
 /** Columns that must appear exactly once, resolved by name alone. */
 const SINGLETON_KEYS = [
@@ -229,7 +229,7 @@ export function resolveKnownLayout(headers: (string | null)[]): KnownLayoutResul
         missing.push({
           column: key,
           label: COLUMN_LABELS[key],
-          detail: 'no column with this header.',
+          detail: `no column with this header. Expected one of: ${quoted(expectedHeaders(key))}.`,
         })
       }
       continue
@@ -348,9 +348,8 @@ export function resolveKnownLayout(headers: (string | null)[]): KnownLayoutResul
       ok: false,
       missing,
       reason:
-        `This sheet does not match the CALLING_MASTER_LIST layout: ` +
-        `${missing.length} required column${missing.length === 1 ? '' : 's'} could not be found. ` +
-        `Map the columns by hand instead.`,
+        `This sheet is ${missing.length} required column${missing.length === 1 ? '' : 's'} short of the guest-list format. Missing: ` +
+        `${missing.map((m) => m.label).join('; ')}. Each line below names the header it expects.`,
     }
   }
 
@@ -435,4 +434,17 @@ export function locateKnownLayout(grid: unknown[][], maxScanRows = 10): LocateLa
 /** True when this header row is the CALLING_MASTER_LIST layout. */
 export function matchesKnownLayout(headers: (string | null)[]): boolean {
   return resolveKnownLayout(headers).ok
+}
+
+/**
+ * The header spellings that would resolve a column, for the "what to type"
+ * line. A missing column must come with a fix, not just a complaint: the
+ * operator is looking at Excel and needs to know what to call the cell.
+ */
+function expectedHeaders(key: KnownColumnKey): string[] {
+  return key === 'name' ? NAME_ALIASES : ALIASES[key]
+}
+
+function quoted(list: string[]): string {
+  return list.map((h) => `"${h}"`).join(', ')
 }
