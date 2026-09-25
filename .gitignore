@@ -50,6 +50,8 @@ next-env.d.ts
 /.commandcode/
 /.claude/
 /.agents/
+# MCP config — carries live Paperclip bearer tokens. Never shared.
+/.mcp.json
 # Agent scratch scripts. These run against the LIVE project with the
 # service-role key from .env.test (RLS bypassed) — they must never be
 # committed, and must never be re-run casually. See the 2026-08-13 triage.

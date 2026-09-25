@@ -25,12 +25,21 @@ android {
         applicationId "com.nuvent.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // Bumped for the EventFlow rebrand: new launcher icon, new launcher
-        // label, new splash. versionCode must go UP on every distributed APK —
-        // it is what the in-app version check compares, and what tells a
-        // handset that an install is an upgrade rather than the same build.
-        versionCode 6
-        versionName "final-06"
+        // versionCode must go UP on every distributed APK — it is what the
+        // in-app version check compares, and what tells a handset that an
+        // install is an upgrade rather than the same build.
+        //
+        // final-08: v3 look (maroon + marigold, 5 tabs). Web UI still ships from
+        // nuvent-five.vercel.app; this build keeps the version check in step.
+        //
+        // final-07: the navigation rebuild (five tabs for an event lead, a
+        // runner's own screens as their bar) and the route collapse. Note that
+        // in remote-shell mode NONE of that ships in this APK — it is served
+        // from nuvent-five.vercel.app and reached final-06 handsets the moment
+        // that deploy landed. This build exists so the version check and the
+        // installed base agree; it is not what carries the redesign.
+        versionCode 8
+        versionName "final-08"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
