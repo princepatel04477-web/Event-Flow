@@ -5,15 +5,8 @@ import { usePathname } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
 import { type Membership } from '@/lib/events/paths'
-import {
-  GridIcon,
-  BuildingIcon,
-  LockIcon,
-  FileTextIcon,
-  ListIcon,
-  SearchIcon,
-  SlidersIcon,
-} from '@/components/icons'
+import { SearchIcon } from '@/components/icons'
+import { ADMIN_NAV, EVENT_NAV, type AdminNavItem } from '@/lib/admin/nav'
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 
@@ -24,68 +17,6 @@ type Viewer = {
   isAdmin: boolean
   memberships: Membership[]
 }
-
-interface NavItem {
-  href: string
-  label: string
-  icon: React.ReactNode
-  /** Matched against the pathname to highlight the active item. */
-  matchSegments: string[]
-}
-
-const ADMIN_NAV: NavItem[] = [
-  {
-    href: '/admin/events',
-    label: 'Events',
-    icon: <GridIcon className="h-5 w-5" />,
-    matchSegments: ['events'],
-  },
-]
-
-const EVENT_NAV: NavItem[] = [
-  {
-    href: '',
-    label: 'Dashboard',
-    icon: <GridIcon className="h-5 w-5" />,
-    matchSegments: ['dashboard'],
-  },
-  {
-    href: 'hotels',
-    label: 'Hotels',
-    icon: <BuildingIcon className="h-5 w-5" />,
-    matchSegments: ['hotels'],
-  },
-  {
-    href: 'codes',
-    label: 'Access codes',
-    icon: <LockIcon className="h-5 w-5" />,
-    matchSegments: ['codes'],
-  },
-  {
-    href: 'messages',
-    label: 'Messages',
-    icon: <FileTextIcon className="h-5 w-5" />,
-    matchSegments: ['messages'],
-  },
-  {
-    href: 'ledger',
-    label: 'Ledger',
-    icon: <ListIcon className="h-5 w-5" />,
-    matchSegments: ['ledger'],
-  },
-  {
-    href: 'files',
-    label: 'Files',
-    icon: <FileTextIcon className="h-5 w-5" />,
-    matchSegments: ['files'],
-  },
-  {
-    href: 'settings',
-    label: 'Settings',
-    icon: <SlidersIcon className="h-5 w-5" />,
-    matchSegments: ['settings'],
-  },
-]
 
 export function AdminSidebar({ viewer }: { viewer: Viewer }) {
   const pathname = usePathname()
@@ -107,7 +38,7 @@ export function AdminSidebar({ viewer }: { viewer: Viewer }) {
 
   const activeEvent = viewer.memberships.find((m) => m.eventCode === eventCode)
 
-  function isActive(item: NavItem): boolean {
+  function isActive(item: AdminNavItem): boolean {
     if (item.matchSegments.length === 1 && item.matchSegments[0] === 'events') {
       return segments[1] === 'events'
     }
@@ -179,7 +110,7 @@ export function AdminSidebar({ viewer }: { viewer: Viewer }) {
   )
 }
 
-function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
+function SidebarLink({ item, active }: { item: AdminNavItem; active: boolean }) {
   return (
     <Link
       href={item.href}

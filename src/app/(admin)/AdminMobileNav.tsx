@@ -6,14 +6,8 @@ import { useState } from 'react'
 
 import { cn } from '@/lib/utils'
 import { type Membership } from '@/lib/events/paths'
-import {
-  GridIcon,
-  LockIcon,
-  FileTextIcon,
-  ListIcon,
-  SearchIcon,
-  SlidersIcon,
-} from '@/components/icons'
+import { GridIcon, FileTextIcon, ListIcon, SearchIcon, SlidersIcon } from '@/components/icons'
+import { EVENT_NAV } from '@/lib/admin/nav'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 
@@ -143,9 +137,20 @@ export function AdminMobileNav({ memberships, isAdmin }: AdminMobileNavProps) {
 
           {segments[1] === 'events' && segments[2] ? (
             <>
-              <SheetLink href={`/admin/events/${segments[2]}/codes`} label="Access codes" icon={<LockIcon className="h-5 w-5" />} />
-              <SheetLink href={`/admin/events/${segments[2]}/ledger`} label="Ledger" icon={<ListIcon className="h-5 w-5" />} />
-              <SheetLink href={`/admin/events/${segments[2]}/messages`} label="Messages" icon={<FileTextIcon className="h-5 w-5" />} />
+              {/* Derived from the SAME list the desktop sidebar renders
+                  (`@/lib/admin/nav`), so an admin page can never be reachable
+                  on a laptop and missing on the handset. It previously
+                  hardcoded only codes/ledger/messages, which left Hotels,
+                  Files and Settings unreachable on a phone. `href === ''` is
+                  the event root (Dashboard), already the Dashboard tab. */}
+              {EVENT_NAV.filter((item) => item.href !== '').map((item) => (
+                <SheetLink
+                  key={item.href}
+                  href={`/admin/events/${segments[2]}/${item.href}`}
+                  label={item.label}
+                  icon={item.icon}
+                />
+              ))}
             </>
           ) : (
             <>
