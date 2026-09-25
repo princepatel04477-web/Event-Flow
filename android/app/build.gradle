@@ -29,8 +29,8 @@ android {
         // label, new splash. versionCode must go UP on every distributed APK —
         // it is what the in-app version check compares, and what tells a
         // handset that an install is an upgrade rather than the same build.
-        versionCode 6
-        versionName "final-06"
+        versionCode 9
+        versionName "final-09"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
