@@ -29,6 +29,7 @@ import { roomGuardMessage } from '@/lib/errors'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { queryKeys } from '@/lib/query/keys'
 import { groupRoomsByHotelFloor, matchesTerm, waitingLabel } from '@/lib/rooms/board'
+import { roomTypeLabel } from '@/lib/rooms/room-type'
 import { initials } from '@/lib/ui/metrics'
 import { cn } from '@/lib/utils'
 
@@ -387,6 +388,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
         matchesTerm(
           term,
           room.roomNumber,
+          room.roomType,
           room.hotelName,
           room.floor,
           ...room.occupants.map((o) => o.headName),
@@ -405,6 +407,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
         hotelId: room.hotelId,
         hotelName: room.hotelName,
         roomNumber: room.roomNumber,
+        roomType: room.roomType,
         floor: room.floor,
         capacity: room.capacity,
         maxCapacity: room.maxCapacity,
@@ -753,6 +756,7 @@ function RoomsGrid({ hotels, hasRooms, onOpen }: RoomsGridProps) {
 /** One room in the grid. Whole card is the tap target. */
 function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) => void }) {
   const occupied = room.occupants.length
+  const typeLabel = roomTypeLabel(room.roomType)
   const beds = Math.max(room.capacity, occupied)
   const heads = [...new Set(room.occupants.map((o) => o.headName))]
   const names = [...new Set(room.occupants.map((o) => firstName(o.guestName)))]
@@ -761,7 +765,7 @@ function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) =
     <button
       type="button"
       onClick={() => onOpen(room.roomId)}
-      aria-label={`Room ${room.roomNumber}, ${occupied} of ${room.capacity} beds, ${
+      aria-label={`Room ${room.roomNumber}${typeLabel ? ` ${typeLabel}` : ''}, ${occupied} of ${room.capacity} beds, ${
         names.length === 0 ? 'empty' : names.join(', ')
       }`}
       className={cn(
@@ -775,8 +779,13 @@ function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) =
           360px card, and without these the flex row pushes its own status
           label out of the card instead of ellipsising the number. */}
       <span className="flex items-baseline justify-between gap-2">
-        <span className="figure min-w-0 truncate text-xl leading-none font-semibold text-ink">
-          {room.roomNumber}
+        <span className="flex min-w-0 items-baseline gap-1.5">
+          <span className="figure min-w-0 truncate text-xl leading-none font-semibold text-ink">
+            {room.roomNumber}
+          </span>
+          {typeLabel ? (
+            <span className="shrink-0 text-xs font-medium text-subtle">{typeLabel}</span>
+          ) : null}
         </span>
         {room.isBlocked ? (
           <span className="shrink-0 text-xs font-medium text-muted">Out</span>

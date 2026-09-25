@@ -377,6 +377,8 @@ export interface RoomGridRow {
   hotelId: string
   hotelName: string
   roomNumber: string
+  /** Stored vocabulary value (suite|standard|deluxe|king|queen), or null. */
+  roomType: string | null
   capacity: number
   /** Extra-bed ceiling. Shown nowhere; the board plans against `capacity`. */
   maxCapacity: number
@@ -430,7 +432,7 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
   // groups = 6 requests; now: 5) by selecting rsvp_status once.
   const roomsRes = await supabase
     .from('rooms')
-    .select('id, hotel_id, room_number, capacity, max_capacity, floor, is_blocked')
+    .select('id, hotel_id, room_number, room_type, capacity, max_capacity, floor, is_blocked')
     .eq('event_id', eventId)
     .order('room_number', { ascending: true })
   const assignmentsRes = await supabase
@@ -526,6 +528,7 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
       hotelId: r.hotel_id,
       hotelName: hotelNames.get(r.hotel_id) ?? 'Unknown hotel',
       roomNumber: r.room_number,
+      roomType: r.room_type,
       capacity: r.capacity,
       maxCapacity: r.max_capacity ?? r.capacity,
       floor: r.floor,

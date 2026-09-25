@@ -2,6 +2,7 @@
 
 import { z } from 'zod'
 
+import { normaliseRoomType } from '@/lib/rooms/room-type'
 import { createClient } from '@/lib/supabase/server'
 import { getEventAccess } from '@/lib/supabase/queries'
 import type { Json } from '@/lib/supabase/database.types'
@@ -170,7 +171,7 @@ export async function commitHotelImport(
         event_id: eventId,
         hotel_id: hotelId,
         room_number: row.roomNumber.trim() || `R${row.rowNumber}`,
-        room_type: row.roomType || null,
+        room_type: normaliseRoomType(row.roomType),
         floor: row.floor || null,
         capacity: row.capacity ?? 2,
         max_capacity: (row.capacity ?? 2) + 1,
