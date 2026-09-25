@@ -10,9 +10,19 @@ import { Row } from '@/components/ui/Row'
 import { Spinner } from '@/components/ui/Spinner'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { ChevronRightIcon, ShieldAlertIcon } from '@/components/icons'
-import { readDashboard, readTodayLegs, readAttention, type DashboardRow, type TodayLeg, type AttentionRow } from '@/lib/actions/dashboard'
+import {
+  readDashboard,
+  readRsvpBreakdown,
+  readTodayLegs,
+  readAttention,
+  type DashboardRow,
+  type RsvpBucket,
+  type TodayLeg,
+  type AttentionRow,
+} from '@/lib/actions/dashboard'
 
 import { TodayPanel } from './TodayPanel'
+import { ConfirmationTabs } from './ConfirmationTabs'
 import { AttentionPanel } from '@/components/dashboard/AttentionPanel'
 
 interface Props {
@@ -30,6 +40,7 @@ const ROW_LINK = 'tap block border-b border-rule last:border-b-0'
 
 export function DashboardClient({ eventId, eventCode }: Props) {
   const [dash, setDash] = useState<DashboardRow | null>(null)
+  const [buckets, setBuckets] = useState<RsvpBucket[]>([])
   const [today, setToday] = useState<{ arrivals: TodayLeg[]; departures: TodayLeg[] }>({ arrivals: [], departures: [] })
   const [attn, setAttn] = useState<AttentionRow | null>(null)
   const [todayDate, setTodayDate] = useState('')
@@ -41,12 +52,14 @@ export function DashboardClient({ eventId, eventCode }: Props) {
       const todayStr = new Date().toISOString().slice(0, 10)
       setTodayDate(todayStr)
 
-      const [d, t, a] = await Promise.all([
+      const [d, b, t, a] = await Promise.all([
         readDashboard(eventId),
+        readRsvpBreakdown(eventId),
         readTodayLegs(eventId, todayStr),
         readAttention(eventId),
       ])
       setDash(d)
+      setBuckets(b)
       setToday(t)
       setAttn(a)
       setError(null)
@@ -92,16 +105,21 @@ export function DashboardClient({ eventId, eventCode }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* ---- Numbers ---- */}
+      {/* ---- Numbers ----
+          PAX is the headline, and the family count sits beside it: "312
+          guests / 96 families" is the pair an admin plans against, and a
+          families-only count reads as nine people when it is three hundred. */}
       <section>
         <h2 className="eyebrow mb-3">RSVP</h2>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Total groups" value={dash.totalGroups} note="families on the list" />
-          <StatCard label="Guests expected" value={dash.totalPax} note="confirmed where known" />
-          <StatCard label="Confirmed" value={dash.rsvpConfirmed} tone="success" />
-          <StatCard label="Pending" value={dash.rsvpPending} tone="warning" />
+          <StatCard label="Guests (PAX)" value={dash.totalPax} note="confirmed where known" />
+          <StatCard label="No. of families" value={dash.totalGroups} note="groups on the list" />
+          <StatCard label="Confirmed families" value={dash.rsvpConfirmed} tone="success" />
+          <StatCard label="Pending families" value={dash.rsvpPending} tone="warning" />
         </div>
       </section>
+
+      <ConfirmationTabs buckets={buckets} />
 
 
       <section>

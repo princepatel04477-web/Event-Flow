@@ -1,6 +1,7 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -42,6 +43,15 @@ const INITIAL_STATE: CreateEventState = {
 export function CreateEventForm() {
   const [state, formAction, pending] = useActionState(createEvent, INITIAL_STATE)
   const [rawCode, setRawCode] = useState('')
+  const router = useRouter()
+
+  // Warm the destination as soon as the event exists, so "Open SHARMA26" is a
+  // paint rather than a fresh server render — the create is the slow part and
+  // the click immediately after it should not wait again.
+  const createdCode = state.created?.eventCode
+  useEffect(() => {
+    if (createdCode) router.prefetch(`/${createdCode}`)
+  }, [router, createdCode])
 
   const codePreview = normaliseEventCode(rawCode)
 

@@ -25,6 +25,41 @@ const UNIQUE_VIOLATION = '23505'
 /** Postgres insufficient_privilege — RLS refused the row. */
 const RLS_DENIED = '42501'
 
+/** Per-phase server-side timing for event creation (measure, then trust). */
+function phaseTiming(label: string) {
+  const marks: Record<string, number> = {}
+  let last = performance.now()
+  return {
+    mark(name: string) {
+      const now = performance.now()
+      marks[name] = Math.round(now - last)
+      last = now
+    },
+    report() {
+      const parts = Object.entries(marks).map(([k, v]) => `${k}:${v}ms`)
+      console.log(`[perf] ${label} phases :: ${parts.join(' · ')}`)
+    },
+  }
+}
+
+/**
+ * A hand-written shim around `supabase.rpc`.
+ *
+ * `database.types.ts` is GENERATED and only lists what existed at its last
+ * regeneration, so it does not know `create_event_with_defaults` until the
+ * migration is applied and the types regenerated. Rather than hand-edit a
+ * generated file, this narrows the client to the exact call used.
+ */
+type UntypedRpc = {
+  rpc: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{
+    data: unknown
+    error: { code?: string | null; message?: string | null } | null
+  }>
+}
+
 /** Which field a message belongs under, so it renders next to the input. */
 export type CreateEventFieldErrors = {
   name?: string
@@ -176,19 +211,39 @@ export async function createEvent(
     }
   }
 
-  const { data, error } = await supabase
-    .from('events')
-    .insert({
-      name: values.name,
-      code: values.code,
-      bride_name: orNull(values.brideName),
-      groom_name: orNull(values.groomName),
-      starts_on: values.startsOn,
-      ends_on: orNull(values.endsOn),
-      created_by: user.id,
-    })
-    .select('code, id')
-    .single()
+  // Hash the codes here — the plaintext never reaches the database, and
+  // neither the RPC nor `event_access_codes` can store it. These two imports
+  // and the two digests are all the work left in the app: the two inserts used
+  // to be two sequential round trips to the database and are now one call into
+  // `create_event_with_defaults`, one transaction, one hop.
+  const timing = phaseTiming('event :: createEvent')
+  const { createHash } = await import('node:crypto')
+  const { generateAccessCode } = await import('@/lib/auth/codes')
+  timing.mark('imports')
+
+  const teamCode = generateAccessCode('team')
+  const clientCode = generateAccessCode('client')
+  const teamHash = createHash('sha256').update(teamCode.replace('-', '')).digest('hex')
+  const clientHash = createHash('sha256').update(clientCode.replace('-', '')).digest('hex')
+  timing.mark('codes')
+
+  const { data, error } = await (supabase as unknown as UntypedRpc).rpc(
+    'create_event_with_defaults',
+    {
+      p_name: values.name,
+      p_code: values.code,
+      p_bride_name: values.brideName,
+      p_groom_name: values.groomName,
+      p_starts_on: values.startsOn,
+      p_ends_on: orNull(values.endsOn),
+      p_team_hash: teamHash,
+      p_team_last_four: teamCode.slice(-4),
+      p_client_hash: clientHash,
+      p_client_last_four: clientCode.slice(-4),
+    },
+  )
+  timing.mark('rpc')
+  timing.report()
 
   if (error) {
     if (error.code === UNIQUE_VIOLATION) {
@@ -210,50 +265,19 @@ export async function createEvent(
     return { error: friendlyDbError(error), fieldErrors: {}, values }
   }
 
-  // Generate both access codes and store them hashed. The plaintext is
-  // returned once (below) so the admin can share it; it is never stored.
-  const { createHash } = await import('node:crypto')
-  const { generateAccessCode } = await import('@/lib/auth/codes')
-  const teamCode = generateAccessCode('team')
-  const clientCode = generateAccessCode('client')
-  const teamHash = createHash('sha256').update(teamCode.replace('-', '')).digest('hex')
-  const clientHash = createHash('sha256').update(clientCode.replace('-', '')).digest('hex')
-
-  const { error: codeErr } = await supabase.from('event_access_codes').insert([
-    {
-      event_id: data!.id,
-      role: 'team',
-      code_hash: teamHash,
-      code_prefix: 'E',
-      last_four: teamCode.slice(-4),
-      created_by: user.id,
-    },
-    {
-      event_id: data!.id,
-      role: 'client',
-      code_hash: clientHash,
-      code_prefix: 'C',
-      last_four: clientCode.slice(-4),
-      created_by: user.id,
-    },
-  ])
-
-  if (codeErr) {
-    return { error: 'The event was created but its access codes could not be saved. Create them in the event admin screen.', fieldErrors: {}, values }
-  }
-
   // Every layout above reads the viewer's event list — the front door, the
   // event switcher, this page. Drop the lot rather than guess which.
   revalidatePath('/', 'layout')
 
   // Return the codes to the form so the admin can share them ONCE. They
   // are never persisted in plaintext; this is the single reveal.
+  const created = (data ?? {}) as { code?: string }
   return {
     error: null,
     fieldErrors: {},
     values,
     created: {
-      eventCode: data?.code ?? values.code,
+      eventCode: created.code ?? values.code,
       teamCode,
       clientCode,
     },
