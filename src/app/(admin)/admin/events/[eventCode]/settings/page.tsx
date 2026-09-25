@@ -2,9 +2,11 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
 import { readSectionLocks } from '@/lib/actions/section-locks'
+import { isArrivalsNotifyEnabled } from '@/lib/actions/arrivals'
 import { resolveEventByCode } from '@/lib/supabase/queries'
 
 import { SectionLockSettings } from './SectionLockSettings'
+import { NotificationSettings } from './NotificationSettings'
 
 export const metadata: Metadata = { title: 'Settings' }
 
@@ -23,6 +25,7 @@ export default async function AdminEventSettingsPage({ params }: PageProps) {
   if (!event) notFound()
 
   const locks = await readSectionLocks(event.id)
+  const arrivalsNotify = await isArrivalsNotifyEnabled(event.id)
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,6 +39,11 @@ export default async function AdminEventSettingsPage({ params }: PageProps) {
       </div>
 
       <SectionLockSettings eventId={event.id} initial={locks} />
+
+      <section className="flex flex-col gap-3">
+        <h2 className="eyebrow">Notifications</h2>
+        <NotificationSettings eventId={event.id} initial={arrivalsNotify} />
+      </section>
     </div>
   )
 }

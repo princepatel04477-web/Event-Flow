@@ -3,6 +3,8 @@ import { Suspense, type ReactNode } from 'react'
 
 import { UndoBar } from '@/components/ui/UndoBar'
 import { LockedSectionBanner } from '@/components/LockedSectionBanner'
+import { ArrivalBanner } from '@/components/ArrivalBanner'
+import { isArrivalsNotifyEnabled } from '@/lib/actions/arrivals'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
 import { v3TabsFor } from '@/lib/sections/v3'
@@ -73,6 +75,11 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
   // Belt and braces: getEventByCode already returned null for a non-member,
   // so this cannot fire. It documents the invariant rather than assuming it.
   if (access === 'none') notFound()
+
+  // The arrival banner's two server inputs: the admin's switch, and today's
+  // date (resolved here so the server and client agree on the day).
+  const arrivalsNotify = access !== 'client' && (await isArrivalsNotifyEnabled(event.id))
+  const today = new Date().toISOString().slice(0, 10)
 
   // The v3 bar: Today · Calls · Hospitality · Hampers · Logistics, per-department
   // filtering intact. This is deliberately NOT `bottomTabsFor`, which still
@@ -165,6 +172,14 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
           <Suspense fallback={null}>
             <DeniedNote />
           </Suspense>
+          {/* Arrival notices (A9): Today and Logistics, live. Renders nothing
+              when there is nothing to say or the admin switched it off. */}
+          <ArrivalBanner
+            eventId={event.id}
+            eventCode={event.code}
+            date={today}
+            enabled={arrivalsNotify}
+          />
           {/* Read-only section notice (A8), for the field team only. An admin
               is the one who set the lock and never needs telling. */}
           {access === 'event_team' ? (
