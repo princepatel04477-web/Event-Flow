@@ -38,8 +38,12 @@ android {
         // from nuvent-five.vercel.app and reached final-06 handsets the moment
         // that deploy landed. This build exists so the version check and the
         // installed base agree; it is not what carries the redesign.
-        versionCode 8
-        versionName "final-08"
+        // final-09: the admin nav fix — every admin page (Hotels, Files and
+        // Settings included) is now reachable from the phone's More sheet. In
+        // remote-shell mode the fix itself ships from nuvent-five.vercel.app;
+        // this bump keeps the version check and the installed base in step.
+        versionCode 9
+        versionName "final-09"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
