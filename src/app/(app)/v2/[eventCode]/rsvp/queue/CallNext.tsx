@@ -29,6 +29,13 @@ import {
   type RsvpLogFormValues,
   type SpecialRequirement,
 } from '@/lib/rsvp-log'
+import {
+  OUTCOME_DEFINITIONS,
+  filterCounts,
+  filterRows,
+  outcomeDefinition,
+  type OutcomeKey,
+} from '@/lib/rsvp-queue'
 import { captureDiagnostic } from '@/lib/sentry'
 import { createClient } from '@/lib/supabase/client'
 
@@ -153,29 +160,15 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
       (r.attempt_count !== null && r.attempt_count > 0),
   ).length
 
-  const filteredRows = useMemo(() => {
-    switch (activeFilter) {
-      case 'to_call':
-        return allRows.filter(
-          (r) => !r.rsvp_status || r.rsvp_status === 'not_started' || r.rsvp_status === 'attempted',
-        )
-      case 'callback':
-        return allRows.filter(
-          (r) => r.rsvp_status === 'callback' || r.next_callback_at !== null,
-        )
-      case 'coming':
-        return allRows.filter(
-          (r) => r.rsvp_status === 'confirmed' || r.rsvp_status === 'tentative',
-        )
-      case 'not_coming':
-        return allRows.filter(
-          (r) => r.rsvp_status === 'declined' || r.rsvp_status === 'unreachable',
-        )
-      case 'all':
-      default:
-        return allRows
-    }
-  }, [allRows, activeFilter])
+  // The chip -> row mapping lives in `@/lib/rsvp-queue` so this screen, the
+  // sheet and the tests cannot drift apart. `not_coming` is `declined` ONLY:
+  // `unreachable` is its own chip (No answer), and folding it in here is what
+  // made "Not coming" show families nobody had actually spoken to.
+  const filteredRows = useMemo(() => filterRows(allRows, activeFilter), [allRows, activeFilter])
+
+  // Every chip shows its own number, computed over ALL rows rather than the
+  // filtered ones, so a chip can say how much work is behind it before the tap.
+  const counts = useMemo(() => filterCounts(allRows), [allRows])
 
   const callable = useMemo(() => filteredRows.filter((r) => r.group_id !== null), [filteredRows])
 
@@ -360,24 +353,23 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
     }
   }
 
-  function logOutcomeDirectly(row: QueueRow, status: 'unreachable' | 'declined') {
+  function logOutcomeDirectly(row: QueueRow, key: Extract<OutcomeKey, 'no_answer' | 'not_coming'>) {
     const groupId = row.group_id
     if (!groupId) return
 
     const stored = attemptRef.current ?? getStoredAttempt(groupId)
     const attempt = stored && stored.groupId === groupId ? stored : null
-    const callOutcome: CallOutcome = status === 'unreachable' ? 'no_answer' : 'declined'
-    const label = status === 'unreachable' ? 'No answer' : 'Not coming'
+    const definition = outcomeDefinition(key)
 
     outcome.run({
       groupId,
       headName: row.head_name?.trim() || 'family',
-      label,
-      callOutcome,
+      label: definition.label,
+      callOutcome: definition.callOutcome,
       callbackAt: null,
       attempt,
       values: {
-        rsvpStatus: status,
+        rsvpStatus: definition.status,
         adultsConfirmed: '',
         childrenConfirmed: '',
         needsPickup: family?.needs_pickup ?? false,
@@ -398,13 +390,13 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
 
     const stored = attemptRef.current ?? getStoredAttempt(groupId)
     const attempt = stored && stored.groupId === groupId ? stored : null
-    const label = values.rsvpStatus === 'confirmed' ? 'Coming' : 'Maybe'
+    const definition = outcomeDefinition(values.rsvpStatus === 'confirmed' ? 'coming' : 'maybe')
 
     outcome.run({
       groupId,
       headName: current.head_name?.trim() || 'family',
-      label,
-      callOutcome: 'connected',
+      label: definition.label,
+      callOutcome: definition.callOutcome,
       callbackAt: null,
       attempt,
       values,
@@ -419,16 +411,17 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
 
     const stored = attemptRef.current ?? getStoredAttempt(groupId)
     const attempt = stored && stored.groupId === groupId ? stored : null
+    const definition = OUTCOME_DEFINITIONS.callback
 
     outcome.run({
       groupId,
       headName: current.head_name?.trim() || 'family',
-      label: 'Call back',
-      callOutcome: 'callback',
+      label: definition.label,
+      callOutcome: definition.callOutcome,
       callbackAt: new Date(callbackDatetime).toISOString(),
       attempt,
       values: {
-        rsvpStatus: 'callback',
+        rsvpStatus: definition.status,
         adultsConfirmed: '',
         childrenConfirmed: '',
         needsPickup: family?.needs_pickup ?? false,
@@ -525,8 +518,8 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
             onSelectComing={() =>
               setActiveInlineOutcome((prev) => (prev === 'confirmed' ? null : 'confirmed'))
             }
-            onSelectNotComing={() => logOutcomeDirectly(current, 'declined')}
-            onSelectNoAnswer={() => logOutcomeDirectly(current, 'unreachable')}
+            onSelectNotComing={() => logOutcomeDirectly(current, 'not_coming')}
+            onSelectNoAnswer={() => logOutcomeDirectly(current, 'no_answer')}
             onOpenAlternate={() => setAlternateSheetOpen(true)}
           />
 
@@ -584,6 +577,7 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
         rows={callable}
         currentGroupId={currentId}
         activeFilter={activeFilter}
+        counts={counts}
         onFilterChange={(f) => {
           setActiveFilter(f)
           setActiveInlineOutcome(null)

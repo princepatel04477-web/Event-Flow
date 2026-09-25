@@ -5,17 +5,10 @@ import { Chip } from '@/components/ui/Chip'
 import { Row } from '@/components/ui/Row'
 import { initials } from '@/lib/ui/metrics'
 import { rsvpStatusLabel } from '@/lib/rsvp'
+import { FILTER_CHIPS, type FilterChipId } from '@/lib/rsvp-queue'
 import { statusTone } from '@/lib/status'
 
-import type { FilterChipId, QueueRow } from './types'
-
-const FILTER_CHIPS: { id: FilterChipId; label: string }[] = [
-  { id: 'to_call', label: 'To call' },
-  { id: 'callback', label: 'Call back' },
-  { id: 'coming', label: 'Coming' },
-  { id: 'not_coming', label: 'Not coming' },
-  { id: 'all', label: 'All' },
-]
+import type { QueueRow } from './types'
 
 function rowToneForStatus(status: string): 'neutral' | 'done' | 'waiting' | 'problem' {
   const tone = statusTone(status)
@@ -45,6 +38,8 @@ export interface FamilyQueueSheetProps {
   rows: QueueRow[]
   currentGroupId: string | null
   activeFilter: FilterChipId
+  /** How many families sit under each chip, computed over the WHOLE event. */
+  counts: Record<FilterChipId, number>
   onFilterChange: (filter: FilterChipId) => void
   onSelectFamily: (groupId: string) => void
 }
@@ -55,6 +50,7 @@ export function FamilyQueueSheet({
   rows,
   currentGroupId,
   activeFilter,
+  counts,
   onFilterChange,
   onSelectFamily,
 }: FamilyQueueSheetProps) {
@@ -74,6 +70,9 @@ export function FamilyQueueSheet({
               tone={activeFilter === chip.id ? 'active' : 'neutral'}
             >
               {chip.label}
+              <span className="ml-1.5 tabular-nums font-normal opacity-70">
+                {counts[chip.id]}
+              </span>
             </Chip>
           ))}
         </div>

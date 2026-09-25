@@ -47,7 +47,12 @@ export interface Outcome {
   callOutcome: CallOutcome
 }
 
-export type FilterChipId = 'to_call' | 'callback' | 'coming' | 'not_coming' | 'all'
+/**
+ * The chip ids live with the filter logic in `@/lib/rsvp-queue`, so the queue
+ * screen, the sheet and `tests/rsvp-queue.test.ts` cannot disagree about which
+ * chips exist.
+ */
+export type { FilterChipId } from '@/lib/rsvp-queue'
 
 export interface CallNextProps {
   eventId: string

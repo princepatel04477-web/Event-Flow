@@ -203,6 +203,7 @@ describe('Calls: the queue sheet', () => {
       rows: [outOfScope(queueRow)],
       currentGroupId: null,
       activeFilter: 'to_call',
+      counts: { to_call: 1, coming: 0, not_coming: 0, no_answer: 0, callback: 0, all: 1 },
       onFilterChange: () => {},
       onSelectFamily: () => {},
     }),
