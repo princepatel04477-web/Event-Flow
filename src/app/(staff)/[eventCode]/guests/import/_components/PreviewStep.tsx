@@ -34,7 +34,7 @@ export interface PreviewOutcome {
    * families and guests, and silently discards Pax and every travel column.
    * Those are exactly the headers someone writes when inventing their own
    * sheet, and the gap only surfaces later, when room allocation has no
-   * headcount to work with.
+   * headcount to work with. It is therefore stated plainly on the preview.
    */
   contactsFallback: boolean
 }
@@ -103,34 +103,23 @@ export function PreviewStep({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Top of the screen, not buried in the warnings list. This is the one
-          thing that changes what the operator should DO — everything below it
-          describes an import that is about to drop half their columns. */}
+      {/* Top of the screen, not buried in the warnings list: whether this was
+          read as a simple name/number list is the one thing that changes what
+          the operator should expect from the preview below it. */}
       {outcome.contactsFallback ? (
-        <div
-          role="alert"
-          className="rounded-2xl border border-ledger-red bg-red-tint px-4 py-3"
-        >
-          <p className="text-sm font-semibold text-ledger-red">
-            Reading this as a contacts sheet: name and mobile only.
+        // A name column and a phone column are a COMPLETE guest list, not a
+        // degraded one, so this states what was read rather than raising an
+        // alarm. It still needs saying: an operator who expected travel dates
+        // and pax to come across should know they were not in this file.
+        <div className="rounded-2xl border border-info bg-tint-info px-4 py-3">
+          <p className="text-sm font-semibold text-info">
+            Simple list: names and phone numbers.
           </p>
           <p className="mt-1 text-sm leading-relaxed text-fg">
-            The full calling-list columns were not found, so{' '}
-            <span className="font-semibold">Guest counts and every travel column will be
-            ignored</span>{' '}
-            — arrival and departure dates, times, modes, pickup and drop. Names
-            and phone numbers still import correctly.
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-fg">
-            If you expected those to import, stop and{' '}
-            <a
-              href="/nuvent-guest-list-template.xlsx"
-              download
-              className="font-semibold text-ledger-red underline underline-offset-2"
-            >
-              download the template
-            </a>{' '}
-            — its headers are the ones this importer looks for.
+            This file has a name column and a phone column and nothing else, so
+            each row imports as one guest. Travel dates, pax and rooms are not in
+            it — expected for a plain contact list. If you meant to import those,
+            upload the app&apos;s export (the Guest Master tab) instead.
           </p>
         </div>
       ) : null}

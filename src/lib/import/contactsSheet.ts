@@ -68,11 +68,33 @@ const CONTACT_ALIASES = [
   'phone no',
   'phone number',
   'number',
+  'tel',
+  'telephone',
+  'cell',
+  'cell no',
   'whatsapp',
   'whatsapp no',
+  'whatsapp number',
 ]
 
-const NAME_ALIASES = ['name', 'guest name', 'full name', 'names']
+/**
+ * Name spellings the operator actually types. "Head name" and "Family head"
+ * are the export's own wording (see src/lib/export/definitions.ts), so a sheet
+ * built from a Family Heads export reads without being re-labelled.
+ */
+const NAME_ALIASES = [
+  'name',
+  'names',
+  'guest',
+  'guest name',
+  'guest names',
+  'full name',
+  'head name',
+  'head',
+  'family head',
+  'family name',
+  'contact name',
+]
 
 /** How a header cell is normalised before alias matching. */
 function normaliseHeader(value: unknown): string {
@@ -173,22 +195,18 @@ export function resolveContactsSheet(headers: (string | null)[]): ContactsColumn
 }
 
 /**
- * Reads the named sheet off disk and resolves its contacts header row.
+ * Resolves a raw grid that has ALREADY been read off disk: find the header
+ * row, resolve the two columns, collect the data rows beneath them.
  *
- * Throws `SheetNotFoundError` when the tab is missing — same contract as
- * `readSheetGrid`, so the caller can distinguish "wrong tab" from "not a
- * contacts sheet".
+ * Split out of `readContactsSheet` so the auto-detecting importer can apply
+ * the contacts shape to a tab it has already read, without re-reading the
+ * workbook once per sheet.
  */
-export async function readContactsSheet(
-  file: File,
-  sheetName: string = KNOWN_SHEET_NAME,
-): Promise<ContactsSheetResult> {
-  const { sheetName: resolvedName, grid } = await readSheetGrid(file, sheetName)
-
+export function resolveContactsGrid(grid: unknown[][], sheetName: string): ContactsSheetResult {
   // The header is the first row that has any non-blank cell.
   const headerRowIndex = grid.findIndex((row) => (row ?? []).some((c) => !isBlankCell(c)))
   if (headerRowIndex < 0) {
-    return { ok: false, reason: `"${resolvedName}" is empty — there is no header row to read.` }
+    return { ok: false, reason: `"${sheetName}" is empty — there is no header row to read.` }
   }
 
   const headers = (grid[headerRowIndex] ?? []).map((h) => (isBlankCell(h) ? null : String(h)))
@@ -203,8 +221,23 @@ export async function readContactsSheet(
     rows.push({ sheetRowNumber: i + 1, cells })
   }
 
-  const sheet: ContactsSheet = { sheetName: resolvedName, ...resolved.sheet, rows }
+  const sheet: ContactsSheet = { sheetName, ...resolved.sheet, rows }
   return { ok: true, sheet }
+}
+
+/**
+ * Reads the named sheet off disk and resolves its contacts header row.
+ *
+ * Throws `SheetNotFoundError` when the tab is missing — same contract as
+ * `readSheetGrid`, so the caller can distinguish "wrong tab" from "not a
+ * contacts sheet".
+ */
+export async function readContactsSheet(
+  file: File,
+  sheetName: string = KNOWN_SHEET_NAME,
+): Promise<ContactsSheetResult> {
+  const { sheetName: resolvedName, grid } = await readSheetGrid(file, sheetName)
+  return resolveContactsGrid(grid, resolvedName)
 }
 
 export interface ContactsParseFailure {

@@ -2736,3 +2736,46 @@ remaining twelve once a test fails, so the structural sweep was exercised by the
 `scripts/tap-budget.mjs` instead (nine routes, findings listed under 4).
 **No handset, no camera, no real venue Wi-Fi** — every number here is a desktop Chromium at a
 360px viewport with CDP throttling.
+
+---
+
+## 2026-09-25 — Import: the app's own export was the file it could not read
+
+**The bug the operator reported as "it insists on a fixed format".** The import tried one tab,
+by name: `Sheet1`. `buildSheetDefinitions()` names the export's guest tab **"Guest Master"**,
+so exporting the guest list and re-importing it failed with `That workbook has no sheet named
+"Sheet1"` — a file the app itself wrote. A plain contact list (a name column and a phone
+column) hit the same wall: the contacts fallback ran only *after* the name-gated read had
+already thrown.
+
+**Fix, all in `src/lib/import/`:**
+- `parse.ts` gains `readAllSheetGrids()` — the workbook is read once, every tab.
+- `parseImportFile()` now FINDS the sheet. Every tab is tried against the known
+  CALLING_MASTER_LIST layout first (the richer read: travel, pax, remarks), then against the
+  simple contacts shape (name + number). `sheetName` is a preference, never a gate.
+- `contactsSheet.ts` resolves a grid it is handed (`resolveContactsGrid`, split out of
+  `readContactsSheet`) and accepts the export's own spellings — "Head name", "Family head",
+  "Phone", "Tel", "Cell".
+- A file that resolves nowhere now names the column it needs ("a column of names and a column
+  of phone numbers") instead of listing the seventeen master columns that were absent.
+- The Download-template asset is now the simple two-column list the operator actually has
+  (name, number, city), not the twenty-column calling list.
+
+**Round-trip test, `tests/importRoundTrip.test.ts` (7 tests).** Proved failing first — 5 of 6
+red on `SheetNotFoundError` — green after. It builds the real export workbook, hands it to the
+real `parseImportFile`, and asserts same families, zero orphans, zero criticals; and it reads
+the SHIPPED template off disk through the same parser, so a template that does not import
+cannot ship again.
+
+**Scope deliberately not taken.** Pax / Side / RSVP columns on the simple path: `ParsedFamily`
+carries neither side nor group type, so mapping them widens the `commit_guest_import` contract
+— a migration — and the operator asked only for name + number. The export's full columns still
+import through the known layout.
+
+**Also cleared:** a corrupted generated `.next/dev/types/routes.d.ts` (a truncated write) was
+failing `next build` with a type error in `.next/`, unrelated to this change. Removing `.next`
+regenerated it clean.
+
+### Verification
+`npx tsc --noEmit` exit 0. `npx eslint` on the changed files: clean. `npx vitest run`:
+**23 files / 287 tests, all pass**. `NEXT_PUBLIC_UI=v2 npm run build`: exit 0.
