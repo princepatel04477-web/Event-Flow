@@ -12,6 +12,7 @@ import {
   FileTextIcon,
   ListIcon,
   SearchIcon,
+  SlidersIcon,
 } from '@/components/icons'
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
@@ -71,6 +72,12 @@ const EVENT_NAV: NavItem[] = [
     label: 'Ledger',
     icon: <ListIcon className="h-5 w-5" />,
     matchSegments: ['ledger'],
+  },
+  {
+    href: 'settings',
+    label: 'Settings',
+    icon: <SlidersIcon className="h-5 w-5" />,
+    matchSegments: ['settings'],
   },
 ]
 

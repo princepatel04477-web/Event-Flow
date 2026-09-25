@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { Suspense, type ReactNode } from 'react'
 
 import { UndoBar } from '@/components/ui/UndoBar'
+import { LockedSectionBanner } from '@/components/LockedSectionBanner'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
 import { v3TabsFor } from '@/lib/sections/v3'
@@ -164,6 +165,11 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
           <Suspense fallback={null}>
             <DeniedNote />
           </Suspense>
+          {/* Read-only section notice (A8), for the field team only. An admin
+              is the one who set the lock and never needs telling. */}
+          {access === 'event_team' ? (
+            <LockedSectionBanner eventId={event.id} eventCode={event.code} />
+          ) : null}
           {children}
         </div>
       </main>

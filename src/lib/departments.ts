@@ -8,6 +8,7 @@ export type StaffDepartment =
   | 'hospitality'
   | 'hamper'
   | 'production'
+  | 'rsvp'
 
 export const STAFF_DEPARTMENTS: StaffDepartment[] = [
   'management',
@@ -15,6 +16,7 @@ export const STAFF_DEPARTMENTS: StaffDepartment[] = [
   'hospitality',
   'hamper',
   'production',
+  'rsvp',
 ]
 
 /** Plain labels for runners — not org-chart jargon. */
@@ -24,6 +26,7 @@ export const DEPARTMENT_LABELS: Record<StaffDepartment, string> = {
   hospitality: 'Hospitality',
   hamper: 'Hampers',
   production: 'Setup',
+  rsvp: 'RSVP / Calls',
 }
 
 /** Sections each department may open. Management sees everything. */
@@ -33,6 +36,7 @@ export const DEPARTMENT_SECTIONS: Record<StaffDepartment, SectionId[]> = {
   hospitality: ['dashboard', 'hospitality'],
   hamper: ['dashboard', 'hamper'],
   production: ['dashboard', 'production'],
+  rsvp: ['dashboard', 'rsvp'],
 }
 
 export function isStaffDepartment(value: string | null | undefined): value is StaffDepartment {
@@ -52,6 +56,10 @@ export function departmentHomePath(eventCode: string, department: StaffDepartmen
       return `/${eventCode}/hamper`
     case 'production':
       return `/${eventCode}/production`
+    case 'rsvp':
+      // The calling team's whole job is the queue, so that is where they land
+      // — not the campaigns board, which is the lead's view of the campaign.
+      return `/${eventCode}/rsvp/queue`
     default:
       return `/${eventCode}`
   }

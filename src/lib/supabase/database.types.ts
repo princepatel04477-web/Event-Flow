@@ -110,6 +110,7 @@ export type Database = {
         | "hospitality"
         | "hamper"
         | "production"
+        | "rsvp"
       side: "bride" | "groom" | "both" | "other"
       travel_direction: "arrival" | "departure"
       travel_mode: "air" | "train" | "bus" | "cab" | "self_drive"
@@ -3963,6 +3964,7 @@ export const Constants = {
         "hospitality",
         "hamper",
         "production",
+        "rsvp",
       ],
       side: ["bride", "groom", "both", "other"],
       travel_direction: ["arrival", "departure"],

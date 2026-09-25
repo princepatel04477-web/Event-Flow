@@ -13,8 +13,14 @@
  * paint it a hundred percent, and this module refuses to render it at all.
  */
 
-/** The five field departments (`staff_members.department`). */
-export type StaffFocus = 'management' | 'logistics' | 'hospitality' | 'hamper' | 'production'
+/** The six field departments (`staff_members.department`). */
+export type StaffFocus =
+  | 'management'
+  | 'logistics'
+  | 'hospitality'
+  | 'hamper'
+  | 'production'
+  | 'rsvp'
 
 /**
  * Everything Today reads off the board. Deliberately structural rather than a
@@ -131,6 +137,7 @@ const DEPARTMENT_JOB: Record<StaffFocus, Exclude<JobId, 'default'> | null> = {
   hospitality: 'confirmedNoRoom',
   hamper: 'hampersPending',
   production: null, // no production counter exists on the board
+  rsvp: null, // the calling team's own counter is the calls bar, not a job here
 }
 
 /** What to do when nothing is wrong — one per department, never a dead end. */
@@ -173,6 +180,14 @@ const CALM_JOBS: Record<StaffFocus, Omit<TodayJob, 'href'> & { path: string }> =
     context: 'Your items for this event.',
     actionLabel: 'Open setup',
     path: 'production',
+    status: '',
+  },
+  rsvp: {
+    id: 'default',
+    headline: 'Call the next family',
+    context: 'The calling queue is where your work starts.',
+    actionLabel: 'Start calling',
+    path: 'rsvp/queue',
     status: '',
   },
 }
@@ -241,6 +256,7 @@ export function progressBars(n: TodayNumbers, focus: StaffFocus): TodayBar[] {
     hospitality: [rooms, calls],
     hamper: [hampers, calls],
     production: [calls],
+    rsvp: [calls],
   }
 
   return ordered[focus].filter((bar) => bar.total > 0).slice(0, 3)

@@ -5,7 +5,7 @@ import { STAFF_DEPARTMENTS, mayOpenCallRecords, type StaffDepartment } from '@/l
 /**
  * "Open the family record" on the guest sheet (`docs/BUGS.md` M3).
  *
- * The search button sits in EVERY header, so all five departments reach Find and
+ * The search button sits in EVERY header, so all six departments reach Find and
  * its guest sheet. The record it links to is behind `requireSection(..., 'rsvp')`
  * — management and admins only — so the button bounced hospitality, travel,
  * hamper and production runners back to their own board with a
@@ -30,9 +30,11 @@ describe('mayOpenCallRecords', () => {
   })
 
   it('says yes for exactly the departments the RSVP section admits', () => {
+    // A8 added the rsvp department, whose whole job IS the call records, so it
+    // joins management as a department the RSVP section admits.
     for (const department of [...STAFF_DEPARTMENTS, null] as (StaffDepartment | null)[]) {
       expect(mayOpenCallRecords('event_team', department)).toBe(
-        department === 'management',
+        department === 'management' || department === 'rsvp',
       )
     }
   })
