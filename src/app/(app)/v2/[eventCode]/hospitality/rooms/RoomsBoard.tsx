@@ -463,9 +463,32 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
               total={grid.totals.confirmedGuests}
               tone="brand"
             />
-            <p className="text-sm leading-snug text-muted">
-              {bedLine(grid.totals.bedsFree, waiting.length)}
-            </p>
+            {/* The two figures in this card are the screen's count tiles, and
+                each is a door into the list behind it: the bar into the rooms
+                (a bed is a room), the waiting line into the families still to
+                place. They were prose before — the numbers a coordinator reads
+                first and could not act on. Two buttons, never nested: the
+                second is a sibling, not a child of the first. */}
+            <div className="flex items-stretch gap-2">
+              <button
+                type="button"
+                onClick={() => setTab('rooms')}
+                aria-pressed={tab === 'rooms'}
+                className="tap min-h-11 min-w-0 flex-1 rounded-xl border border-rule-strong px-3 py-2 text-left text-sm text-muted transition-colors duration-press ease-ledger active:bg-surface-2"
+              >
+                {grid.totals.bedsFree} {grid.totals.bedsFree === 1 ? 'bed' : 'beds'} free
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab('waiting')}
+                aria-pressed={tab === 'waiting'}
+                className="tap min-h-11 min-w-0 flex-1 rounded-xl border border-rule-strong px-3 py-2 text-left text-sm text-muted transition-colors duration-press ease-ledger active:bg-surface-2"
+              >
+                {waiting.length === 0
+                  ? 'Every family has a bed'
+                  : `${waiting.length} ${waiting.length === 1 ? 'family' : 'families'} waiting`}
+              </button>
+            </div>
           </>
         )}
       </section>

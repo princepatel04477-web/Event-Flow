@@ -154,6 +154,14 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     children: [
       { segment: 'rooms', label: 'Hospitality', icon: <BuildingIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
       { segment: 'checkin', label: 'Check in / out', icon: <ClipboardCheckIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
+      // ADMIN ONLY, DELIBERATELY. Every row of this sheet is a door out of the
+      // section — the family head opens RSVP status, the hamper opens the hamper
+      // proof — and an `event_team` hospitality runner belongs to neither. Marked
+      // `['admin']` it renders only for an admin, so nothing on it is a control
+      // that bounces. A code-auth session is `event_team`, which means the people
+      // on the phones do NOT see this child; that is the intended audience, and
+      // the page guard repeats the same check so a typed URL cannot reach it.
+      { segment: 'rooming-list', label: 'Rooming list', icon: <ListIcon className="h-6 w-6" />, roles: ['admin'] },
       // Borrowed: lives at /{event}/hamper, shown here so an event lead does
       // not need a sixth tab to reach it.
       {
