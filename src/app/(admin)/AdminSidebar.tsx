@@ -74,6 +74,12 @@ const EVENT_NAV: NavItem[] = [
     matchSegments: ['ledger'],
   },
   {
+    href: 'files',
+    label: 'Files',
+    icon: <FileTextIcon className="h-5 w-5" />,
+    matchSegments: ['files'],
+  },
+  {
     href: 'settings',
     label: 'Settings',
     icon: <SlidersIcon className="h-5 w-5" />,
