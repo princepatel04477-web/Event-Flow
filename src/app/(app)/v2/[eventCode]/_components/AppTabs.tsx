@@ -106,7 +106,7 @@ export function AppTabs({ tabs, model = 'v3' }: AppTabsProps) {
   return (
     <nav
       aria-label="Sections"
-      className="fixed inset-x-0 z-40 border-t border-rule bg-nav pb-safe px-safe transition-[bottom] duration-press ease-ledger"
+      className="fixed inset-x-0 z-40 border-t border-rule bg-nav pb-safe px-safe transition-[bottom] duration-press ease-ledger lg:hidden"
       style={{ bottom: 'var(--keyboard-offset, 0px)' }}
     >
       <ul
