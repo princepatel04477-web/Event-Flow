@@ -7,6 +7,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { ChevronRightIcon, SearchIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
+import { PendingDot } from '@/components/ui/PendingDot'
+import { Pressable } from '@/components/ui/Pressable'
 import type { GuestSearchRow } from '@/lib/actions/search-guests'
 import { traceFetch } from '@/lib/perf'
 import { queryKeys } from '@/lib/query/keys'
@@ -352,7 +354,7 @@ function GuestListRow({ row, eventCode }: { row: GuestSearchRow; eventCode: stri
   )
 
   const cls = cn(
-    'flex h-full items-center rounded-2xl border border-border bg-surface active:bg-surface-2',
+    'relative flex h-full items-center rounded-2xl border border-border bg-surface',
   )
 
   if (!href) {
@@ -375,9 +377,13 @@ function GuestListRow({ row, eventCode }: { row: GuestSearchRow; eventCode: stri
     // and a lock has no manual override: it expires or it does not clear
     // (CLAUDE.md §11b). Prefetching this route is a data bug wearing a
     // performance costume.
-    <Link href={href} prefetch={false} className={cls} role="listitem">
-      {inner}
-    </Link>
+    <Pressable asChild>
+      <Link href={href} prefetch={false} className={cls} role="listitem">
+        {/* Lights from the tap until the family's record commits (S1). */}
+        <PendingDot className="absolute top-2 right-2.5" />
+        {inner}
+      </Link>
+    </Pressable>
   )
 }
 

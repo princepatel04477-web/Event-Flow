@@ -7,6 +7,7 @@ import { ChevronRightIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LinkButton } from '@/components/ui/LinkButton'
 import { NowCard } from '@/components/ui/NowCard'
+import { Pressable } from '@/components/ui/Pressable'
 import { Progress } from '@/components/ui/Progress'
 import { Row } from '@/components/ui/Row'
 import { readBoard } from '@/lib/actions/dashboard'
@@ -205,15 +206,17 @@ export default async function AppHomePage({ params }: PageProps) {
                 is valid HTML and the WHOLE row stays the tap target. */}
             <div className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
               {rest.map((job) => (
-                <Link key={job.id} href={job.href} className="tap block">
-                  <Row
-                    heading={job.headline}
-                    meta={job.context}
-                    status={job.status}
-                    tone="waiting"
-                    trailing={<ChevronRightIcon className="h-5 w-5" />}
-                  />
-                </Link>
+                <Pressable key={job.id} asChild>
+                  <Link href={job.href} className="block">
+                    <Row
+                      heading={job.headline}
+                      meta={job.context}
+                      status={job.status}
+                      tone="waiting"
+                      trailing={<ChevronRightIcon className="h-5 w-5" />}
+                    />
+                  </Link>
+                </Pressable>
               ))}
             </div>
           </section>

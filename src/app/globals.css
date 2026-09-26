@@ -68,6 +68,10 @@
   /* Cards are the bright plane. */
   --ef-surface: #ffffff;
   --ef-surface-2: #f1eadf;
+  /* The pressed surface — one notch darker than `--ef-surface-2`, so a tap on
+     a card or row reads as a press even before the 0.97 scale is noticed.
+     Consumed by `.pressable` (see the press-feedback block below). */
+  --ef-press: #ece3d4;
 
   /* Near-black ink. 16.3:1 on paper, 17.4:1 on white. */
   --ef-ink: #1c1917;
@@ -183,6 +187,9 @@
   --ef-paper-band: #f2ebdf;
   --ef-surface: #ffffff;
   --ef-surface-2: #f4eee3;
+  /* The pressed surface on the brighter client ground — kept in step with the
+     staff value's contrast step, so a client's tap feels the same. */
+  --ef-press: #efe7d9;
 
   --ef-ink: #1c1917;
   --ef-muted: #6b645a;
@@ -464,6 +471,50 @@
 @utility tap {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* --------------------------------------------------------------------
+   Press feedback (S1). The ONE place a tap is acknowledged, and it is
+   acknowledged on POINTERDOWN — not `:active`, which is a browser
+   decision on the browser's schedule and can miss the frame the finger
+   landed on when the main thread is busy.
+
+   The JS on this path does exactly one thing: set or remove the
+   `data-pressed` attribute, imperatively, on the element the finger hit.
+   No React state, so no re-render is queued before the browser paints.
+   The scale and the colour are here, in CSS.
+
+   Transform + background only. 90ms — shorter than the 100ms press budget
+   on purpose, because the change has to read as instantaneous.
+   -------------------------------------------------------------------- */
+.pressable {
+  transition:
+    transform 90ms var(--ef-ease),
+    background-color 90ms var(--ef-ease);
+}
+
+.pressable[data-pressed] {
+  transform: scale(0.97);
+  background-color: var(--ef-press);
+}
+
+/* --------------------------------------------------------------------
+   The link-pending dot (S1). Opacity only, and its space is reserved at
+   all times, so it can never nudge the row or tab it lives in. It reads
+   `currentColor`, so it takes the colour of whatever it sits inside.
+   -------------------------------------------------------------------- */
+.pending-dot {
+  display: inline-block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 9999px;
+  background-color: currentColor;
+  opacity: 0;
+  transition: opacity 90ms var(--ef-ease);
+}
+
+.pending-dot[data-pending] {
+  opacity: 1;
 }
 
 /* The small label above a title: "Right now", "Waiting", "Needs

@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import { PendingDot } from '@/components/ui/PendingDot'
+import { Pressable } from '@/components/ui/Pressable'
 import { useBoundedPrefetch } from '@/lib/query/prefetch'
 import { cn } from '@/lib/utils'
 import { resolveActive, type NavTab, type TabAccess } from '@/lib/sections/config'
@@ -131,44 +133,48 @@ export function AppTabs({ tabs, model = 'v3' }: AppTabsProps) {
 
           return (
             <li key={tab.key} className="relative">
-              <Link
-                href={href}
-                // FULL prefetch — the route AND its data — not Next's default.
-                // The default for a dynamic route is a PARTIAL prefetch that
-                // stops at the nearest `loading.tsx`, so it warms a skeleton and
-                // the tap still crosses to Seoul. Armed on TOUCH, never on
-                // mount: measured at n=5, five eager prefetches on the venue-Wi-Fi
-                // profile made every route SLOWER, not faster. Numbers in
-                // DECISIONS.md, 21 September 2026.
-                prefetch={isArmed(href) ? true : undefined}
-                onPointerDown={() => arm(href)}
-                onTouchStart={() => arm(href)}
-                aria-current={isActive ? 'page' : undefined}
-                className={cn(
-                  'tap relative flex min-h-16 flex-col items-center justify-center gap-1 px-0.5 py-2',
-                  'text-xs leading-tight font-medium',
-                  'transition-colors duration-press ease-ledger',
-                  isActive ? 'text-brand' : 'text-muted active:text-ink',
-                )}
-              >
-                {/* The active tab is a maroon icon in a tint pill (v3),
-                    rather than a bar along the top edge (v2). The pill is
-                    36px wide and 28px tall — wider than the 24px glyph, so
-                    it reads as a seat for the icon rather than a box around
-                    it — and it is the only tinted shape in the bar. */}
-                <span
+              <Pressable asChild>
+                <Link
+                  href={href}
+                  // FULL prefetch — the route AND its data — not Next's default.
+                  // The default for a dynamic route is a PARTIAL prefetch that
+                  // stops at the nearest `loading.tsx`, so it warms a skeleton and
+                  // the tap still crosses to Seoul. Armed on TOUCH, never on
+                  // mount: measured at n=5, five eager prefetches on the venue-Wi-Fi
+                  // profile made every route SLOWER, not faster. Numbers in
+                  // DECISIONS.md, 21 September 2026.
+                  prefetch={isArmed(href) ? true : undefined}
+                  onPointerDown={() => arm(href)}
+                  onTouchStart={() => arm(href)}
+                  aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'flex h-7 w-9 items-center justify-center rounded-full transition-colors duration-press ease-ledger',
-                    isActive ? 'bg-brand-tint text-brand' : 'text-muted',
+                    'tap relative flex min-h-16 flex-col items-center justify-center gap-1 px-0.5 py-2',
+                    'text-xs leading-tight font-medium',
+                    isActive ? 'text-brand' : 'text-muted',
                   )}
                 >
-                  {tab.icon}
-                </span>
-                {/* `truncate` and `max-w-full` are load-bearing: a long tab
-                    label ("Check in / out") would otherwise set the flex item's
-                    min-content width and push the bar wider than the screen. */}
-                <span className="max-w-full truncate">{tab.label}</span>
-              </Link>
+                  {/* Lights from the tap until the destination commits, so a
+                      slow tab switch never reads as a dropped tap (S1). */}
+                  <PendingDot className="absolute top-1.5 right-1.5" />
+                  {/* The active tab is a maroon icon in a tint pill (v3),
+                      rather than a bar along the top edge (v2). The pill is
+                      36px wide and 28px tall — wider than the 24px glyph, so
+                      it reads as a seat for the icon rather than a box around
+                      it — and it is the only tinted shape in the bar. */}
+                  <span
+                    className={cn(
+                      'flex h-7 w-9 items-center justify-center rounded-full transition-colors duration-press ease-ledger',
+                      isActive ? 'bg-brand-tint text-brand' : 'text-muted',
+                    )}
+                  >
+                    {tab.icon}
+                  </span>
+                  {/* `truncate` and `max-w-full` are load-bearing: a long tab
+                      label ("Check in / out") would otherwise set the flex item's
+                      min-content width and push the bar wider than the screen. */}
+                  <span className="max-w-full truncate">{tab.label}</span>
+                </Link>
+              </Pressable>
             </li>
           )
         })}

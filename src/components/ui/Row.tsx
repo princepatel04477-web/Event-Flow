@@ -2,6 +2,8 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
 
+import { pressHandlers } from './press'
+
 export type RowTone = 'neutral' | 'done' | 'waiting' | 'problem'
 
 export interface RowProps {
@@ -117,9 +119,9 @@ export function Row({
   const rowClass = cn(
     'tap flex min-h-16 w-full items-center gap-3 px-3 py-2.5 text-left',
     'border-b border-rule last:border-b-0',
-    onPress && !disabled
-      ? 'cursor-pointer transition-colors duration-press ease-ledger active:bg-surface-2'
-      : undefined,
+    // `pressable` rather than `active:bg-*`: the pressed state lands on
+    // pointerdown, in the same frame as the finger (S1).
+    onPress && !disabled ? 'pressable cursor-pointer' : undefined,
     disabled && 'opacity-60',
     className,
   )
@@ -131,6 +133,7 @@ export function Row({
         onClick={onPress}
         disabled={disabled}
         className={rowClass}
+        {...pressHandlers(disabled)}
         {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}
       >
         {inner}

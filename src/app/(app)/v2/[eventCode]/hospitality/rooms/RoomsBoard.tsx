@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { LinkButton } from '@/components/ui/LinkButton'
 import { LoadingRows } from '@/components/ui/LoadingRows'
+import { Pressable } from '@/components/ui/Pressable'
 import { Progress } from '@/components/ui/Progress'
 import { Row } from '@/components/ui/Row'
 import { Segmented } from '@/components/ui/Segmented'
@@ -758,15 +759,13 @@ function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) =
   const names = [...new Set(room.occupants.map((o) => firstName(o.guestName)))]
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(room.roomId)}
+    <Pressable
       aria-label={`Room ${room.roomNumber}, ${occupied} of ${room.capacity} beds, ${
         names.length === 0 ? 'empty' : names.join(', ')
       }`}
+      onPress={() => onOpen(room.roomId)}
       className={cn(
-        'tap flex h-full min-h-[6.5rem] w-full flex-col gap-2 rounded-2xl border bg-surface p-3 text-left',
-        'transition-colors duration-press ease-ledger active:bg-surface-2',
+        'flex h-full min-h-[6.5rem] w-full flex-col gap-2 rounded-2xl border bg-surface p-3 text-left',
         room.isBlocked ? 'border-rule opacity-70' : 'border-rule-strong',
       )}
     >
@@ -822,7 +821,7 @@ function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) =
           </>
         )}
       </span>
-    </button>
+    </Pressable>
   )
 }
 

@@ -2,6 +2,8 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
 
+import { pressHandlers } from './press'
+
 interface ListRowBaseProps {
   /**
    * The one thing on this row that matters — nearly always a family name.
@@ -71,9 +73,7 @@ export function ListRow({
 
   const rowClass = cn(
     'tap relative flex min-h-14 items-center gap-3 px-3 py-3 text-left',
-    onPress && !disabled
-      ? 'cursor-pointer transition-colors duration-press ease-ledger active:bg-surface-2'
-      : undefined,
+    onPress && !disabled ? 'pressable cursor-pointer' : undefined,
     disabled && 'opacity-60',
     className,
   )
@@ -85,6 +85,7 @@ export function ListRow({
         onClick={onPress}
         disabled={disabled}
         className={cn(rowClass, 'w-full')}
+        {...pressHandlers(disabled)}
         {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}
       >
         {inner}
