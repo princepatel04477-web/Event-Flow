@@ -7,7 +7,6 @@ import { ChevronRightIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LinkButton } from '@/components/ui/LinkButton'
 import { NowCard } from '@/components/ui/NowCard'
-import { Pressable } from '@/components/ui/Pressable'
 import { Progress } from '@/components/ui/Progress'
 import { Row } from '@/components/ui/Row'
 import { readBoard } from '@/lib/actions/dashboard'
@@ -28,6 +27,7 @@ import {
   type TodayNumbers,
 } from './_home/today'
 import { readVisibleNumbers } from './_home/visibleNumbers'
+import { PrefetchedLink } from './_components/PrefetchedLink'
 import { WarmRoutes } from './_components/WarmRoutes'
 
 export const metadata: Metadata = {
@@ -210,17 +210,15 @@ export default async function AppHomePage({ params }: PageProps) {
                 is valid HTML and the WHOLE row stays the tap target. */}
             <div className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
               {rest.map((job) => (
-                <Pressable key={job.id} asChild>
-                  <Link href={job.href} className="block">
-                    <Row
-                      heading={job.headline}
-                      meta={job.context}
-                      status={job.status}
-                      tone="waiting"
-                      trailing={<ChevronRightIcon className="h-5 w-5" />}
-                    />
-                  </Link>
-                </Pressable>
+                <PrefetchedLink key={job.id} href={job.href} className="block">
+                  <Row
+                    heading={job.headline}
+                    meta={job.context}
+                    status={job.status}
+                    tone="waiting"
+                    trailing={<ChevronRightIcon className="h-5 w-5" />}
+                  />
+                </PrefetchedLink>
               ))}
             </div>
           </section>
