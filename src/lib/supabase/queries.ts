@@ -376,10 +376,22 @@ async function getEventAccessUncached(eventId: string): Promise<EventAccess> {
   // Both halves of `app.is_admin()`. A deactivated admin falls through to
   // their `event_members` row — usually none, so 'none' — which is exactly
   // what the database would answer.
+  //
+  // THE MEMBER BRANCHES REQUIRE is_active TOO, and that is not decoration.
+  // The database fences a deactivated member out of every base table
+  // (`is_member()` routes every non-admin through `is_admin()`, which requires
+  // it), so answering 'event_team' for one would make this function disagree
+  // with the rows the caller is about to read — the confident lie it exists to
+  // prevent. It also has to MATCH `public.route_context()`, or the fast path
+  // and the fallback would give one deactivated user two different answers
+  // depending only on whether the migration is live, which is a miserable
+  // thing to debug.
+  const active = profile?.is_active === true
+
   let result: EventAccess
-  if (profile?.global_role === 'admin' && profile.is_active) result = 'admin'
-  else if (member?.role === 'event_team') result = 'event_team'
-  else if (member?.role === 'client') result = 'client'
+  if (profile?.global_role === 'admin' && active) result = 'admin'
+  else if (active && member?.role === 'event_team') result = 'event_team'
+  else if (active && member?.role === 'client') result = 'client'
   else result = 'none'
   timing.report()
   return result
