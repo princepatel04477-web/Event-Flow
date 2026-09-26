@@ -19,6 +19,8 @@ EASE ledger/seal and the one SPRING. No new animation libraries.
 
 ## Phase A — allowed NOW (before 30 Sep freeze)
 
+- [x] MERGE upstream A1–A11 merged — `e3529df` (conflicts resolved per recipe; 838/838 green, no DB gating needed)
+
 - [x] G1  S4 gap: replace record-screen placeholder with real empty/loading state
       `96e5a2a` — added `src/app/(app)/v2/[eventCode]/rsvp/status/[groupId]/loading.tsx`,
       a skeleton shaped like the record (identity card, five outcome chips, notes
