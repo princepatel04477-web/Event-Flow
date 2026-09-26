@@ -31,7 +31,7 @@ export function OutcomeButtons({
           disabled={disabled}
           onClick={onSelectComing}
           className={cn(
-            'tap flex min-h-12 items-center justify-center rounded-row border px-2 text-sm font-semibold',
+            'tap flex min-h-16 items-center justify-center rounded-row border px-2 text-base font-semibold',
             activeOutcome === 'confirmed'
               ? 'border-brand bg-brand-tint text-brand'
               : 'border-rule-strong bg-surface text-ink active:bg-surface-2',
@@ -46,7 +46,7 @@ export function OutcomeButtons({
           disabled={disabled}
           onClick={onSelectNotComing}
           className={cn(
-            'tap flex min-h-12 items-center justify-center rounded-row border px-2 text-sm font-semibold',
+            'tap flex min-h-16 items-center justify-center rounded-row border px-2 text-base font-semibold',
             'border-rule-strong bg-surface text-ink active:bg-surface-2',
             disabled && 'cursor-not-allowed opacity-55',
           )}
@@ -59,7 +59,7 @@ export function OutcomeButtons({
           disabled={disabled}
           onClick={onSelectNoAnswer}
           className={cn(
-            'tap flex min-h-12 items-center justify-center rounded-row border px-2 text-sm font-semibold',
+            'tap flex min-h-16 items-center justify-center rounded-row border px-2 text-base font-semibold',
             'border-rule-strong bg-surface text-ink active:bg-surface-2',
             disabled && 'cursor-not-allowed opacity-55',
           )}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { InboxIcon } from '@/components/icons'
+import { SuccessMark } from '@/components/motion/SuccessMark'
 import { BottomBar } from '@/components/ui/BottomBar'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -126,6 +127,7 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
 
   const [deferredSubmit, setDeferredSubmit] = useState<(() => void) | null>(null)
   const [deferredCanSave, setDeferredCanSave] = useState(false)
+  const [justSaved, setJustSaved] = useState<{ groupId: string; label: string } | null>(null)
 
   const attemptRef = useRef<StoredCallAttempt | null>(null)
 
@@ -359,6 +361,15 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
     }
   }
 
+  /** A one-tap outcome: show the check for a beat, then move on (M4). */
+  function advanceAfterSave(groupId: string, label: string) {
+    setJustSaved({ groupId, label })
+    window.setTimeout(() => {
+      setJustSaved(null)
+      advanceToNextFamily(groupId)
+    }, 600)
+  }
+
   function logOutcomeDirectly(row: QueueRow, key: Extract<OutcomeKey, 'no_answer' | 'not_coming'>) {
     const groupId = row.group_id
     if (!groupId) return
@@ -387,7 +398,7 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
       },
     })
 
-    advanceToNextFamily(groupId)
+    advanceAfterSave(groupId, definition.label)
   }
 
   function handleSaveInline(values: RsvpLogFormValues) {
@@ -439,7 +450,7 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
       },
     })
 
-    advanceToNextFamily(groupId)
+    advanceAfterSave(groupId, definition.label)
   }
 
   const handleSubmitReady = useCallback((submit: () => void, canSave: boolean) => {
@@ -520,7 +531,7 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
 
           <OutcomeButtons
             activeOutcome={activeInlineOutcome === 'confirmed' ? 'confirmed' : null}
-            disabled={family === null && !familyError}
+            disabled={(family === null && !familyError) || justSaved !== null}
             onSelectComing={() =>
               setActiveInlineOutcome((prev) => (prev === 'confirmed' ? null : 'confirmed'))
             }
@@ -616,6 +627,15 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
             disabled: !deferredCanSave || outcome.syncState === 'sending',
           }}
         />
+      ) : null}
+
+      {justSaved ? (
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-2 rounded-2xl bg-now px-6 py-5 shadow-e3">
+            <SuccessMark className="text-highlight" />
+            <span className="text-sm font-medium text-now-fg">Saved</span>
+          </div>
+        </div>
       ) : null}
     </div>
   )
