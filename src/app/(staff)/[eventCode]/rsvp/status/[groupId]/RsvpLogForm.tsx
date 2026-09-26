@@ -10,7 +10,8 @@ import { Row } from '@/components/ui/Row'
 import { Select } from '@/components/ui/Select'
 import { Stepper } from '@/components/ui/Stepper'
 import { Textarea } from '@/components/ui/Textarea'
-import { CheckCircleIcon, ChevronDownIcon, ChevronRightIcon } from '@/components/icons'
+import { ChevronDownIcon, ChevronRightIcon } from '@/components/icons'
+import { SuccessMark } from '@/components/motion/SuccessMark'
 import { saveRsvpLog } from '@/lib/actions/rsvp'
 import { releaseGroupAfterCall } from '@/lib/actions/call'
 import { cn, formatDateTime } from '@/lib/utils'
@@ -718,7 +719,7 @@ function SavedState({ hasQueueNext }: { hasQueueNext: boolean }) {
         aria-hidden
         className="flex h-14 w-14 items-center justify-center rounded-full bg-green-tint text-ledger-green"
       >
-        <CheckCircleIcon className="h-8 w-8" />
+        <SuccessMark />
       </span>
       <p className="font-display text-xl font-semibold text-ink">Saved</p>
       <p className="max-w-xs text-sm text-muted">
