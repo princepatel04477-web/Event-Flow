@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 
-import { dehydrateSafe, isPersistableKey, scopeFromPath } from '@/lib/queries/persist'
+import { cacheScope, dehydrateSafe, isPersistableKey, scopeFromPath } from '@/lib/queries/persist'
 
 /**
  * The persisted query cache (S5).
@@ -27,6 +27,23 @@ describe('scopeFromPath', () => {
     // is undone — it must not be mistaken for an event code.
     expect(scopeFromPath('/v2/SAMPLE2026')).toBeNull()
     expect(scopeFromPath('/')).toBeNull()
+  })
+})
+
+describe('cacheScope', () => {
+  it('partitions by event code and staff member, not event code alone', () => {
+    expect(cacheScope('SAMPLE2026', 'staff-a')).toBe('SAMPLE2026:staff-a')
+    expect(cacheScope('SAMPLE2026', 'staff-b')).toBe('SAMPLE2026:staff-b')
+    expect(cacheScope('SHARMA26', 'staff-a')).toBe('SHARMA26:staff-a')
+  })
+
+  it('never lets two staff on the same event share a key', () => {
+    expect(cacheScope('SAMPLE2026', 'staff-a')).not.toBe(cacheScope('SAMPLE2026', 'staff-b'))
+  })
+
+  it('sends a session with no identity to the shared anon partition', () => {
+    expect(cacheScope('SAMPLE2026', null)).toBe('SAMPLE2026:anon')
+    expect(cacheScope('SAMPLE2026', '')).toBe('SAMPLE2026:anon')
   })
 })
 

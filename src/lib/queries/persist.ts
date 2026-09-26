@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { dehydrate, hydrate, type QueryClient } from '@tanstack/react-query'
 import { openDB, type IDBPDatabase } from 'idb'
 
+import { readStoredStaffMemberId } from '@/lib/native/session-keeper'
+
 /**
  * Keep the last known data on the phone (S5).
  *
@@ -19,11 +21,13 @@ import { openDB, type IDBPDatabase } from 'idb'
  * token or a search term is on it, and a key that is not recognised is dropped
  * rather than trusted. `isPersistableKey` is pure and tested.
  *
- * SCOPED. The store is keyed by the event code, so one event's rows can never
- * paint under another event's header — the tenancy rule the query keys already
- * enforce, applied to the disk as well. (Partitioning by STAFF identity as well
- * is a one-line change to `scopeFromPath` once the shell passes the selected
- * staff member down; today the event half is what the tenancy fence needs.)
+ * SCOPED. The store is keyed by event code AND the selected staff member (G5),
+ * so one event's rows can never paint under another event's header, and one
+ * login's rows can never paint under another login on a shared handset — the
+ * tenancy rule the query keys already enforce, applied to the disk as well.
+ * A session with no staff identity (an admin, or a runner who skipped the
+ * picker) shares the "anon" partition: their event rows are the same and there
+ * is no identity to leak. `cacheScope` is pure and tested.
  *
  * AGE. 24 hours. Older than that is not "yesterday's data", it is a different
  * day's event.
@@ -54,6 +58,19 @@ export function scopeFromPath(pathname: string): string | null {
   const first = pathname.split('/').filter(Boolean)[0]
   if (!first || NON_EVENT_FIRST_SEGMENTS.has(first)) return null
   return first
+}
+
+/**
+ * The IndexedDB key for one event + one login (G5).
+ *
+ * `scopeFromPath` yields only the event code; this adds the identity half so a
+ * shared handset never hydrates one staff member's rows into another staff
+ * member's session. A null identity — an admin, or a runner who skipped the
+ * picker — lands in the shared `anon` partition, because those sessions have
+ * the same event rows and no name to leak.
+ */
+export function cacheScope(eventCode: string, staffMemberId: string | null): string {
+  return staffMemberId ? `${eventCode}:${staffMemberId}` : `${eventCode}:anon`
 }
 
 /**
@@ -155,54 +172,65 @@ export async function clearCache(scope?: string): Promise<void> {
  *
  * The subscription writes on a 1s debounce, so a burst of query updates is one
  * write, not one per cache event.
+ *
+ * The identity half (G5) is resolved BEFORE the cache is read, so a shared
+ * handset hydrates under the correct login from the first byte — never one
+ * staff member's rows into another's session.
  */
-export function useCachePersistence(scope: string | null, queryClient: QueryClient): boolean {
+export function useCachePersistence(eventScope: string | null, queryClient: QueryClient): boolean {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
     let hydrated = false
+    let unsubscribe: (() => void) | null = null
 
     const finish = () => {
       if (!cancelled) setReady(true)
     }
 
-    if (!scope) {
+    if (!eventScope) {
       // Not an event screen (the sign-in page, admin): nothing to hydrate, and
       // nothing to write. Do not hold the first paint for it.
       finish()
-      return
+      return () => {
+        cancelled = true
+      }
     }
 
     const cap = setTimeout(finish, HYDRATE_CAP_MS)
 
     void (async () => {
+      const staffId = await readStoredStaffMemberId()
+      if (cancelled) return
+      const scope = cacheScope(eventScope, staffId)
+
       const state = await loadCache(scope)
       if (cancelled) return
       if (state) hydrate(queryClient, state)
       hydrated = true
       clearTimeout(cap)
       finish()
-    })()
 
-    const unsubscribe = queryClient.getQueryCache().subscribe(() => {
-      // Only start writing back once hydration has finished, so the first write
-      // cannot overwrite a good cache with an empty one mid-hydrate.
-      if (!hydrated || cancelled) return
-      if (timer) clearTimeout(timer)
-      timer = setTimeout(() => {
-        void saveCache(scope, dehydrateSafe(queryClient))
-      }, SAVE_DEBOUNCE_MS)
-    })
+      unsubscribe = queryClient.getQueryCache().subscribe(() => {
+        // Only start writing back once hydration has finished, so the first write
+        // cannot overwrite a good cache with an empty one mid-hydrate.
+        if (!hydrated || cancelled) return
+        if (timer) clearTimeout(timer)
+        timer = setTimeout(() => {
+          void saveCache(scope, dehydrateSafe(queryClient))
+        }, SAVE_DEBOUNCE_MS)
+      })
+    })()
 
     return () => {
       cancelled = true
       clearTimeout(cap)
       if (timer) clearTimeout(timer)
-      unsubscribe()
+      unsubscribe?.()
     }
-  }, [scope, queryClient])
+  }, [eventScope, queryClient])
 
   return ready
 }

@@ -65,6 +65,20 @@ export async function readStoredClaims(): Promise<StoredCodeClaims | null> {
   }
 }
 
+/**
+ * The selected staff member id only — the identity half of the query-cache
+ * scope (G5). Read without touching the JWT: the cache only needs WHO is
+ * signed in, not the token, and reading the token here would mirror it into
+ * the fetch wrapper for no reason.
+ */
+export async function readStoredStaffMemberId(): Promise<string | null> {
+  try {
+    return await capacitorStorageAdapter.getItem(STAFF_KEY)
+  } catch {
+    return null
+  }
+}
+
 /** Remove the stored code-auth claims (sign-out). */
 export async function clearClaims(): Promise<void> {
   codeTokenCache.current = null

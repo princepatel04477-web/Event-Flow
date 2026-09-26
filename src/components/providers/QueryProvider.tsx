@@ -115,8 +115,8 @@ export default QueryProvider
 function CacheLayer({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const queryClient = useQueryClient()
-  const scope = scopeFromPath(pathname)
-  const ready = useCachePersistence(scope, queryClient)
+  const eventScope = scopeFromPath(pathname)
+  const ready = useCachePersistence(eventScope, queryClient)
 
   return (
     <>
