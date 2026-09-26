@@ -110,6 +110,44 @@ describe('claimWelcome', () => {
   })
 })
 
+describe('claimHomeEntrance', () => {
+  it('plays once per session and no more (tab switches never replay it)', async () => {
+    installWindow(fakeStorage())
+    const { claimHomeEntrance } = await loadModule()
+
+    expect(claimHomeEntrance()).toBe(true)
+    expect(claimHomeEntrance()).toBe(false)
+    expect(claimHomeEntrance()).toBe(false)
+  })
+
+  it('does not play when the session already entered Home', async () => {
+    installWindow(fakeStorage({ 'nuvent.home.entered': '1' }))
+    const { claimHomeEntrance } = await loadModule()
+
+    expect(claimHomeEntrance()).toBe(false)
+  })
+
+  it('fails closed when sessionStorage throws', async () => {
+    installWindow({
+      getItem: () => {
+        throw new Error('storage blocked')
+      },
+      setItem: () => {},
+      removeItem: () => {},
+    })
+    const { claimHomeEntrance } = await loadModule()
+
+    expect(claimHomeEntrance()).toBe(false)
+  })
+
+  it('is server-safe', async () => {
+    vi.stubGlobal('window', undefined)
+    const { claimHomeEntrance } = await loadModule()
+
+    expect(claimHomeEntrance()).toBe(false)
+  })
+})
+
 describe('resetWelcomeClaim', () => {
   it('lets the welcome play again (the /debug replay button)', async () => {
     installWindow(fakeStorage())

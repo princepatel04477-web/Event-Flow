@@ -26,6 +26,7 @@
  */
 
 const KEY = 'nuvent.welcome.played'
+const HOME_KEY = 'nuvent.home.entered'
 
 /**
  * Claims the one welcome slot for this app launch.
@@ -62,5 +63,27 @@ export function resetWelcomeClaim(): void {
     window.sessionStorage.removeItem(KEY)
   } catch {
     // Storage is blocked; claimWelcome() already fails closed. Nothing to do.
+  }
+}
+
+/**
+ * "Has Home's staggered entrance already played this session?" (M3).
+ *
+ * Same contract and lifetime as `claimWelcome`: sessionStorage, read-and-mark
+ * in one step, fails closed to "do not animate". The entrance is a rise+fade,
+ * so failing closed means the content simply appears at rest — the same
+ * fail-closed reason the welcome itself skips rather than replays.
+ *
+ * Returns true exactly once per WebView session; false every time after.
+ */
+export function claimHomeEntrance(): boolean {
+  if (typeof window === 'undefined') return false
+
+  try {
+    if (window.sessionStorage.getItem(HOME_KEY) !== null) return false
+    window.sessionStorage.setItem(HOME_KEY, '1')
+    return true
+  } catch {
+    return false
   }
 }

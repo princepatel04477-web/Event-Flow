@@ -27,6 +27,7 @@ import {
   type TodayNumbers,
 } from './_home/today'
 import { readVisibleNumbers } from './_home/visibleNumbers'
+import { HomeEntrance } from './_home/HomeEntrance'
 import { PrefetchedLink } from './_components/PrefetchedLink'
 import { WarmRoutes } from './_components/WarmRoutes'
 
@@ -172,10 +173,10 @@ export default async function AppHomePage({ params }: PageProps) {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <div data-screen="home" className="flex flex-col gap-5">
-        {/* Warms Rooms and Calls after this screen has painted (S3). Renders
-            nothing and never blocks the paint; see the component. */}
-        <WarmRoutes eventId={event.id} eventCode={event.code} />
+      {/* Warms Rooms and Calls after this screen has painted (S3). Renders
+          nothing and never blocks the paint; see the component. */}
+      <WarmRoutes eventId={event.id} eventCode={event.code} />
+      <HomeEntrance>
         <NowCard
           eyebrow="Right now"
           headline={now.headline}
@@ -253,7 +254,7 @@ export default async function AppHomePage({ params }: PageProps) {
         ) : null}
 
         <HelpLink eventCode={event.code} />
-      </div>
+      </HomeEntrance>
     </HydrationBoundary>
   )
 }
