@@ -74,6 +74,7 @@ const TEXT_ON: Array<[fg: string, bg: string, floor: number]> = [
   ['ledger-green', 'green-tint', 4.5],
   ['ledger-red', 'red-tint', 4.5],
   ['ledger-amber', 'amber-tint', 4.5],
+  ['amber-fg', 'ledger-amber-strong', 4.5],
   ['brand-fg', 'brand', 4.5],
   ['now-fg', 'now', 4.5],
   ['now-muted', 'now', 4.5],

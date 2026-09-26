@@ -62,20 +62,18 @@ export function OfflineBanner({ offlineNote }: OfflineBannerProps = {}) {
   return (
     <div
       role="status"
-      className="sticky top-0 z-50 w-full bg-warning px-4 py-2 text-center text-sm font-semibold text-warning-fg"
-      style={{ background: '#a35408', color: '#fff9f2' }}
+      className="sticky top-0 z-50 w-full bg-ledger-amber-strong px-4 py-2 text-center text-sm font-semibold text-amber-fg"
     >
       {online
         ? `${queued} change${queued === 1 ? '' : 's'} queued — will sync when online`
         : `Offline — ${queued} change${queued === 1 ? '' : 's'} queued`}
       {!online && offlineNote ? (
-        // The ground here is the hardcoded dark amber above, so this line uses
-        // the same light-on-dark pair the headline already wears, at a lighter
-        // weight — a token such as `text-muted` would be charcoal on amber and
-        // unreadable in exactly the light this banner exists for.
-        <p className="mt-1 text-xs leading-snug font-normal" style={{ color: '#fff9f2' }}>
-          {offlineNote}
-        </p>
+        // The note INHERITS the banner's pair (`text-amber-fg`), which is the
+        // one written for an amber ground: light in light mode, dark in dark
+        // mode, where the amber itself lightens. A neutral token such as
+        // `text-muted` would be charcoal on amber — unreadable in exactly the
+        // light this banner exists for.
+        <p className="mt-1 text-xs leading-snug font-normal">{offlineNote}</p>
       ) : null}
     </div>
   )

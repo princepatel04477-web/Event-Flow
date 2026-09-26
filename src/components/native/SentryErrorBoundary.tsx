@@ -68,8 +68,8 @@ class Boundary extends Component<Props, State> {
           alignItems: 'center',
           justifyContent: 'center',
           padding: 24,
-          background: '#f5ead8',
-          color: '#201e1d',
+          background: 'var(--ef-paper)',
+          color: 'var(--ef-ink)',
           fontFamily: 'Figtree, system-ui, sans-serif',
         }}
       >
@@ -77,7 +77,7 @@ class Boundary extends Component<Props, State> {
           <h1 style={{ fontFamily: 'Caprasimo, Georgia, serif', fontSize: 24, margin: '0 0 8px' }}>
             Something went wrong
           </h1>
-          <p style={{ margin: '0 0 20px', color: '#4a5568' }}>
+          <p style={{ margin: '0 0 20px', color: 'var(--ef-muted)' }}>
             The event team has been notified. Tap to reload and carry on.
           </p>
           <button
@@ -87,8 +87,8 @@ class Boundary extends Component<Props, State> {
               padding: '0 24px',
               borderRadius: 999,
               border: 'none',
-              background: '#201e1d',
-              color: '#f6efe1',
+              background: 'var(--ef-ink)',
+              color: 'var(--ef-paper)',
               fontSize: 16,
               fontWeight: 700,
               cursor: 'pointer',

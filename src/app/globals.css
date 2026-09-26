@@ -101,6 +101,11 @@
   --ef-ledger-amber: #9c5c10;
   --ef-ledger-amber-strong: #7f4a0c;
   --ef-amber-tint: #fbf0df;
+  /* ON amber. The one pair the palette was missing, and the reason
+     OfflineBanner carried an inline hex: the amber ground needs LIGHT text in
+     light mode and DARK text in dark mode (the amber itself lightens there), so
+     neither --ef-ink nor --ef-paper can serve both. */
+  --ef-amber-fg: #fff9f2;
 
   /* Maroon — the accent. 9.8:1 on paper, and white on it is 10.0:1, so one
      token serves both the tooltip-free text usage and the primary fill. */
@@ -209,6 +214,7 @@
   --ef-ledger-amber: #9c5c10;
   --ef-ledger-amber-strong: #7f4a0c;
   --ef-amber-tint: #fbf0df;
+  --ef-amber-fg: #fff9f2;
 
   --ef-brand: #7f1d3a;
   --ef-brand-hover: #5e1229;
@@ -284,6 +290,8 @@
   --ef-ledger-amber: #f5c46b;
   --ef-ledger-amber-strong: #ffd894;
   --ef-amber-tint: #241c0f;
+  /* The amber lightens in dark mode, so this pair flips: dark text on it. */
+  --ef-amber-fg: #201a12;
 
   /* The accent, lightened so it can be read AS TEXT on the dark ground
      and still carry white-free labels when used as a fill. */
@@ -343,6 +351,7 @@
   --ef-ledger-amber: #f5c46b;
   --ef-ledger-amber-strong: #ffd894;
   --ef-amber-tint: #241c0f;
+  --ef-amber-fg: #201a12;
 
   --ef-brand: #d4708f;
   --ef-brand-hover: #e0859f;
@@ -390,6 +399,7 @@
   --color-ledger-amber: var(--ef-ledger-amber);
   --color-ledger-amber-strong: var(--ef-ledger-amber-strong);
   --color-amber-tint: var(--ef-amber-tint);
+  --color-amber-fg: var(--ef-amber-fg);
 
   --color-margin-rule: var(--ef-margin-rule);
   --color-ring: var(--ef-ring);
