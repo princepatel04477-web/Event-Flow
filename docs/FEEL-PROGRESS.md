@@ -21,6 +21,8 @@ EASE ledger/seal and the one SPRING. No new animation libraries.
 
 - [x] MERGE upstream A1–A11 merged — `e3529df` (conflicts resolved per recipe; 838/838 green, no DB gating needed)
 
+- [x] RCTX route_context migration now returns the A8 section locks — `c0567ca` (comment + returned shape corrected; TS caller + tests updated; NOT applied)
+
 - [x] G1  S4 gap: replace record-screen placeholder with real empty/loading state
       `96e5a2a` — added `src/app/(app)/v2/[eventCode]/rsvp/status/[groupId]/loading.tsx`,
       a skeleton shaped like the record (identity card, five outcome chips, notes
