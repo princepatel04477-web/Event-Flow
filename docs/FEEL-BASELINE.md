@@ -194,3 +194,30 @@ code **from where the login landed**, and throttles through CDP.
    offers "Test Caller A" and login succeeds. Neither table is where that identity comes from,
    and CLAUDE.md §9 describes a staff-roster model that these tables do not currently reflect.
    Not investigated further here; recorded because it contradicts what the docs say.
+
+---
+
+## Not yet measured: tap → sheet (M1), and how to measure it
+
+M1's `Done when` asked for a Performance trace of a sheet opening with no long
+task over 50 ms. That trace has **not** been captured — it needs a real handset
+and Chrome remote debugging, which this environment does not have. It is written
+down here so the next session can close it rather than re-derive it:
+
+1. Handset on the deployed build, connected over `chrome://inspect`.
+2. Open any screen with a sheet — Rooms ("Waiting" → tap a family), or Calls
+   ("See all families"). Start recording, tap the control, wait for the sheet to
+   settle (~1s), stop.
+3. In the trace, look for **Long Tasks** (red triangles) spanning the open, and
+   for the panel's `transform` on the compositor.
+4. Pass: no long task over **50 ms**, and the panel reaches its resting position
+   within the one SPRING — roughly 280 ms (`DURATION.enter`), the value
+   `src/lib/motion/tokens.ts` pins.
+5. Also switch the OS to "reduce motion" and repeat: the sheet must be INSTANT —
+   present with no travel — because `MotionConfig reducedMotion="user"` and the
+   `prefers-reduced-motion` block in `globals.css` both collapse it.
+
+What IS already verified without a device: the scrim fades with
+`DURATION.fade`/`EASE.ledger` and the panel rises with THE spring, both inside
+`AnimatePresence` so the close animates too; and the hardware Back button closes
+the sheet through the `efSheet` history entry (M1 commit `34557eb`).

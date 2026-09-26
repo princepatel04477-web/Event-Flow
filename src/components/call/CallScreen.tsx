@@ -12,11 +12,11 @@ import { Textarea } from '@/components/ui/Textarea'
 import {
   ArrowDownCircleIcon,
   ArrowUpCircleIcon,
-  CheckCircleIcon,
   ClockIcon,
   InboxIcon,
   PhoneIcon,
 } from '@/components/icons'
+import { SuccessMark } from '@/components/motion/SuccessMark'
 import { cn, formatDateTime, formatDuration } from '@/lib/utils'
 import { rsvpStatusLabel, rsvpStatusTone } from '@/lib/rsvp'
 
@@ -543,7 +543,7 @@ export function CallScreen({
                   </>
                 ) : (
                   <>
-                    <CheckCircleIcon className="h-8 w-8 text-success" />
+                    <SuccessMark className="text-success" />
                     <p className="text-base font-semibold text-fg">Outcome saved</p>
                     <p className="text-sm text-muted">This record cannot be edited from here on.</p>
                   </>
