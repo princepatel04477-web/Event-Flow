@@ -197,6 +197,12 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
     queryFn: () => fetchFamily(supabase, eventId, currentId as string),
     enabled: currentId !== null,
     staleTime: 0,
+    // S4: the row we are already standing on carries the name, the number and
+    // the PAX, so the family card renders its header in the same frame as the
+    // tap instead of waiting for the full family read. The full row replaces it
+    // when it lands (the fields the queue view does not carry — remarks,
+    // special requirements — arrive with that read, never before).
+    placeholderData: current ? familyFromQueueRow(current) : undefined,
   })
 
   const family = (rawFamily ?? null) as FamilyRow | null
@@ -619,6 +625,32 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
       ) : null}
     </div>
   )
+}
+
+/**
+ * A queue row, shaped as the family record's header (S4).
+ *
+ * `v_rsvp_queue` carries the name, the number, the PAX and the RSVP status but
+ * NOT remarks or special requirements, so those take their empty values here.
+ * They exist only to satisfy the record's shape until the real read lands, and
+ * nothing that depends on them (saving an outcome) can run before it does.
+ */
+function familyFromQueueRow(row: QueueRow): FamilyRow {
+  return {
+    id: row.group_id ?? '',
+    head_name: row.head_name ?? '',
+    primary_mobile: row.primary_mobile ?? null,
+    expected_pax: row.expected_pax ?? 0,
+    confirmed_pax: row.confirmed_pax ?? null,
+    adults_confirmed: null,
+    children_confirmed: null,
+    needs_pickup: false,
+    special_requirements: [],
+    rsvp_status: (row.rsvp_status ?? 'not_started') as FamilyRow['rsvp_status'],
+    group_type: (row.group_type ?? 'family') as FamilyRow['group_type'],
+    side: (row.side ?? null) as FamilyRow['side'],
+    remarks: null,
+  }
 }
 
 function durationOf(attempt: StoredCallAttempt): number | null {

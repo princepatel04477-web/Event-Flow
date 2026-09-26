@@ -165,6 +165,35 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
   const endIndex = Math.min(list.length, startIndex + visibleCount)
   const windowRows = useMemo(() => list.slice(startIndex, endIndex), [list, startIndex, endIndex])
 
+  // S4: come back to the list where it was left. sessionStorage rather than
+  // component memory, because opening a family IS a navigation — this screen
+  // unmounts — and per-event, so two events never share a position.
+  const scrollKey = `eventflow:guests:scroll:${eventId}`
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (restoredRef.current || list.length === 0) return
+    const el = scrollRef.current
+    if (!el) return
+    let saved = 0
+    try {
+      saved = Number(sessionStorage.getItem(scrollKey) ?? '0')
+    } catch {
+      saved = 0
+    }
+    if (saved > 0) {
+      el.scrollTop = saved
+      // Restoring a persisted scroll position is exactly the "synchronize with
+      // an external system" case the rule's own guidance describes: the value
+      // comes from sessionStorage, not from a render. The alternative — seeding
+      // useState from sessionStorage — renders a different window of rows on the
+      // client than the server and is a hydration mismatch.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setScrollTop(saved)
+    }
+    restoredRef.current = true
+  }, [list.length, scrollKey])
+
   const loadError = error instanceof Error ? error.message : error ? String(error) : null
   const searchErrorMessage = searchError instanceof Error ? searchError.message : null
 
@@ -286,8 +315,18 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
             aria-busy={searchStale || undefined}
           >
             <div
+              ref={scrollRef}
               className="absolute inset-0 overflow-y-auto"
-              onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+              onScroll={(e) => {
+                const next = e.currentTarget.scrollTop
+                setScrollTop(next)
+                try {
+                  sessionStorage.setItem(scrollKey, String(next))
+                } catch {
+                  // Private mode or a full quota — the list still scrolls, it
+                  // just will not be restored.
+                }
+              }}
             >
               <div
                 className="relative"
