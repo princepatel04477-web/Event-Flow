@@ -2,10 +2,10 @@ import { notFound, redirect } from 'next/navigation'
 import { Suspense, type ReactNode } from 'react'
 
 import { UndoBar } from '@/components/ui/UndoBar'
-import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
+import { getRouteContext } from '@/lib/route-context'
 import { v3TabsFor } from '@/lib/sections/v3'
-import { getEventAccess, getViewer, resolveEventByCode } from '@/lib/supabase/queries'
+import { getViewer } from '@/lib/supabase/queries'
 import { cn } from '@/lib/utils'
 
 import { AppHeader } from './_components/AppHeader'
@@ -27,11 +27,15 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
 
   // Provably identical guards to src/app/(staff)/[eventCode]/layout.tsx:
   // Both query getViewer(), resolveEventByCode(), and getSessionClaims() in parallel.
-  const [viewer, event, codeClaims] = await Promise.all([
+  const [viewer, route, codeClaims] = await Promise.all([
     getViewer(),
-    resolveEventByCode(eventCode),
+    // ONE call for the event AND the viewer's access AND the department (S2).
+    // It seeds the per-request memo the page's guards read, so nothing below
+    // this line crosses to the database to re-answer the same question.
+    getRouteContext(eventCode),
     getSessionClaims(),
   ])
+  const event = route.event
 
   // A code-auth (team/client) session has no GoTrue viewer — getViewer()
   // returns null for it because the code cookie is not visible in this render
@@ -57,15 +61,13 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
   // 404 is the right answer to both.
   if (!event) notFound()
 
-  // Resolved once here, for the nav. The per-page gate (requireStaff /
-  // requireAdmin) resolves it again inside each page, because a server layout
-  // cannot see the pathname and sniffing headers() to fake it would opt this
-  // whole subtree out of static rendering.
-  const access = await getEventAccess(event.id)
-  const staffCtx = access === 'admin' || access === 'event_team'
-    ? await getStaffViewerContext(event.id)
-    : null
-  const department = staffCtx?.department ?? null
+  // Resolved once here, for the nav, by ONE call (S2). The per-page gate
+  // (requireStaff / requireSection) still runs inside each page — a server
+  // layout cannot see the pathname, and sniffing headers() to fake it would opt
+  // this whole subtree out of static rendering — but it now reads this same
+  // answer out of the per-request memo instead of crossing to Seoul again.
+  const access = route.access
+  const department = route.department
 
   // Belt and braces: getEventByCode already returned null for a non-member,
   // so this cannot fire. It documents the invariant rather than assuming it.

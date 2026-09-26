@@ -63,3 +63,19 @@ export async function perRequest<T>(key: string, fn: () => Promise<T>): Promise<
 export function perRequestSize(): number {
   return store().size
 }
+
+/**
+ * Record an answer that was resolved somewhere else in this request.
+ *
+ * WHY THIS EXISTS. `route_context()` (one RPC, S2) resolves the event row and
+ * the viewer's access in a single round trip, but dozens of call sites still
+ * ask for them through `resolveEventByCode` / `getEventAccess`. Rather than
+ * rewrite every call site — and risk the guards drifting apart — the one
+ * resolver SEEDS the same keys those functions read, so their `perRequest`
+ * lookups hit this map instead of the network. Same contract as `perRequest`:
+ * a nullish value is never recorded, because it means "no answer".
+ */
+export function seedPerRequest<T>(key: string, value: T): void {
+  if (value === null || value === undefined) return
+  store().set(key, value)
+}
