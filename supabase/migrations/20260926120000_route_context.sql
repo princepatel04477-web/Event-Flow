@@ -63,15 +63,26 @@ as $$
             and app.code_is_live()
         ) then 'client'
         when exists (
-          select 1 from public.event_members em
+          select 1
+          from public.event_members em
+          join public.profiles p on p.id = em.user_id
           where em.event_id = (select id from ev)
             and em.user_id = auth.uid()
+            -- is_active, because the database already fences a deactivated
+            -- member out (is_member() routes non-admins through is_admin(),
+            -- which requires it). Without this the app would label them
+            -- event_team on a screen they can read nothing from — a confident
+            -- lie, which is the one thing getEventAccess exists to prevent.
+            and p.is_active is true
             and em.role = 'event_team'
         ) then 'event_team'
         when exists (
-          select 1 from public.event_members em
+          select 1
+          from public.event_members em
+          join public.profiles p on p.id = em.user_id
           where em.event_id = (select id from ev)
             and em.user_id = auth.uid()
+            and p.is_active is true
             and em.role = 'client'
         ) then 'client'
         else 'none'
