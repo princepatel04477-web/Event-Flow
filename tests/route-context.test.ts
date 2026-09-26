@@ -68,6 +68,7 @@ const rpcPayload = {
   },
   access: 'event_team',
   department: 'hospitality',
+  locks: ['rsvp', 'hamper'],
 }
 
 beforeEach(() => {
@@ -83,6 +84,7 @@ describe('toRouteContext', () => {
     expect(ctx!.event?.id).toBe('evt-1')
     expect(ctx!.access).toBe('event_team')
     expect(ctx!.department).toBe('hospitality')
+    expect(ctx!.locks).toEqual(['rsvp', 'hamper'])
     expect(ctx!.source).toBe('rpc')
   })
 
@@ -97,6 +99,16 @@ describe('toRouteContext', () => {
 
   it('drops a department it does not recognise instead of passing it through', () => {
     expect(toRouteContext({ ...rpcPayload, department: 'catering' })!.department).toBeNull()
+  })
+
+  it('keeps the locked sections it recognises and drops the ones it does not', () => {
+    const ctx = toRouteContext({ ...rpcPayload, locks: ['rsvp', 'catering', 'hamper'] })
+    expect(ctx!.locks).toEqual(['rsvp', 'hamper'])
+  })
+
+  it('treats a missing locks array as empty', () => {
+    expect(toRouteContext({ ...rpcPayload, locks: undefined })!.locks).toEqual([])
+    expect(toRouteContext({ ...rpcPayload, locks: 'rsvp' })!.locks).toEqual([])
   })
 })
 
@@ -127,6 +139,7 @@ describe('getRouteContext', () => {
     expect(layout.event?.id).toBe('evt-1')
     expect(page.access).toBe('event_team')
     expect(guard.department).toBe('hospitality')
+    expect(layout.locks).toEqual(['rsvp', 'hamper'])
     expect(rpcMock).toHaveBeenCalledTimes(1)
   })
 
@@ -143,6 +156,7 @@ describe('getRouteContext', () => {
     const ctx = await getRouteContext('FALLBACK-A')
     expect(ctx.source).toBe('fallback')
     expect(ctx.event?.id).toBe('evt-2')
+    expect(ctx.locks).toEqual([])
   })
 
   it('stops asking for a function that does not exist', async () => {

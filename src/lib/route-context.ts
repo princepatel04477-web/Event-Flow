@@ -3,6 +3,7 @@ import 'server-only'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { isStaffDepartment, type StaffDepartment } from '@/lib/departments'
 import { perRequest, seedPerRequest } from '@/lib/request-cache'
+import { isLockableSection, type LockableSection } from '@/lib/section-locks'
 import { createClient } from '@/lib/supabase/server'
 import { getEventAccess, resolveEventByCode, type EventAccess } from '@/lib/supabase/queries'
 
@@ -14,6 +15,8 @@ export interface RouteContext {
   event: RouteEvent | null
   access: EventAccess
   department: StaffDepartment | null
+  /** The sections an admin has locked for this event (A8). Empty for a client. */
+  locks: LockableSection[]
   /** Which resolver answered. Not rendered — read by the report and the test. */
   source: 'rpc' | 'fallback'
 }
@@ -60,7 +63,7 @@ export function isMissingFunctionError(error: RpcError): boolean {
  */
 export function toRouteContext(data: unknown): RouteContext | null {
   if (!data || typeof data !== 'object') return null
-  const raw = data as { event?: unknown; access?: unknown; department?: unknown }
+  const raw = data as { event?: unknown; access?: unknown; department?: unknown; locks?: unknown }
 
   const e = raw.event as { id?: unknown; code?: unknown } | undefined
   if (!e || typeof e.id !== 'string' || typeof e.code !== 'string') return null
@@ -74,10 +77,18 @@ export function toRouteContext(data: unknown): RouteContext | null {
       ? (raw.department as StaffDepartment)
       : null
 
+  const locks: LockableSection[] = Array.isArray(raw.locks)
+    ? raw.locks.filter(
+        (section): section is LockableSection =>
+          typeof section === 'string' && isLockableSection(section),
+      )
+    : []
+
   return {
     event: raw.event as RouteEvent,
     access: raw.access,
     department,
+    locks,
     source: 'rpc',
   }
 }
@@ -106,7 +117,7 @@ async function loadViaRpc(eventCode: string): Promise<RouteContext | 'unsupporte
 
     rpcSupported = true
     // A null answer is a real one: "this viewer cannot see this event".
-    return toRouteContext(data) ?? { event: null, access: 'none', department: null, source: 'rpc' }
+    return toRouteContext(data) ?? { event: null, access: 'none', department: null, locks: [], source: 'rpc' }
   } catch {
     return 'unsupported'
   }
@@ -130,14 +141,18 @@ function seedResolution(ctx: RouteContext, requestedCode: string): void {
 /** The pre-migration path: the same three calls, in the same order as today. */
 async function loadViaHelpers(eventCode: string): Promise<RouteContext> {
   const event = await resolveEventByCode(eventCode)
-  if (!event) return { event: null, access: 'none', department: null, source: 'fallback' }
+  if (!event) return { event: null, access: 'none', department: null, locks: [], source: 'fallback' }
 
   const staffCtx = await getStaffViewerContext(event.id)
   // getStaffViewerContext returns null for a client and for nobody alike; only
   // getEventAccess can tell those apart, so ask it for the non-staff case.
   const access: EventAccess = staffCtx ? staffCtx.access : await getEventAccess(event.id)
 
-  return { event, access, department: staffCtx?.department ?? null, source: 'fallback' }
+  // Locks are deliberately NOT read here: this is the pre-migration path, and
+  // the LockedSectionBanner reads them itself (client-side) in both paths.
+  // Reading them here would add a fourth round trip to a path that exists
+  // only to stay fast until the RPC lands.
+  return { event, access, department: staffCtx?.department ?? null, locks: [], source: 'fallback' }
 }
 
 /**

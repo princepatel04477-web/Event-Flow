@@ -20,11 +20,15 @@
 -- the database cannot disagree, including for a deactivated admin (whose
 -- app.is_admin() is false) and for a revoked code (app.code_is_live()).
 --
--- NOTE ON "SECTION LOCKS". No such thing exists in this schema: what gates
--- a screen is the viewer's DEPARTMENT (src/lib/departments.ts,
--- DEPARTMENT_SECTIONS), which is a JWT claim mirrored on staff_members.
--- This function returns the department, which is the real answer; there is
--- no lock table to return.
+-- NOTE ON "SECTION LOCKS" (A8). Section locks DO exist in the merged schema:
+-- `public.event_section_locks` (20260925160000_event_section_locks.sql) holds
+-- one row per (event_id, section) an admin has locked, and
+-- `app.enforce_section_lock()` refuses staff writes to those sections in the
+-- database. This function returns them next to the department: `locks` is a
+-- jsonb array of the locked section ids ('rsvp' | 'hospitality' | 'hamper' |
+-- 'logistics'), read under the caller's own RLS (`event_section_locks_sel` is
+-- app.is_staff(event_id)) — so an admin and a field runner see the same list
+-- the banner would read, and a client sees an empty list.
 --
 -- NOT APPLIED by this commit. Until it is, src/lib/route-context.ts
 -- feature-detects its absence once and falls back to the three existing
@@ -118,16 +122,28 @@ as $$
                   and sm.is_active
               )
             )
-          end
+          end,
+        -- A8: the locked sections, as an array of ids. Read under the caller's
+        -- own RLS (event_section_locks_sel = app.is_staff(event_id)), so it is
+        -- empty for a client and for anyone the table does not admit.
+        'locks', coalesce(
+          (
+            select jsonb_agg(l.section order by l.section)
+            from public.event_section_locks l
+            where l.event_id = (select id from ev)
+          ),
+          '[]'::jsonb
+        )
       )
     end;
 $$;
 
 comment on function public.route_context(text) is
   'One-call route context for a staff route: the event row, the viewer '
-  'access (admin|event_team|client) and the viewer department. Returns null '
-  'when the viewer cannot see the event. Mirrors getEventAccess() and '
-  'getStaffViewerContext() in the app. SECURITY INVOKER: the events read is '
-  'fenced by the caller''s own RLS.';
+  'access (admin|event_team|client), the viewer department, and the locked '
+  'sections (a jsonb array of rsvp|hospitality|hamper|logistics). Returns '
+  'null when the viewer cannot see the event. Mirrors getEventAccess() and '
+  'getStaffViewerContext() in the app. SECURITY INVOKER: the events and '
+  'locks reads are fenced by the caller''s own RLS.';
 
 grant execute on function public.route_context(text) to authenticated, anon;
