@@ -59,7 +59,13 @@ EASE ledger/seal and the one SPRING. No new animation libraries.
       staggered rise+fade entrance (hero first, then each section 40ms later),
       played once per session via `claimHomeEntrance`. PHONE CHECK: open Home
       cold, then tab away and back — the entrance plays once, never on return.
-- [ ] M4  Call flow rebuild
+- [x] M4  Call flow rebuild
+      `74d4f58` — the call-flow structure was already rebuilt upstream (one
+      family card, optimistic outcome buttons, auto-advance, callback sheet,
+      progress bar). M4 added the missing feel: a SuccessMark + 600ms
+      auto-advance on the one-tap outcomes (No answer / Not coming / Call back),
+      and enlarged the outcome targets to 64px. PHONE CHECK: log "Not coming"
+      and watch the check draw before the next family arrives.
 - [ ] M5  Polish pass
 - [x] G5  S5 gap: staff-identity scope
       `4c7d9a5` — the offline query cache is now keyed by event code AND the
