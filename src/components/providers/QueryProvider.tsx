@@ -1,8 +1,16 @@
 'use client'
 
-import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query'
+import {
+  QueryClient,
+  QueryClientProvider,
+  onlineManager,
+  useIsFetching,
+  useQueryClient,
+} from '@tanstack/react-query'
+import { usePathname } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 
+import { scopeFromPath, useCachePersistence } from '@/lib/queries/persist'
 import { useOnline } from '@/lib/useOnline'
 
 /**
@@ -87,12 +95,60 @@ export function QueryProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       <OnlineBridge />
-      {children}
+      <CacheLayer>{children}</CacheLayer>
     </QueryClientProvider>
   )
 }
 
 export default QueryProvider
+
+/**
+ * The offline-start layer (S5): hydrate the last-known cache for this event
+ * before the first query fires, then keep it written back.
+ *
+ * `children` is held only until the FIRST hydration resolves — or 250 ms,
+ * whichever comes first — so a cold open on venue Wi-Fi paints what was already
+ * on the phone instead of a blank screen. It is not held on later navigations:
+ * `ready` is component state and this layer never unmounts, so a tab switch is
+ * unaffected.
+ */
+function CacheLayer({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const queryClient = useQueryClient()
+  const scope = scopeFromPath(pathname)
+  const ready = useCachePersistence(scope, queryClient)
+
+  return (
+    <>
+      {ready ? <UpdatingChip /> : null}
+      {ready ? children : null}
+    </>
+  )
+}
+
+/**
+ * "Updating…" while a screen shows data that came off the disk.
+ *
+ * Non-blocking on purpose — T7 forbids a spinner standing between a runner and
+ * their screen — and it says nothing when nothing is in flight. It is rendered
+ * only after hydration, so the ordinary first fetch of a fresh session does not
+ * produce a chip that means nothing.
+ */
+function UpdatingChip() {
+  const fetching = useIsFetching()
+  if (fetching === 0) return null
+
+  return (
+    <div
+      className="pointer-events-none fixed right-3 z-30"
+      style={{ top: 'calc(env(safe-area-inset-top, 0px) + 3.25rem)' }}
+    >
+      <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-rule-strong bg-surface px-2.5 text-xs text-muted shadow-e1">
+        Updating…
+      </span>
+    </div>
+  )
+}
 
 /**
  * Mirrors `useOnline()` into TanStack's `onlineManager`, so `retry` above — and

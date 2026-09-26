@@ -4,6 +4,7 @@ import { startTransition, useState } from 'react'
 
 import { signOut } from '@/lib/actions/auth'
 import { clearClaims } from '@/lib/native/session-keeper'
+import { clearCache } from '@/lib/queries/persist'
 import { cn } from '@/lib/utils'
 import { LogOutIcon } from '@/components/icons'
 
@@ -21,7 +22,12 @@ export function SignOutButton({ compact = false, className }: SignOutButtonProps
     // Clear the durable copy of the code-auth claims so a later remount
     // cannot resurrect a signed-out session. The server action deletes the
     // httpOnly cookies and redirects to /login.
+    //
+    // The persisted QUERY cache goes with it (S5): it holds guest rows for
+    // whichever event this phone was looking at, and a signed-out handset must
+    // not keep them.
     void clearClaims().finally(() => {
+      void clearCache()
       startTransition(() => {
         void signOut()
       })
