@@ -1,5 +1,10 @@
 # FEEL progress
 
+**NEXT: G3 — nothing started.** G3 (SuccessMark on the remaining confirm spots +
+a tap→sheet perf-trace note) is the next unchecked Phase A item; no work has
+been done on it beyond M1's RSVP-save usage. G4 follows. Stop reason: loop rule
+5d (context), not a blocker.
+
 Standing loop file. Source of truth for tasks: `docs/FEEL-PROMPT-SERIES.md`.
 Pick the first unchecked item whose phase is allowed today (`date`).
 
@@ -20,12 +25,16 @@ EASE ledger/seal and the one SPRING. No new animation libraries.
       converted to a client query consumer (shares the v1 screen, claims the lock).
       PHONE CHECK: open a family from Calls and confirm the skeleton matches the
       real record with no jump.
-- [ ] G2  S4 gap: prefetch route data on pointerdown (not just hover) for list rows + tab bar
+- [x] G2  S4 gap: prefetch route data on pointerdown (not just hover) for list rows + tab bar
+      `4ffffc2` — new `PrefetchedLink`; Today's attention rows now arm a FULL
+      prefetch on pointerdown/touchstart. The tab bar already did. The guest list
+      is deliberately excluded (its destination claims the caller lock) and the
+      call queue's rows do not navigate. PHONE CHECK: none.
 - [ ] G3  M1 gap: add SuccessMark to the remaining confirm spots; add a perf trace note for tap→sheet
 - [ ] G4  M2 gap: in-situ colour audit, every screen in light AND dark, fix any hardcoded colours to --ef-* tokens
 - [x] M6  Hide developer surfaces
       `a4798d1` — debug pipeline route is admin-only; review title/loading say
-      "call notes"; rooms MOVE capacity says "Empty one room first". Phone check:
+      "call notes"; rooms MOVE capacity says "Empty one room first". PHONE CHECK:
       try `/{event}/debug/pipeline` as a team login (should bounce).
 
 ## Phase B — ONLY after 4 Oct (skip if today < 2026-10-05)
