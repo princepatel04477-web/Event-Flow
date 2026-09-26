@@ -30,7 +30,12 @@ EASE ledger/seal and the one SPRING. No new animation libraries.
       prefetch on pointerdown/touchstart. The tab bar already did. The guest list
       is deliberately excluded (its destination claims the caller lock) and the
       call queue's rows do not navigate. PHONE CHECK: none.
-- [ ] G3  M1 gap: add SuccessMark to the remaining confirm spots; add a perf trace note for tap→sheet
+- [x] G3  M1 gap: add SuccessMark to the remaining confirm spots; add a perf trace note for tap→sheet
+      `91120c6` — CallScreen's "Outcome saved" now uses SuccessMark (the second
+      and last spot with a check to replace; room placement has no check and
+      hamper delivery already has its seal). FEEL-BASELINE.md now records how to
+      take the tap→sheet trace. PHONE CHECK: log a call outcome and watch the
+      check draw.
 - [ ] G4  M2 gap: in-situ colour audit, every screen in light AND dark, fix any hardcoded colours to --ef-* tokens
 - [x] M6  Hide developer surfaces
       `a4798d1` — debug pipeline route is admin-only; review title/loading say
