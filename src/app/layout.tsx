@@ -172,6 +172,24 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     // we let React keep the WebView's version instead of erroring.
     <html lang="en" className={`h-full ${fontVariables}`} suppressHydrationWarning>
       <body className="min-h-dvh bg-paper font-sans text-base text-ink antialiased">
+        {/* Set the colour mode BEFORE the first paint (M2). Without this a
+            dark-mode user gets a white flash on every cold start, because the
+            server has no idea what the device was told last time. It reads the
+            same localStorage key `src/lib/theme/mode.ts` writes, resolves
+            'system' against the OS, and fails closed to light. Kept inline and
+            tiny on purpose — it is on the critical path. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var m=localStorage.getItem('eventflow:theme-mode');" +
+              "var d=m==='dark'||(m==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);" +
+              "if(d)document.documentElement.setAttribute('data-mode','dark');" +
+              "var c=d?'#0d0f10':'#f7f3ec';" +
+              "var t=document.querySelector('meta[name=\"theme-color\"]');" +
+              "if(t)t.setAttribute('content',c);" +
+              "}catch(e){}})();",
+          }}
+        />
         <SentryErrorBoundary>
           <SessionBridge />
           <MobileViewport />

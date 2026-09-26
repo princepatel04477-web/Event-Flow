@@ -237,6 +237,134 @@
   --ef-shadow-e3: 0 -4px 6px -1px rgba(28, 25, 23, 0.04), 0 -16px 32px -4px rgba(28, 25, 23, 0.06);
 }
 
+/* --------------------------------------------------------------------
+   DARK (M2). Light stays the default; this is the same token NAMES with
+   dark values, so no component branches on the mode.
+
+   Direction is CRED-like: a near-black ground, raised surfaces two to
+   three steps lighter, hairlines instead of shadows (a shadow on a dark
+   ground reads as a smudge, not as lift), and the one accent kept.
+
+   The Now card INVERTS here on purpose. In light mode it is the dark
+   plane that stands out from paper; on a near-black ground a dark card
+   would vanish, so it becomes the light plane. That is the same
+   "one surface that is not like the others" rule, not a different one.
+
+   Every text/surface pair below is checked by tests/theme-contrast.test.ts,
+   which parses these blocks and fails on any pair under its floor.
+   -------------------------------------------------------------------- */
+[data-mode='dark'] {
+  color-scheme: dark;
+
+  /* Ground — near-black, a touch warm so it belongs to the same family
+     as the paper it replaces. */
+  --ef-paper: #0d0f10;
+  --ef-paper-band: #141719;
+  --ef-surface: #16191b;
+  --ef-surface-2: #1f2426;
+  --ef-press: #262c2f;
+
+  --ef-ink: #f4f2ef;
+  --ef-muted: #b3ada6;
+  --ef-subtle: #9c968f;
+
+  --ef-rule: #242a2d;
+  --ef-rule-strong: #38403f;
+
+  /* Statuses lighten: the light-mode values are chosen to read on paper,
+     and several of them would be under 3:1 on this ground. */
+  --ef-ledger-red: #ff8a80;
+  --ef-ledger-red-strong: #ffb3aa;
+  --ef-red-tint: #2a1616;
+
+  --ef-ledger-green: #6ee7a8;
+  --ef-ledger-green-strong: #9af0c3;
+  --ef-green-tint: #122019;
+
+  --ef-ledger-amber: #f5c46b;
+  --ef-ledger-amber-strong: #ffd894;
+  --ef-amber-tint: #241c0f;
+
+  /* The accent, lightened so it can be read AS TEXT on the dark ground
+     and still carry white-free labels when used as a fill. */
+  --ef-brand: #d4708f;
+  --ef-brand-hover: #e0859f;
+  --ef-brand-fg: #12100f;
+  --ef-brand-tint: #2a1a20;
+
+  /* Marigold keeps its job: the ONE highlight, now on the light Now card. */
+  --ef-highlight: #e8a33d;
+  --ef-highlight-fg: #12100f;
+  --ef-highlight-tint: #e8a33d40;
+
+  /* The Now card, inverted — see the note above. */
+  --ef-now: #f4f2ef;
+  --ef-now-fg: #12100f;
+  --ef-now-muted: #4a443e;
+
+  --ef-margin-rule: var(--ef-ledger-red);
+  --ef-ring: #d4708f;
+  --ef-nav: #16191b;
+
+  /* Shadows become hairlines: on dark, a cast shadow is invisible at best
+     and a grey smudge at worst. A 1px inset light edge does the lifting. */
+  --ef-shadow-e1: 0 0 0 1px rgb(255 255 255 / 0.05);
+  --ef-shadow-e2: 0 0 0 1px rgb(255 255 255 / 0.07), 0 2px 8px -2px rgb(0 0 0 / 0.5);
+  --ef-shadow-e3: 0 0 0 1px rgb(255 255 255 / 0.07), 0 -8px 24px -6px rgb(0 0 0 / 0.6);
+}
+
+/* The client dark ground. Same dark vocabulary, a hair warmer, because the
+   client theme's light ground is warmer too. Kept as its own block so the
+   two can move apart without one dragging the other. */
+[data-theme='client'][data-mode='dark'] {
+  color-scheme: dark;
+
+  --ef-paper: #100f0e;
+  --ef-paper-band: #171513;
+  --ef-surface: #191716;
+  --ef-surface-2: #23201e;
+  --ef-press: #2a2624;
+
+  --ef-ink: #f6f3ef;
+  --ef-muted: #b6afa6;
+  --ef-subtle: #9f988f;
+
+  --ef-rule: #272321;
+  --ef-rule-strong: #3b3532;
+
+  --ef-ledger-red: #ff8a80;
+  --ef-ledger-red-strong: #ffb3aa;
+  --ef-red-tint: #2a1616;
+
+  --ef-ledger-green: #6ee7a8;
+  --ef-ledger-green-strong: #9af0c3;
+  --ef-green-tint: #122019;
+
+  --ef-ledger-amber: #f5c46b;
+  --ef-ledger-amber-strong: #ffd894;
+  --ef-amber-tint: #241c0f;
+
+  --ef-brand: #d4708f;
+  --ef-brand-hover: #e0859f;
+  --ef-brand-fg: #12100f;
+  --ef-brand-tint: #2a1a1f;
+
+  --ef-highlight: #e8a33d;
+  --ef-highlight-fg: #12100f;
+  --ef-highlight-tint: #e8a33d40;
+
+  --ef-now: #f6f3ef;
+  --ef-now-fg: #12100f;
+  --ef-now-muted: #4c453e;
+
+  --ef-ring: #d4708f;
+  --ef-nav: #191716;
+
+  --ef-shadow-e1: 0 0 0 1px rgb(255 255 255 / 0.05);
+  --ef-shadow-e2: 0 0 0 1px rgb(255 255 255 / 0.07), 0 2px 8px -2px rgb(0 0 0 / 0.5);
+  --ef-shadow-e3: 0 0 0 1px rgb(255 255 255 / 0.07), 0 -8px 24px -6px rgb(0 0 0 / 0.6);
+}
+
 @theme inline {
   --color-paper: var(--ef-paper);
   --color-paper-band: var(--ef-paper-band);
@@ -367,6 +495,11 @@
     overflow-x: clip;
     /* The ground, so overscroll on the APK reveals warm paper. */
     background-color: var(--ef-paper);
+    /* Switching Light/Dark crossfades the GROUND only (M2). Nothing else
+       moves — no size, no position — so a mode change is a settle, not a
+       re-layout. 220ms is written here rather than as a token because it is
+       the one duration that belongs to the mode switch alone. */
+    transition: background-color 220ms var(--ef-ease);
   }
 
   body {

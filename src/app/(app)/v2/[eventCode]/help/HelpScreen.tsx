@@ -2,6 +2,8 @@ import { Row } from '@/components/ui/Row'
 import { V2_OFFLINE_NOTE } from '@/lib/offline-note'
 import type { NavTab } from '@/lib/sections/config'
 
+import { ModeToggle } from './ModeToggle'
+
 /**
  * The cheat sheet's body.
  *
@@ -89,6 +91,8 @@ export function HelpScreen({ tabs, departmentLabel }: HelpScreenProps) {
           <Row key={tab.key} heading={tab.label} meta={lineFor(tab)} />
         ))}
       </section>
+
+      <ModeToggle />
 
       <section className="flex flex-col gap-3 rounded-2xl border border-rule bg-surface p-4">
         <p className="text-sm leading-snug text-muted">
