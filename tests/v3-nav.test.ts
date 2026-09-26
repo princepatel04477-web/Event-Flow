@@ -5,7 +5,7 @@ import { v3ActiveChild, v3ActiveSection, v3ScreenTitle, v3TabsFor } from '@/lib/
 import { STAFF_DEPARTMENTS, sectionAllowedForDepartment, type StaffDepartment } from '@/lib/departments'
 
 /**
- * The v3 bottom bar is **Today · Calls · Rooms · Hampers · Travel** and it is
+ * The v3 bottom bar is **Today · Calls · Hospitality · Hampers · Logistics** and it is
  * the only navigation most of these users have. Every rule in it is a rule
  * about who someone is rather than where they are, which is the combination
  * that has already shipped two bugs (a section with no way in, a Home tab
@@ -27,9 +27,9 @@ describe('v3TabsFor — event lead', () => {
     expect(labels(v3TabsFor(EV, 'admin', 'management'))).toEqual([
       'Today',
       'Calls',
-      'Rooms',
+      'Hospitality',
       'Hampers',
-      'Travel',
+      'Logistics',
     ])
   })
 
@@ -37,9 +37,9 @@ describe('v3TabsFor — event lead', () => {
     expect(labels(v3TabsFor(EV, 'event_team', 'management'))).toEqual([
       'Today',
       'Calls',
-      'Rooms',
+      'Hospitality',
       'Hampers',
-      'Travel',
+      'Logistics',
     ])
   })
 
@@ -115,7 +115,7 @@ describe('v3TabsFor — runners', () => {
     // hamper section — so their bar is the two screens they can actually
     // open, not a tab that bounces them to `?denied=section`.
     expect(labels(v3TabsFor(EV, 'event_team', 'hospitality'))).toEqual([
-      'Rooms',
+      'Hospitality',
       'Check in / out',
     ])
   })
@@ -198,8 +198,8 @@ describe('v3ScreenTitle', () => {
   it('names the section beside the event root', () => {
     expect(v3ScreenTitle('')).toBe('Today')
     expect(v3ScreenTitle('rsvp')).toBe('Calls')
-    expect(v3ScreenTitle('logistics')).toBe('Travel')
-    expect(v3ScreenTitle('hospitality')).toBe('Rooms')
+    expect(v3ScreenTitle('logistics')).toBe('Logistics')
+    expect(v3ScreenTitle('hospitality')).toBe('Hospitality')
   })
 
   it('names a child screen by the child label', () => {
@@ -207,9 +207,9 @@ describe('v3ScreenTitle', () => {
     expect(v3ScreenTitle('hospitality/checkin')).toBe('Check in / out')
   })
 
-  it('names the one Rooms screen that is not about rooms', () => {
+  it('names the one Hospitality screen that is not about rooms', () => {
     // `hospitality/deliveries` has no matching child in `SECTIONS.hospitality`
-    // — without the override it titles itself "Rooms", on the hamper run.
+    // — without the override it titles itself "Hospitality", on the hamper run.
     expect(v3ScreenTitle('hospitality/deliveries')).toBe('Hampers')
     expect(v3ScreenTitle('hospitality/deliveries/abc-123')).toBe('Hampers')
   })
@@ -219,7 +219,7 @@ describe('v3ScreenTitle', () => {
   })
 
   it('falls back to the section name on a detail route', () => {
-    expect(v3ScreenTitle('hospitality/rooms/104')).toBe('Rooms')
+    expect(v3ScreenTitle('hospitality/rooms/104')).toBe('Hospitality')
   })
 
   it('never returns an empty string', () => {

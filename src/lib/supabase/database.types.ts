@@ -110,6 +110,7 @@ export type Database = {
         | "hospitality"
         | "hamper"
         | "production"
+        | "rsvp"
       side: "bride" | "groom" | "both" | "other"
       travel_direction: "arrival" | "departure"
       travel_mode: "air" | "train" | "bus" | "cab" | "self_drive"
@@ -3580,6 +3581,19 @@ export type Database = {
         }
         Returns: Json
       }
+      create_rooms_bulk: {
+        Args: {
+          p_capacity?: number
+          p_event_id: string
+          p_hotel_id: string
+          p_max_capacity?: number | null
+          p_prefix?: string
+          p_qty: number
+          p_room_type: string
+          p_start_number: number
+        }
+        Returns: Json
+      }
       issue_access_code: {
         Args: {
           p_event_id: string
@@ -3950,6 +3964,7 @@ export const Constants = {
         "hospitality",
         "hamper",
         "production",
+        "rsvp",
       ],
       side: ["bride", "groom", "both", "other"],
       travel_direction: ["arrival", "departure"],

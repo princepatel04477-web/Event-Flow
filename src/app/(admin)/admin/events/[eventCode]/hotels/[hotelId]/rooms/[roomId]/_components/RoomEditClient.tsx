@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { updateRoom } from '@/lib/actions/hotels'
 import { lostResponseMessage } from '@/lib/errors'
+import { ROOM_TYPE_LABELS, ROOM_TYPES } from '@/lib/rooms/room-type'
 
 interface Props {
   roomId: string; eventId: string; eventCode: string; hotelId: string
@@ -68,7 +69,7 @@ export function RoomEditClient({ roomId, eventId, eventCode, hotelId, initial }:
             onChange={e => setRoomType(e.target.value)}
             className="tap min-h-14 rounded-xl border border-rule-strong bg-surface px-4 text-base text-ink"
           >
-            <option value="">Select…</option><option value="Standard">Standard</option><option value="Deluxe">Deluxe</option><option value="Suite">Suite</option><option value="Twin">Twin</option>
+            <option value="">Select…</option>{ROOM_TYPES.map((t) => (<option key={t} value={t}>{ROOM_TYPE_LABELS[t]}</option>))}
           </select>
         </label>
         <label className="flex flex-col gap-1.5">

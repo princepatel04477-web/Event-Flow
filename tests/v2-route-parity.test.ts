@@ -104,8 +104,20 @@ const NEW_IN_V11 = new Set([
   'help', // the "?" cheat sheet — a screen v1 has no counterpart for
 ])
 
+/**
+ * T6's rooming list is the third kind of new route, and the reason this is a
+ * set of its own rather than another name in `NEW_IN_V11`: the rooming list is
+ * a printable Hospitality table (hotel, room, type, family, pax, check-in,
+ * hamper) that no v1 screen ever rendered. v1 had the room board and the room
+ * sheet, not a per-guest list you hand to a hotel desk, so there is no legacy
+ * path for the parity check to find.
+ */
+const NEW_IN_T6 = new Set([
+  'hospitality/rooming-list', // printable rooming list — v1 never had one
+])
+
 /** Every route any session added that has no legacy counterpart at all. */
-const NEW_ROUTES = new Set([...NEW_IN_V8, ...NEW_IN_V11])
+const NEW_ROUTES = new Set([...NEW_IN_V8, ...NEW_IN_V11, ...NEW_IN_T6])
 
 /**
  * FIX-UI took the hospitality layout exception away.

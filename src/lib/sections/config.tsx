@@ -88,7 +88,7 @@ const ALL_DEPTS: StaffDepartment[] = [
  *
  * The bottom bar had seven entries for an event lead, which is past what the
  * bar can lay out — the `truncate` on the label was already load-bearing at
- * five. Hamper and Setup move into Rooms as borrowed children rather than
+ * five. Hamper and Setup move into Hospitality as borrowed children rather than
  * losing their routes, which is only safe now that `SectionTabs` renders a
  * second level; before it existed, a non-default child was unreachable and
  * promoting Hamper to a section was the only way to get to it.
@@ -133,7 +133,7 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     ],
   },
   logistics: {
-    id: 'logistics', label: 'Travel', tabLabel: 'Travel',
+    id: 'logistics', label: 'Logistics', tabLabel: 'Logistics',
     icon: <CarIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
     departments: ['management', 'logistics'],
@@ -146,14 +146,22 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     ],
   },
   hospitality: {
-    id: 'hospitality', label: 'Rooms', tabLabel: 'Rooms',
+    id: 'hospitality', label: 'Hospitality', tabLabel: 'Hospitality',
     icon: <BuildingIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
     departments: ['management', 'hospitality'],
     inTabBar: true,
     children: [
-      { segment: 'rooms', label: 'Rooms', icon: <BuildingIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
+      { segment: 'rooms', label: 'Hospitality', icon: <BuildingIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
       { segment: 'checkin', label: 'Check in / out', icon: <ClipboardCheckIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
+      // ADMIN ONLY, DELIBERATELY. Every row of this sheet is a door out of the
+      // section — the family head opens RSVP status, the hamper opens the hamper
+      // proof — and an `event_team` hospitality runner belongs to neither. Marked
+      // `['admin']` it renders only for an admin, so nothing on it is a control
+      // that bounces. A code-auth session is `event_team`, which means the people
+      // on the phones do NOT see this child; that is the intended audience, and
+      // the page guard repeats the same check so a typed URL cannot reach it.
+      { segment: 'rooming-list', label: 'Rooming list', icon: <ListIcon className="h-6 w-6" />, roles: ['admin'] },
       // Borrowed: lives at /{event}/hamper, shown here so an event lead does
       // not need a sixth tab to reach it.
       {
@@ -309,7 +317,7 @@ export function visibleChildren(
  * - A client gets nothing. They have one screen.
  * - An event lead (or admin) gets the five sections.
  * - A runner on a single department gets THEIR SECTION'S SCREENS as the bar.
- *   They used to get `[Home] [Travel]`, where Home redirected to Travel — a
+ *   They used to get `[Home] [Logistics]`, where Home redirected to Logistics — a
  *   two-tab bar with one working tab. Their four real screens sat in the strip
  *   above it instead. Promoting those to the bar means every tab a runner has
  *   is a place they actually work.

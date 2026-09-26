@@ -591,7 +591,7 @@ export function RoomsGridClient({ eventId, eventCode, access }: Props) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <PageTitle right={`${placedCount} / ${bedCount}`}>Rooms</PageTitle>
+        <PageTitle right={`${placedCount} / ${bedCount}`}>Hospitality</PageTitle>
         {/* The grid is the day-of rooms screen, but allocation was only
             reachable from check-in. Put the path here so staff can go from
             "who is unplaced" to "assign them" without leaving the section. */}

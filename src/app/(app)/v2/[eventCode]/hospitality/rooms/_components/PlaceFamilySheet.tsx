@@ -10,6 +10,7 @@ import { Row } from '@/components/ui/Row'
 import { Stepper } from '@/components/ui/Stepper'
 import { suggestRooms, type SuggestRoom } from '@/lib/allocate/suggest'
 import { compareRoomNumbers } from '@/lib/rooms/board'
+import { roomTypeLabel } from '@/lib/rooms/room-type'
 
 /** The room facts this sheet needs — a subset of the grid row. */
 export interface PlaceRoom {
@@ -17,6 +18,8 @@ export interface PlaceRoom {
   hotelId: string
   hotelName: string
   roomNumber: string
+  /** Stored vocabulary value (suite|standard|deluxe|king|queen), or null. */
+  roomType: string | null
   floor: string | null
   capacity: number
   maxCapacity: number
@@ -111,6 +114,12 @@ export function PlaceFamilySheet({ family, rooms, onClose, onPlace }: PlaceFamil
     return result.suggestions[0] ?? null
   }, [family, open, count])
 
+  // The scored engine answers with a room id and a reason, not a room type, so
+  // the type comes back off the row this sheet already holds.
+  const bestTypeLabel = best
+    ? roomTypeLabel(rooms.find((r) => r.roomId === best.room.id)?.roomType)
+    : null
+
   const pickable = useMemo(() => {
     const list = hotel === null ? open : open.filter((r) => r.hotelName === hotel)
     return [...list].sort((a, b) => {
@@ -158,7 +167,7 @@ export function PlaceFamilySheet({ family, rooms, onClose, onPlace }: PlaceFamil
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-base leading-snug font-semibold text-ink">
-                  Room {best.room.roomNumber} · {best.room.hotelName}
+                  Room {best.room.roomNumber}{bestTypeLabel ? <span className="ml-1.5 align-middle text-xs font-medium text-subtle">{bestTypeLabel}</span> : null} · {best.room.hotelName}
                 </span>
                 <span className="mt-0.5 line-clamp-2 block text-sm leading-snug text-muted">
                   {reasonTail(best.reason, best.room.roomNumber)}
@@ -197,10 +206,12 @@ export function PlaceFamilySheet({ family, rooms, onClose, onPlace }: PlaceFamil
             <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
               {pickable.map((room) => {
                 const tight = room.freeBeds < count
+                const type = roomTypeLabel(room.roomType)
+                const heading = type ? `Room ${room.roomNumber} (${type})` : `Room ${room.roomNumber}`
                 return (
                   <li key={room.roomId}>
                     <Row
-                      heading={`Room ${room.roomNumber}`}
+                      heading={heading}
                       meta={`${room.hotelName}${room.floor ? ` · ${room.floor}` : ''}`}
                       status={tight ? (room.freeBeds <= 0 ? 'Full' : `${room.freeBeds} free`) : undefined}
                       tone={room.freeBeds <= 0 ? 'problem' : 'waiting'}

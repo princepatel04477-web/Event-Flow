@@ -2,13 +2,18 @@ import { notFound, redirect } from 'next/navigation'
 import { Suspense, type ReactNode } from 'react'
 
 import { UndoBar } from '@/components/ui/UndoBar'
+import { LockedSectionBanner } from '@/components/LockedSectionBanner'
+import { ArrivalBanner } from '@/components/ArrivalBanner'
+import { isArrivalsNotifyEnabled } from '@/lib/actions/arrivals'
 import { getSessionClaims } from '@/lib/auth/server'
 import { getRouteContext } from '@/lib/route-context'
 import { v3TabsFor } from '@/lib/sections/v3'
+import { sidebarGroupsFor } from '@/lib/sections/sidebar'
 import { getViewer } from '@/lib/supabase/queries'
 import { cn } from '@/lib/utils'
 
 import { AppHeader } from './_components/AppHeader'
+import { AppSidebar } from './_components/AppSidebar'
 import { AppTabs } from './_components/AppTabs'
 import { DeniedNote } from './_components/DeniedNote'
 
@@ -73,7 +78,12 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
   // so this cannot fire. It documents the invariant rather than assuming it.
   if (access === 'none') notFound()
 
-  // The v3 bar: Today · Calls · Rooms · Hampers · Travel, per-department
+  // The arrival banner's two server inputs: the admin's switch, and today's
+  // date (resolved here so the server and client agree on the day).
+  const arrivalsNotify = access !== 'client' && (await isArrivalsNotifyEnabled(event.id))
+  const today = new Date().toISOString().slice(0, 10)
+
+  // The v3 bar: Today · Calls · Hospitality · Hampers · Logistics, per-department
   // filtering intact. This is deliberately NOT `bottomTabsFor`, which still
   // serves the v1 shell (`(staff)/[eventCode]/layout.tsx`) and its pinned
   // tests; the two models share the `SECTIONS` table underneath. See
@@ -85,6 +95,12 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
   // written to fix in v1.
   const tabs = v3TabsFor(event.code, access, department)
   const showTabs = tabs.length > 0
+
+  // The desktop sidebar (>= 1024px). Resolved from the SAME SECTIONS table as
+  // the bar above, so the two cannot disagree about what this viewer may open.
+  // Empty for a client — they get no nav, exactly as they get no bottom bar.
+  const sidebar = sidebarGroupsFor(event.code, access, department)
+  const showSidebar = sidebar.length > 0
 
   /**
    * How much room the page must leave at the bottom.
@@ -109,13 +125,15 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
     // token names (see globals.css).
     <div
       data-theme={access === 'client' ? 'client' : undefined}
-      className="flex min-h-dvh flex-col bg-paper text-ink"
+      className={cn('flex min-h-dvh flex-col bg-paper text-ink', showSidebar && 'lg:pl-64')}
     >
       {/* NO OFFLINE BANNER HERE, DELIBERATELY. The root layout renders it,
           once, on every route, and only while the device is actually offline
           (`OfflineBanner` returns null otherwise) — so the v3 rule "keep ONE
           small offline pill, only when offline" is already satisfied by that
           one component. This shell used to render a second one. */}
+
+      {showSidebar ? <AppSidebar groups={sidebar} /> : null}
 
       <AppHeader
         event={{
@@ -145,6 +163,7 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
           className={cn(
             'mx-auto flex w-full min-w-0 max-w-[480px] flex-1 flex-col overflow-x-hidden px-4 pt-3',
             contentBottom,
+            showSidebar && 'lg:mx-0 lg:max-w-none lg:px-8 lg:pb-8',
           )}
         >
           {/* A refused tap lands on the viewer's OWN department home, and says
@@ -155,6 +174,19 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
           <Suspense fallback={null}>
             <DeniedNote />
           </Suspense>
+          {/* Arrival notices (A9): Today and Logistics, live. Renders nothing
+              when there is nothing to say or the admin switched it off. */}
+          <ArrivalBanner
+            eventId={event.id}
+            eventCode={event.code}
+            date={today}
+            enabled={arrivalsNotify}
+          />
+          {/* Read-only section notice (A8), for the field team only. An admin
+              is the one who set the lock and never needs telling. */}
+          {access === 'event_team' ? (
+            <LockedSectionBanner eventId={event.id} eventCode={event.code} />
+          ) : null}
           {children}
         </div>
       </main>

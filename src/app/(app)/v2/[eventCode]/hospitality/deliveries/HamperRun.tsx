@@ -116,6 +116,14 @@ export function HamperRun({
    * same as walking back down the corridor.
    */
   const [skipped, setSkipped] = useState<readonly string[]>([])
+  /**
+   * The full register, on demand — every hamper, delivered ones included.
+   *
+   * The run is the screen's default because it is the job; this is the answer to
+   * "which 34?" that the progress tile offers. Not persisted: walking away and
+   * coming back puts a runner in front of their round, which is where they work.
+   */
+  const [fullList, setFullList] = useState(false)
 
   const router = useRouter()
 
@@ -202,6 +210,19 @@ export function HamperRun({
   const next = visible[0] ?? null
   const rest = visible.slice(1)
 
+  // Every hamper, in the order a person walks: hotel, then floor, then room.
+  const allRows = useMemo(
+    () =>
+      [...rows].sort((a, b) => {
+        const h = (a.hotel_name ?? '').localeCompare(b.hotel_name ?? '')
+        if (h !== 0) return h
+        const f = (a.floor ?? '').localeCompare(b.floor ?? '')
+        if (f !== 0) return f
+        return (a.room_number ?? '').localeCompare(b.room_number ?? '')
+      }),
+    [rows],
+  )
+
   const detailHref = (row: DeliveryRunRow) => `/${eventCode}/${detailBase}/${row.id}`
 
   return (
@@ -209,7 +230,30 @@ export function HamperRun({
     // hamper team) has no tab bar, and the bar lifts itself above one when it
     // exists — so this is the only clearance the screen needs.
     <div className="flex flex-col gap-5 pb-bottombar">
-      <Progress label="Hampers delivered" done={delivered} total={rows.length} tone="amber" />
+      {/* The progress tile is a door, not a label. Tapping it opens the FULL
+          register — every hamper on the event, delivered ones included, in
+          walking order — because the number "34/74" makes a runner ask "which
+          34?", and a tile that answers nothing is the dead end this rebuild is
+          written against. It also clears the two filters on the way in, since a
+          full list that is quietly filtered is the failure mode it exists to
+          fix. The bar stays a `progressbar` inside the button: the button is the
+          affordance, the bar is the number. */}
+      <button
+        type="button"
+        onClick={() => {
+          setHotel(null)
+          setKind(null)
+          setFullList((prev) => !prev)
+        }}
+        aria-expanded={fullList}
+        aria-label="Show every hamper on this event"
+        className="tap rounded-2xl border border-rule-strong bg-surface p-3.5 text-left transition-colors duration-press ease-ledger active:bg-surface-2"
+      >
+        <Progress label="Hampers delivered" done={delivered} total={rows.length} tone="amber" />
+        <span className="mt-2 block text-sm font-medium text-muted">
+          {fullList ? 'Showing every hamper · tap to go back to the round' : 'Tap to see every hamper'}
+        </span>
+      </button>
 
       {/* ONE control for the filter, right under the number it filters. */}
       <div className="flex items-center justify-between gap-3">
@@ -267,6 +311,36 @@ export function HamperRun({
             ) : undefined
           }
         />
+      ) : fullList ? (
+        <section className="flex flex-col gap-2">
+          <h2 className="eyebrow">Every hamper · {allRows.length}</h2>
+          {/* The same `Row` as the round below, with no skip treatment: this
+              list is the record, not the round. Every row opens its proof —
+              including the delivered ones, which is the whole point of the
+              tile that opens it. */}
+          <ul className="overflow-hidden rounded-2xl border border-rule bg-surface">
+            {allRows.map((row) => (
+              <li key={row.id}>
+                <Row
+                  heading={displayName(row)}
+                  meta={rowMeta(row)}
+                  badge={<RoomBadge roomNumber={row.room_number} />}
+                  status={row.status === 'delivered' ? 'Delivered' : rowStatus(row, skipped)}
+                  tone={
+                    row.status === 'delivered'
+                      ? 'done'
+                      : row.room_number
+                        ? 'waiting'
+                        : 'problem'
+                  }
+                  onPress={() => {
+                    router.push(detailHref(row))
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : visible.length === 0 ? (
         <EmptyState
           icon={<GiftIcon className="h-7 w-7" />}
@@ -330,7 +404,7 @@ export function HamperRun({
         </>
       )}
 
-      {deliveredRows.length > 0 ? (
+      {!fullList && deliveredRows.length > 0 ? (
         <section className="flex flex-col gap-2">
           <h2 className="eyebrow">Delivered · {deliveredRows.length}</h2>
           <ul className="overflow-hidden rounded-2xl border border-rule bg-surface">

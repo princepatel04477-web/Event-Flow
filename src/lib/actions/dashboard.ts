@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { perRequest } from '@/lib/request-cache'
 import { PERF_BASELINE } from '@/lib/supabase/queries'
+import { RSVP_BUCKETS, type RsvpBucketId } from '@/lib/rsvp-buckets'
 import { ttlCache } from '@/lib/ttl-cache'
 
 // Dashboard counters are 30s-stale at worst. Every row of this module pays
@@ -198,6 +199,86 @@ function projectBoard(d: Record<string, unknown>): BoardRow {
 
 export async function readDashboard(eventId: string): Promise<DashboardRow | null> {
   return readBoard(eventId)
+}
+
+// ---------------------------------------------------------------------------
+// RSVP confirmation tabs (A7) — per-bucket PAX, family count and list
+// ---------------------------------------------------------------------------
+
+export interface RsvpBucketFamily {
+  groupId: string
+  headName: string
+  pax: number
+}
+
+export interface RsvpBucket {
+  id: RsvpBucketId
+  label: string
+  /** One per family, never PAX: the two are always shown side by side. */
+  families: number
+  /** `confirmed_pax`, falling back to `expected_pax`. */
+  pax: number
+  /** The largest families first — the ones a coordinator is looking for. */
+  people: RsvpBucketFamily[]
+}
+
+const BUCKET_IDS = new Set<RsvpBucketId>(RSVP_BUCKETS.map((b) => b.id))
+
+/** A hand-written shim, because `database.types.ts` is generated — see above. */
+type BucketQueryResult = {
+  data: Array<Record<string, unknown>> | null
+  error: { code?: string; message?: string } | null
+}
+type UntypedBuckets = {
+  from: (relation: string) => {
+    select: (columns: string) => {
+      eq: (column: string, value: string) => Promise<BucketQueryResult>
+    }
+  }
+}
+
+/**
+ * Every family, bucketed for the confirmation tabs, in ONE read of
+ * `v_event_rsvp_buckets` (migration 20260925130000).
+ *
+ * A failed or not-yet-applied view returns five empty buckets rather than
+ * throwing: the tabs are a refinement of a dashboard that already renders its
+ * own load-failure state, and an empty tab is the honest "nothing is here".
+ */
+export async function readRsvpBreakdown(eventId: string): Promise<RsvpBucket[]> {
+  const buckets = new Map<RsvpBucketId, RsvpBucket>(
+    RSVP_BUCKETS.map((b) => [b.id, { id: b.id, label: b.label, families: 0, pax: 0, people: [] }]),
+  )
+
+  try {
+    const supabase = await createClient()
+    const { data } = await (supabase as unknown as UntypedBuckets)
+      .from('v_event_rsvp_buckets')
+      .select('group_id, head_name, pax, bucket')
+      .eq('event_id', eventId)
+
+    for (const row of data ?? []) {
+      const id = row.bucket as RsvpBucketId
+      const bucket = BUCKET_IDS.has(id) ? buckets.get(id) : undefined
+      if (!bucket) continue
+      const pax = typeof row.pax === 'number' ? row.pax : 0
+      bucket.families += 1
+      bucket.pax += pax
+      bucket.people.push({
+        groupId: String(row.group_id),
+        headName: String(row.head_name ?? 'Unnamed family'),
+        pax,
+      })
+    }
+  } catch {
+    // Five empty buckets, already built above.
+  }
+
+  for (const bucket of buckets.values()) {
+    bucket.people.sort((a, b) => b.pax - a.pax || a.headName.localeCompare(b.headName))
+  }
+
+  return RSVP_BUCKETS.map((b) => buckets.get(b.id)!)
 }
 // ---------------------------------------------------------------------------
 // Today panel — arrivals/departures detail

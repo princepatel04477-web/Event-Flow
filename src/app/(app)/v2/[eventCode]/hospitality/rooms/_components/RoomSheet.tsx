@@ -7,6 +7,7 @@ import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
 import { Row } from '@/components/ui/Row'
 import { bedsLabel, compareRoomNumbers, matchesTerm } from '@/lib/rooms/board'
+import { roomTypeLabel } from '@/lib/rooms/room-type'
 import { initials } from '@/lib/ui/metrics'
 import { cn } from '@/lib/utils'
 
@@ -26,6 +27,8 @@ export interface SheetRoom {
   hotelId: string
   hotelName: string
   roomNumber: string
+  /** Stored vocabulary value (suite|standard|deluxe|king|queen), or null. */
+  roomType: string | null
   floor: string | null
   capacity: number
   freeBeds: number
@@ -152,6 +155,7 @@ export function RoomSheet({
   if (room === null) return null
 
   const occupied = room.occupants.length
+  const typeLabel = roomTypeLabel(room.roomType)
   const title = `${room.hotelName} · Room ${room.roomNumber}`
   const pickedOccupant = room.occupants.find((o) => o.assignmentId === picked) ?? null
   const lonelySingle =
@@ -164,8 +168,13 @@ export function RoomSheet({
       <div className="flex flex-col gap-4">
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="figure text-3xl leading-none font-semibold text-ink">
-              {room.roomNumber}
+            <p className="flex items-baseline gap-2">
+              <span className="figure text-3xl leading-none font-semibold text-ink">
+                {room.roomNumber}
+              </span>
+              {typeLabel ? (
+                <span className="text-sm font-medium text-subtle">{typeLabel}</span>
+              ) : null}
             </p>
             <p className="mt-1.5 truncate text-sm text-muted">
               {room.hotelName}

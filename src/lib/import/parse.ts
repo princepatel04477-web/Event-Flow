@@ -243,3 +243,37 @@ export function forwardFillGroupColumns(
     return { ...row, cells }
   })
 }
+
+export interface WorkbookSheets {
+  /** Every tab name, in workbook order. */
+  availableSheets: string[]
+  /** Every sheet's raw grid, in the same order. */
+  sheets: SheetGrid[]
+}
+
+/**
+ * Reads EVERY sheet of a workbook into raw grids — one pass.
+ *
+ * The importer used to demand one named tab (`Sheet1`) and to re-open the file
+ * for each layout it tried: three parses of the same bytes, and a hard stop the
+ * moment the tab was called anything else. The app's own export is exactly that
+ * case — its guest list sits on a tab named "Guest Master", so the round trip
+ * the export is built for died at the door with `no sheet named "Sheet1"`.
+ *
+ * Reading them all once lets the caller find the known layout wherever it
+ * actually sits, and costs one pass instead of three.
+ */
+export async function readWorkbookSheets(file: File): Promise<WorkbookSheets> {
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: false })
+  const availableSheets = [...workbook.SheetNames]
+
+  return {
+    availableSheets,
+    sheets: availableSheets.map((name) => ({
+      sheetName: name,
+      availableSheets,
+      grid: readGrid(workbook.Sheets[name]),
+    })),
+  }
+}

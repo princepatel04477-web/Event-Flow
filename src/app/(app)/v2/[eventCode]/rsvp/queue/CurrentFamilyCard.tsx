@@ -2,9 +2,12 @@
 
 import { PhoneIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
+import { StatusPill } from '@/components/ui/StatusPill'
 import type { LockNote } from '@/lib/lock'
 import { dialTarget } from '@/lib/native-call'
 import { SIDE_LABELS } from '@/lib/review/payload'
+import { rsvpStatusLabel } from '@/lib/rsvp'
+import { statusTone } from '@/lib/status'
 import { cn, formatDateTime } from '@/lib/utils'
 
 import type { QueueRow, Side } from './types'
@@ -64,6 +67,19 @@ export function CurrentFamilyCard({
           <h2 className="line-clamp-2 text-xl leading-tight font-semibold break-words text-ink font-display">
             {headName}
           </h2>
+          {/*
+            The family's calling status, ON the call screen. It was only ever
+            rendered inside the "all families" sheet, so logging an outcome
+            changed nothing the caller could see without opening that sheet -
+            which is how "the status does not update" got reported. The queue
+            row is patched optimistically before the write leaves the phone,
+            so this pill flips on the tap.
+          */}
+          <div className="mt-1.5">
+            <StatusPill tone={statusTone(row.rsvp_status)}>
+              {rsvpStatusLabel(row.rsvp_status)}
+            </StatusPill>
+          </div>
           <p className="mt-1 text-sm text-muted">{metaLine}</p>
           {attempts > 0 ? (
             <p className="mt-0.5 text-xs text-subtle">

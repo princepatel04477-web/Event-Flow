@@ -122,6 +122,16 @@ export const queryKeys = {
   hospitality: {
     /** The check-in / check-out board. */
     checkIn: (eventId: string) => eventKey(eventId, 'hospitality', 'checkin'),
+    /**
+     * The rooming list — one row per room × family.
+     *
+     * A key of its own rather than a reuse of `rooms.grid`: the two reads
+     * answer different questions from different shapes (the grid is a card per
+     * ROOM, this is a line per room × family with the check-in stamp and the
+     * hamper id the grid does not carry), and two shapes under one key is the
+     * failure this file's header warns about.
+     */
+    roomingList: (eventId: string) => eventKey(eventId, 'hospitality', 'rooming-list'),
   },
 
   rooms: {

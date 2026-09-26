@@ -8,7 +8,7 @@ import { getEventAccess, resolveEventByCode } from '@/lib/supabase/queries'
 import { RoomsBoard } from './RoomsBoard'
 
 export const metadata: Metadata = {
-  title: 'Rooms',
+  title: 'Hospitality',
 }
 
 type PageProps = {

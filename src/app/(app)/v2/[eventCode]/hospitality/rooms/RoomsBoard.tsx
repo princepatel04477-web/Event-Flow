@@ -1,11 +1,13 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ChevronRightIcon, SearchIcon } from '@/components/icons'
 import { BottomBar } from '@/components/ui/BottomBar'
+import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
+import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { LinkButton } from '@/components/ui/LinkButton'
@@ -14,6 +16,7 @@ import { Pressable } from '@/components/ui/Pressable'
 import { Progress } from '@/components/ui/Progress'
 import { Row } from '@/components/ui/Row'
 import { Segmented } from '@/components/ui/Segmented'
+import { Select } from '@/components/ui/Select'
 import {
   assignGuestToRoom,
   assignGuestsToRoom,
@@ -30,6 +33,21 @@ import { roomGuardMessage } from '@/lib/errors'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { queryKeys } from '@/lib/query/keys'
 import { groupRoomsByHotelFloor, matchesTerm, waitingLabel } from '@/lib/rooms/board'
+import {
+  activeRoomFilterCount,
+  matchesRoomFilters,
+  OCCUPANCY_LABELS,
+  OCCUPANCY_STATUSES,
+  occupancyStatus,
+  roomFilterCounts,
+  toggleInList,
+  type OccupancyStatus,
+  type RoomFilterable,
+  type RoomFilterCounts,
+  type RoomFilters,
+} from '@/lib/rooms/filters'
+import { ROOM_TYPES, ROOM_TYPE_LABELS, roomTypeLabel, type RoomType } from '@/lib/rooms/room-type'
+import { useStoredVenue } from '@/lib/rooms/venue'
 import { initials } from '@/lib/ui/metrics'
 import { cn } from '@/lib/utils'
 
@@ -107,6 +125,23 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
   })
 
   const grid = data ?? EMPTY_GRID
+
+  // -------------------------------------------------------------------------
+  // Room filters (the one "Filter · n" sheet, plus the remembered venue)
+  // -------------------------------------------------------------------------
+
+  // `filters` deliberately never carries a hotel: the venue is a single,
+  // device-remembered choice and lives in its own hook, so the two controls
+  // (the selector at the top, the Venue chips in the sheet) cannot disagree.
+  const [filters, setFilters] = useState<RoomFilters>({ types: [], hotels: [], statuses: [] })
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [venue, chooseVenue] = useStoredVenue(eventId)
+
+  const effectiveFilters = useMemo<RoomFilters>(
+    () => ({ ...filters, hotels: venue ? [venue] : [] }),
+    [filters, venue],
+  )
+  const activeFilters = activeRoomFilterCount(effectiveFilters)
 
   // -------------------------------------------------------------------------
   // The four reversible writes this screen makes — unchanged from v2
@@ -398,20 +433,45 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
 
   const roomsShown = useMemo(
     () =>
-      grid.rooms.filter((room) =>
-        matchesTerm(
-          term,
-          room.roomNumber,
-          room.hotelName,
-          room.floor,
-          ...room.occupants.map((o) => o.headName),
-          ...room.occupants.map((o) => o.guestName),
-        ),
+      grid.rooms.filter(
+        (room) =>
+          matchesTerm(
+            term,
+            room.roomNumber,
+            room.roomType,
+            room.hotelName,
+            room.floor,
+            ...room.occupants.map((o) => o.headName),
+            ...room.occupants.map((o) => o.guestName),
+          ) && matchesRoomFilters(roomFacts(room), effectiveFilters),
       ),
-    [grid.rooms, term],
+    [grid.rooms, term, effectiveFilters],
   )
 
   const hotels = useMemo(() => groupRoomsByHotelFloor(roomsShown), [roomsShown])
+
+  // The venue selector's options, in first-seen order, from EVERY room — a
+  // venue must not vanish from the list just because the current filter hides
+  // all of its rooms, or it could never be un-chosen.
+  const venueOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const room of grid.rooms) if (!seen.has(room.hotelId)) seen.set(room.hotelId, room.hotelName)
+    return [...seen.entries()].map(([value, label]) => ({ value, label }))
+  }, [grid.rooms])
+
+  // The numbers on every chip, faceted against the filters on the other
+  // dimensions (see `roomFilterCounts`).
+  const filterFacets = useMemo(
+    () => roomFilterCounts(grid.rooms.map(roomFacts), effectiveFilters),
+    [grid.rooms, effectiveFilters],
+  )
+
+  // What the sheet's primary button promises: the rooms left after the filters,
+  // before the search box (which the sheet does not touch).
+  const filteredRoomCount = useMemo(
+    () => grid.rooms.filter((room) => matchesRoomFilters(roomFacts(room), effectiveFilters)).length,
+    [grid.rooms, effectiveFilters],
+  )
 
   const sheetRooms = useMemo(
     () =>
@@ -420,6 +480,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
         hotelId: room.hotelId,
         hotelName: room.hotelName,
         roomNumber: room.roomNumber,
+        roomType: room.roomType,
         floor: room.floor,
         capacity: room.capacity,
         maxCapacity: room.maxCapacity,
@@ -475,12 +536,48 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
               total={grid.totals.confirmedGuests}
               tone="brand"
             />
-            <p className="text-sm leading-snug text-muted">
-              {bedLine(grid.totals.bedsFree, waiting.length)}
-            </p>
+            {/* The two figures in this card are the screen's count tiles, and
+                each is a door into the list behind it: the bar into the rooms
+                (a bed is a room), the waiting line into the families still to
+                place. They were prose before — the numbers a coordinator reads
+                first and could not act on. Two buttons, never nested: the
+                second is a sibling, not a child of the first. */}
+            <div className="flex items-stretch gap-2">
+              <button
+                type="button"
+                onClick={() => setTab('rooms')}
+                aria-pressed={tab === 'rooms'}
+                className="tap min-h-11 min-w-0 flex-1 rounded-xl border border-rule-strong px-3 py-2 text-left text-sm text-muted transition-colors duration-press ease-ledger active:bg-surface-2"
+              >
+                {grid.totals.bedsFree} {grid.totals.bedsFree === 1 ? 'bed' : 'beds'} free
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab('waiting')}
+                aria-pressed={tab === 'waiting'}
+                className="tap min-h-11 min-w-0 flex-1 rounded-xl border border-rule-strong px-3 py-2 text-left text-sm text-muted transition-colors duration-press ease-ledger active:bg-surface-2"
+              >
+                {waiting.length === 0
+                  ? 'Every family has a bed'
+                  : `${waiting.length} ${waiting.length === 1 ? 'family' : 'families'} waiting`}
+              </button>
+            </div>
           </>
         )}
       </section>
+
+      {/* The venue you are standing in — one choice, remembered on this
+          device, because on a two-hotel event the coordinator at the Grand is
+          rarely the one at the Sea View. Hidden on a single-venue event, where
+          it would be a control with one answer. */}
+      {venueOptions.length > 1 ? (
+        <Select
+          label="Venue"
+          value={venue ?? ''}
+          onChange={(event) => chooseVenue(event.target.value || null)}
+          options={[{ value: '', label: 'All venues' }, ...venueOptions]}
+        />
+      ) : null}
 
       {planError ? (
         <p
@@ -539,6 +636,32 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
         />
       </label>
 
+      {/* One control for every room filter, and the count is the number of
+          active choices, so a filter that is on is never invisible. It stays
+          visible on the Waiting tab too — the two share one selection. */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setFilterOpen(true)}
+          aria-haspopup="dialog"
+          className="tap inline-flex min-h-11 items-center gap-2 rounded-full border border-rule-strong bg-surface px-4 text-sm font-semibold text-ink transition-colors duration-press ease-ledger active:bg-surface-2"
+        >
+          Filter{activeFilters > 0 ? ` · ${activeFilters}` : ''}
+        </button>
+        {activeFilters > 0 ? (
+          <button
+            type="button"
+            onClick={() => {
+              setFilters({ types: [], hotels: [], statuses: [] })
+              chooseVenue(null)
+            }}
+            className="tap min-h-11 px-3 text-sm font-medium text-muted underline"
+          >
+            Clear
+          </button>
+        ) : null}
+      </div>
+
       {stale ? (
         <p role="status" className="text-xs text-muted">
           Updating…
@@ -588,6 +711,25 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
         onMove={move.run}
         onRemove={remove.run}
         onAdd={add.run}
+      />
+
+      <RoomFilterSheet
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        filters={effectiveFilters}
+        facet={filterFacets}
+        resultCount={filteredRoomCount}
+        venue={venue}
+        venueOptions={venueOptions}
+        onToggleType={(type) => setFilters((f) => ({ ...f, types: toggleInList(f.types, type) }))}
+        onToggleStatus={(status) =>
+          setFilters((f) => ({ ...f, statuses: toggleInList(f.statuses, status) }))
+        }
+        onChooseVenue={chooseVenue}
+        onClear={() => {
+          setFilters({ types: [], hotels: [], statuses: [] })
+          chooseVenue(null)
+        }}
       />
 
       <BottomBar
@@ -733,6 +875,7 @@ function RoomsGrid({ hotels, hasRooms, onOpen }: RoomsGridProps) {
 
   return (
     <div className="flex flex-col gap-6">
+      <OccupancyLegend />
       {hotels.map((hotel) => (
         <section key={hotel.hotelId} className="flex flex-col gap-3">
           {hotels.length > 1 || hotel.floors.length > 1 ? (
@@ -768,19 +911,21 @@ function RoomsGrid({ hotels, hasRooms, onOpen }: RoomsGridProps) {
 /** One room in the grid. Whole card is the tap target. */
 function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) => void }) {
   const occupied = room.occupants.length
+  const typeLabel = roomTypeLabel(room.roomType)
   const beds = Math.max(room.capacity, occupied)
   const heads = [...new Set(room.occupants.map((o) => o.headName))]
   const names = [...new Set(room.occupants.map((o) => firstName(o.guestName)))]
+  const status = occupancyStatus(roomFacts(room))
 
   return (
     <Pressable
-      aria-label={`Room ${room.roomNumber}, ${occupied} of ${room.capacity} beds, ${
-        names.length === 0 ? 'empty' : names.join(', ')
-      }`}
+      aria-label={`Room ${room.roomNumber}${typeLabel ? ` ${typeLabel}` : ''}, ${
+        occupied === 0 ? 'empty' : `${OCCUPANCY_LABELS[status]}, ${occupied} of ${room.capacity} beds`
+      }${names.length === 0 ? '' : `, ${names.join(', ')}`}`}
       onPress={() => onOpen(room.roomId)}
       className={cn(
         'flex h-full min-h-[6.5rem] w-full flex-col gap-2 rounded-2xl border bg-surface p-3 text-left',
-        room.isBlocked ? 'border-rule opacity-70' : 'border-rule-strong',
+        room.isBlocked ? 'border-rule opacity-70' : OCCUPANCY_BORDER[status],
       )}
     >
       {/* `min-w-0 truncate` on the number and `shrink-0` on the status: a
@@ -788,16 +933,21 @@ function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) =
           360px card, and without these the flex row pushes its own status
           label out of the card instead of ellipsising the number. */}
       <span className="flex items-baseline justify-between gap-2">
-        <span className="figure min-w-0 truncate text-xl leading-none font-semibold text-ink">
-          {room.roomNumber}
+        <span className="flex min-w-0 items-baseline gap-1.5">
+          <span className="figure min-w-0 truncate text-xl leading-none font-semibold text-ink">
+            {room.roomNumber}
+          </span>
+          {typeLabel ? (
+            <span className="shrink-0 text-xs font-medium text-subtle">{typeLabel}</span>
+          ) : null}
         </span>
         {room.isBlocked ? (
           <span className="shrink-0 text-xs font-medium text-muted">Out</span>
-        ) : occupied === 0 ? (
-          <span className="shrink-0 text-xs font-medium text-subtle">Empty</span>
-        ) : room.freeBeds === 0 ? (
-          <span className="shrink-0 text-xs font-medium text-ledger-green">Full</span>
-        ) : null}
+        ) : (
+          <span className={cn('shrink-0 text-xs font-semibold', OCCUPANCY_TEXT[status])}>
+            {OCCUPANCY_LABELS[status]}
+          </span>
+        )}
       </span>
 
       {/* One square per bed: filled = taken, outlined = free. A blocked room
@@ -833,6 +983,13 @@ function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) =
               <span className="mt-0.5 block text-xs text-muted">Shared</span>
             ) : null}
           </>
+        )}
+        {/* The exact bed count, because the squares are a shape you read at a
+            glance and "3 of 3 beds" is the number a coordinator repeats back. */}
+        {room.isBlocked ? null : (
+          <span className="mt-0.5 block text-xs text-muted">
+            {occupied}/{room.capacity} beds
+          </span>
         )}
       </span>
     </Pressable>
@@ -889,6 +1046,180 @@ function displayName(headName: string | null | undefined): string {
 /** The first word of a name — what fits on a 164px card. */
 function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] || name
+}
+
+// ---------------------------------------------------------------------------
+// Room filters — the pure parts live in `@/lib/rooms/filters`; these are the
+// pixels: the colour key, the "Filter · n" sheet, and the row adapter.
+// ---------------------------------------------------------------------------
+
+/**
+ * A room, as the filter arithmetic sees it. `GridRoom` carries `occupants`
+ * (the rows) but no bed count, so the two are reconciled here, once, and both
+ * the filter test and the chip counts read the same shape.
+ */
+function roomFacts(room: GridRoom): RoomFilterable {
+  return {
+    roomType: room.roomType,
+    hotelId: room.hotelId,
+    capacity: room.capacity,
+    occupied: room.occupants.length,
+  }
+}
+
+/** Occupancy -> the ledger colour the card's status word takes. */
+const OCCUPANCY_TEXT: Record<OccupancyStatus, string> = {
+  empty: 'text-ledger-green',
+  partly: 'text-ledger-amber',
+  full: 'text-ledger-red',
+}
+
+/**
+ * Occupancy -> the card's border. A tint, not a fill: the bed squares are the
+ * data, and a card washed in colour behind them fights its own contents.
+ */
+const OCCUPANCY_BORDER: Record<OccupancyStatus, string> = {
+  empty: 'border-ledger-green/45',
+  partly: 'border-ledger-amber/50',
+  full: 'border-ledger-red/45',
+}
+
+/** The solid dot for the key below the grid. */
+const OCCUPANCY_DOT: Record<OccupancyStatus, string> = {
+  empty: 'bg-ledger-green',
+  partly: 'bg-ledger-amber',
+  full: 'bg-ledger-red',
+}
+
+/** Three words and three swatches, so the border colours are not a guess. */
+function OccupancyLegend() {
+  return (
+    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Room occupancy key">
+      {OCCUPANCY_STATUSES.map((status) => (
+        <li key={status} className="flex items-center gap-1.5 text-xs text-muted">
+          <span aria-hidden className={cn('h-2.5 w-2.5 rounded-full', OCCUPANCY_DOT[status])} />
+          {OCCUPANCY_LABELS[status]}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+interface RoomFilterSheetProps {
+  open: boolean
+  onClose: () => void
+  /** What is currently applied, including the venue. */
+  filters: RoomFilters
+  facet: RoomFilterCounts
+  /** Rooms left after the filters — the promise on the primary button. */
+  resultCount: number
+  venue: string | null
+  venueOptions: readonly { value: string; label: string }[]
+  onToggleType: (type: RoomType) => void
+  onToggleStatus: (status: OccupancyStatus) => void
+  onChooseVenue: (venueId: string | null) => void
+  onClear: () => void
+}
+
+/**
+ * The one filter sheet (SPEC A5).
+ *
+ * A single sheet rather than a row of chips on the board: with three dimensions
+ * and up to six values each, an inline chip row is a wall that pushes the grid
+ * below the fold on a 390px screen. The count on every chip is a facet count
+ * (see `roomFilterCounts`), so choosing "Deluxe" leaves the "Suite" and "King"
+ * chips showing what they would still find.
+ */
+function RoomFilterSheet({
+  open,
+  onClose,
+  filters,
+  facet,
+  resultCount,
+  venue,
+  venueOptions,
+  onToggleType,
+  onToggleStatus,
+  onChooseVenue,
+  onClear,
+}: RoomFilterSheetProps) {
+  const active = activeRoomFilterCount(filters)
+
+  return (
+    <BottomSheet open={open} onClose={onClose} label="Filter rooms">
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-ink">Filter rooms</h2>
+          {active > 0 ? (
+            <button
+              type="button"
+              onClick={onClear}
+              className="tap min-h-11 px-2 text-sm font-medium text-brand underline"
+            >
+              Clear all
+            </button>
+          ) : null}
+        </div>
+
+        <FilterSection title="Type">
+          {ROOM_TYPES.map((type) => (
+            <Chip
+              key={type}
+              selected={filters.types.includes(type)}
+              onClick={() => onToggleType(type)}
+            >
+              {ROOM_TYPE_LABELS[type]}
+              <span className="figure ml-1.5 font-normal">({facet.types[type]})</span>
+            </Chip>
+          ))}
+        </FilterSection>
+
+        {venueOptions.length > 1 ? (
+          <FilterSection title="Venue">
+            {venueOptions.map((option) => (
+              <Chip
+                key={option.value}
+                selected={venue === option.value}
+                onClick={() => onChooseVenue(venue === option.value ? null : option.value)}
+              >
+                {option.label}
+                <span className="figure ml-1.5 font-normal">
+                  ({facet.hotels[option.value] ?? 0})
+                </span>
+              </Chip>
+            ))}
+          </FilterSection>
+        ) : null}
+
+        <FilterSection title="Status">
+          {OCCUPANCY_STATUSES.map((status) => (
+            <Chip
+              key={status}
+              selected={filters.statuses.includes(status)}
+              onClick={() => onToggleStatus(status)}
+            >
+              {OCCUPANCY_LABELS[status]}
+              <span className="figure ml-1.5 font-normal">({facet.statuses[status]})</span>
+            </Chip>
+          ))}
+        </FilterSection>
+
+        <Button variant="primary" fullWidth onClick={onClose}>
+          {resultCount === 1 ? 'Show 1 room' : `Show ${resultCount} rooms`}
+        </Button>
+      </div>
+    </BottomSheet>
+  )
+}
+
+/** A titled group of chips. */
+function FilterSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-2.5">
+      <h3 className="eyebrow text-muted">{title}</h3>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </section>
+  )
 }
 
 export default RoomsBoard

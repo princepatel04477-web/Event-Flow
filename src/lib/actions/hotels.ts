@@ -2,6 +2,7 @@
 
 import { z } from 'zod'
 
+import { ROOM_TYPES, normaliseRoomType } from '@/lib/rooms/room-type'
 import { createClient } from '@/lib/supabase/server'
 import { getEventAccess } from '@/lib/supabase/queries'
 
@@ -190,14 +191,24 @@ export async function deleteHotel(hotelId: string, eventId: string) {
 // Rooms
 // ---------------------------------------------------------------------------
 
-const createRoomRangeSchema = z.object({
+/**
+ * The bulk-create payload. Mirrors create_rooms_bulk()'s named arguments,
+ * minus event_id/hotel_id which travel as function arguments.
+ *
+ * `roomType` is a closed enum, not a free string: the database CHECK rejects
+ * anything else, and a write of ten rooms should fail once with a readable
+ * message rather than ten times with a constraint name.
+ */
+const createRoomBulkSchema = z.object({
+  roomType: z.enum(ROOM_TYPES),
+  qty: z
+    .number()
+    .int()
+    .min(1, 'Quantity must be at least 1')
+    .max(500, 'At most 500 rooms at a time'),
+  startNumber: z.number().int().min(0, 'Starting number must be 0 or more'),
   prefix: z.string().default(''),
-  start: z.number().int().min(0),
-  end: z.number().int().min(0),
-  roomType: z.string().nullable().optional(),
-  floor: z.string().nullable().optional(),
   capacity: z.number().int().min(1).default(2),
-  notes: z.string().nullable().optional(),
 })
 
 const createSingleRoomSchema = z.object({
@@ -212,7 +223,13 @@ export interface CreateRoomsResult {
   ok: boolean
   error?: string
   created: number
-  skipped: number
+  /**
+   * Room numbers that already existed and were left alone. The bulk RPC
+   * returns these explicitly (ON CONFLICT on `unique (hotel_id,
+   * room_number)`), because "10 asked for, 8 created" is alarming without
+   * the two names.
+   */
+  skipped: string[]
 }
 
 export async function createRooms(
@@ -223,56 +240,44 @@ export async function createRooms(
 ): Promise<CreateRoomsResult> {
   const access = await getEventAccess(eventId)
   const block = staffGate(access)
-  if (block) return { ok: false, error: block, created: 0, skipped: 0 }
+  if (block) return { ok: false, error: block, created: 0, skipped: [] }
 
   if (mode === 'range') {
-    const parsed = createRoomRangeSchema.safeParse(raw)
+    const parsed = createRoomBulkSchema.safeParse(raw)
     if (!parsed.success) {
-      return { ok: false, error: parsed.error.issues[0]?.message, created: 0, skipped: 0 }
+      return { ok: false, error: parsed.error.issues[0]?.message, created: 0, skipped: [] }
     }
 
-    const { prefix, start, end, roomType, floor, capacity, notes } = parsed.data
-    if (end < start) {
-      return { ok: false, error: 'End number must be >= start number.', created: 0, skipped: 0 }
-    }
+    const { roomType, qty, startNumber, prefix, capacity } = parsed.data
 
-    const digits = String(end).length
-    const rows = []
-    for (let n = start; n <= end; n++) {
-      rows.push({
-        event_id: eventId,
-        hotel_id: hotelId,
-        room_number: prefix + String(n).padStart(digits, '0'),
-        room_type: roomType ?? null,
-        floor: floor ?? null,
-        capacity,
-        max_capacity: capacity + 1,
-        notes: notes ?? null,
-      })
-    }
-
+    // One RPC, one transaction, and it reports what it skipped. The path this
+    // replaces inserted row by row and returned on the first non-unique error,
+    // so a 10-room range against a hotel already holding 3 reported "3
+    // created" and silently dropped the other 7.
     const supabase = await createClient()
-    let created = 0
-    let skipped = 0
-    for (const row of rows) {
-      const { error } = await supabase.from('rooms').insert(row).select('id').single()
-      if (error) {
-        if (error.code === '23505') {
-          skipped++
-          continue
-        }
-        return { ok: false, error: `Room ${row.room_number}: ${error.message}`, created, skipped }
-      }
-      created++
+    const { data, error } = await supabase.rpc('create_rooms_bulk', {
+      p_event_id: eventId,
+      p_hotel_id: hotelId,
+      p_room_type: roomType,
+      p_qty: qty,
+      p_start_number: startNumber,
+      p_prefix: prefix,
+      p_capacity: capacity,
+    })
+
+    if (error) {
+      return { ok: false, error: error.message, created: 0, skipped: [] }
     }
 
-    return { ok: true, created, skipped }
+    const payload = (data ?? {}) as { created?: number; skipped?: unknown }
+    const skipped = Array.isArray(payload.skipped) ? payload.skipped.map(String) : []
+    return { ok: true, created: payload.created ?? 0, skipped }
   }
 
   // Single-room mode
   const parsed = createSingleRoomSchema.safeParse(raw)
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message, created: 0, skipped: 0 }
+    return { ok: false, error: parsed.error.issues[0]?.message, created: 0, skipped: [] }
   }
 
   const { roomNumber, roomType, floor, capacity, notes } = parsed.data
@@ -282,7 +287,10 @@ export async function createRooms(
     event_id: eventId,
     hotel_id: hotelId,
     room_number: roomNumber,
-    room_type: roomType ?? null,
+    // Folded to the fixed vocabulary, or null when it is not one of the five.
+    // The single-room screen sends a value from that list; the importer and
+    // any older client could still send 'Twin'.
+    room_type: normaliseRoomType(roomType),
     floor: floor ?? null,
     capacity,
     max_capacity: capacity + 1,
@@ -291,12 +299,12 @@ export async function createRooms(
 
   if (error) {
     if (error.code === '23505') {
-      return { ok: true, created: 0, skipped: 1 }
+      return { ok: true, created: 0, skipped: [roomNumber] }
     }
-    return { ok: false, error: error.message, created: 0, skipped: 0 }
+    return { ok: false, error: error.message, created: 0, skipped: [] }
   }
 
-  return { ok: true, created: 1, skipped: 0 }
+  return { ok: true, created: 1, skipped: [] }
 }
 
 export async function updateRoom(
@@ -318,7 +326,7 @@ export async function updateRoom(
   const supabase = await createClient()
   const db: Record<string, boolean | string | number | null> = {}
   if (patch.roomNumber !== undefined) db.room_number = patch.roomNumber
-  if (patch.roomType !== undefined) db.room_type = patch.roomType ?? null
+  if (patch.roomType !== undefined) db.room_type = normaliseRoomType(patch.roomType)
   if (patch.floor !== undefined) db.floor = patch.floor ?? null
   if (patch.capacity !== undefined) {
     db.capacity = patch.capacity
