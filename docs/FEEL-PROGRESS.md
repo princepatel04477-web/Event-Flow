@@ -53,7 +53,12 @@ EASE ledger/seal and the one SPRING. No new animation libraries.
 
 ## Phase B — ONLY after 4 Oct (skip if today < 2026-10-05)
 
-- [ ] M3  Home rebuild
+- [x] M3  Home rebuild
+      `65277f0` — the hero/bars/attention structure was already rebuilt by the
+      merged tree (SPEC-V3 §4 / A3), so M3 added the one missing feel: a
+      staggered rise+fade entrance (hero first, then each section 40ms later),
+      played once per session via `claimHomeEntrance`. PHONE CHECK: open Home
+      cold, then tab away and back — the entrance plays once, never on return.
 - [ ] M4  Call flow rebuild
 - [ ] M5  Polish pass
 - [x] G5  S5 gap: staff-identity scope
