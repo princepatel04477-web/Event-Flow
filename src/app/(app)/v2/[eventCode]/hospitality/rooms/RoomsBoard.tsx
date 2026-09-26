@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ChevronRightIcon, SearchIcon } from '@/components/icons'
 import { BottomBar } from '@/components/ui/BottomBar'
@@ -95,6 +95,15 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
   const { data, isPending, isFetching, error, refetch } = useQuery({
     queryKey: queryKeys.rooms.grid(eventId),
     queryFn: () => readRoomsGrid(eventId),
+    // S3: an explicit budget for the grid, so a return visit paints from
+    // memory instead of blanking. 30s stale matches the default and the
+    // dashboard counters; 10 minutes of gc is a whole walk between floors.
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    // Keep the previous grid on screen while a re-read is in flight, so the
+    // board never falls back to "Counting beds…" on a refetch. There is no
+    // venue switch on this screen today; this is what makes one safe to add.
+    placeholderData: keepPreviousData,
   })
 
   const grid = data ?? EMPTY_GRID

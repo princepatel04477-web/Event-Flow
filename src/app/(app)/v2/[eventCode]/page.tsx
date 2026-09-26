@@ -28,6 +28,7 @@ import {
   type TodayNumbers,
 } from './_home/today'
 import { readVisibleNumbers } from './_home/visibleNumbers'
+import { WarmRoutes } from './_components/WarmRoutes'
 
 export const metadata: Metadata = {
   title: 'Today',
@@ -172,6 +173,9 @@ export default async function AppHomePage({ params }: PageProps) {
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <div data-screen="home" className="flex flex-col gap-5">
+        {/* Warms Rooms and Calls after this screen has painted (S3). Renders
+            nothing and never blocks the paint; see the component. */}
+        <WarmRoutes eventId={event.id} eventCode={event.code} />
         <NowCard
           eyebrow="Right now"
           headline={now.headline}
