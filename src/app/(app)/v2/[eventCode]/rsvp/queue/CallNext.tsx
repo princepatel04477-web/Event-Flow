@@ -463,7 +463,7 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-nav-bottombar">
+    <div data-screen="calls" className="flex flex-col gap-4 pb-nav-bottombar">
       {isAdmin ? (
         <div className="flex justify-end">
           <AdminCampaignsLink eventCode={eventCode} isAdmin={isAdmin} />

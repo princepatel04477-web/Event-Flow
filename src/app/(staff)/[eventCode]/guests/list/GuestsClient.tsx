@@ -181,7 +181,7 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div data-screen="guests" className="flex flex-col gap-4">
       <div>
         <h2 className="text-xl font-semibold text-fg">Guest list</h2>
         <p className="mt-0.5 text-sm text-muted">

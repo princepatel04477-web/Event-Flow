@@ -304,7 +304,7 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div data-screen="arrivals" className="flex flex-col gap-5">
       {/* The switch between the two views of the same ledger. Both directions
           are their own address (the v3 bar highlights them), so this navigates
           rather than holding a second copy of the board in local state. */}

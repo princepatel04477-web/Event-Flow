@@ -1,5 +1,87 @@
 # Feel baseline
 
+Two measurements live in this file. **The newest is at the top**; the V1 `next dev` baseline it
+replaced is kept below, unchanged, so the before/after is readable in one place.
+
+---
+
+## 2026-09-26 — S0: re-measured against a **production build** (`next start`)
+
+**Measured 2026-09-26 on `brain/showcase`**, against `NEXT_PUBLIC_UI=v2 npm run build` served
+by `npm run start` on `http://localhost:3000`, signed in through `/login` → `/pick-staff` as the
+team caller and measuring event **`SAMPLE2026`** (the code read from the login landing URL, not
+`E2E_EVENT_ID`).
+
+Why re-measure: the 2026-09-21 numbers below were taken on `next dev`, which is slower and
+noisier than what staff get (Turbopack compiles per request, React runs in dev mode). Every
+later prompt in the feel series has to be judged against a production build, so this section is
+the number those prompts beat. **The old section is not deleted** — it documents V1 and is the
+proof that the app was slow on the thing the phone actually runs.
+
+### What is measured now, and what still is not
+
+| Metric | Status |
+|---|---|
+| Route load, five routes, two throttle profiles | **MEASURED** on `next start` |
+| **M1** tap → first visual change | **MEASURED** (family row → family record) |
+| **M2** tap → destination frame | **NOW MEASURED.** Every v2 screen carries `data-screen="<route-id>"` on the root of its main column (added in this commit: `home`, `guests`, `calls`, `rooms`, `arrivals`, `family`). The probe waits for `[data-screen="family"]` — the destination's own value, not a bare `[data-screen]`, because the list being left already carries one. |
+| **M3** tap → real rows on screen | **MEASURED** (same tap; skeletons explicitly excluded) |
+| **M5** back → list restored | **NOW MEASURED.** From the record, `history.back()`, then the SAME row that was tapped must be visible again. |
+| **M4** commit → screen moved | **NOT MEASURED** — needs the RSVP log flow. `scripts/tap-budget.mjs` owns it. |
+
+### Route load (full document navigation) — median of 3, ms
+
+| Route | venue-wifi | 4g | venue-wifi worst |
+|---|---|---|---|
+| home | **434** | 318 | 612 |
+| rsvp-queue | 1406 | 1580 | 1627 |
+| guest-list | 1694 | 1788 | 2131 |
+| rooms | **436** | 310 | 436 |
+| arrivals | 434 | 637 | 482 |
+
+### Tap (family row → family record) — median of 3, ms
+
+| Profile | M1 first visual change | M2 destination frame | M3 real rows | M5 back to list |
+|---|---|---|---|---|
+| venue-wifi | 366 | 1713 | 1713 | 21 |
+| 4g | 214 | 1553 | 1553 | 22 |
+
+### What changed, and what the numbers do **not** say
+
+- **Rooms 6303 → 436 ms and home 4917 → 434 ms are not a fair dev-to-prod comparison on their
+  own.** The tree also advanced: `23dacc2` is V1, while this run is on `brain/showcase`, which
+  carries the V4–V12 work (the tap paints the destination, the RSVP save is one round trip, the
+  arrivals board moved onto the shared query cache). Isolating "dev vs prod" from "V1 vs V12"
+  would mean rebuilding `23dacc2` in this environment, which was not done. Treat this section as
+  **the current number to beat**, not as a claim about how much of the gain was the build mode.
+- **The network leg is not a staff phone.** The browser, the Next server and the Supabase client
+  are all on one machine; only the browser→server hop is throttled through CDP, and Supabase is
+  reached from this machine in Seoul-adjacent conditions. A handset in India adds the
+  India→Vercel(`bom1` edge → `icn1` compute) leg that no local measurement can include. These are
+  best-case numbers for the app's own work.
+- **M2 == M3 at the moment.** The destination counts as "the frame is up" only when the whole
+  record has rendered, so today it arrives with the real rows. S4 (placeholder data from the
+  tapped row) is what is supposed to pull M2 below M3 — when it does, this table is what shows it.
+- **M5 is already fast (21–22 ms) because the "back" is a client-cache read.** That is the
+  `arrivals` pattern working, not a new fix; the S4 scroll/filters restore is still to be done.
+
+### To reproduce
+
+```bash
+NEXT_PUBLIC_UI=v2 npm run build
+NEXT_PUBLIC_UI=v2 npm run start          # http://localhost:3000
+node scripts/feel-baseline.mjs           # FEEL_OUT_DIR overrides where the log/json land
+```
+
+The harness now reads `.env`/`.env.test` from the CWD first and the historical
+`C:\dev\EventFlow` location last, so it runs from any worktree, and it writes its log/json to
+`FEEL_OUT_DIR` (else the scratchpad, else the CWD) instead of a hardcoded path in another
+checkout.
+
+---
+
+## 2026-09-21 — V1 baseline, `next dev` (superseded, kept for comparison)
+
 **Measured 2026-09-21 at commit `23dacc2`**, against a local `next dev` server seeded to
 the real 238-family / 543-guest scale (`SAMPLE2026`, 543 `SEED-543` guests, 782 families).
 

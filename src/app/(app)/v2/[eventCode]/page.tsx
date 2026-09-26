@@ -114,7 +114,7 @@ export default async function AppHomePage({ params }: PageProps) {
   // confident lie on a wedding with 238 families.
   if (board && board.totalGroups === 0) {
     return (
-      <div className="flex flex-col gap-4">
+      <div data-screen="home" className="flex flex-col gap-4">
         <EmptyState
           icon={<UsersIcon className="h-7 w-7" />}
           title="No guests on this event yet"
@@ -147,7 +147,7 @@ export default async function AppHomePage({ params }: PageProps) {
   if (!numbers) {
     const job = departmentJob(focus, event.code)
     return (
-      <div className="flex flex-col gap-5">
+      <div data-screen="home" className="flex flex-col gap-5">
         <NowCard
           eyebrow="Right now"
           headline={job.headline}
@@ -170,7 +170,7 @@ export default async function AppHomePage({ params }: PageProps) {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <div className="flex flex-col gap-5">
+      <div data-screen="home" className="flex flex-col gap-5">
         <NowCard
           eyebrow="Right now"
           headline={now.headline}

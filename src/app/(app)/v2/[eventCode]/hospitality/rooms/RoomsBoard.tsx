@@ -444,7 +444,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
   }
 
   return (
-    <div className="flex flex-col gap-5 pb-nav-bottombar">
+    <div data-screen="rooms" className="flex flex-col gap-5 pb-nav-bottombar">
       {/* The screen's state in one bar. Rooms is maroon (SPEC-V3 §2), and the
           bar is the label + done/total + a line of what is left. */}
       <section className="flex flex-col gap-3 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1">

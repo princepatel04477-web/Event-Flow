@@ -15,24 +15,33 @@
  *                   must not be compared to a tap budget.
  *   M1              real in-app tap -> first visual change (MutationObserver
  *                   armed before the click).
+ *   M2              same tap -> the DESTINATION FRAME. Waits for the
+ *                   `[data-screen]` attribute every v2 screen carries on the
+ *                   root of its main column, so this is "the new screen is on
+ *                   the glass", not "some pixel moved". A proxy would be worse.
  *   M3              same tap -> real rows on screen. A skeleton is explicitly
  *                   excluded; a harness that cannot tell them apart measures
  *                   nothing.
- *   M2              NOT MEASURED. Separating "the destination frame painted" from
- *                   "the first pixel changed" needs a stable frame selector that
- *                   exists on every route. There is not one, and inventing a
- *                   proxy would be worse than reporting a gap.
- *   M4 / M5         NOT MEASURED — they need the RSVP log flow and a list-restore
- *                   probe. Left to the runner-based spec once it can execute.
+ *   M5              from the record, history.back() -> the list restored with
+ *                   the SAME row that was tapped visible again.
+ *   M4              NOT MEASURED here — it needs the RSVP log flow, which is
+ *                   the tap-budget runner's job (`scripts/tap-budget.mjs`).
+ *
+ * WHERE IT WRITES. `FEEL_OUT_DIR` if set, else the session scratchpad when the
+ * harness runs under Command Code, else the current directory. The log/json
+ * deliberately do NOT hardcode another checkout's path — that made a baseline
+ * impossible to reproduce from any tree but one.
  *
  * Progress is appended with synchronous writes: stdout here is fully buffered
  * through a pipe, so nothing is observable until the process exits.
  */
-import { appendFileSync, writeFileSync, readFileSync } from 'node:fs'
+import { appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { chromium } from 'playwright'
 
-const LOG = 'C:\\dev\\EventFlow-ui2\\feel-baseline.log'
+const OUT_DIR = process.env.FEEL_OUT_DIR ?? process.env.COMMANDCODE_SCRATCHPAD ?? process.cwd()
+const LOG = join(OUT_DIR, 'feel-baseline.log')
 writeFileSync(LOG, '')
 const mark = (m) => {
   appendFileSync(LOG, `${new Date().toISOString()}  ${m}\n`)
@@ -67,7 +76,22 @@ function parseEnv(path) {
   return out
 }
 
-const env = { ...parseEnv('C:\\dev\\EventFlow\\.env.local'), ...parseEnv('C:\\dev\\EventFlow\\.env.test') }
+/**
+ * Credentials, read from wherever they are. Earlier versions hardcoded one
+ * checkout's path, which is why this could only ever run from that tree; the
+ * CWD is tried first and the historical location last, so a run in a worktree
+ * uses the worktree's own env when it has one.
+ */
+const ENV_FILES = [
+  join(process.cwd(), '.env.local'),
+  join(process.cwd(), '.env.test'),
+  'C:\\dev\\EventFlow\\.env.local',
+  'C:\\dev\\EventFlow\\.env.test',
+]
+const env = Object.assign(
+  {},
+  ...ENV_FILES.filter((p) => existsSync(p)).map((p) => parseEnv(p)),
+)
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0
 
 /** Replicates e2e/helpers/auth.ts loginTeamAs using the real UI flow. */
@@ -183,7 +207,7 @@ async function run() {
       mark(`  load ${r.label.padEnd(11)} median=${median(times)}ms worst=${Math.max(...times)}ms`)
     }
 
-    // ---- M1 / M3 on a REAL in-app tap -------------------------------------
+    // ---- M1 / M2 / M3 / M5 on a REAL in-app tap ---------------------------
     // The most common navigation in the product: open a family from the list.
     for (let i = 0; i < ITERATIONS; i += 1) {
       await page.goto(`${BASE}/${code}/guests/list`, { waitUntil: 'domcontentloaded' }).catch(() => {})
@@ -194,6 +218,9 @@ async function run() {
         mark('  tap: no family row link on the guest list, skipping')
         break
       }
+
+      // Kept so M5 can look for the SAME row after going back, not just any row.
+      const rowHref = await rowLink.getAttribute('href').catch(() => null)
 
       await page.evaluate(() => {
         const snap = () => document.body.textContent ?? ''
@@ -210,11 +237,46 @@ async function run() {
       const t0 = Date.now()
       await rowLink.click({ timeout: 20_000 }).catch(() => {})
       await page.waitForURL(/\/rsvp\/(status|call)\//, { timeout: 30_000 }).catch(() => {})
+
+      // M2 — the destination frame. `data-screen` sits on the root of the new
+      // screen's main column, so this lands when the SCREEN is on the glass,
+      // which is the thing T4's budget is about. The value is the DESTINATION's
+      // ("family"), not a bare `[data-screen]`: the list being left behind
+      // already carries `data-screen="guests"`, so a bare selector would match
+      // before the tap did anything and report a fake zero.
+      const m2 = await page
+        .waitForSelector('[data-screen="family"]', { timeout: 30_000 })
+        .then(() => Date.now() - t0)
+        .catch(() => null)
+
       const toContent = Date.now() - t0
       const first = await page.evaluate(() => window.__t?.first ?? null)
 
-      taps.push({ profile: profile.name, m1: first === null ? toContent : Math.round(first), m3: toContent })
-      mark(`  tap  family row  M1=${taps.at(-1).m1}ms  M3=${toContent}ms`)
+      // M5 — back to the list, restored. A soft back (popstate), then the row
+      // that was tapped must be visible again.
+      let m5 = null
+      if (rowHref) {
+        const tBack = Date.now()
+        await page.goBack({ timeout: 30_000 }).catch(() => {})
+        const restored = await page
+          .locator(`main a[href="${rowHref}"]`)
+          .first()
+          .waitFor({ state: 'visible', timeout: 30_000 })
+          .then(() => true)
+          .catch(() => false)
+        if (restored) m5 = Date.now() - tBack
+      }
+
+      taps.push({
+        profile: profile.name,
+        m1: first === null ? toContent : Math.round(first),
+        m2,
+        m3: toContent,
+        m5,
+      })
+      mark(
+        `  tap  family row  M1=${taps.at(-1).m1}ms  M2=${m2 ?? '-'}ms  M3=${toContent}ms  M5=${m5 ?? '-'}ms`,
+      )
     }
 
     await context.close()
@@ -222,8 +284,13 @@ async function run() {
 
   await browser.close()
 
-  const out = 'C:\\dev\\EventFlow-ui2\\feel-baseline.json'
+  const out = join(OUT_DIR, 'feel-baseline.json')
   writeFileSync(out, JSON.stringify({ code, landing, iterations: ITERATIONS, routeLoads, taps }, null, 2))
+
+  const medOf = (xs) => {
+    const real = xs.filter((x) => typeof x === 'number')
+    return real.length ? median(real) : null
+  }
 
   mark('')
   mark('=== ROUTE LOAD (full document navigation, NOT a tap) ===')
@@ -233,7 +300,13 @@ async function run() {
   mark('=== TAP (real client-side navigation: family row) ===')
   for (const p of PROFILES) {
     const xs = taps.filter((t) => t.profile === p.name)
-    if (xs.length) mark(`  ${p.name.padEnd(11)} M1=${median(xs.map((t) => t.m1))}ms  M3=${median(xs.map((t) => t.m3))}ms`)
+    if (xs.length) {
+      mark(
+        `  ${p.name.padEnd(11)} M1=${medOf(xs.map((t) => t.m1))}ms  ` +
+          `M2=${medOf(xs.map((t) => t.m2)) ?? '-'}ms  ` +
+          `M3=${medOf(xs.map((t) => t.m3))}ms  M5=${medOf(xs.map((t) => t.m5)) ?? '-'}ms`,
+      )
+    }
   }
   mark(`wrote ${out}`)
   mark('=== DONE ===')

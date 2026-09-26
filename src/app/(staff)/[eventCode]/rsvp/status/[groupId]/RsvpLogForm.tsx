@@ -335,7 +335,7 @@ export function RsvpLogForm({
         : outcomeWord(status)
 
   return (
-    <div className="flex flex-col gap-4 pb-nav-bottombar">
+    <div data-screen="family" className="flex flex-col gap-4 pb-nav-bottombar">
       {/* WHO AM I LOGGING. The shell's header names the SECTION ("Calls"); the
           record's own identity is the first thing in the body, which is the
           v3 rule for every detail screen. */}
