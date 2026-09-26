@@ -216,11 +216,16 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
       const result = await moveGuestsToRoom(eventId, [v.assignmentId], v.toRoomId)
       if (result.ok) return { ok: true, data: { count: result.count } }
       if (result.code === 'capacity') {
+        // THE SWAP CASE, said plainly (M6, CLAUDE.md §14). A MOVE that
+        // over-fills its target is two full rooms being swapped, where the
+        // intermediate state is over capacity whatever order the writes go in.
+        // The shared guard copy offers the capacity OVERRIDE here, and this
+        // board has no override control at all — so the offer was both wrong
+        // (it would commit an over-capacity swap) and dead (nothing to tap).
+        // What actually unblocks it is emptying a room.
         return {
           ok: false,
-          message:
-            roomGuardMessage(result.cause ?? null, { roomNumber: result.roomNumber }) ??
-            result.error,
+          message: `Room ${v.toRoomNumber} is full. Empty one room first, then move the family.`,
         }
       }
       return { ok: false, message: result.error }

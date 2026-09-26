@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
+import { requireAdmin, resolveEventByCode } from '@/lib/supabase/queries'
 
 export const metadata: Metadata = {
   title: 'Pipeline',
@@ -26,7 +26,13 @@ export default async function PipelineDebugPage({ params }: PageProps) {
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
 
-  await requireStaff(event.id, event.code)
+  // ADMIN ONLY (M6). This screen renders raw `recording_id` / `transcript_id`
+  // values, the column names of the backlog views, and the name of a view that
+  // may not be deployed — none of which a runner can act on, and all of which
+  // read as the app being broken. `requireStaff` let every event_team session
+  // reach it by URL. There is no plain-language equivalent of a diagnostic
+  // table, so the answer is to keep it, not translate it: admins keep it.
+  await requireAdmin(event.id, event.code)
 
   const supabase = await createClient()
 

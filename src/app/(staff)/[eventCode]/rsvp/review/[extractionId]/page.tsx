@@ -25,7 +25,7 @@ import {
 } from '@/components/review/ReviewPanel'
 
 export const metadata: Metadata = {
-  title: 'Review extraction',
+  title: 'Review call notes',
 }
 
 type PageProps = {
