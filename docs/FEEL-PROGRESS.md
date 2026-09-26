@@ -56,7 +56,12 @@ EASE ledger/seal and the one SPRING. No new animation libraries.
 - [ ] M3  Home rebuild
 - [ ] M4  Call flow rebuild
 - [ ] M5  Polish pass
-- [ ] G5  S5 gap: staff-identity scope
+- [x] G5  S5 gap: staff-identity scope
+      `4c7d9a5` — the offline query cache is now keyed by event code AND the
+      selected staff member (read from the durable store; "anon" when there is
+      none), so a shared handset never hydrates one login's rows into another's.
+      PHONE CHECK: sign in as two different staff on one phone and confirm each
+      cold open shows only their own login's cached Home.
 - [ ] PF  P-Final
 
 ## Blockers
