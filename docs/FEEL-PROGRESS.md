@@ -57,4 +57,49 @@ EASE ledger/seal and the one SPRING. No new animation libraries.
 
 ## Blockers
 
-(none)
+### BLOCKED: push + Vercel deploy (2026-09-26)
+
+Asked to push and redeploy. **Not pushed, not deployed.** Two reasons, in order
+of severity:
+
+1. **`brain/showcase` has diverged.** Common base `d9bc4f0`. Local: 19 commits,
+   44 files. `origin/brain/showcase`: **14 commits, 92 files** — an A1–A11 series
+   (`A1` calling status, `A3` rename to Logistics/Hospitality + drop Today tiles,
+   `A4` create rooms by quantity, `A5` one room filter sheet + remembered venue,
+   `A6` rooming list, `A8` rsvp department **and DB-enforced section locks**,
+   `A9` live arrival banner, `A10` desktop web portal, `A11` Files area). A push
+   is rejected; force-pushing would destroy their 14. Overlap: **5 files**
+   (`AppTabs.tsx`, `CallNext.tsx`, `RoomsBoard.tsx`, `layout.tsx`,
+   `HelpScreen.tsx`).
+2. **A merge was attempted and the suite went RED: 1 failed / 838** (was 722
+   green). The failing test inserts `guest_groups` / `guests` /
+   `room_assignments`, i.e. a DB-backed one; `tests/hotels.test.ts` passes 11/11
+   in isolation, so it is order/parallelism-dependent or a new upstream test
+   expecting migrations that are NOT applied (the Never list forbids applying
+   them). Not diagnosed — no budget left. Rule 3 says do not proceed on red, so
+   the merge was **aborted** and the branch is back at the green 19-commit state.
+
+**The resolution is known, and short — redo it in a fresh session:**
+
+- `layout.tsx` — take UPSTREAM's new imports (`LockedSectionBanner`,
+  `ArrivalBanner`, `isArrivalsNotifyEnabled`) plus OUR `getRouteContext`, and
+  `sidebarGroupsFor` plus `getViewer`. **Drop** `getStaffViewerContext`,
+  `getEventAccess`, `resolveEventByCode`: the merged body uses
+  `route.access` / `route.department`, so they are unused (lint will say so).
+- `RoomsBoard.tsx` — imports: theirs' `type ReactNode` **and** our
+  `keepPreviousData`. RoomCard: OUR `Pressable` wrapper **with** THEIR
+  `OCCUPANCY_BORDER[status]` and THEIR richer `aria-label`; drop the
+  `tap` / `active:bg-surface-2` classes, which `Pressable` now owns.
+- `AppTabs.tsx`, `HelpScreen.tsx`, `CallNext.tsx` auto-merged cleanly.
+- Method note: the two `[eventCode]` paths cannot be edited by the file tools
+  after a merge (the bracket globs and the read tracker disagree). Resolve with
+  a small node script doing exact literal replacements, then delete it.
+
+**Also for 5 October:** `feat(A8)` added **DB-enforced section locks**, but
+`20260926120000_route_context.sql` says "SECTION LOCKS — no such thing exists in
+this schema". That comment, and possibly the RPC's shape, are now stale against
+`brain/showcase`. Fix before the migration push.
+
+**And after merging:** the 3 remaining feel prompts (M3, M4, M5) sit on screens
+A3/A5 may have already redesigned — re-check each against the merged tree before
+implementing.
