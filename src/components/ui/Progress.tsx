@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedNumber } from '@/components/motion/AnimatedNumber'
 import { cn } from '@/lib/utils'
 import { progressCount, progressPercent } from '@/lib/ui/metrics'
 
@@ -60,7 +61,11 @@ export function Progress({
         <span className="min-w-0 truncate text-base leading-snug font-medium text-ink">
           {label}
         </span>
-        <span className="figure shrink-0 text-sm font-medium text-muted">{figure}</span>
+        <span className="figure shrink-0 text-sm font-medium text-muted">
+          <AnimatedNumber value={done} />
+          <span aria-hidden>/</span>
+          {total}
+        </span>
       </div>
 
       <div

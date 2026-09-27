@@ -1,7 +1,9 @@
 'use client'
 
+import { useEffect } from 'react'
 import { m } from 'motion/react'
 
+import { hapticTick } from '@/lib/haptics'
 import { DURATION, EASE, SPRING } from '@/lib/motion/tokens'
 
 /**
@@ -24,6 +26,12 @@ import { DURATION, EASE, SPRING } from '@/lib/motion/tokens'
  * and `pathLength` is left completed, so the mark is simply there.
  */
 export function SuccessMark({ className }: { className?: string }) {
+  // The tick lands the moment the check appears, so the handset confirms the
+  // save at the same instant the eye does (M5). Best-effort; see lib/haptics.
+  useEffect(() => {
+    hapticTick()
+  }, [])
+
   return (
     <m.span
       aria-hidden
