@@ -1,5 +1,18 @@
 # FEEL progress
 
+## Morning handoff
+
+- **Branches** (neither pushed):
+  - `brain/showcase` @ `e7080ca` — upstream A1–A11 merge `e3529df` + RCTX `c0567ca`.
+  - `feel/phase-b` @ `04ef831` — Phase B: G5 `4c7d9a5`, M3 `65277f0`, M4 `74d4f58`, M5 `91f9c69`, PF `9d27f48`.
+- **Tests:** 847 passed / 847 (65 files). `tsc --noEmit` clean; lint clean on every touched file.
+- **Phone checks** (the machine cannot do these):
+  - Home staggered entrance plays once per session, never on tab return.
+  - Calls: log "Not coming" → SuccessMark + haptic tick, next family within ~700ms; outcome targets are 64px.
+  - Success haptic + number glide on Home's "Families called" bar.
+  - Offline cache: two staff on one phone see only their own login's cached Home.
+- **Blockers:** push/Vercel deploy (unchanged, below). PF's "after" re-measurement is pending — needs `scripts/feel-baseline.mjs` + `scripts/tap-budget.mjs` on a production build/device.
+
 **Phase A is COMPLETE.** Every allowed item is ticked. Nothing is left in
 progress, so there is no `NEXT:` marker: the next thing to do is Phase B's M3,
 and it is date-gated — Phase B unlocks when `date` reads **>= 2026-10-05**
