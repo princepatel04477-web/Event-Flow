@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { AnimatePresence, m } from 'motion/react'
 
 import { InboxIcon } from '@/components/icons'
 import { Crossfade } from '@/components/motion/Crossfade'
@@ -22,6 +23,7 @@ import {
 } from '@/lib/call/session'
 import { MAX_PLAUSIBLE_CALL_SEC, type CallOutcome, type GuestGroupRow } from '@/lib/call/types'
 import { lockNote, useStaffNames } from '@/lib/lock'
+import { advanceVariants } from '@/lib/motion/tokens'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { dialTarget, placeCall } from '@/lib/native-call'
 import { traceFetch } from '@/lib/perf'
@@ -521,12 +523,28 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
         </Crossfade>
       ) : (
         <Crossfade className="flex flex-col gap-4">
-          <CurrentFamilyCard
-            row={current}
-            dialling={diallingGroupId === current.group_id}
-            lock={currentLock}
-            onCall={() => void handleCall(current)}
-          />
+          {/* M4: the hand-over to the next family is a short horizontal slide -
+              the only horizontal transition in the app, because the queue IS a
+              sequence. `initial={false}`: the first family just appears; only a
+              change of family slides. `popLayout` keeps the outgoing card out of
+              the flow so the page does not jump while it leaves. */}
+          <AnimatePresence mode="popLayout" initial={false} custom={1}>
+            <m.div
+              key={current.group_id}
+              custom={1}
+              variants={advanceVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <CurrentFamilyCard
+                row={current}
+                dialling={diallingGroupId === current.group_id}
+                lock={currentLock}
+                onCall={() => void handleCall(current)}
+              />
+            </m.div>
+          </AnimatePresence>
 
           {familyError ? (
             <p className="text-sm text-muted">Could not read saved details. Reconnecting…</p>

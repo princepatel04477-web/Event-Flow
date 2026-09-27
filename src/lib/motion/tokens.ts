@@ -86,6 +86,18 @@ export const DISTANCE = {
   rise: 8,
   /** A sheet or overlay leaving downward. */
   sink: 12,
+  /**
+   * The call queue handing over to the next family (M4): the outgoing card
+   * leaves left, the incoming one arrives from the right. The only horizontal
+   * travel in the app, because it is the only place the screens ARE a sequence.
+   */
+  advance: 16,
+  /** Pull-to-refresh: how far the finger must travel (after damping) to refresh. */
+  pullTrigger: 64,
+  /** Pull-to-refresh: where the indicator rests while the refresh runs. */
+  pullHold: 48,
+  /** Pull-to-refresh: the furthest the content will follow the finger. */
+  pullMax: 96,
 } as const
 
 /**
@@ -111,6 +123,26 @@ export const riseVariants = {
     opacity: 0,
     transition: { duration: DURATION.fade, ease: EASE.ledger },
   },
+} as const
+
+/**
+ * The call queue's hand-over to the next family (M4). Transform and opacity
+ * only, on the `fade` duration: this runs straight after an outcome tap, which
+ * is a primary action path, so `enter` is not allowed here (see the header).
+ * `custom` is the direction: 1 = forward to the next family.
+ */
+export const advanceVariants = {
+  hidden: (direction: number) => ({ opacity: 0, x: DISTANCE.advance * direction }),
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: DURATION.fade, ease: EASE.ledger },
+  },
+  exit: (direction: number) => ({
+    opacity: 0,
+    x: -DISTANCE.advance * direction,
+    transition: { duration: DURATION.fade, ease: EASE.ledger },
+  }),
 } as const
 
 /**

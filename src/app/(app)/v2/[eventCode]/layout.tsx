@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { Suspense, type ReactNode } from 'react'
 
+import { PullToRefresh } from '@/components/motion/PullToRefresh'
 import { UndoBar } from '@/components/ui/UndoBar'
 import { LockedSectionBanner } from '@/components/LockedSectionBanner'
 import { ArrivalBanner } from '@/components/ArrivalBanner'
@@ -187,7 +188,8 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
           {access === 'event_team' ? (
             <LockedSectionBanner eventId={event.id} eventCode={event.code} />
           ) : null}
-          {children}
+          {/* Pull down at the top of any v2 screen to refresh it (M5). */}
+          <PullToRefresh>{children}</PullToRefresh>
         </div>
       </main>
       <AppTabs tabs={tabs} model="v3" />
