@@ -126,3 +126,26 @@ The line staff must be able to repeat, in these words:
   does not say which hotel" is actionable; "the app is confusing" is not.
 - **Do not fix anything during the session.** Five testers in a row on an unchanged build is
   the data; a build that changes halfway through measures the build, not the screen.
+
+---
+
+## FEEL 10-minute script (M1–M5 + P-Final)
+
+A shorter pass for the feel work specifically. Run it on the **deployed build**, on
+**mobile data** (not venue Wi-Fi — you want the numbers, not the drops), with one stopwatch.
+
+| # | Do this | Stopwatch | Watch for |
+|---|---|---|---|
+| 1 | Open the app cold. | ______ s | Home's staggered entrance plays once (hero, then bars 40ms later); no blank screen. |
+| 2 | Tab to Rooms, back to Home. | ______ s | The entrance does **not** replay — Home paints at rest. |
+| 3 | Open Rooms twice in a row. | ______ s / ______ s | Second visit ≤ 300ms, from cache, not a skeleton. |
+| 4 | Tap 5 families in the call queue, one after another. | ______ s each | Header paints instantly from the row (S4); no 3s "nothing happened". |
+| 5 | Log 3 call outcomes ("Not coming", "No answer", "Call back"). | ______ s each | The SuccessMark draws, a haptic tick fires, and the next family arrives within ~700ms. |
+| 6 | Toggle dark mode, back to light. | ______ s | Both render correctly at 390px; no white flash on a dark cold start. |
+| 7 | Pull to refresh on a list screen. | ______ s | The indicator follows the finger and releases with a spring; no native overscroll fight. |
+| 8 | Go offline (airplane mode), reopen the app. | ______ s | Home/Rooms show last data with an "Updating…" chip, not a blank screen. |
+| 9 | Watch a number change (a count, a PAX, "x left"). | ______ s | The number glides from old to new, never snaps. |
+
+Each row that fails, write the exact second and what the person said. The FEEL report
+(`docs/FEEL-REPORT.md`) is where the before/after numbers land once the baseline is
+re-measured — this script is the human half of that same verdict.
