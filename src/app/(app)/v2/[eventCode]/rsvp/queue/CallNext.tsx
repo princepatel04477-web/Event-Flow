@@ -112,11 +112,23 @@ interface OutcomeVars {
   values: RsvpLogFormValues
 }
 
-export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: CallNextProps) {
+export function CallNext({
+  eventId,
+  eventCode,
+  startsOn,
+  endsOn,
+  isAdmin,
+  initialFilter,
+  initialGroupId,
+}: CallNextProps) {
   const supabase = useMemo(() => createClient(), [])
 
-  const [activeFilter, setActiveFilter] = useState<FilterChipId>('to_call')
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  // A link that names a family opens on the ALL list, so the family is
+  // always in it whatever its status; otherwise the link's chip, or To call.
+  const [activeFilter, setActiveFilter] = useState<FilterChipId>(
+    initialGroupId ? 'all' : (initialFilter ?? 'to_call'),
+  )
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroupId ?? null)
   const [activeInlineOutcome, setActiveInlineOutcome] = useState<OutcomeStatus | null>(null)
   const [queueSheetOpen, setQueueSheetOpen] = useState(false)
   const [alternateSheetOpen, setAlternateSheetOpen] = useState(false)

@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import { LinkButton } from '@/components/ui/LinkButton'
 import { ArrowDownCircleIcon, ArrowUpCircleIcon, CarIcon } from '@/components/icons'
 import type { TodayLeg } from '@/lib/actions/dashboard'
@@ -16,9 +18,12 @@ function formatTime(t: string | null): string {
   return t.slice(0, 5)
 }
 
-function LegRow({ leg }: { leg: TodayLeg }) {
+function LegRow({ leg, href }: { leg: TodayLeg; href: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2">
+    <Link
+      href={href}
+      className="tap flex min-h-11 items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 transition-colors duration-press ease-ledger hover:bg-surface active:bg-surface"
+    >
       <span className="figure w-12 shrink-0 text-sm text-muted">
         {formatTime(leg.travelTime)}
       </span>
@@ -36,7 +41,7 @@ function LegRow({ leg }: { leg: TodayLeg }) {
       ) : (
         <CarIcon className="h-4 w-4 shrink-0 text-muted" aria-label="No vehicle" />
       )}
-    </div>
+    </Link>
   )
 }
 
@@ -63,7 +68,7 @@ export function TodayPanel({ arrivals, departures, date, eventCode }: Props) {
               </h3>
               <div className="flex flex-col gap-1">
                 {arrivals.map((a) => (
-                  <LegRow key={a.legId} leg={a} />
+                  <LegRow key={a.legId} leg={a} href={`/${eventCode}/logistics/arrivals`} />
                 ))}
               </div>
             </div>
@@ -78,7 +83,7 @@ export function TodayPanel({ arrivals, departures, date, eventCode }: Props) {
               </h3>
               <div className="flex flex-col gap-1">
                 {departures.map((d) => (
-                  <LegRow key={d.legId} leg={d} />
+                  <LegRow key={d.legId} leg={d} href={`/${eventCode}/logistics/departures`} />
                 ))}
               </div>
             </div>

@@ -1,6 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
+
+import { ChevronRightIcon } from '@/components/icons'
+import { bucketHref, familyHref } from '@/lib/admin/dashboard-links'
 
 import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -20,7 +24,13 @@ import type { RsvpBucketId } from '@/lib/rsvp-buckets'
  * labels with two counts each do not fit a 390px screen, and a wrapped chip
  * block pushes the list below the fold exactly when it is being read.
  */
-export function ConfirmationTabs({ buckets }: { buckets: RsvpBucket[] }) {
+export function ConfirmationTabs({
+  buckets,
+  eventCode,
+}: {
+  buckets: RsvpBucket[]
+  eventCode: string
+}) {
   const [active, setActive] = useState<RsvpBucketId>('confirmed')
   const current = buckets.find((bucket) => bucket.id === active) ?? buckets[0]
 
@@ -44,6 +54,16 @@ export function ConfirmationTabs({ buckets }: { buckets: RsvpBucket[] }) {
         ))}
       </div>
 
+      {current ? (
+        <Link
+          href={bucketHref(eventCode, current.id)}
+          className="tap flex min-h-11 items-center justify-between gap-2 self-start text-sm font-medium text-brand"
+        >
+          Open {current.label.toLowerCase()} in Calls
+          <ChevronRightIcon className="h-4 w-4" aria-hidden />
+        </Link>
+      ) : null}
+
       {!current ? null : current.people.length === 0 ? (
         <EmptyState
           title={`No families ${current.label.toLowerCase()}`}
@@ -52,14 +72,19 @@ export function ConfirmationTabs({ buckets }: { buckets: RsvpBucket[] }) {
       ) : (
         <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
           {current.people.map((family) => (
-            <li
-              key={family.groupId}
-              className="flex items-center justify-between gap-3 border-b border-rule px-4 py-3 last:border-b-0"
-            >
-              <span className="min-w-0 truncate text-base text-ink">{family.headName}</span>
-              <span className="figure shrink-0 text-sm text-muted">
-                {family.pax} {family.pax === 1 ? 'guest' : 'guests'}
-              </span>
+            <li key={family.groupId} className="border-b border-rule last:border-b-0">
+              {/* Opens the family on the Calls screen, NOT its record: the
+                  record claims the caller lock (see dashboard-links.ts). */}
+              <Link
+                href={familyHref(eventCode, family.groupId)}
+                className="tap flex min-h-12 items-center justify-between gap-3 px-4 py-3 transition-colors duration-press ease-ledger hover:bg-surface-2 active:bg-surface-2"
+              >
+                <span className="min-w-0 truncate text-base text-ink">{family.headName}</span>
+                <span className="figure flex shrink-0 items-center gap-1 text-sm text-muted">
+                  {family.pax} {family.pax === 1 ? 'guest' : 'guests'}
+                  <ChevronRightIcon className="h-4 w-4" aria-hidden />
+                </span>
+              </Link>
             </li>
           ))}
         </ul>

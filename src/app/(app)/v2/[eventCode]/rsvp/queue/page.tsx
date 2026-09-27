@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
 import { requireSection } from '@/lib/auth/section-guard'
+import { parseFamilyParam, parseFilterParam } from '@/lib/admin/dashboard-links'
 import { getViewer, resolveEventByCode } from '@/lib/supabase/queries'
 
 import { CallNext } from './CallNext'
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 type PageProps = {
   // Next 15+ hands params over as a Promise.
   params: Promise<{ eventCode: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
 /**
@@ -33,8 +35,8 @@ type PageProps = {
  * entry in DECISIONS.md for why that is cheap on a code-auth session and where
  * the real cost on this path is.
  */
-export default async function CallNextPage({ params }: PageProps) {
-  const { eventCode } = await params
+export default async function CallNextPage({ params, searchParams }: PageProps) {
+  const [{ eventCode }, query] = await Promise.all([params, searchParams])
 
   const [event, viewer] = await Promise.all([
     resolveEventByCode(eventCode),
@@ -52,6 +54,8 @@ export default async function CallNextPage({ params }: PageProps) {
       startsOn={event.starts_on}
       endsOn={event.ends_on}
       isAdmin={viewer?.isAdmin ?? false}
+      initialFilter={parseFilterParam(query.filter)}
+      initialGroupId={parseFamilyParam(query.family)}
     />
   )
 }
