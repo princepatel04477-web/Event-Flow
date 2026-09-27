@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { InboxIcon } from '@/components/icons'
+import { Crossfade } from '@/components/motion/Crossfade'
 import { SuccessMark } from '@/components/motion/SuccessMark'
 import { BottomBar } from '@/components/ui/BottomBar'
 import { Button } from '@/components/ui/Button'
@@ -502,7 +503,8 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
       {isPending ? (
         <LoadingRows count={3} />
       ) : callable.length === 0 || current === null ? (
-        <EmptyState
+        <Crossfade>
+          <EmptyState
           icon={<InboxIcon className="h-7 w-7" />}
           title={activeFilter === 'to_call' ? "That's everyone" : 'No families here'}
           description={
@@ -515,9 +517,10 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
               See all families
             </Button>
           }
-        />
+          />
+        </Crossfade>
       ) : (
-        <>
+        <Crossfade className="flex flex-col gap-4">
           <CurrentFamilyCard
             row={current}
             dialling={diallingGroupId === current.group_id}
@@ -572,7 +575,7 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
           >
             See all families ({callable.length})
           </button>
-        </>
+        </Crossfade>
       )}
 
       {!isPending ? (
