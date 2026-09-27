@@ -79,7 +79,12 @@ EASE ledger/seal and the one SPRING. No new animation libraries.
       none), so a shared handset never hydrates one login's rows into another's.
       PHONE CHECK: sign in as two different staff on one phone and confirm each
       cold open shows only their own login's cached Home.
-- [ ] PF  P-Final
+- [x] PF  P-Final
+      `9d27f48` — `docs/FEEL-REPORT.md` written (S0 "before" table + the three
+      slowest things left), and `docs/HANDSET-TEST.md` gained the 10-minute
+      FEEL script. The "after" column is deliberately pending: it needs the
+      production-build browser harness (`scripts/feel-baseline.mjs` +
+      `scripts/tap-budget.mjs`), which is the phone-check / next-session item.
 
 ## Blockers
 
