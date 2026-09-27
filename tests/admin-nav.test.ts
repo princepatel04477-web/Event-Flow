@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { EVENT_NAV } from '@/lib/admin/nav'
+import { EVENT_NAV, eventAppNav } from '@/lib/admin/nav'
 
 /**
  * The admin nav contract.
@@ -16,7 +16,7 @@ describe('admin event nav', () => {
   const segments = EVENT_NAV.map((item) => item.href)
 
   it('lists every admin event page', () => {
-    for (const page of ['hotels', 'codes', 'messages', 'ledger', 'files', 'settings']) {
+    for (const page of ['staff', 'hotels', 'codes', 'messages', 'ledger', 'files', 'settings']) {
       expect(segments, `missing admin page: ${page}`).toContain(page)
     }
   })
@@ -27,6 +27,16 @@ describe('admin event nav', () => {
 
   it('has a unique segment per item', () => {
     expect(new Set(segments).size).toBe(segments.length)
+  })
+
+  it('links the admin into every working screen of the event', () => {
+    const hrefs = eventAppNav('UNICOS279').map((item) => item.href)
+    expect(hrefs).toContain('/UNICOS279')
+    expect(hrefs).toContain('/UNICOS279/rsvp/queue')
+    expect(hrefs).toContain('/UNICOS279/guests/import')
+    expect(hrefs).toContain('/UNICOS279/hospitality/rooms')
+    for (const href of hrefs) expect(href.startsWith('/admin')).toBe(false)
+    expect(new Set(hrefs).size).toBe(hrefs.length)
   })
 
   it('gives the phone every page except the root', () => {

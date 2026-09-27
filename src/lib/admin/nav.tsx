@@ -3,10 +3,15 @@ import type { ReactNode } from 'react'
 import {
   GridIcon,
   BuildingIcon,
+  CarIcon,
+  GiftIcon,
   LockIcon,
   FileTextIcon,
   ListIcon,
+  PhoneIcon,
   SlidersIcon,
+  UploadIcon,
+  UsersIcon,
 } from '@/components/icons'
 
 /**
@@ -53,6 +58,12 @@ export const EVENT_NAV: AdminNavItem[] = [
     matchSegments: ['dashboard'],
   },
   {
+    href: 'staff',
+    label: 'Staff',
+    icon: <UsersIcon className="h-5 w-5" />,
+    matchSegments: ['staff'],
+  },
+  {
     href: 'hotels',
     label: 'Hotels',
     icon: <BuildingIcon className="h-5 w-5" />,
@@ -89,3 +100,25 @@ export const EVENT_NAV: AdminNavItem[] = [
     matchSegments: ['settings'],
   },
 ]
+
+/**
+ * The event's working screens, reachable from the admin panel.
+ *
+ * The admin panel used to be a dead end: nothing in it led to the screens the
+ * crew actually works in (Today, Calls, Guests, Rooms, Hampers, Travel), so an
+ * admin had to know the URLs. An admin passes every section guard
+ * (`requireSection` lets `admin` through), so these are real doors, not
+ * bounces. ABSOLUTE hrefs: they live outside `/admin`.
+ */
+export function eventAppNav(eventCode: string): AdminNavItem[] {
+  const at = (path: string) => (path ? `/${eventCode}/${path}` : `/${eventCode}`)
+  return [
+    { href: at(''), label: 'Today', icon: <GridIcon className="h-5 w-5" />, matchSegments: [] },
+    { href: at('rsvp/queue'), label: 'Calls', icon: <PhoneIcon className="h-5 w-5" />, matchSegments: [] },
+    { href: at('guests'), label: 'Guest list', icon: <UsersIcon className="h-5 w-5" />, matchSegments: [] },
+    { href: at('guests/import'), label: 'Import guests', icon: <UploadIcon className="h-5 w-5" />, matchSegments: [] },
+    { href: at('hospitality/rooms'), label: 'Rooms', icon: <BuildingIcon className="h-5 w-5" />, matchSegments: [] },
+    { href: at('hospitality/deliveries'), label: 'Hampers', icon: <GiftIcon className="h-5 w-5" />, matchSegments: [] },
+    { href: at('logistics'), label: 'Logistics', icon: <CarIcon className="h-5 w-5" />, matchSegments: [] },
+  ]
+}

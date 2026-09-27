@@ -7,7 +7,7 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { type Membership } from '@/lib/events/paths'
 import { GridIcon, FileTextIcon, ListIcon, SearchIcon, SlidersIcon } from '@/components/icons'
-import { EVENT_NAV } from '@/lib/admin/nav'
+import { EVENT_NAV, eventAppNav } from '@/lib/admin/nav'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 
@@ -150,6 +150,13 @@ export function AdminMobileNav({ memberships, isAdmin }: AdminMobileNavProps) {
                   label={item.label}
                   icon={item.icon}
                 />
+              ))}
+
+              {/* The event's working screens - the admin panel used to have
+                  no door into them at all. */}
+              <p className="eyebrow mt-3 px-3 pb-1">Event app</p>
+              {eventAppNav(segments[2]).map((item) => (
+                <SheetLink key={item.href} href={item.href} label={item.label} icon={item.icon} />
               ))}
             </>
           ) : (

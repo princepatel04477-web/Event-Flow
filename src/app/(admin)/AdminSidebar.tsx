@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { type Membership } from '@/lib/events/paths'
 import { SearchIcon } from '@/components/icons'
-import { ADMIN_NAV, EVENT_NAV, type AdminNavItem } from '@/lib/admin/nav'
+import { ADMIN_NAV, EVENT_NAV, eventAppNav, type AdminNavItem } from '@/lib/admin/nav'
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 
@@ -72,6 +72,16 @@ export function AdminSidebar({ viewer }: { viewer: Viewer }) {
           <p className="eyebrow mb-1.5 px-2">Event pages</p>
           {eventNavItems.map((item) => (
             <SidebarLink key={item.href} item={item} active={isActive(item)} />
+          ))}
+        </div>
+      ) : null}
+
+      {/* The event's working screens (Today, Calls, Rooms...). */}
+      {isInEvent && eventCode ? (
+        <div className="flex flex-col gap-0.5 px-2 py-3">
+          <p className="eyebrow mb-1.5 px-2">Event app</p>
+          {eventAppNav(eventCode).map((item) => (
+            <SidebarLink key={item.href} item={item} active={false} />
           ))}
         </div>
       ) : null}
