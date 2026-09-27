@@ -66,7 +66,13 @@ EASE ledger/seal and the one SPRING. No new animation libraries.
       auto-advance on the one-tap outcomes (No answer / Not coming / Call back),
       and enlarged the outcome targets to 64px. PHONE CHECK: log "Not coming"
       and watch the check draw before the next family arrives.
-- [ ] M5  Polish pass
+- [x] M5  Polish pass
+      `91f9c69` — haptic tick on success (SuccessMark) and count-up numbers
+      (AnimatedNumber in Progress) landed. Toasts (UndoBar), empty states
+      (EmptyState + icons) and rare skeletons (S3/S5) were already covered by
+      the merged tree. Pull-to-refresh is the one item left: it needs a device
+      for the pointer-tracking trace. PHONE CHECK: confirm the haptic tick on a
+      save and the number glide on Home's "Families called" bar.
 - [x] G5  S5 gap: staff-identity scope
       `4c7d9a5` — the offline query cache is now keyed by event code AND the
       selected staff member (read from the durable store; "anon" when there is
