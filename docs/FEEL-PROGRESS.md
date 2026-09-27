@@ -114,7 +114,19 @@ already there, in this order.
       admin counters stay admin-only. New pure fns + 5 tests. PHONE CHECK:
       open Home and confirm the tiles count up once, the single Families-called
       bar sits under the hero, and "More" holds the other bars.
-- [ ] M4b  Call card, horizontal slide, 5 s Undo, Call-back quick-choice sheet, queue progress bar
+- [x] M4b  Call card, horizontal slide, 5 s Undo, Call-back quick-choice sheet, queue progress bar
+      `db68105` — call card now shows the phone number + "Last call" outcome and
+      a large full-width green Call button in the thumb zone (was a small corner
+      button); call-back quick choices are explicit ("This evening 7 pm",
+      "Tomorrow 10 am") and the evening maths moved 18:00 -> 19:00 (IST) with the
+      existing `callbackChipToValue` tests updated. Kept as-is on purpose: "5 s
+      Undo" stays 7 s (docs/UX-RULES R5, more generous) and the queue progress
+      bar already moves after each outcome. NOT DONE: the horizontal slide — the
+      one horizontal transition needs a horizontal travel distance in
+      `src/lib/motion/tokens.ts`, which M4's file scope excludes (tokens are
+      vertical rise/sink only). PHONE CHECK: open a family, confirm the number
+      shows, the green Call button is large at the card's bottom, and "Call back
+      later" offers the three timed choices.
 - [ ] M5b  Crossfade, Toast region, shared EmptyState x5 screens, pull to refresh
 
 ## Blockers
