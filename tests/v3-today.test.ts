@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   attentionJobs,
   attentionRows,
+  dayBar,
   departmentJob,
+  moreBars,
   moreNumbers,
   nowJob,
   progressBars,
@@ -189,5 +191,41 @@ describe('moreNumbers', () => {
       'Confirmed',
       'Still to call',
     ])
+  })
+})
+
+describe('attentionJobs count field', () => {
+  it('carries the numeric count next to the headline', () => {
+    const jobs = attentionJobs(numbers({ confirmedNoRoom: 17, arrivalsNoVehicle: 3, noDeparture: 0, hampersPending: 0 }), 'E')
+    expect(jobs.map((j) => [j.id, j.count])).toEqual([
+      ['confirmedNoRoom', 17],
+      ['arrivalsNoVehicle', 3],
+    ])
+  })
+})
+
+describe('dayBar', () => {
+  it('is the shared families-called bar', () => {
+    expect(dayBar(numbers({ totalGroups: 238, rsvpPending: 40 }))).toEqual({
+      label: 'Families called',
+      done: 198,
+      total: 238,
+      tone: 'green',
+    })
+  })
+
+  it('never goes negative when counts disagree', () => {
+    expect(dayBar(numbers({ totalGroups: 10, rsvpPending: 40 })).done).toBe(0)
+  })
+})
+
+describe('moreBars', () => {
+  it('moves the department-specific bars behind More, never the day bar', () => {
+    const bars = moreBars(numbers(), 'management')
+    expect(bars.map((b) => b.label)).toEqual(['Guests with a bed', 'Hampers delivered'])
+  })
+
+  it('is empty for a calls-only department', () => {
+    expect(moreBars(numbers(), 'rsvp')).toEqual([])
   })
 })

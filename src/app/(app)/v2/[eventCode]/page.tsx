@@ -3,12 +3,12 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query'
 
-import { ChevronRightIcon, UsersIcon } from '@/components/icons'
+import { UsersIcon } from '@/components/icons'
+import { AnimatedNumber } from '@/components/motion/AnimatedNumber'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LinkButton } from '@/components/ui/LinkButton'
 import { NowCard } from '@/components/ui/NowCard'
 import { Progress } from '@/components/ui/Progress'
-import { Row } from '@/components/ui/Row'
 import { readBoard } from '@/lib/actions/dashboard'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { v2DepartmentHome } from '@/lib/departments'
@@ -19,10 +19,11 @@ import { traceFetch } from '@/lib/perf'
 import {
   attentionJobs,
   attentionRows,
+  dayBar,
   departmentJob,
+  moreBars,
   moreNumbers,
   nowJob,
-  progressBars,
   type StaffFocus,
   type TodayNumbers,
 } from './_home/today'
@@ -169,7 +170,8 @@ export default async function AppHomePage({ params }: PageProps) {
   const jobs = attentionJobs(numbers, event.code)
   const now = nowJob(jobs, focus, event.code)
   const rest = attentionRows(jobs, now)
-  const bars = progressBars(numbers, focus)
+  const day = dayBar(numbers)
+  const more = moreBars(numbers, focus)
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
@@ -185,21 +187,14 @@ export default async function AppHomePage({ params }: PageProps) {
           actionHref={now.href}
         />
 
-        {bars.length > 0 ? (
-          <section
-            aria-label="How it is going"
-            className="flex flex-col gap-4 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1"
-          >
-            {bars.map((bar) => (
-              <Progress
-                key={bar.label}
-                label={bar.label}
-                done={bar.done}
-                total={bar.total}
-                tone={bar.tone}
-              />
-            ))}
-          </section>
+        {day.total > 0 ? (
+          <Progress
+            label={day.label}
+            done={day.done}
+            total={day.total}
+            tone={day.tone}
+            ariaLabel={`${day.done} of ${day.total} families called`}
+          />
         ) : null}
 
         {rest.length > 0 ? (
@@ -207,18 +202,18 @@ export default async function AppHomePage({ params }: PageProps) {
             <h2 id="attention-heading" className="eyebrow text-muted px-1">
               Needs attention
             </h2>
-            {/* A Row with no `onPress` renders a div, so wrapping it in a Link
-                is valid HTML and the WHOLE row stays the tap target. */}
-            <div className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
+            <div className="grid grid-cols-2 gap-2.5">
               {rest.map((job) => (
                 <PrefetchedLink key={job.id} href={job.href} className="block">
-                  <Row
-                    heading={job.headline}
-                    meta={job.context}
-                    status={job.status}
-                    tone="waiting"
-                    trailing={<ChevronRightIcon className="h-5 w-5" />}
-                  />
+                  <div className="flex min-h-28 flex-col justify-between gap-1.5 rounded-2xl border border-rule-strong bg-surface p-3.5 shadow-e1">
+                    <span className="figure text-2xl leading-none font-semibold text-ink">
+                      <AnimatedNumber value={job.count ?? 0} />
+                    </span>
+                    <span className="text-sm leading-snug font-medium text-ink">
+                      {job.actionLabel}
+                    </span>
+                    <span className="text-xs leading-snug text-muted">{job.context}</span>
+                  </div>
                 </PrefetchedLink>
               ))}
             </div>
@@ -228,21 +223,38 @@ export default async function AppHomePage({ params }: PageProps) {
         {/* §4: admin-only extra counters go BELOW a "More numbers" disclosure.
             Native <details> — no script, works before hydration, and it is the
             one control on this screen that is allowed to be quiet. */}
-        {access === 'admin' ? (
+        {more.length > 0 || access === 'admin' ? (
           <details className="rounded-2xl border border-rule-strong bg-surface">
             <summary className="tap flex min-h-12 cursor-pointer items-center px-4 text-base font-medium text-ink">
-              More numbers
+              More
             </summary>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-rule px-4 py-3.5">
-              {moreNumbers(numbers).map((row) => (
-                <div key={row.label} className="min-w-0">
-                  <dt className="text-sm leading-snug text-muted">{row.label}</dt>
-                  <dd className="figure mt-0.5 text-lg leading-none font-medium text-ink">
-                    {row.value}
-                  </dd>
+            <div className="flex flex-col gap-4 border-t border-rule px-4 py-3.5">
+              {more.length > 0 ? (
+                <div className="flex flex-col gap-4">
+                  {more.map((bar) => (
+                    <Progress
+                      key={bar.label}
+                      label={bar.label}
+                      done={bar.done}
+                      total={bar.total}
+                      tone={bar.tone}
+                    />
+                  ))}
                 </div>
-              ))}
-            </dl>
+              ) : null}
+              {access === 'admin' ? (
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {moreNumbers(numbers).map((row) => (
+                    <div key={row.label} className="min-w-0">
+                      <dt className="text-sm leading-snug text-muted">{row.label}</dt>
+                      <dd className="figure mt-0.5 text-lg leading-none font-medium text-ink">
+                        {row.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
+            </div>
           </details>
         ) : null}
 

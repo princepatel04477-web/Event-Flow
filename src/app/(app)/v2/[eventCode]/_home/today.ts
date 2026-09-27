@@ -46,6 +46,8 @@ export type JobId = 'confirmedNoRoom' | 'arrivalsNoVehicle' | 'noDeparture' | 'h
 
 export interface TodayJob {
   id: JobId
+  /** The numeric attention count, present only on attention jobs (not the calm default). */
+  count?: number
   /** One short sentence — the Now card headline, or a Row's heading. */
   headline: string
   /** One line under it. Facts only, no second sentence. */
@@ -121,6 +123,7 @@ export function attentionJobs(n: TodayNumbers, eventCode: string): TodayJob[] {
       const spec = JOBS[id]
       return {
         id,
+        count,
         headline: spec.headline(count),
         context: spec.context,
         actionLabel: spec.actionLabel,
@@ -260,6 +263,25 @@ export function progressBars(n: TodayNumbers, focus: StaffFocus): TodayBar[] {
   }
 
   return ordered[focus].filter((bar) => bar.total > 0).slice(0, 3)
+}
+
+/**
+ * The ONE bar Home shows for the day, across every department: families called.
+ * It is the shared "are we winning" number; the department-specific bars
+ * (rooms, hampers) move behind the More row via `moreBars`.
+ */
+export function dayBar(n: TodayNumbers): TodayBar {
+  const called = Math.max(0, n.totalGroups - n.rsvpPending)
+  return { label: 'Families called', done: called, total: n.totalGroups, tone: 'green' }
+}
+
+/**
+ * The department's remaining bars, for the More row: everything except the
+ * shared day bar. Reuses `progressBars` so the drop-zero-denominator rule and
+ * the department ordering stay in one place.
+ */
+export function moreBars(n: TodayNumbers, focus: StaffFocus): TodayBar[] {
+  return progressBars(n, focus).filter((bar) => bar.label !== 'Families called')
 }
 
 /**
