@@ -116,12 +116,12 @@ describe('callbackChipToValue', () => {
     expect(val).toMatch(/^2026-09-22T15:/)
   })
 
-  it('computes "This evening"', () => {
+  it('computes "This evening" (7 pm, rolls to tomorrow once 7 pm has passed)', () => {
     const afternoon = new Date('2026-09-22T14:00:00')
-    expect(callbackChipToValue('evening', afternoon)).toBe('2026-09-22T18:00')
+    expect(callbackChipToValue('evening', afternoon)).toBe('2026-09-22T19:00')
 
     const lateNight = new Date('2026-09-22T21:00:00')
-    expect(callbackChipToValue('evening', lateNight)).toBe('2026-09-23T18:00')
+    expect(callbackChipToValue('evening', lateNight)).toBe('2026-09-23T19:00')
   })
 
   it('computes "Tomorrow morning"', () => {

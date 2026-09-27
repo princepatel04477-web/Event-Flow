@@ -3,6 +3,7 @@
 import { PhoneIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { StatusPill } from '@/components/ui/StatusPill'
+import { outcomeOption, type CallOutcome } from '@/lib/call/types'
 import type { LockNote } from '@/lib/lock'
 import { dialTarget } from '@/lib/native-call'
 import { SIDE_LABELS } from '@/lib/review/payload'
@@ -46,6 +47,8 @@ export function CurrentFamilyCard({
   const attempts = row.attempt_count ?? 0
   const callback = row.next_callback_at
   const canDial = dialTarget(row.primary_mobile) !== null
+  const phoneLabel = dialTarget(row.primary_mobile)?.label ?? null
+  const lastOutcomeLabel = outcomeOption(row.last_outcome as CallOutcome)?.label ?? null
   const relation = relationLabel(row.group_type)
   const sideLabel = row.side ? (SIDE_LABELS[row.side as Side] ?? row.side) : null
 
@@ -75,12 +78,18 @@ export function CurrentFamilyCard({
             row is patched optimistically before the write leaves the phone,
             so this pill flips on the tap.
           */}
-          <div className="mt-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
             <StatusPill tone={statusTone(row.rsvp_status)}>
               {rsvpStatusLabel(row.rsvp_status)}
             </StatusPill>
+            {lastOutcomeLabel ? (
+              <span className="text-xs text-subtle">Last call: {lastOutcomeLabel}</span>
+            ) : null}
           </div>
           <p className="mt-1 text-sm text-muted">{metaLine}</p>
+          {phoneLabel ? (
+            <p className="mt-1 text-sm font-medium text-ink">{phoneLabel}</p>
+          ) : null}
           {attempts > 0 ? (
             <p className="mt-0.5 text-xs text-subtle">
               {attempts} {attempts === 1 ? 'call' : 'calls'} so far
@@ -88,17 +97,6 @@ export function CurrentFamilyCard({
           ) : null}
         </div>
 
-        <Button
-          variant="success"
-          size="sm"
-          disabled={!canDial || dialling}
-          leadingIcon={<PhoneIcon className="h-5 w-5" aria-hidden />}
-          onClick={onCall}
-          className="shrink-0"
-          aria-label={`Call ${headName}`}
-        >
-          {dialling ? 'Calling…' : 'Call'}
-        </Button>
       </div>
 
       {callback ? (
@@ -121,6 +119,18 @@ export function CurrentFamilyCard({
       {!canDial ? (
         <p className="text-xs text-muted">No phone number on file for this family.</p>
       ) : null}
+
+      <Button
+        variant="success"
+        size="lg"
+        fullWidth
+        disabled={!canDial || dialling}
+        leadingIcon={<PhoneIcon className="h-5 w-5" aria-hidden />}
+        onClick={onCall}
+        aria-label={`Call ${headName}`}
+      >
+        {dialling ? 'Calling…' : 'Call'}
+      </Button>
     </section>
   )
 }

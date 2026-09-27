@@ -359,8 +359,8 @@ export function travelModeChipToValue(chipId: TravelModeChipId | string): Travel
 
 export const CALLBACK_CHIPS = [
   { id: '1hour', label: 'In 1 hour' },
-  { id: 'evening', label: 'This evening' },
-  { id: 'tomorrow_morning', label: 'Tomorrow morning' },
+  { id: 'evening', label: 'This evening 7 pm' },
+  { id: 'tomorrow_morning', label: 'Tomorrow 10 am' },
   { id: 'custom', label: 'Pick time' },
 ] as const
 
@@ -384,10 +384,11 @@ export function callbackChipToValue(
     return toDateTimeLocalValue(d)
   }
   if (chipId === 'evening') {
-    if (d.getHours() >= 17) {
+    // "This evening 7 pm" (IST): roll to tomorrow once 7 pm has already passed.
+    if (d.getHours() >= 19) {
       d.setDate(d.getDate() + 1)
     }
-    d.setHours(18, 0, 0, 0)
+    d.setHours(19, 0, 0, 0)
     return toDateTimeLocalValue(d)
   }
   if (chipId === 'tomorrow_morning') {
