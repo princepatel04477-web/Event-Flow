@@ -106,7 +106,14 @@ spec. The real spec is now in the tree at `docs/FEEL-PHASE-B-SPEC.md` (copied
 from `C:/dev/ef-overnight/SPEC-M3-M5.md`). Build what it lists that is not
 already there, in this order.
 
-- [ ] M3b  Home hero card + up to 4 tiles + day progress bar + More row
+- [x] M3b  Home hero card + up to 4 tiles + day progress bar + More row
+      `12842a5` — hero keeps `nowJob` (already pure + tested); "Needs attention"
+      became 2-col tiles with an `AnimatedNumber` count (`count` added to
+      `TodayJob`); Home now shows ONE day bar (`dayBar`) and the rest moved
+      behind a "More" disclosure (`moreBars`), now visible to staff while the
+      admin counters stay admin-only. New pure fns + 5 tests. PHONE CHECK:
+      open Home and confirm the tiles count up once, the single Families-called
+      bar sits under the hero, and "More" holds the other bars.
 - [ ] M4b  Call card, horizontal slide, 5 s Undo, Call-back quick-choice sheet, queue progress bar
 - [ ] M5b  Crossfade, Toast region, shared EmptyState x5 screens, pull to refresh
 
