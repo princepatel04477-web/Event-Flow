@@ -4,8 +4,9 @@
 
 - **Branches** (neither pushed):
   - `brain/showcase` @ `e7080ca` — upstream A1–A11 merge `e3529df` + RCTX `c0567ca`.
-  - `feel/phase-b` @ `2eb6608` — Phase B: G5 `4c7d9a5`, M3 `65277f0`, M4 `74d4f58`, M5 `91f9c69`, PF `9d27f48`. **Pass 2 (spec-driven):** M3b `12842a5`, M4b `db68105`, M5b `2eb6608`.
-- **Tests:** 852 passed / 852 (65 files). `tsc --noEmit` clean; lint clean on every touched file.
+  - `feel/phase-b` @ `2eb6608` — Phase B: G5 `4c7d9a5`, M3 `65277f0`, M4 `74d4f58`, M5 `91f9c69`, PF `9d27f48`. **Pass 2 (spec-driven):** M3b `12842a5`, M4b `db68105`, M5b `2eb6608`. **Pass 3 (Claude, the two gaps pass 2 left):** M4c + M5c `8b2907c` — hand-over slide + pull to refresh.
+- **Tests:** 862 passed / 862 (66 files). `tsc --noEmit` clean; lint clean on every touched file; `NEXT_PUBLIC_UI=v2 npm run build` compiles.
+- **Spec items deliberately NOT built:** Undo on RSVP outcomes. DECISIONS.md ("No Undo, and not deferred") rules it out: `call_attempts` freezes the moment an outcome is written, so an Undo would be a lie. The project decision wins over the FEEL spec. The shell's UndoBar remains the one toast region (undo + refused writes); success is the SuccessMark.
 - **Phone checks** (the machine cannot do these):
   - Pass 2: Home attention tiles count up once; the single Families-called bar sits under the hero; "More" holds the other bars.
   - Pass 2: call card shows the number + "Last call", and the green Call button is large at the card's bottom.
@@ -14,7 +15,9 @@
   - Calls: log "Not coming" → SuccessMark + haptic tick, next family within ~700ms; outcome targets are 64px.
   - Success haptic + number glide on Home's "Families called" bar.
   - Offline cache: two staff on one phone see only their own login's cached Home.
-- **Blockers:** push/Vercel deploy (unchanged, below); pull-to-refresh (M5b, needs device). PF's "after" re-measurement is pending — needs `scripts/feel-baseline.mjs` + `scripts/tap-budget.mjs` on a production build/device.
+  - Pass 3: Calls — after an outcome the next family slides in from the right (16px, 150ms), the first family just appears.
+  - Pass 3: pull down at the top of Today, Calls, Rooms → arrow turns, a tick at the trigger, spinner while it refreshes, springs back. Pulling inside a sheet or a text field does nothing. Scrolling a long list is unaffected.
+- **Blockers:** push/Vercel deploy (unchanged, below). Pull-to-refresh is BUILT (`8b2907c`); only its feel needs the phone check above. PF's "after" re-measurement is pending — needs `scripts/feel-baseline.mjs` + `scripts/tap-budget.mjs` on a production build/device.
 
 **Phase A is COMPLETE.** Every allowed item is ticked. Nothing is left in
 progress, so there is no `NEXT:` marker: the next thing to do is Phase B's M3,
@@ -130,7 +133,7 @@ already there, in this order.
       vertical rise/sink only). PHONE CHECK: open a family, confirm the number
       shows, the green Call button is large at the card's bottom, and "Call back
       later" offers the three timed choices.
-- [~] M5b  Crossfade, Toast region, shared EmptyState x5 screens, pull to refresh
+- [x] M5b  Crossfade, Toast region, shared EmptyState x5 screens, pull to refresh
       `2eb6608` — crossfade skeleton -> content landed (new `Crossfade` motion
       wrapper using the quick `fadeVariants` token, applied to the call queue).
       Already in the tree: the toast region (`UndoBar` for undo + failed writes,
