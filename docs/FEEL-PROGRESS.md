@@ -4,14 +4,17 @@
 
 - **Branches** (neither pushed):
   - `brain/showcase` @ `e7080ca` — upstream A1–A11 merge `e3529df` + RCTX `c0567ca`.
-  - `feel/phase-b` @ `04ef831` — Phase B: G5 `4c7d9a5`, M3 `65277f0`, M4 `74d4f58`, M5 `91f9c69`, PF `9d27f48`.
-- **Tests:** 847 passed / 847 (65 files). `tsc --noEmit` clean; lint clean on every touched file.
+  - `feel/phase-b` @ `2eb6608` — Phase B: G5 `4c7d9a5`, M3 `65277f0`, M4 `74d4f58`, M5 `91f9c69`, PF `9d27f48`. **Pass 2 (spec-driven):** M3b `12842a5`, M4b `db68105`, M5b `2eb6608`.
+- **Tests:** 852 passed / 852 (65 files). `tsc --noEmit` clean; lint clean on every touched file.
 - **Phone checks** (the machine cannot do these):
+  - Pass 2: Home attention tiles count up once; the single Families-called bar sits under the hero; "More" holds the other bars.
+  - Pass 2: call card shows the number + "Last call", and the green Call button is large at the card's bottom.
+  - Pass 2: skeleton -> content crossfades on the call queue (no hard swap).
   - Home staggered entrance plays once per session, never on tab return.
   - Calls: log "Not coming" → SuccessMark + haptic tick, next family within ~700ms; outcome targets are 64px.
   - Success haptic + number glide on Home's "Families called" bar.
   - Offline cache: two staff on one phone see only their own login's cached Home.
-- **Blockers:** push/Vercel deploy (unchanged, below). PF's "after" re-measurement is pending — needs `scripts/feel-baseline.mjs` + `scripts/tap-budget.mjs` on a production build/device.
+- **Blockers:** push/Vercel deploy (unchanged, below); pull-to-refresh (M5b, needs device). PF's "after" re-measurement is pending — needs `scripts/feel-baseline.mjs` + `scripts/tap-budget.mjs` on a production build/device.
 
 **Phase A is COMPLETE.** Every allowed item is ticked. Nothing is left in
 progress, so there is no `NEXT:` marker: the next thing to do is Phase B's M3,
@@ -127,9 +130,23 @@ already there, in this order.
       vertical rise/sink only). PHONE CHECK: open a family, confirm the number
       shows, the green Call button is large at the card's bottom, and "Call back
       later" offers the three timed choices.
-- [ ] M5b  Crossfade, Toast region, shared EmptyState x5 screens, pull to refresh
+- [~] M5b  Crossfade, Toast region, shared EmptyState x5 screens, pull to refresh
+      `2eb6608` — crossfade skeleton -> content landed (new `Crossfade` motion
+      wrapper using the quick `fadeVariants` token, applied to the call queue).
+      Already in the tree: the toast region (`UndoBar` for undo + failed writes,
+      `SuccessMark` for success), the shared `EmptyState` (used across rooms /
+      hampers / travel / call queue), and `AnimatedNumber`. LEFT: pull to
+      refresh — the custom pointer-tracking indicator needs a device (Blockers).
 
 ## Blockers
+
+### BLOCKED: pull-to-refresh needs a device (M5b)
+
+M5's "custom indicator that follows the finger (pointer events + transform
+only), releases with the spring, invalidates the query" cannot be verified here —
+no handset and no CDP pointer-tracking trace. Same gap the first pass recorded
+for M5. The pure logic is trivial; the risk is the gesture feel, which is
+exactly what a device is for.
 
 ### BLOCKED: push + Vercel deploy (2026-09-26)
 
@@ -177,3 +194,5 @@ this schema". That comment, and possibly the RPC's shape, are now stale against
 **And after merging:** the 3 remaining feel prompts (M3, M4, M5) sit on screens
 A3/A5 may have already redesigned — re-check each against the merged tree before
 implementing.
+
+PASS2 DONE
