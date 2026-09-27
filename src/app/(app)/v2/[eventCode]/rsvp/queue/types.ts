@@ -1,5 +1,6 @@
 import type { CallOutcome, GuestGroupRow } from '@/lib/call/types'
 import type { QueueFiltersKey } from '@/lib/query/keys'
+import type { FilterChipId } from '@/lib/rsvp-queue'
 
 export type QueueRow = {
   group_id: string | null
@@ -60,4 +61,8 @@ export interface CallNextProps {
   startsOn?: string | null
   endsOn?: string | null
   isAdmin?: boolean
+  /** `?filter=` from the URL: which chip the list opens on (admin dashboard links). */
+  initialFilter?: FilterChipId | null
+  /** `?family=` from the URL: open on this family (admin dashboard links). */
+  initialGroupId?: string | null
 }

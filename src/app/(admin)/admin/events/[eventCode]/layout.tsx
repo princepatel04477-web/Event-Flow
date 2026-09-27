@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { resolveEventByCode } from '@/lib/supabase/queries'
@@ -44,11 +45,17 @@ export default async function EventLayout({ children, params }: EventLayoutProps
           does its job — an admin three screens into the wrong wedding sees
           the name and code above every page — but it no longer reads as a
           second page title competing with the screen's own. */}
-      <div className="flex min-h-11 flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-xl border border-rule bg-surface-2 px-4 py-2.5">
+      {/* Tapping the bar goes to the events list, to switch event. */}
+      <Link
+        href="/admin/events"
+        aria-label={`Active event ${event.name} (${event.code}). Switch event`}
+        className="tap flex min-h-11 flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-xl border border-rule bg-surface-2 px-4 py-2.5 transition-colors duration-press ease-ledger hover:bg-surface active:bg-surface"
+      >
         <span className="eyebrow">Active event</span>
         <span className="min-w-0 truncate text-sm font-semibold text-ink">{event.name}</span>
         <span className="code-figure text-xs text-muted">{event.code}</span>
-      </div>
+        <span className="ml-auto self-center text-xs font-medium text-brand">Switch</span>
+      </Link>
 
       {!isLive ? (
         <div

@@ -24,6 +24,7 @@ import {
 import { TodayPanel } from './TodayPanel'
 import { ConfirmationTabs } from './ConfirmationTabs'
 import { AttentionPanel } from '@/components/dashboard/AttentionPanel'
+import { dashboardLinks } from '@/lib/admin/dashboard-links'
 
 interface Props {
   eventId: string
@@ -103,6 +104,9 @@ export function DashboardClient({ eventId, eventCode }: Props) {
     )
   }
 
+  // Every counter is a door to the screen that answers it (owner's ask).
+  const links = dashboardLinks(eventCode)
+
   return (
     <div className="flex flex-col gap-6">
       {/* ---- Numbers ----
@@ -112,36 +116,36 @@ export function DashboardClient({ eventId, eventCode }: Props) {
       <section>
         <h2 className="eyebrow mb-3">RSVP</h2>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Guests (PAX)" value={dash.totalPax} note="confirmed where known" />
-          <StatCard label="No. of families" value={dash.totalGroups} note="groups on the list" />
-          <StatCard label="Confirmed families" value={dash.rsvpConfirmed} tone="success" />
-          <StatCard label="Pending families" value={dash.rsvpPending} tone="warning" />
+          <StatCard label="Guests (PAX)" value={dash.totalPax} note="confirmed where known" href={links.guests} />
+          <StatCard label="No. of families" value={dash.totalGroups} note="groups on the list" href={links.families} />
+          <StatCard label="Confirmed families" value={dash.rsvpConfirmed} tone="success" href={links.confirmed} />
+          <StatCard label="Pending families" value={dash.rsvpPending} tone="warning" href={links.pending} />
         </div>
       </section>
 
-      <ConfirmationTabs buckets={buckets} />
+      <ConfirmationTabs buckets={buckets} eventCode={eventCode} />
 
 
       <section>
         <h2 className="eyebrow mb-3">Hospitality</h2>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Guests roomed" value={dash.guestsRoomed} tone="info" />
-          <StatCard label="Rooms available" value={null} tone="neutral" note="see Hospitality screen" />
+          <StatCard label="Guests roomed" value={dash.guestsRoomed} tone="info" href={links.roomed} />
+          <StatCard label="Rooms available" value={null} tone="neutral" note="open the Rooms board" href={links.rooms} />
         </div>
       </section>
 
       <section>
         <h2 className="eyebrow mb-3">Deliveries</h2>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Hampers done" value={dash.hampersDelivered} tone="success" />
-          <StatCard label="Hampers pending" value={dash.hampersPending} tone="warning" />
+          <StatCard label="Hampers done" value={dash.hampersDelivered} tone="success" href={links.hampersDone} />
+          <StatCard label="Hampers pending" value={dash.hampersPending} tone="warning" href={links.hampersPending} />
         </div>
       </section>
 
       <section>
         <h2 className="eyebrow mb-3">Money</h2>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Logistics spend" value={dash.logisticsExpense} tone="neutral" note="from trip expenses" />
+          <StatCard label="Logistics spend" value={dash.logisticsExpense} tone="neutral" note="from trip expenses" href={links.spend} />
         </div>
       </section>
 
