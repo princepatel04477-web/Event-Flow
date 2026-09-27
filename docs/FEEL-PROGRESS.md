@@ -99,6 +99,17 @@ EASE ledger/seal and the one SPRING. No new animation libraries.
       production-build browser harness (`scripts/feel-baseline.mjs` +
       `scripts/tap-budget.mjs`), which is the phone-check / next-session item.
 
+## Phase B pass 2
+
+Standing loop pass 2 (2026-09-27): the first pass ticked M3/M4/M5 without the
+spec. The real spec is now in the tree at `docs/FEEL-PHASE-B-SPEC.md` (copied
+from `C:/dev/ef-overnight/SPEC-M3-M5.md`). Build what it lists that is not
+already there, in this order.
+
+- [ ] M3b  Home hero card + up to 4 tiles + day progress bar + More row
+- [ ] M4b  Call card, horizontal slide, 5 s Undo, Call-back quick-choice sheet, queue progress bar
+- [ ] M5b  Crossfade, Toast region, shared EmptyState x5 screens, pull to refresh
+
 ## Blockers
 
 ### BLOCKED: push + Vercel deploy (2026-09-26)
