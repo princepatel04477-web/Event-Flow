@@ -42,8 +42,8 @@ export const ADMIN_NAV: AdminNavItem[] = [
 ]
 
 /**
- * Per-event pages. Every item here MUST also be reachable from the phone's More
- * sheet (see AdminMobileNav) — the shared import is what guarantees it.
+ * Per-event pages. Every item here MUST also be reachable from the phone's Control
+ * list (see `@/lib/admin/control`, which a test walks against this one).
  */
 export const EVENT_NAV: AdminNavItem[] = [
   {

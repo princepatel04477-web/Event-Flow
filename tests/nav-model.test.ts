@@ -39,7 +39,7 @@ describe('bottomTabsFor — event lead', () => {
     expect(hrefs(tabs)).toEqual([
       `/${EV}`,
       `/${EV}/guests/list`,
-      `/${EV}/rsvp/campaigns`,
+      `/${EV}/rsvp/queue`,
       `/${EV}/logistics/arrivals`,
       `/${EV}/hospitality/rooms`,
     ])
@@ -75,7 +75,7 @@ describe('bottomTabsFor — runners', () => {
     // `requireSection` would bounce a hospitality runner off both, so a tab
     // for either would be a control that cannot work.
     const tabs = bottomTabsFor(EV, 'event_team', 'hospitality')
-    expect(labels(tabs)).toEqual(['Hospitality', 'Check in / out'])
+    expect(labels(tabs)).toEqual(['Rooms', 'Check in / out'])
   })
 
   it('gives a single-screen department no bar at all', () => {
@@ -159,7 +159,9 @@ describe('section definitions', () => {
 
   it('marks exactly the borrowed sections as out of the tab bar', () => {
     const outOfBar = Object.values(SECTIONS).filter((s) => !s.inTabBar).map((s) => s.id)
-    expect(outOfBar.sort()).toEqual(['hamper', 'production'])
+    // `control` is not borrowed: it is admin-only and only the v3 bar draws it
+    // (UI4 Part S). It is out of the v1 bar deliberately.
+    expect(outOfBar.sort()).toEqual(['control', 'hamper', 'production'])
   })
 
   it('gives every borrowed child an href, since its route is elsewhere', () => {
@@ -177,6 +179,9 @@ describe('section definitions', () => {
     const tabs = bottomTabsFor(EV, 'admin', 'management')
     const reachable = new Set<string>(tabs.map((t) => t.sectionId))
     for (const section of Object.values(SECTIONS)) {
+      // Control is reached from the v3 bar only (and /admin on v1); it is not a
+      // v1 section. `tests/v3-nav.test.ts` pins that an admin gets its tab.
+      if (section.id === 'control') continue
       if (section.inTabBar) {
         expect(reachable.has(section.id), `${section.id} has no tab`).toBe(true)
         continue

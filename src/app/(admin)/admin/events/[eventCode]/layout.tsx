@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { notFound } from 'next/navigation'
 
 import { resolveEventByCode } from '@/lib/supabase/queries'
+import { v3TabsFor } from '@/lib/sections/v3'
+import { AppTabs } from '@/app/(app)/v2/[eventCode]/_components/AppTabs'
 
 type EventLayoutProps = {
   children: ReactNode
@@ -61,6 +63,14 @@ export default async function EventLayout({ children, params }: EventLayoutProps
       ) : null}
 
       {children}
+
+      {/* The event's own tab bar, with Control lit (UI4 Part S). On a phone an
+          admin tool is one of Control's screens, so the bar the admin arrived
+          from stays under their thumb and one tap returns to Today, Calls or
+          wherever they were. The admin layout guard above has already refused
+          a non-admin, so the admin tab set is the right one to draw. Hidden at
+          lg+, where the admin sidebar is the navigation. */}
+      <AppTabs tabs={v3TabsFor(event.code, 'admin', 'management')} activeSection="control" />
     </div>
   )
 }

@@ -14,10 +14,11 @@ import {
   FileTextIcon,
   UploadIcon,
   DownloadIcon,
+  SlidersIcon,
 } from '@/components/icons'
 import { type StaffDepartment } from '@/lib/departments'
 
-export type SectionId = 'dashboard' | 'guests' | 'rsvp' | 'logistics' | 'hospitality' | 'hamper' | 'production'
+export type SectionId = 'dashboard' | 'guests' | 'rsvp' | 'logistics' | 'hospitality' | 'hamper' | 'production' | 'control'
 
 export type TabAccess = 'admin' | 'event_team' | 'client'
 
@@ -127,9 +128,13 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     departments: ['management'],
     inTabBar: true,
     children: [
-      { segment: 'campaigns', label: 'Auto-call', icon: <PhoneIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
-      { segment: 'queue', label: 'Call list', icon: <ListIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
+      // UI4 Part S: the call list is the section's front door, for the lead
+      // and the caller alike. Auto-call is the lead's view of a campaign, not a
+      // caller's job, so it comes last and only for management — a calling
+      // runner's first tab used to be a campaign board they had no use for.
+      { segment: 'queue', label: 'Call list', icon: <ListIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
       { segment: 'review', label: 'Call notes', icon: <FileTextIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
+      { segment: 'campaigns', label: 'Auto-call', icon: <PhoneIcon className="h-6 w-6" />, roles: ['admin','event_team'], departments: ['management'] },
     ],
   },
   logistics: {
@@ -152,7 +157,10 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     departments: ['management', 'hospitality'],
     inTabBar: true,
     children: [
-      { segment: 'rooms', label: 'Hospitality', icon: <BuildingIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
+      // "Rooms", not "Hospitality": this is one screen INSIDE Hospitality, and
+      // the section switcher shows it beside Check in and Hampers. The TAB
+      // stays "Hospitality" (A3's rename is about the section, not this row).
+      { segment: 'rooms', label: 'Rooms', icon: <BuildingIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
       { segment: 'checkin', label: 'Check in / out', icon: <ClipboardCheckIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
       // ADMIN ONLY, DELIBERATELY. Every row of this sheet is a door out of the
       // section — the family head opens RSVP status, the hamper opens the hamper
@@ -195,6 +203,19 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     inTabBar: false,
     children: [],
     featureFlag: 'production',
+  },
+  // UI4 Part S: every admin tool for the event, one tap from the bar. Admin
+  // ONLY — `roles` is the gate; `departments` is management so a lead who is
+  // not an admin is refused by the department table as well, never shown a
+  // tab that would bounce. Not in the v1 bar (`inTabBar: false`); the v3 bar
+  // appends it for admins (`src/lib/sections/v3.ts`).
+  control: {
+    id: 'control', label: 'Control', tabLabel: 'Control',
+    icon: <SlidersIcon className="h-6 w-6" />,
+    roles: ['admin'],
+    departments: ['management'],
+    inTabBar: false,
+    children: [],
   },
 } as const
 

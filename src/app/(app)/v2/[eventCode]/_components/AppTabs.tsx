@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 
 import { useBoundedPrefetch } from '@/lib/query/prefetch'
 import { cn } from '@/lib/utils'
-import { resolveActive, type NavTab, type TabAccess } from '@/lib/sections/config'
+import { resolveActive, type NavTab, type SectionId, type TabAccess } from '@/lib/sections/config'
 import { v3ActiveChild, v3ActiveSection } from '@/lib/sections/v3'
 
 export type { TabAccess }
@@ -36,6 +36,13 @@ export interface AppTabsProps {
    *   below is v2's, not v3's.
    */
   model?: 'v3' | 'legacy'
+  /**
+   * Light this section's tab regardless of the path. For screens outside the
+   * event URL space that still belong to a tab — the admin tools under
+   * `/admin/events/{code}/…` are Control's screens on a phone (UI4 Part S),
+   * but their path does not start with the event code.
+   */
+  activeSection?: SectionId
 }
 
 /**
@@ -84,7 +91,7 @@ export function tabHrefFor(href: string): string {
  * the one that used to write on render was `rsvp/campaigns` (`ensureCampaigns`
  * inserted the default draft waves), and no v3 tab points at it.
  */
-export function AppTabs({ tabs, model = 'v3' }: AppTabsProps) {
+export function AppTabs({ tabs, model = 'v3', activeSection: forcedSection }: AppTabsProps) {
   const pathname = usePathname()
   // segments = [eventCode, ...rest]. The event code is sliced off because this
   // component renders inside the rewritten (internal) URL when the proxy is on,
@@ -100,7 +107,8 @@ export function AppTabs({ tabs, model = 'v3' }: AppTabsProps) {
   // The v3 model resolves a borrowed child to its host tab; the legacy model
   // reads the shared `resolveActive`. Both are pure.
   const active = model === 'v3' ? null : resolveActive(rest)
-  const activeSection = model === 'v3' ? v3ActiveSection(rest) : active?.sectionId ?? null
+  const activeSection =
+    forcedSection ?? (model === 'v3' ? v3ActiveSection(rest) : active?.sectionId ?? null)
   const activeChild = model === 'v3' ? v3ActiveChild(rest) : active?.childSegment ?? null
 
   return (

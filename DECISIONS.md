@@ -2868,3 +2868,57 @@ remaining twelve once a test fails, so the structural sweep was exercised by the
 `scripts/tap-budget.mjs` instead (nine routes, findings listed under 4).
 **No handset, no camera, no real venue Wi-Fi** — every number here is a desktop Chromium at a
 360px viewport with CDP throttling.
+
+---
+
+## 28 September 2026 — UI4 structure, step 1: Control tab, section switcher, admin inside the one app
+
+Source: `UI4-ARENA-PROMPTS.md` Part S (S1–S3, N1). Built directly rather than through arena
+prototypes, at the owner's request.
+
+### What changed
+
+- **Control (`/{event}/control`, v2 tree).** A grouped list of every admin tool for the event —
+  Staff, Access codes, Import, Export, Files, Hotels & rooms, Send, Templates, Sent log, Ledger,
+  Section locks, Arrival alerts — with live counts read in parallel, a filter box, the "no staff
+  names" warning, and Archive alone at the foot. Admin only: `requireSection` admits management,
+  so the gate is `access !== 'admin'` → `?denied=admin`. Row destinations are data in
+  `src/lib/admin/control.ts` so a test can prove every `EVENT_NAV` page is one tap from it.
+- **A fifth tab for admins.** New `SectionId` `control` (roles `['admin']`, not in the v1 bar).
+  The v3 bar is now Today · Calls · Hospitality · Logistics · Control for an admin, four tabs for
+  a non-admin lead. **Hampers left the lead's bar** — it is a screen inside Hospitality now, and
+  the hamper runner still gets it as their whole app with no bar (unchanged).
+- **Section switcher** (`_components/SectionSwitch.tsx`), one row of pills under the header for
+  leads and admins. Found while doing this: the v3 shell had dropped the section strip, so an
+  event lead had **no nav entry** for Check in, Rooming list, Hampers, Departures, Fleet, Trips or
+  Call notes. Runners are unaffected (their bar already is their section's screens).
+- **Calls' front door is the call list.** `queue` is the default child; `campaigns` (Auto-call)
+  is last and management-only, so a calling runner's first tab is no longer a campaign board.
+  The Rooms child is labelled "Rooms" (it sat beside Check in labelled "Hospitality").
+- **Admin on a phone is inside the one app.** `AdminMobileNav` (Events · Dashboard · Msgs · More)
+  is deleted. Admin event screens draw the event's own tab bar with Control lit (`AppTabs`
+  gained `activeSection`), and the header (`AdminHeader`) names the tool and goes back to
+  Control instead of the fixed "Admin" title with a back link labelled "App".
+
+### What deliberately did NOT change
+
+- `departmentHomePath('management')` still returns `rsvp/campaigns`. It was changed and
+  reverted in this session: v1's dashboard redirects departments through the same function, so
+  pointing it at `/{event}` is a redirect loop on v1. v2 already lands the lead on Today
+  (`v2DepartmentHome` returns null), which is the tree this work targets.
+- No route moved and nothing was deleted except `AdminMobileNav`. The route map (S3), the family
+  page (S4) and Android back (N4) are later steps.
+
+### Tests changed on purpose
+
+`v3-nav`, `nav-model`, `sidebar-model`, `v2-route-parity` and `admin-nav` pinned the old bar,
+the Auto-call default and the More sheet. Each assertion was rewritten to pin the new contract
+(Control for admins only; queue as Calls' default; "every EVENT_NAV page is reachable from
+Control"), not deleted. New: `tests/admin-header.test.ts`.
+
+### Verification
+
+`tsc --noEmit` clean. `vitest run`: 60 files pass; `caller-lock` fails at import because the
+sandbox has no Supabase URL/key (it failed identically before this change). `next build` with
+`NEXT_PUBLIC_UI=v2`: exit 0. `eslint` on the changed files: clean. **Not run on a handset** —
+the sandbox has no device, so this is committed, not verified (CLAUDE.md §14).
