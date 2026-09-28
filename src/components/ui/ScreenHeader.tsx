@@ -17,6 +17,12 @@ export interface ScreenHeaderProps {
    */
   context?: string
   /**
+   * Replaces the context line with a control — the event pill (UI4 Part S).
+   * When both are given the eyebrow wins; the context is for screens that
+   * have nothing more useful to put there.
+   */
+  eyebrow?: ReactNode
+  /**
    * Where the back arrow goes. Provide it on a DETAIL screen only — a screen
    * reached by drilling into a row. A tab-level screen has no back arrow:
    * the tab bar underneath is the way out, and a back arrow there would
@@ -80,6 +86,7 @@ export function splitEventPath(pathname: string | null): {
 export function ScreenHeader({
   title,
   context,
+  eyebrow,
   backHref,
   backLabel = 'Back',
   search = true,
@@ -98,9 +105,9 @@ export function ScreenHeader({
         className,
       )}
     >
-      {/* 64px of content: a 20px context line over a 30px title, on 4px
-          padding. Deliberately not taller — at 360px every pixel here is a
-          pixel the list below does not get. */}
+      {/* ~68px of content: a 28px event pill (or 20px context line) over a
+          35px serif title, on 4px padding. Deliberately not taller — at 360px
+          every pixel here is a pixel the list below does not get. */}
       <div className="mx-auto flex w-full max-w-[480px] items-center gap-2 px-4 py-2">
         {backHref ? (
           <Link
@@ -113,10 +120,14 @@ export function ScreenHeader({
         ) : null}
 
         <div className="min-w-0 flex-1">
-          {context ? (
+          {eyebrow ? (
+            <div className="flex min-w-0 pb-0.5">{eyebrow}</div>
+          ) : context ? (
             <p className="truncate text-sm leading-tight text-muted">{context}</p>
           ) : null}
-          <h1 className="truncate font-display text-[1.875rem] leading-[1.15] font-semibold tracking-tight text-ink">
+          {/* UI4: the title is the serif at 32px, one weight — no
+              `font-semibold`, which the serif does not have. */}
+          <h1 className="truncate font-display text-[2rem] leading-[1.1] text-ink">
             {title}
           </h1>
         </div>

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { resolveEventByCode } from '@/lib/supabase/queries'
 import { v3TabsFor } from '@/lib/sections/v3'
 import { AppTabs } from '@/app/(app)/v2/[eventCode]/_components/AppTabs'
+import { NavTracker } from '@/components/nav/NavTracker'
 
 type EventLayoutProps = {
   children: ReactNode
@@ -42,15 +43,9 @@ export default async function EventLayout({ children, params }: EventLayoutProps
 
   return (
     <div className="flex flex-col gap-4">
-      {/* One compact line, not a stacked eyebrow + title block. The bar still
-          does its job — an admin three screens into the wrong wedding sees
-          the name and code above every page — but it no longer reads as a
-          second page title competing with the screen's own. */}
-      <div className="flex min-h-11 flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-xl border border-rule bg-surface-2 px-4 py-2.5">
-        <span className="eyebrow">Active event</span>
-        <span className="min-w-0 truncate text-sm font-semibold text-ink">{event.name}</span>
-        <span className="code-figure text-xs text-muted">{event.code}</span>
-      </div>
+      {/* The "Active event" strip that sat here is now the event pill in
+          the header (UI4 Part S), on every admin screen and every app screen
+          alike — one place the event is named, not two. */}
 
       {!isLive ? (
         <div
@@ -71,6 +66,10 @@ export default async function EventLayout({ children, params }: EventLayoutProps
           a non-admin, so the admin tab set is the right one to draw. Hidden at
           lg+, where the admin sidebar is the navigation. */}
       <AppTabs tabs={v3TabsFor(event.code, 'admin', 'management')} activeSection="control" />
+      {/* Admin tools are Control's screens, so they join the same visit
+          record the Android back button reads (UI4 N4). The landing is left
+          as the event shell set it. */}
+      <NavTracker landing={null} />
     </div>
   )
 }

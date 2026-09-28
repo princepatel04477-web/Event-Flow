@@ -681,8 +681,11 @@
 @media (pointer: coarse) {
   .list-fade,
   .grow-x,
-  .push-in,
-  .sheet-in {
+  .push-in {
     animation: none;
   }
+  /* UI4: `.sheet-in` is NOT killed here any more. A sheet rising is the
+     response to the tap that opened it (confirmation, not transition), it is
+     transform-only, and it is what makes the drag-to-dismiss read as one
+     physical object. The navigation entrances above stay off. */
 }

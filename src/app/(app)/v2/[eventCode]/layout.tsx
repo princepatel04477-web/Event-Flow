@@ -17,6 +17,8 @@ import { AppSidebar } from './_components/AppSidebar'
 import { AppTabs } from './_components/AppTabs'
 import { DeniedNote } from './_components/DeniedNote'
 import { SectionSwitch } from './_components/SectionSwitch'
+import { NavTracker } from '@/components/nav/NavTracker'
+import { v2DepartmentHome } from '@/lib/departments'
 
 /* The offline training line that used to live here as a constant now lives in
    `src/lib/offline-note.ts`, because the banner that renders it is mounted by
@@ -195,6 +197,17 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
         </div>
       </main>
       <AppTabs tabs={tabs} model="v3" />
+
+      {/* Where this viewer lands, and where they have been, for the Android
+          back button (UI4 N4). A runner's landing is their own section; a
+          lead's, an admin's and a client's is this event's root. */}
+      <NavTracker
+        landing={
+          access === 'event_team' && department
+            ? v2DepartmentHome(event.code, department) ?? `/${event.code}`
+            : `/${event.code}`
+        }
+      />
 
       {/* Undo bar mounted in the shell for global 7-second cross-screen undo capability */}
       <UndoBar />

@@ -2971,3 +2971,28 @@ padding/boxShadow/filter) inside a motion `animate`/`initial`/`exit` object — 
 
 Not done: the per-gesture frame measurement (F10) needs a Playwright run against a seeded
 database with CPU throttling; the sandbox has no database, so that stays open.
+
+## 28 September 2026 — UI4 step 4: event pill, draggable sheets, Android back, button press
+
+- **Event pill** (`src/components/nav/EventPill.tsx`) replaces the header's date line on every
+  event screen and every admin event screen: the event code and name, one tap opens a sheet to
+  switch. Switching keeps you on the same tab in the other event (`switchTarget`, N9; tested);
+  Control survives the switch for admins only. Admins also get "All events" and "New event"
+  (`/admin/events#new`). The event switcher and the Admin link left the account menu, and the
+  admin event layout's "Active event" strip is gone — the pill is the one place the event is
+  named.
+- **Bottom sheets drag to dismiss** (`BottomSheet.tsx`). The handle strip follows the finger by
+  writing `transform` straight to the panel's style (no React state per frame) and closes past
+  30% of its height or on a flick; otherwise it springs back on the out-expo ease. motion's drag
+  was not used because it needs the larger `domMax` bundle. The scrim is unblurred ink at 50%,
+  the body scrolls with `overscroll-behavior: contain`, the sheet's radius is 32px. `.sheet-in`
+  is no longer disabled on coarse pointers: a sheet rising is the response to the tap.
+- **Android back follows N4** (`src/lib/nav/back.ts`, `resolveBack`, 9 tests): close the top
+  sheet (sheets register in `src/lib/nav/sheet-stack.ts`) → back within the same tab → up from a
+  detail screen (admin tools go up to Control) → the viewer's landing tab → "Press back again to
+  close EventFlow" → exit. `NavTracker` records visits and the landing (a runner's is their own
+  section). "Up" uses `router.replace` so the detail screen does not linger in history.
+  **This is native behaviour and has NOT been run on a handset.**
+- **Buttons** press with `scale(0.97)` (transform) as well as the colour change, and gain a
+  `now` (haldi) variant. The header title is the 32px serif with no faked weight.
+- `adminHeaderFor` moved to `src/lib/admin/header.ts` so the back resolver can reuse it.

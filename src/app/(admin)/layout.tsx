@@ -31,6 +31,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           "App" is what made admin read as a second app on a phone. */}
       <AdminHeader
         context={viewer.fullName ?? viewer.email ?? 'Signed in'}
+        memberships={viewer.memberships}
         actions={<SignOutButton compact />}
       />
 

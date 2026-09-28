@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { adminHeaderFor } from '@/app/(admin)/AdminHeader'
+import { adminHeaderFor } from '@/lib/admin/header'
 
 /**
  * UI4 Part S: an admin tool on a phone is one of Control's screens. Its back
