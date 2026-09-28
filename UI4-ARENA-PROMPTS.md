@@ -1,5 +1,15 @@
 # EventFlow — UI4 "Haldi & Ink": new structure (flows + navigation) and redesign — arena prompts + Claude Code prompts
 
+> **Build status (28 Sep 2026) — built directly, without arena, at the owner's request.**
+> DECISIONS.md has one entry per step. Done: Control tab + screen (C5, CS3 bars), section
+> switcher, admin inside the one shell with `AdminMobileNav` deleted (C4), Haldi & Ink tokens and
+> fonts (C1), the 60fps rules as a test with every offender fixed (C2), draggable sheets, event
+> pill with same-tab switching (N9), Android back order (CS4/N4), button press, family page
+> (CS5), setup checklist (CS8), hero guests card on Today, design-system page as the living spec.
+> **Not done:** the route moves and redirects of S3 beyond `/families` (CS1/CS7), the merged
+> single-URL call flow (CS6), the per-screen restyles C6–C14 beyond what the tokens give, and the
+> frame measurements (C15/CS9). **Nothing has been run on a handset.**
+
 **Supersedes the visual layer of `UI2-PROMPTS.md` (V0–V12) and the v3 shell.** It does NOT
 supersede their rules. `docs/UX-RULES.md` (R1–R8) and `docs/INTERACTION-CONTRACT.md` (T1–T7)
 still apply to every screen below. This series adds an eighth concern those two never had:
