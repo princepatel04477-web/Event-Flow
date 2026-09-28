@@ -256,6 +256,8 @@ const V3_TITLE_OVERRIDES: Record<string, string> = {
   // screen is still named for itself.
   hamper: 'Hampers',
   production: 'Setup',
+  // The family page (UI4 S4) belongs to no section; it is named for itself.
+  families: 'Family',
   help: 'Help',
 }
 
@@ -268,7 +270,10 @@ export function v3ScreenTitle(rest: string): string {
   // as its list, and a whole-path key would miss the moment an id followed.
   // A one-segment path slices to itself, so `help` is covered by the same
   // lookup.
-  const override = V3_TITLE_OVERRIDES[segments.slice(0, 2).join('/')]
+  // A one-segment override (`hamper`, `families`) also names that screen's
+  // detail routes (`hamper/{id}`, `families/{id}`).
+  const override =
+    V3_TITLE_OVERRIDES[segments.slice(0, 2).join('/')] ?? V3_TITLE_OVERRIDES[segments[0]]
   if (override) return override
 
   const sectionId = v3ActiveSection(rest)

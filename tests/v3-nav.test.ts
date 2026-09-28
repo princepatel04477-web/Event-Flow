@@ -225,6 +225,10 @@ describe('v3ScreenTitle', () => {
     expect(v3ScreenTitle('hospitality/rooms/104')).toBe('Rooms')
   })
 
+  it('names the family page for itself', () => {
+    expect(v3ScreenTitle('families/abc-123')).toBe('Family')
+  })
+
   it('never returns an empty string', () => {
     for (const rest of ['', 'rsvp', 'guests/list', 'nonsense/page', 'help']) {
       expect(v3ScreenTitle(rest).length).toBeGreaterThan(0)
