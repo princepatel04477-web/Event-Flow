@@ -152,8 +152,9 @@ export default async function AdminEventsPage({ searchParams }: PageProps) {
         the staff nav — so nothing is lost by removing the section.
       */}
       <section
+        id="new"
         aria-label="Create an event"
-        className="flex flex-col gap-4 border-t border-rule pt-6"
+        className="flex scroll-mt-24 flex-col gap-4 border-t border-rule pt-6"
       >
         <h2 className="font-display text-xl leading-tight font-semibold tracking-tight text-ink">
           Create an event

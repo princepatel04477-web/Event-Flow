@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { EVENT_NAV } from '@/lib/admin/nav'
+import { controlGroups } from '@/lib/admin/control'
 
 /**
  * The admin nav contract.
@@ -29,12 +30,24 @@ describe('admin event nav', () => {
     expect(new Set(segments).size).toBe(segments.length)
   })
 
-  it('gives the phone every page except the root', () => {
-    // Mirrors AdminMobileNav's `EVENT_NAV.filter((item) => item.href !== '')`.
-    const phoneItems = EVENT_NAV.filter((item) => item.href !== '')
-    expect(phoneItems.length).toBe(EVENT_NAV.length - 1)
-    for (const page of ['hotels', 'files', 'settings']) {
-      expect(phoneItems.map((i) => i.href)).toContain(page)
+  it('puts every admin event page one tap from Control on a phone', () => {
+    // UI4 Part S: the phone's admin tab bar and its More sheet are gone. An
+    // admin on a phone reaches every event tool from the Control tab instead,
+    // so every EVENT_NAV page except the root (the event itself) must be a
+    // row there. This replaced "the More sheet lists every page".
+    const controlHrefs = controlGroups('SHARMA26').flatMap((g) => g.rows.map((r) => r.href))
+    for (const item of EVENT_NAV.filter((i) => i.href !== '')) {
+      const href = `/admin/events/SHARMA26/${item.href}`
+      expect(
+        controlHrefs.some((h) => h === href || h.startsWith(`${href}/`)),
+        `${item.label} is not reachable from Control`,
+      ).toBe(true)
     }
+  })
+
+  it('also puts the staff roster on Control, which the sidebar lists elsewhere', () => {
+    const keys = controlGroups('SHARMA26').flatMap((g) => g.rows.map((r) => r.key))
+    expect(keys).toContain('staff')
+    expect(new Set(keys).size).toBe(keys.length)
   })
 })

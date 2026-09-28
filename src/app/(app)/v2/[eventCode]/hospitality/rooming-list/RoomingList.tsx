@@ -362,7 +362,9 @@ function RoomingTr({
           <span className="block px-3 py-2 text-sm text-subtle">—</span>
         ) : (
           <Link
-            href={`/${eventCode}/rsvp/status/${row.groupId}`}
+            // The family page, not rsvp/status: opening the RSVP form claims the
+            // caller lock (CLAUDE.md §6), and reading a rooming list is not a call.
+            href={`/${eventCode}/families/${row.groupId}`}
             className="tap flex min-h-11 items-center px-3 py-2 text-sm text-ink underline decoration-rule-strong underline-offset-4"
           >
             {familyLabel(row)}

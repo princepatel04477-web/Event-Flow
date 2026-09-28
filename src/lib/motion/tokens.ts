@@ -18,25 +18,25 @@
  * Set deliberately below the brief's ceilings; the existing design system was
  * already tighter than the brief asked for, so we kept its numbers:
  *
- *   feedback  100ms  (brief allows 150) — press states
- *   fade      150ms  (brief allows 150) — opacity in/out
- *   enter     280ms  (brief allows 250 on a PRIMARY ACTION PATH, 400 ceiling)
+ *   feedback   90ms  (brief allows 150) — press states
+ *   fade      160ms  (brief allows 150 on a primary path; used for arrivals)
+ *   enter     240ms  (brief allows 250 on a PRIMARY ACTION PATH, 400 ceiling)
  *
- * `enter` at 280ms is the one value above the brief's 250ms transition figure.
- * It is deliberate and in-bounds: 280ms is an ENTRY sequence (a screen
- * arriving), never a primary action path, and it sits under the 400ms absolute
- * ceiling. Nothing a caller taps to dial, confirm, or submit uses it — those
+ * UI4 "Haldi & Ink" (§2.4) moved these to 90 / 160 / 240 on an out-expo curve
+ * `(0.16, 1, 0.3, 1)`: a sharper press, and an entry that lands inside the
+ * brief's 250ms rather than 30ms over it. `fade` at 160ms is content arriving
+ * into a laid-out frame, not a tap's response. Nothing a caller taps to dial, confirm, or submit uses it — those
  * use `feedback` or `fade`. Do not reuse `enter` on an action path.
  */
 
 /** Milliseconds. Matches the `--ef-duration-*` custom properties exactly. */
 export const DURATION_MS = {
   /** Press / release state feedback. Primary action paths. */
-  feedback: 100,
+  feedback: 90,
   /** Opacity in-out. Primary action paths, confirmations. */
-  fade: 150,
+  fade: 160,
   /** Screen and overlay entry sequences. NEVER a primary action path. */
-  enter: 280,
+  enter: 240,
 } as const
 
 /** Seconds. Motion's `transition.duration` is in seconds, not milliseconds. */
@@ -56,7 +56,7 @@ export const DURATION = {
  */
 export const EASE = {
   /** cubic-bezier(0.23, 1, 0.32, 1) — `--ef-ease` */
-  ledger: [0.23, 1, 0.32, 1],
+  ledger: [0.16, 1, 0.3, 1],
   /** cubic-bezier(0.65, 0, 0.35, 1) — `--ef-ease-seal` */
   seal: [0.65, 0, 0.35, 1],
 } as const satisfies Record<string, [number, number, number, number]>
@@ -81,6 +81,18 @@ export const SPRING = {
  * at arm's length, and a 24px slide that looks refined on a desktop mock
  * reads as a lurch on a phone.
  */
+/**
+ * The bottom-sheet spring (UI4 §2.4): firm, no overshoot you can see, and
+ * fast to settle so a sheet dragged on a slow phone never wobbles after the
+ * finger lifts. Used by `BottomSheet` for drag-to-dismiss and its snap back.
+ */
+export const SHEET_SPRING = {
+  type: 'spring',
+  stiffness: 420,
+  damping: 40,
+  mass: 1,
+} as const
+
 export const DISTANCE = {
   /** A wordmark or heading settling into place. */
   rise: 8,

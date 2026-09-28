@@ -2,16 +2,16 @@ import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 
 import { SignOutButton } from '@/components/auth/SignOutButton'
-import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { AdminSidebar } from './AdminSidebar'
-import { AdminMobileNav } from './AdminMobileNav'
+import { AdminHeader } from './AdminHeader'
 import { getViewer } from '@/lib/supabase/queries'
 
 /**
  * Shell for the admin-only screens.
  *
- * Administrators manage everything from a laptop — sidebar on wide viewports,
- * bottom tab bar on phones. The guard runs here so a non-admin never receives
+ * Administrators manage everything from a laptop — sidebar on wide viewports —
+ * and, on a phone, from the event app's Control tab: the event layout below
+ * this one draws the event's own tab bar with Control lit (UI4 Part S). The guard runs here so a non-admin never receives
  * the admin markup at all.
  *
  * Every admin screen carries the current event's name and a switcher. An admin
@@ -26,22 +26,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   return (
     <div className="flex min-h-dvh flex-col bg-paper text-ink">
-      {/* The v3 screen title: a small muted context line over a 30px Bricolage
-          title. The signed-in identity is the context line — it is what the
-          old `StickyHeader` subtitle carried — and it no longer competes with
-          the title for the same 40px.
-
-          `search={false}`: `ScreenHeader` derives its round Find button from
-          the path's first segment, which on every admin route is `admin`, so
-          the default would render a link to `/admin/find` — a route that does
-          not exist. Admin has no Find; the button is switched off rather than
-          left pointing at a 404. */}
-      <ScreenHeader
-        title="Admin"
+      {/* UI4 Part S: the header names the TOOL and goes back to the event's
+          Control tab. The old fixed "Admin" title with a back link labelled
+          "App" is what made admin read as a second app on a phone. */}
+      <AdminHeader
         context={viewer.fullName ?? viewer.email ?? 'Signed in'}
-        backHref="/"
-        backLabel="App"
-        search={false}
+        memberships={viewer.memberships}
         actions={<SignOutButton compact />}
       />
 
@@ -62,7 +52,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
                 the bottom and still not reach it — there was nothing below it
                 to scroll past. Creating an event was impossible on a phone.
                 The staff shell already solved this with pb-nav; admin just
-                never adopted it. */}
+                never adopted it. The bar is now the event's own tab bar
+                (drawn by the event layout), which is fixed in the same place. */}
             <div className="mx-auto w-full max-w-[480px] px-4 pt-4 pb-nav md:max-w-none md:pb-8">
               {children}
             </div>
@@ -70,8 +61,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         </div>
       </div>
 
-      {/* Bottom nav — visible on mobile only */}
-      <AdminMobileNav memberships={viewer.memberships} isAdmin={viewer.isAdmin} />
+      {/* No admin tab bar. On a phone the event's own bar is drawn by
+          `admin/events/[eventCode]/layout.tsx` with Control lit, so admin
+          tools sit inside the one app (UI4 Part S). The old four-tab bar
+          (Events · Dashboard · Msgs · More) and its More sheet are gone. */}
     </div>
   )
 }

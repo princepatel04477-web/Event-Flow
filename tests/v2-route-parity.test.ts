@@ -116,8 +116,20 @@ const NEW_IN_T6 = new Set([
   'hospitality/rooming-list', // printable rooming list — v1 never had one
 ])
 
+/**
+ * UI4 Part S. Control is the admin's grouped list of every event tool, inside
+ * the one app shell. v1 has no counterpart: its admin tools live only under
+ * `/admin/events/{code}/…`, in a second shell, which is the problem Control
+ * exists to remove on a phone.
+ */
+const NEW_IN_UI4 = new Set([
+  'control', // every admin tool for the event, one tap from the bar
+  'families/[groupId]', // one family, everything about them — v1 had no such page
+  'families', // the directory address (S3); redirects to the guest list for now
+])
+
 /** Every route any session added that has no legacy counterpart at all. */
-const NEW_ROUTES = new Set([...NEW_IN_V8, ...NEW_IN_V11, ...NEW_IN_T6])
+const NEW_ROUTES = new Set([...NEW_IN_V8, ...NEW_IN_V11, ...NEW_IN_T6, ...NEW_IN_UI4])
 
 /**
  * FIX-UI took the hospitality layout exception away.
@@ -345,10 +357,12 @@ describe('the new bar points at the new call screen', () => {
     // Guards the SET as well as the mapping: if the shared config ever grows a
     // sixth tab, or a default child moves, this fails here rather than on a
     // phone. The set must stay the five sections.
+    // UI4 Part S: the call list is Calls' default child now (Auto-call is last
+    // and management-only), so the shared config already lands on rsvp/queue.
     expect(defaults).toEqual([
       `/${EV}`,
       `/${EV}/guests/list`,
-      `/${EV}/rsvp/campaigns`,
+      `/${EV}/rsvp/queue`,
       `/${EV}/logistics/arrivals`,
       `/${EV}/hospitality/rooms`,
     ])
@@ -362,9 +376,11 @@ describe('the new bar points at the new call screen', () => {
       `/${EV}/hospitality/rooms`,
     ])
 
-    // Exactly one changed. A second silent remap is the failure this pins.
+    // Nothing changes any more: the config's own default is the call list
+    // (UI4), so the legacy remap is a no-op. Any remap appearing here is a
+    // second silent rewrite, which is the failure this pins.
     const changed = defaults.filter((href, i) => href !== mapped[i])
-    expect(changed).toEqual([`/${EV}/rsvp/campaigns`])
+    expect(changed).toEqual([])
   })
 
   it('leaves a runner\'s child tabs alone', () => {

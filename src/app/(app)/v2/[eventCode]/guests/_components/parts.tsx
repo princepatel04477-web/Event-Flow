@@ -312,11 +312,13 @@ export function GuestSheet({ guest, open, onClose, familyHref }: GuestSheetProps
 
       <div className="mt-5 flex flex-col gap-2">
         {familyHref ? (
-          // `prefetch={false}` IS LOAD-BEARING. The destination is the family's
-          // RSVP record, whose server render claims the 15-minute caller lock —
-          // and a lock has no manual release (CLAUDE.md §11b). `LinkButton`
-          // does not expose `prefetch`, so this is a `Link` wearing the
-          // button's own class list — the same box, with prefetch off.
+          // The destination is the family page (UI4 S4), a read that takes no
+          // lock. It USED to be the family's RSVP record, whose server render
+          // claims the 15-minute caller lock, and prefetch was off so a lock was
+          // never claimed by a sheet merely opening. Prefetch stays off anyway:
+          // a sheet of search results is not a promise to open every family.
+          // `LinkButton` does not expose `prefetch`, hence a `Link` wearing the
+          // button's own class list.
           <Link
             href={familyHref}
             prefetch={false}

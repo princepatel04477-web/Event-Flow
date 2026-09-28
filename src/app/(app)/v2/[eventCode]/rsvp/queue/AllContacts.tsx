@@ -68,7 +68,7 @@ export function AllContacts({ rows, currentGroupId, onSelectFamily }: AllContact
             return (
               <li
                 key={r.group_id as string}
-                className={`flex items-center gap-3 border-b border-rule px-3.5 py-2.5 last:border-b-0 ${isCurrent ? 'bg-brand-tint' : ''}`}
+                className={`perf-rows flex items-center gap-3 border-b border-rule px-3.5 py-2.5 last:border-b-0 ${isCurrent ? 'bg-brand-tint' : ''}`}
               >
                 <button
                   type="button"

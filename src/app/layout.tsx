@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from 'next'
 import {
-  Bricolage_Grotesque,
-  Figtree,
-  IBM_Plex_Mono,
+  Geist,
+  Geist_Mono,
   IBM_Plex_Sans_Devanagari,
+  Instrument_Serif,
+  Noto_Sans_Gujarati,
 } from 'next/font/google'
 import type { ReactNode } from 'react'
 
@@ -46,15 +47,17 @@ if (typeof window !== 'undefined') {
  */
 
 /**
- * Display — screen titles, big numbers, the Now-card headline. Nothing
- * else. The variable axis is requested (Bricolage Grotesque is a variable
- * face) with the two weights the spec names: 600 for titles, 700 for the
- * Now-card headline.
+ * Display (UI4 "Haldi & Ink") — screen titles, the one hero number, the
+ * Now-card headline, empty-state titles. Instrument Serif has a single
+ * weight; the italic is loaded for the hero number's unit word ("412
+ * *guests*") and nothing else. See `.font-display` in globals.css for why a
+ * bold is never synthesised.
  */
-const bricolage = Bricolage_Grotesque({
+const instrumentSerif = Instrument_Serif({
   subsets: ['latin'],
-  weight: ['600', '700'],
-  variable: '--font-bricolage',
+  weight: '400',
+  style: ['normal', 'italic'],
+  variable: '--font-instrument-serif',
   display: 'swap',
 })
 
@@ -63,10 +66,10 @@ const bricolage = Bricolage_Grotesque({
  * emphasis and labels, 700 for the rare bold. Nothing else is loaded: each
  * extra weight is another file over venue Wi-Fi.
  */
-const figtree = Figtree({
+const geist = Geist({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
-  variable: '--font-figtree',
+  variable: '--font-geist',
   display: 'swap',
 })
 
@@ -83,26 +86,37 @@ const plexDevanagari = IBM_Plex_Sans_Devanagari({
   display: 'swap',
 })
 
+/**
+ * The Gujarati cut. This wedding's families write their names in Gujarati
+ * ("રમેશભાઈ શાહ") as often as in Hindi, and the same fallback problem as the
+ * Devanagari cut applies: a different face, weight and x-height per handset.
+ */
+const notoGujarati = Noto_Sans_Gujarati({
+  subsets: ['gujarati'],
+  weight: ['400', '600'],
+  variable: '--font-noto-gujarati',
+  display: 'swap',
+})
+
 /** Every figure in the app, plus every phone and flight number. */
-const plexMono = IBM_Plex_Mono({
+const geistMono = Geist_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
-  variable: '--font-plex-mono',
+  variable: '--font-geist-mono',
   display: 'swap',
 })
 
 /**
- * Be Vietnam Pro is gone with the gold. v3 puts Bricolage Grotesque on the
- * display tier and Figtree on the body tier, so shipping a third Latin
- * family nothing references is a font file downloaded for no reason. The
- * Devanagari cut and the mono stay: both are load-bearing (see the token
- * comments in globals.css).
+ * UI4 replaced Bricolage Grotesque + Figtree + IBM Plex Mono with Instrument
+ * Serif + Geist + Geist Mono. Three Latin families, as before; the two Indic
+ * cuts are load-bearing (see the token comments in globals.css).
  */
 const fontVariables = [
-  bricolage.variable,
-  figtree.variable,
+  instrumentSerif.variable,
+  geist.variable,
   plexDevanagari.variable,
-  plexMono.variable,
+  notoGujarati.variable,
+  geistMono.variable,
 ].join(' ')
 
 export const metadata: Metadata = {
@@ -143,7 +157,7 @@ export const viewport: Viewport = {
   // system chrome must not either. A dark status bar over the paper ground
   // is the tell that the two disagree. v3 paper, kept in step with
   // `--ef-paper` in globals.css.
-  themeColor: '#f7f3ec',
+  themeColor: '#f4f1ea',
 }
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

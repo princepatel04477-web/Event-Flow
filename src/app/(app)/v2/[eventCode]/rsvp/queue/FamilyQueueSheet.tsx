@@ -91,7 +91,7 @@ export function FamilyQueueSheet({
             ].filter(Boolean)
 
             return (
-              <li key={row.group_id}>
+              <li key={row.group_id} className="perf-rows">
                 <Row
                   heading={name}
                   meta={metaParts.join(' · ') || undefined}

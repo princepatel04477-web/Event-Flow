@@ -4,11 +4,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import { SignOutButton } from '@/components/auth/SignOutButton'
-import { AdminLink } from '@/components/nav/AdminLink'
 import { AccountMenu } from '@/components/nav/AccountMenu'
-import { EventSwitcher } from '@/components/nav/EventSwitcher'
+import { EventPill } from '@/components/nav/EventPill'
 import { ScreenHeader, splitEventPath } from '@/components/ui/ScreenHeader'
-import { cn, formatDateRange } from '@/lib/utils'
+import { formatDateRange } from '@/lib/utils'
 import { v3ScreenTitle } from '@/lib/sections/v3'
 import type { Membership } from '@/lib/supabase/queries'
 
@@ -67,9 +66,15 @@ interface AppHeaderProps {
  *   capitals), replaced by `ScreenHeader`'s small muted context line.
  * - the Help glyph. Help is reached from a small link inside Today now, so
  *   it is not a permanent control on every screen.
- * - the event switcher, the admin link and the sign-out control. All three
- *   are about the SESSION, not about this screen, and at 360px they left the
- *   title about 90px wide. They live in `AccountMenu` behind one 44px button.
+ * - the admin link and the sign-out control, which are about the SESSION, not
+ *   about this screen; at 360px they left the title about 90px wide. Sign-out
+ *   lives in `AccountMenu` behind one 44px button; the admin's tools are the
+ *   Control tab (UI4).
+ *
+ * WHAT CAME BACK IN UI4: the event itself, as a pill above the title
+ * (`EventPill`). Knowing which wedding you are editing is not a session
+ * detail — it is the most dangerous thing to get wrong — so it is on every
+ * screen, and the switcher is one tap on it.
  *
  * WHAT STAYED: the search button, which is now the ONLY way into Find — and
  * therefore the only way to reach Guests, which is no longer a tab.
@@ -93,28 +98,18 @@ export function AppHeader({ event, viewer, showHelp, showGuests }: AppHeaderProp
     <ScreenHeader
       title={title}
       context={context}
+      eyebrow={
+        <EventPill
+          event={{ code: event.code, name: event.name }}
+          memberships={viewer.memberships}
+          isAdmin={viewer.isAdmin}
+        />
+      }
       actions={
         <AccountMenu>
-          {viewer.memberships.length > 1 ? (
-            // Full memberships, not a projection: the switcher needs each
-            // event's role so it can send a client to their guests page
-            // rather than to a dashboard they will be bounced off.
-            <div className={cn('flex min-h-11 items-center px-1')}>
-              <EventSwitcher
-                events={viewer.memberships}
-                currentCode={event.code}
-                isAdmin={viewer.isAdmin}
-              />
-            </div>
-          ) : null}
-
-          {viewer.isAdmin ? (
-            <div className="flex min-h-11 items-center justify-between gap-2 px-1">
-              <span className="text-sm font-medium text-ink">Admin</span>
-              <AdminLink show />
-            </div>
-          ) : null}
-
+          {/* The event switcher and the Admin link left this menu (UI4 Part
+              S): the event is the pill above the title, and an admin's tools
+              are the Control tab. */}
           {/* The two secondary jobs that have no home in the v3 bar:
               the guest list with its import/export screens, and Help. Both are
               about the SESSION rather than this screen, which is what this menu

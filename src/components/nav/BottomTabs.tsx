@@ -43,8 +43,11 @@ export function BottomTabs({ eventCode, access, department = null }: BottomTabsP
   return (
     <nav
       aria-label="Sections"
-      className="fixed inset-x-0 z-40 border-t border-rule-strong bg-nav pb-safe px-safe transition-[bottom] duration-press ease-ledger"
-      style={{ bottom: 'var(--keyboard-offset, 0px)' }}
+      className="fixed inset-x-0 z-40 border-t border-rule-strong bg-nav pb-safe px-safe transition-transform duration-press ease-ledger"
+      // Lifted over the soft keyboard with a transform, not `bottom`:
+      // `bottom` is layout, and transitioning it re-lays-out the page every
+      // frame of the lift (UI4 §3, F1). The bar still sits at bottom 0.
+      style={{ bottom: 0, transform: 'translateY(calc(-1 * var(--keyboard-offset, 0px)))' }}
     >
       <ul className="mx-auto grid w-full max-w-[480px]" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
         {tabs.map((tab) => {

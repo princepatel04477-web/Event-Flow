@@ -47,7 +47,7 @@ export function StickyHeader({
   return (
     <header
       className={cn(
-        'sticky top-0 z-30 border-b border-rule bg-paper/95 backdrop-blur-sm pt-safe px-safe',
+        'sticky top-0 z-30 border-b border-rule bg-paper pt-safe px-safe',
         className,
       )}
     >

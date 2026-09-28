@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-import { SlidersIcon } from '@/components/icons'
+import { UserIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
 
 export interface AccountMenuProps {
@@ -62,7 +62,7 @@ export function AccountMenu({ children }: AccountMenuProps) {
       <button
         ref={triggerRef}
         type="button"
-        aria-label="Account and event"
+        aria-label="You — account and help"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
@@ -73,13 +73,13 @@ export function AccountMenu({ children }: AccountMenuProps) {
           open && 'bg-surface-2',
         )}
       >
-        <SlidersIcon className="h-5 w-5" />
+        <UserIcon className="h-5 w-5" />
       </button>
 
       {open ? (
         <div
           role="menu"
-          aria-label="Account and event"
+          aria-label="You — account and help"
           // Fixed and right-anchored to the viewport — NOT absolute inside the
           // header. The header is `overflow` -prone at 360px and a panel
           // positioned inside it gets clipped the moment a long event name
