@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useRef } from 'react'
 
 import type { StaffDepartment } from '@/lib/departments'
 import {
@@ -43,6 +44,18 @@ export function SectionSwitch({ eventCode, access, department }: SectionSwitchPr
   const pathname = usePathname()
   const rest = pathname.split('/').filter(Boolean).slice(1).join('/')
   const { isArmed, arm } = useBoundedPrefetch()
+  const navRef = useRef<HTMLElement>(null)
+
+  // Bring the active pill into view. With four or five pills the row
+  // overflows at 360px, and on the last one (Hampers) the lit pill sat off
+  // screen to the right. One layout read per navigation, no smooth scroll —
+  // this is placement, not an animation.
+  useEffect(() => {
+    const nav = navRef.current
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!nav || !active) return
+    nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.clientWidth) / 2
+  }, [pathname])
 
   if (childrenAreInBottomBar(access, department)) return null
 
@@ -60,6 +73,7 @@ export function SectionSwitch({ eventCode, access, department }: SectionSwitchPr
 
   return (
     <nav
+      ref={navRef}
       aria-label={`${section.tabLabel} screens`}
       className="-mx-4 mb-3 flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >

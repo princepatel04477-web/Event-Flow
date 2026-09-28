@@ -258,6 +258,7 @@ const V3_TITLE_OVERRIDES: Record<string, string> = {
   production: 'Setup',
   // The family page (UI4 S4) belongs to no section; it is named for itself.
   families: 'Family',
+  find: 'Find',
   help: 'Help',
 }
 
