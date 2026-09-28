@@ -39,7 +39,6 @@ import {
 import { captureDiagnostic } from '@/lib/sentry'
 import { createClient } from '@/lib/supabase/client'
 
-import { AdminCampaignsLink } from './AdminCampaignsLink'
 import { AlternateOutcomeSheet } from './AlternateOutcomeSheet'
 import { CurrentFamilyCard } from './CurrentFamilyCard'
 import { FamilyQueueSheet } from './FamilyQueueSheet'
@@ -112,7 +111,7 @@ interface OutcomeVars {
   values: RsvpLogFormValues
 }
 
-export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: CallNextProps) {
+export function CallNext({ eventId, eventCode, startsOn, endsOn }: CallNextProps) {
   const supabase = useMemo(() => createClient(), [])
 
   const [activeFilter, setActiveFilter] = useState<FilterChipId>('to_call')
@@ -457,11 +456,8 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn, isAdmin }: Call
 
   return (
     <div className="flex flex-col gap-4 pb-nav-bottombar">
-      {isAdmin ? (
-        <div className="flex justify-end">
-          <AdminCampaignsLink eventCode={eventCode} isAdmin={isAdmin} />
-        </div>
-      ) : null}
+      {/* The "Auto-call rounds" link that sat here is the Auto-call pill in the
+          section switcher now (UI4), shown to management only. */}
 
       {totalCount > 0 ? (
         <Progress

@@ -49,7 +49,9 @@ export default async function DeparturesPage({ params }: PageProps) {
         eventId={event.id}
         eventCode={event.code}
         direction="departure"
-        otherHref={`/${event.code}/logistics/arrivals`}
+        // No `otherHref`: the Arrivals/Departures toggle repeated the section
+        // switcher (leads) and the bottom bar (logistics runners), both of which
+        // already navigate between these two addresses (UI4 — one row of nav).
       />
     </div>
   )

@@ -3021,3 +3021,26 @@ database with CPU throttling; the sandbox has no database, so that stays open.
 
 Not verified against data: the sandbox has no database, so the family page and checklist were
 checked by typecheck, tests and build only.
+
+## 28 September 2026 — UI4 step 6: checked against a real (local) database
+
+A local Supabase (Docker, all 64 migrations applied clean) was seeded with a fake SHARMA26 —
+40 families across every answer, 20 arrival legs, a 24-room hotel, 4 staff — and the app was
+signed into as an admin and screenshotted at 390px: Today, Calls, Rooms, Arrivals, Control,
+Access codes, and a family page. No page errors. What that found and fixed:
+
+- **Family page, two real bugs the types did not catch:** call outcomes were mapped from
+  invented values — the enum is `connected, no_answer, busy, switched_off, wrong_number,
+  callback, declined, other`; and `special_requirements` is `text[] not null default '{}'`, so an
+  empty array was truthy (an empty Notes card on every family) and a non-empty one rendered with
+  no separators. Stay rows are two lines (room + checked-in pill, then hotel · guests) instead of
+  one truncated line; travel mode reads "Flight/Train/Cab" not the enum.
+- **Double navigation removed:** Arrivals/Departures had an in-page toggle under the section
+  switcher (and under the logistics runner's own bar) — dropped by not passing `otherHref`. The
+  call list's "Auto-call rounds" link duplicated the new Auto-call pill — `AdminCampaignsLink`
+  deleted.
+- **Control** repeated its title under the header; now just the event dates line.
+- **The account menu** used the same sliders glyph as the Control tab; it is a person glyph now.
+
+Still not verified: anything on a handset (Android back, drag, the WebView), the call flow with a
+real dial, and the frame budget under CPU throttling.

@@ -121,13 +121,9 @@ export default async function ControlPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col gap-6 pb-4">
-      <header className="flex flex-col gap-1">
-        <h1 className="font-display text-3xl leading-tight text-ink">Control</h1>
-        <p className="text-sm text-muted">
-          {event.name}
-          {dates ? ` · ${dates}` : ''}
-        </p>
-      </header>
+      {/* The header already says "Control" and the pill names the event; the
+          dates are the one fact neither carries. */}
+      {dates ? <p className="-mt-1 text-sm text-muted">{event.name} · {dates}</p> : null}
 
       {staffCount === 0 ? (
         <a

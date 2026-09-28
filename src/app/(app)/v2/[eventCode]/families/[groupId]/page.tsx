@@ -26,15 +26,25 @@ const ANSWER: Record<string, { label: string; tone: 'done' | 'wait' | 'ink' | 'm
   not_started: { label: 'Not called yet', tone: 'muted' },
 }
 
+/** `app.travel_mode` in plain words. */
+const MODE: Record<string, string> = {
+  air: 'Flight',
+  train: 'Train',
+  bus: 'Bus',
+  cab: 'Cab',
+  self_drive: 'Own car',
+}
+
+/** `app.call_outcome` in plain words. */
 const OUTCOME: Record<string, string> = {
-  confirmed: 'Coming',
-  declined: 'Not coming',
-  tentative: 'Maybe',
-  callback: 'Call back',
+  connected: 'Spoke to them',
   no_answer: 'No answer',
-  unreachable: 'No answer',
-  wrong_number: 'Wrong number',
   busy: 'Busy',
+  switched_off: 'Phone off',
+  wrong_number: 'Wrong number',
+  callback: 'Asked for a call back',
+  declined: 'Not coming',
+  other: 'Other',
 }
 
 /** Today's date where the wedding is. The server runs in Seoul; the guests are in Gujarat. */
@@ -154,6 +164,9 @@ export default async function FamilyPage({ params }: PageProps) {
   const answer = ANSWER[group.rsvp_status ?? 'not_started'] ?? ANSWER.not_started
   const guestsComing = group.confirmed_pax ?? null
   const members = (guestsRes.data ?? []).filter((g) => !g.is_head && g.full_name?.trim())
+  // `special_requirements` is `text[] not null default '{}'`: an empty array is
+  // truthy, so test its length, and join it — React would run the items together.
+  const needs = (group.special_requirements ?? []).filter((s) => s.trim())
 
   return (
     <div className="flex flex-col gap-5 pb-6">
@@ -225,7 +238,8 @@ export default async function FamilyPage({ params }: PageProps) {
                       {l.travel_time ? ` · ${l.travel_time.slice(0, 5)}` : ''}
                     </p>
                     <p className="truncate text-sm text-muted">
-                      {[l.mode, l.reference, l.point].filter(Boolean).join(' · ') || 'Details not given'}
+                      {[l.mode ? MODE[l.mode] ?? l.mode : null, l.reference, l.point].filter(Boolean).join(' · ') ||
+                        'Details not given'}
                     </p>
                   </div>
                   {l.arrived_at || l.departed_at ? (
@@ -251,13 +265,17 @@ export default async function FamilyPage({ params }: PageProps) {
           ) : (
             <ul className="flex flex-col gap-2">
               {groupStays(stays).map((s) => (
-                <li key={s.key} className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 truncate text-base text-ink">
-                    {s.hotel ? `${s.hotel} · ` : ''}Room <span className="figure font-semibold">{s.room}</span>
+                <li key={s.key} className="flex flex-col">
+                  <span className="text-lg text-ink">
+                    Room <span className="figure font-semibold">{s.room}</span>
+                    {s.checkedIn ? (
+                      <span className="ml-2 rounded-full bg-green-tint px-2 py-0.5 align-middle text-xs font-semibold text-ledger-green">
+                        Checked in
+                      </span>
+                    ) : null}
                   </span>
-                  <span className="shrink-0 text-sm text-muted">
-                    {s.beds} {s.beds === 1 ? 'guest' : 'guests'}
-                    {s.checkedIn ? ' · checked in' : ''}
+                  <span className="truncate text-sm text-muted">
+                    {[s.hotel, `${s.beds} ${s.beds === 1 ? 'guest' : 'guests'}`].filter(Boolean).join(' · ')}
                   </span>
                 </li>
               ))}
@@ -311,9 +329,9 @@ export default async function FamilyPage({ params }: PageProps) {
         </Section>
       ) : null}
 
-      {group.remarks || group.special_requirements ? (
+      {group.remarks || needs.length > 0 ? (
         <Section id="notes" title="Notes">
-          {group.special_requirements ? <p className="text-base text-ink">{group.special_requirements}</p> : null}
+          {needs.length > 0 ? <p className="text-base text-ink">{needs.join(' · ')}</p> : null}
           {group.remarks ? <p className="mt-1 text-base text-muted">{group.remarks}</p> : null}
         </Section>
       ) : null}
