@@ -31,8 +31,8 @@ export default function manifest(): MetadataRoute.Manifest {
     display: 'standalone',
     orientation: 'portrait',
     // Both equal `--ef-paper` in globals.css / `themeColor` in layout.tsx.
-    background_color: '#f7f3ec',
-    theme_color: '#f7f3ec',
+    background_color: '#f4f1ea',
+    theme_color: '#f4f1ea',
     icons: [
       { src: '/brand/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: '/brand/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

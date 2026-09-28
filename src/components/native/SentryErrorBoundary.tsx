@@ -70,7 +70,7 @@ class Boundary extends Component<Props, State> {
           padding: 24,
           background: '#f5ead8',
           color: '#201e1d',
-          fontFamily: 'Figtree, system-ui, sans-serif',
+          fontFamily: 'Geist, system-ui, sans-serif',
         }}
       >
         <div style={{ maxWidth: 360, textAlign: 'center' }}>

@@ -2922,3 +2922,29 @@ Control"), not deleted. New: `tests/admin-header.test.ts`.
 sandbox has no Supabase URL/key (it failed identically before this change). `next build` with
 `NEXT_PUBLIC_UI=v2`: exit 0. `eslint` on the changed files: clean. **Not run on a handset** —
 the sandbox has no device, so this is committed, not verified (CLAUDE.md §14).
+
+## 28 September 2026 — UI4 step 2: the "Haldi & Ink" re-skin
+
+Token VALUES changed, names did not, so every screen re-skinned with no component edits
+(`src/app/globals.css`, `:root` and `[data-theme='client']`):
+
+- Ground bone `#f4f1ea`, ink `#141311`, action indigo `#2f2bd8` (7.6:1 on bone, white on it
+  8.5:1), haldi marigold `#f5b301` as a fill with ink text (10.0:1), green `#16794a`, red
+  `#c62a1e`, amber `#8a5a00`. Every text pair was computed with the WCAG formula and is AA or
+  better; the ratios are annotated at each token.
+- Fonts (`src/app/layout.tsx`): Instrument Serif (display, one weight, italic for the hero
+  unit), Geist (body), Geist Mono (figures). IBM Plex Sans Devanagari kept; Noto Sans Gujarati
+  added for family names written in Gujarati. `.font-display` sets `font-synthesis: none`,
+  because screens written for Bricolage pair it with `font-semibold` and a faked bold on a serif
+  reads as a printing fault.
+- Radii: cards 24px (`rounded-2xl`), sheets 32px (`rounded-3xl`). Motion 90/160/240ms on
+  `cubic-bezier(0.16, 1, 0.3, 1)`; `src/lib/motion/tokens.ts` mirrors it (the test pins the pair)
+  and gains `SHEET_SPRING` for the sheet rebuild.
+- `global-error.tsx` keeps inline hex (no stylesheet exists there) with the new values and
+  ratios; `manifest.ts` and `themeColor` follow the new ground.
+- **Not followed: the native launch chain** (`colors.xml`, splash) is still `#f8f9fa`. It needs
+  an APK rebuild. Light-on-light, so no dark flash — the ground shifts slightly on first paint.
+
+Verified: typecheck clean, tests as before, `next build` (v2) exit 0, and a 390px Chromium
+screenshot of `/login` shows the serif wordmark, bone ground and indigo button. Not run on a
+handset.
