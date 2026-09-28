@@ -1,4 +1,4 @@
-# EventFlow — UI4 "Haldi & Ink" Redesign: Arena prompts + Claude Code port prompts
+# EventFlow — UI4 "Haldi & Ink": new structure (flows + navigation) and redesign — arena prompts + Claude Code prompts
 
 **Supersedes the visual layer of `UI2-PROMPTS.md` (V0–V12) and the v3 shell.** It does NOT
 supersede their rules. `docs/UX-RULES.md` (R1–R8) and `docs/INTERACTION-CONTRACT.md` (T1–T7)
@@ -9,11 +9,19 @@ Two kinds of prompt live in this file, and they go to two different places:
 
 | Part | Goes to | Sees the repo? | Produces |
 |---|---|---|---|
+| **Part S** | You, first | — | **The new structure**: who lands where, the tab bars, the route map, the family page, every job's flow with tap counts, navigation rules N1–N10. The A and C prompts are built on it. |
+| **AF-series** (AF1–AF6) | **arena.ai** | **No.** | Clickable multi-screen *flow* prototypes, to prove the structure before any screen is polished. |
 | **A-series** (A0–A16) | **arena.ai** (WebDev arena, two models side by side) | **No.** Every prompt must carry its own context. | A single-file React prototype per screen, with mock data. You pick the winner. |
+| **CS-series** (CS0–CS9) | **Claude Code / Command Code** in `C:\dev\EventFlow` | Yes | The structure, built: route map + redirects, landings, back button, family page, merged flows. |
 | **C-series** (C0–C15) | **Claude Code / Command Code** in `C:\dev\EventFlow` | Yes | The winning prototype, ported into the real app on real data, behind the rules. |
 
 One A prompt → pick a winner → save it → run the matching C prompt → commit → handset.
 Never run a C prompt without its A winner saved in `design/arena/`.
+
+**Scope of "structure" in this file: flows and navigation only.** The route groups
+(`(staff)`, `(app)/v2`, `(admin)`), the folder layout, the data layer, the database and the
+APK shell are NOT restructured here. New URLs are new thin pages in the existing groups that
+reuse existing components; old URLs redirect. That keeps every session revertible.
 
 **Free-rebuild conditions:** the 26 Aug 2026 event is done. No staff are on handsets. These
 prompts may replace the shell, the nav and every screen's look. They still must not write
@@ -186,6 +194,9 @@ server wait still feels slow.
 
 ## 4. The new information architecture — one app, role-shaped
 
+*This is the summary. The full structure — every role, route, flow and navigation rule — is
+**Part S** below, and Part S wins where the two differ.*
+
 ```
                       ┌──────────────── header ────────────────┐
                       │  [SHARMA26 ▾]  event pill     (⌕) (you)│   ← always visible
@@ -216,6 +227,135 @@ server wait still feels slow.
 - `/admin/*` routes stay alive (desktop sidebar, deep links). On phones, the Control rows
   link to them rendered inside the ONE app shell.
 - Plain words (R2): the tab is "Control", never "Admin", "Settings" or "Ops". "Msgs" dies.
+
+---
+
+# PART S — THE STRUCTURE (flows and navigation)
+
+Read this before any A or C prompt. The look (Part A) is the skin; this is the skeleton.
+A beautiful screen in the wrong place is still the wrong place, and every complaint about
+admin-on-a-phone so far has been a *where* problem, not a *what it looks like* problem.
+
+## S1. What is wrong with the structure today — verified in the tree
+
+| Evidence | Where | What it does |
+|---|---|---|
+| **The event lead lands on Auto-call** | `src/lib/departments.ts` — `departmentHomePath('management')` returns `/{e}/rsvp/campaigns` | The person running the wedding opens the app to the auto-dialler campaign board, not to "how are we doing". |
+| **A caller's first tab is Auto-call too** | `src/lib/sections/config.tsx` — rsvp children are `campaigns` (isDefault) · `queue` · `review`; a runner's bar is their section's children | The caller's actual job, the call list, is the second tab. |
+| **One family, no page** | a family's facts are split across `rsvp/status/[groupId]`, `rsvp/call/[groupId]`, the guest-list card, the rooms board, the arrivals row and `hamper/[deliverableId]` | "Where is the Shah family, what room, did they land, did they get their hamper" is four screens and four searches. There is no URL that means *this family*. |
+| **Calling one family is three routes** | `rsvp/queue` → `rsvp/call/[groupId]` → `rsvp/status/[groupId]`, plus `rsvp/next`, and `rsvp` itself only redirects to `rsvp/queue` | Every hop is a server render from Seoul (T4, T5), and the back button walks through all of them. |
+| **Hampers live at two URLs** | `/{e}/hamper[/id]` and `/{e}/hospitality/deliveries[/id]`, both rendering `DeliveryDetail`; `config.tsx` needs "borrowed child" logic to hold it together | Two front doors to one job; R3 already had to be patched for the exits bouncing to `?denied=section`. |
+| **Rooms are created in two places** | `admin/events/[e]/hotels/[hotelId]/rooms` and `hospitality/rooms/new/[hotelId]` | Two forms that can drift. |
+| **Imports live in two shells** | `guests/import` (staff app) and `admin/events/[e]/import-hotels` (admin app) | Setting up an event means two apps. |
+| **Admin is a second app** | §1 of this file | Two headers, two bars, a shell swap for every admin task. |
+| **Android back is plain `history.back()`** | `src/components/native/NativeBridge.tsx` — `canGoBack ? history.back() : App.exitApp()` | Back does not close an open sheet first, walks backwards through every tab you hopped between, and exits the app outright from any screen opened by a deep link (no history). |
+| **A new event has no setup path** | `CreateEventForm.tsx` → the admin dashboard | After creating an event, importing guests, adding staff, adding hotels and sharing codes are four separate places with nothing saying what is left. |
+| **Guests left the bar with no directory to replace it** | `src/lib/sections/v3.ts` (Guests removed, "reached through search"); `find` is a search box, not a browsable list | A lead who wants "everyone not yet called from the bride's side" has no list to browse. |
+
+## S2. Who lands where, and what bar they get
+
+| Who | Lands on | Bottom bar | Header |
+|---|---|---|---|
+| **Organiser** (admin) | The event they last opened → **Today** (remembered on the device); no event yet → **All events** | Today · Calls · Hospitality · Logistics · **Control** | event pill · Find · You |
+| **Event lead** (`management`) | **Today** | Today · Calls · Hospitality · Logistics | same |
+| **Caller** (`rsvp`) | **Calls → Next** | Next · List · Review | same |
+| **Hospitality runner** | **Rooms** | Rooms · Check-in · Rooming list | same |
+| **Hamper runner** | **Hampers** (the next delivery) | none — one job, one screen | same |
+| **Logistics runner** | **Arrivals** | Arrivals · Departures · Trips · Fleet | same |
+| **Setup** (`production`, flag) | **Setup** | none | same |
+| **No name picked** (skipped) | Today, with a one-line "Pick your name so your work is saved under it" row | as their department | same |
+| **Family** (client) | **Family view** (read-only) | none | event name only, no Find |
+
+Auto-call campaigns move to **Calls → List → "Auto-call"** for the lead only. Runners never
+see it.
+
+## S3. The route map — one URL per job
+
+`/{e}` is the event code. "Replaces" means those URLs **redirect** (308) to the new one, so
+old links, bookmarks and the arrival banner keep working. Nothing is deleted in this series.
+
+| New URL | Replaces | What it is |
+|---|---|---|
+| `/{e}` | — | **Today** |
+| `/{e}/families` | `/{e}/guests`, `/{e}/guests/list`, `/{e}/find` | Families directory: search on top, filter chips, A–Z list. Client role gets the read-only version here. |
+| `/{e}/families/[groupId]` | *(new)* | **The family page** — see S4 |
+| `/{e}/families/[groupId]/call` | `/{e}/rsvp/call/[groupId]`, `/{e}/rsvp/status/[groupId]` | The call flow: before → in call → outcome, one URL, three steps |
+| `/{e}/calls` | `/{e}/rsvp`, `/{e}/rsvp/queue`, `/{e}/rsvp/next` | Next call card + the list with filters (`?show=callback` etc.) |
+| `/{e}/calls/review` · `/[extractionId]` | `/{e}/rsvp/review[/…]`, `/{e}/rsvp/unmatched` → `?show=no-family` | Review what the AI heard |
+| `/{e}/calls/auto` | `/{e}/rsvp/campaigns` | Auto-call (lead only) |
+| `/{e}/hospitality` | — | Rooms board (default) |
+| `/{e}/hospitality/checkin` · `/rooming-list` | — | unchanged |
+| `/{e}/hampers` · `/[deliverableId]` | `/{e}/hamper[/…]`, `/{e}/hospitality/deliveries[/…]` | One hamper job, one URL |
+| `/{e}/logistics/arrivals` · `/departures` · `/trips` · `/fleet` · `/sheets` | — | unchanged (`/{e}/logistics` → arrivals) |
+| `/{e}/setup` | `/{e}/production` | The URL follows the word the screen already uses. The `production` department value in the database does NOT change. |
+| `/{e}/control` | *(new)* | Admin tools, grouped (A3) |
+| `/{e}/control/staff` · `/codes` · `/messages` · `/hotels` · `/import` · `/export` · `/files` · `/ledger` · `/settings` | on phones: `/admin/events/{e}/…`, `/{e}/guests/import`, `/{e}/guests/export`, `/admin/events/{e}/import-hotels`, `/{e}/hospitality/rooms/new[/…]` | The same screens, inside the one shell. `/admin/events/{e}/*` stays alive for the desktop sidebar. |
+| `/events` | `/admin/events` on phones | All events + New event (admin) |
+| `/me` | `/pick-staff` (as a sub-step) | You: switch person, sign out, app version (long-press → developer tools) |
+| `/{e}/help` | — | unchanged |
+
+## S4. The family page — the new centre of the app
+
+Every search result, every "Needs you" row, every arrivals row and every room tile leads here.
+It answers everything about one family on one screen, and its **one primary action changes
+with where the family is in the event**:
+
+| Family is… | Primary action |
+|---|---|
+| Not called / no answer | **Call** |
+| Promised a call back | **Call back** (with the promised time) |
+| Coming, arriving today, not checked in | **Check in** |
+| Checked in, hamper not delivered | **Deliver hamper** |
+| Checked in, nothing pending | none — the page is a record |
+| Not coming | none — "Change answer" as a quiet link |
+
+Sections, top to bottom, each linking to its job screen: **Answer** (status, guests coming
+/ expected, who logged it, when; lock holder if any) · **Travel** (arrival and departure legs,
+car assigned) · **Stay** (hotel, room, beds, dates) · **Hamper** (status, proof photo) ·
+**Calls** (every attempt, outcome, notes, recording/review link) · **People** (member names
+once collected at room allocation) · **Notes** (remarks).
+
+Rules: a section the viewer's department cannot see is not rendered (same predicates as
+`config.tsx` — no new permission logic). The client sees Answer, Travel and Stay read-only.
+The page uses only reads that already exist; if one join is missing, the prompt STOPS and
+names it — no migrations in this series.
+
+## S5. The jobs, end to end — taps before and after
+
+"Before" is counted from the route structure on `37347b3` and is approximate; CS9 measures
+both with `scripts/tap-budget.mjs`. A tap is any touch inside the app; typing is not counted.
+
+| # | Job | Who | Before | After |
+|---|---|---|---|---|
+| 1 | Switch to another event | Organiser | More → switch control → pick (3), and the current event is not on screen | Event pill → pick (**2**), always visible |
+| 2 | Rotate an access code | Organiser | App → Admin link → Dashboard → More → Access codes → Rotate → confirm (~6 + a shell swap) | Control → Access codes → Rotate → confirm (**4**) |
+| 3 | Set up a new event | Organiser | Events → form → Create → then find Import (staff app), Staff, Hotels, Codes (admin app) separately | Pill → New event → 3 steps → lands on Today with a **setup checklist** (Import guests · Add staff · Add hotels · Share codes), each one tap, disappearing as each is done |
+| 4 | Call the next family and log the answer | Caller | Queue → card → Call → *(dialler)* → status screen → outcome → Save → back to queue (~7) | Next → Call → *(dialler)* → outcome tile → Save, auto-advance (**4**) |
+| 5 | Find a family and see everything | Lead | Search → status screen (RSVP only) + rooms search + arrivals search | Find → family (**2**, one screen) |
+| 6 | Honour a promised call back | Caller / lead | Calls → Call back chip → family → … | Today "Needs you" row → Call (**2**) |
+| 7 | Place an unplaced family in a room | Hospitality | Rooms → allocate → family → room | Rooms → Unplaced tray → family → room (**3**), Undo bar |
+| 8 | Check in a family that just landed | Hospitality / lead | Arrivals (no link onward) → Hospitality → Check-in → search → Check in (~5) | Arrivals "Landed" row → family → Check in all (**3**); or Check-in, which lists "Arriving now" first (**2**) |
+| 9 | Deliver a hamper with proof | Hamper runner | Hampers → item → photo → confirm (4) | same **4**, then auto-advance to the next delivery |
+| 10 | A flight lands with no car | Lead / logistics | Arrivals → scan list → trips → … | Today "Needs you" → Assign → vehicle (**3**) |
+| 11 | Import the guest list | Lead / organiser | Guests → Import (was invisible to event_team once — CLAUDE.md §12) | Control → Import (**2**), or the setup checklist |
+| 12 | Send a WhatsApp update | Organiser | Admin → Msgs → Send → … | Control → Send a message (**2**) |
+| 13 | The family checks today's arrivals | Client | lands on the guest list | lands on the family view with the Today card (**0**) |
+| 14 | Start the day | Any staff | code → pick name → a department page | code → pick name → their landing (S2); next day the code is remembered, pick name only (**1**) |
+
+## S6. Navigation rules N1–N10 (these become tests in CS9)
+
+| # | Rule | Pass condition |
+|---|---|---|
+| N1 | **One shell.** Every signed-in phone screen has the same header (event pill · Find · You) and the role's bar. | No "Admin" header, no "App" back link, no second tab bar below `md`. |
+| N2 | **Land by role** (S2). | A test per role asserts the landing URL. |
+| N3 | **Tabs keep their place.** Switching tabs returns to that tab's last screen and scroll; tapping the active tab pops to its root, then to top. | Per-tab stack kept in `sessionStorage` (try/catch); verified by a unit test of the stack reducer. |
+| N4 | **Android back, in order:** close the top sheet → back within the current tab's stack → the tab's root → the role's landing tab → "Press back again to close EventFlow" (2s) → exit. | Pure function `resolveBack(state)` with a unit test per step; never exits from a deep screen; never walks back through tab switches. |
+| N5 | **Back is named and deterministic** (R3). A detail screen's back goes to the tab root it belongs to, even when opened by a deep link. | Every detail page declares its parent URL; no `router.back()` in page code. |
+| N6 | **Pages vs sheets.** Anything with an identity (a family, a room, a hamper, a trip) is a page with a URL. Sheets are for choosing and short edits. | No family/room/hamper detail exists only as a sheet. |
+| N7 | **Every number is a door** (R4), to a URL with the filter in it (`?show=callback`), so the filter survives back and reload. | Filters are read from the query string, not component state. |
+| N8 | **Deep links land in context.** Banner, "Needs you" rows and search results open the family page with the relevant section expanded (`#travel`, `#stay`, `#hamper`). | Anchors exist and scroll into view on load. |
+| N9 | **The event is never ambiguous.** Switching event keeps you on the same tab in the new event (or Today if your role cannot see it). A URL for an event you cannot access shows the denied screen with "Switch event". | Test: switch from Calls in A → Calls in B. |
+| N10 | **One place per job.** No job is reachable at two URLs with different chrome; every replaced URL in S3 redirects. | `src/lib/nav/route-map.ts` is the single table, and a test walks it. |
 
 ---
 
@@ -296,7 +436,180 @@ Now design this screen:
 
 ---
 
-## A0 — The design system sheet (run first, lock the winner)
+## AF — FLOW PROTOTYPES (run these BEFORE A0)
+
+These prove the structure in Part S before any screen is polished. Judge them on *where
+things are and how you move*, not on looks — a plain winner that gets the flow right beats a
+gorgeous one that doesn't. Paste **A-BRIEF**, then the **AF add-on** below, then one AF
+prompt.
+
+**AF add-on — paste after A-BRIEF in every AF prompt:**
+
+```
+THIS IS A FLOW PROTOTYPE, NOT A SINGLE SCREEN. Build several connected screens with real
+navigation between them inside the one phone frame. Outside the frame, add:
+- a ROLE switcher (the roles named in the prompt), which resets the prototype to that
+  role's landing screen;
+- an ANDROID BACK button that behaves exactly like this, in order: (1) if a sheet or dialog
+  is open, close it; (2) else go back one step within the current tab; (3) else go to the
+  current tab's first screen; (4) else go to the role's landing tab; (5) else show a toast
+  "Press back again to close EventFlow" and, if pressed again within 2 seconds, show a
+  "closed" screen. Back never walks through tab switches.
+- a TAP COUNTER that counts every tap inside the frame since the flow started, with a reset
+  button, and a small log of the screens visited in order.
+Rules for navigation: every screen with an identity (a family, a room, a hamper, a trip)
+is a page with its own title and a named back link ("‹ Calls"), never only a sheet. Tabs
+keep their place: switching tabs returns to where you were in that tab; tapping the active
+tab returns to its first screen. Tab switches are instant. The header on every screen is:
+event pill (left) · search · your initials (right).
+Visual polish is secondary. Use the tokens, keep it clean, spend your effort on the flow.
+```
+
+### AF1 — The organiser's one app
+
+```
+[A-BRIEF]
+[AF add-on]
+
+ROLES: Organiser (admin), Event lead.
+FLOW: The organiser opens the app and lands on Today of the event they last used
+(SHARMA26). Bar: Today · Calls · Hospitality · Logistics · Control (Control only for the
+organiser; the event lead has four tabs).
+Make these journeys work end to end, each in the tap count shown:
+1. Switch event (2 taps): event pill → pick "PATEL27". You stay on the same tab in the new
+   event. The pill updates everywhere.
+2. Rotate an access code (4 taps): Control → Access codes → Rotate (Team code) → confirm in a
+   sheet that says "Everyone signed in with this code will be signed out and must enter the
+   new one."
+3. New event: pill → "+ New event" → 3 steps (name + code, dates + venue, review) → Create →
+   lands on the NEW event's Today, which shows a SETUP CHECKLIST card: Import the guest list ·
+   Add staff names · Add hotels & rooms · Share the team code. Each item is one tap to its
+   screen; completing one (simulate with a button on that screen) ticks it; when all four are
+   done the card disappears.
+4. From a Calls screen, open a family, then use Android Back three times — prove it returns
+   to the Calls list, then the Calls first screen, then Today, and never into Control.
+5. Control contains: People (Staff, Access codes), Guests (Import, Export, Files), Venue
+   (Hotels & rooms), Messages (Send, Templates, Sent), Records (Ledger), Event (Section
+   locks, Arrival alerts switch), Archive this event (alone, last, red). Every one opens a
+   simple placeholder page with a named back link "‹ Control".
+Show the event lead role: identical except no Control tab and no "+ New event".
+```
+
+### AF2 — The caller's loop
+
+```
+[A-BRIEF]
+[AF add-on]
+
+ROLES: Caller, Event lead.
+FLOW: A caller signs in with a code, picks their name from a grid ("Who's using this phone
+today?"), and lands on Calls → Next. Bar: Next · List · Review.
+1. The loop (4 taps per family): Next shows ONE family on a big card → "Call" → a simulated
+   phone-dialler interstitial ("You're in the phone app. Come back when the call ends." with
+   a "Hang up and return" button — this tap is not counted) → the outcome step: five big
+   tiles (Coming · Not coming · Maybe · Call back · No answer) → Coming reveals guests
+   stepper + arrival day chips in place → Save → a "Saved · Undo" bar, and after 1.2s the
+   next family slides in. Do 3 families in a row.
+2. Call back: choosing Call back asks "When?" (In 1 hour · This evening · Tomorrow morning);
+   that family then appears at the top of Next at that time and on Today (lead role) under
+   "Needs you".
+3. Someone else is on it: one family shows "Priya is logging this family — you can call, but
+   only Priya can save the answer. Frees up by 9:47pm." The Call button still works; the
+   outcome step is read-only with that message.
+4. List tab: filter chips with counts (To call · Call back · No answer · Coming · Not coming
+   · All); each chip changes the URL-like path shown in a small bar outside the frame
+   ("/calls?show=callback") to prove filters are addressable.
+5. Review tab: two AI summaries waiting; open one, confirm, back to Review.
+Event lead role: same, plus an "Auto-call" entry at the top of List.
+```
+
+### AF3 — The family page is the centre
+
+```
+[A-BRIEF]
+[AF add-on]
+
+ROLES: Event lead, Hospitality runner, Family (client).
+FLOW: Search (header) → type "shah" → results grouped Families / Guests / Rooms → open
+"Shah Parivar". This is THE FAMILY PAGE: one screen answering everything about one family.
+Sections in order, each a card with a link to its job screen: Answer (status, 6 of 7
+guests coming, logged by Ravi 2 days ago) · Travel (arrival 19 Dec 6E 5074 10:30 Ahmedabad
+T2, car: Innova MH04 · departure 21 Dec) · Stay (JW Marriott, Room 304, 3 beds, 19–21 Dec) ·
+Hamper (not delivered) · Calls (3 attempts with outcomes) · People (names) · Notes.
+The page has ONE primary action that depends on the family's phase. Add a PHASE switcher
+outside the frame and show all six: Not called → "Call"; Promised call back 6pm → "Call
+back · promised 6:00pm"; Coming, landing today → "Check in"; Checked in, hamper pending →
+"Deliver hamper"; Checked in, all done → no button, the page is a record; Not coming → no
+button, a quiet "Change answer" link.
+Tapping Travel → the arrivals screen with this family highlighted; back returns to the family
+page. Tapping Stay → the room page; back returns to the family.
+Hospitality runner role: Answer and Calls are hidden (not their department); Stay and Hamper
+are shown. Family (client) role: Answer, Travel and Stay only, read-only, no phone numbers,
+no staff names.
+```
+
+### AF4 — Arrival day
+
+```
+[A-BRIEF]
+[AF add-on]
+
+ROLES: Logistics runner, Hospitality runner, Event lead.
+FLOW: 19 Dec, 10:20am.
+1. Logistics runner lands on Arrivals (bar: Arrivals · Departures · Trips · Fleet): today's
+   landings by time. 6E 5074 shows "Landed" (haldi pill), Shah Parivar, 6 guests, car
+   assigned. One row shows "No car yet" in red → Assign → pick a vehicle from a sheet that
+   shows luggage-adjusted seats ("Tempo Traveller · 14 with luggage") → assigned, Undo bar.
+2. Hospitality runner lands on Rooms (bar: Rooms · Check-in · Rooming list). Check-in lists
+   "Arriving now" first; tap Shah Parivar → the family page with "Check in" as the primary
+   action → member rows with check toggles, "Check in all 6" → done, room 304 + "2 keys" shown
+   big (3 taps from Check-in).
+3. Event lead on Today sees "Needs you": "No car for 6E 2231 landing 11:05 → Assign" — one tap
+   lands on the Assign sheet directly (deep link), and Back returns to Today.
+Show the Android-back behaviour when the Assign sheet is open (closes the sheet first).
+```
+
+### AF5 — Runners' apps: one job each
+
+```
+[A-BRIEF]
+[AF add-on]
+
+ROLES: Hamper runner, Setup runner, Hospitality runner, "No name picked".
+FLOW:
+1. Hamper runner: NO bottom bar. Lands straight on the next delivery ("Deliver to Room 304 —
+   Shah Parivar") with the remaining list below. Deliver → camera → photo → Confirm (with the
+   one-time "This photo is permanent proof" note) → the green seal → auto-advance to the next.
+2. Setup runner: NO bottom bar; a checklist of setup tasks for the venue.
+3. Hospitality runner trying to open a Calls link (simulate a shared link button outside the
+   frame): a calm "This is the Calls team's screen" page with a button back to their Rooms —
+   not an error.
+4. "No name picked": Today shows one row at the top: "Pick your name so your work is saved
+   under it" → the name grid → back to where they were.
+```
+
+### AF6 — First run and the family's view
+
+```
+[A-BRIEF]
+[AF add-on]
+
+ROLES: New staff member, Returning staff member, Family (client), Revoked code.
+FLOW:
+1. New staff: sign-in code (8 boxes) → "Who's using this phone today?" name grid → lands by
+   department (show the table of landings in a small legend outside the frame).
+2. Returning staff next morning: app opens straight to the name grid with yesterday's name
+   pre-selected → one tap → their landing.
+3. Family (client) signs in with the client code → the family view: couple's names, dates,
+   "412 guests coming", Today card (arriving / checked in), the families list read-only.
+   There is no bar, no search, no staff names, no phone numbers.
+4. Revoked code: any screen → a full-screen "This code was changed by your admin. Ask them
+   for the new one." → back to the code screen.
+```
+
+---
+
+## A0 — The design system sheet (first SCREEN prompt; lock the winner)
 
 ```
 [A-BRIEF]
@@ -764,7 +1077,299 @@ a verified change.
 
 ---
 
+# PART CS — BUILD THE STRUCTURE (Claude Code, before the screen restyles)
+
+Use the same **PREAMBLE** (Part B) at the top of every CS prompt. Two extra lines for this
+part — add them under the preamble:
+
+```
+STRUCTURE SESSION. You are changing WHERE things are and HOW you move, not how they look.
+Use the existing components as they are; restyling is the C-series. Do NOT restructure
+route groups or folders: new URLs are thin new page.tsx files in (app)/v2/[eventCode]
+(plus the matching (staff) file if tests/v2-route-parity.test.ts demands one) that compose
+existing components. Old URLs redirect; nothing is deleted.
+The source of truth for every decision is docs/STRUCTURE.md (written in CS0). If it and
+this prompt disagree, STOP and ask.
+```
+
+## CS0 — Write the structure down (docs only)
+
+```
+[PREAMBLE + structure lines]
+Design source: UI4-ARENA-PROMPTS.md Part S, and the AF winners in design/arena/AF*.tsx
+
+TASK: Write docs/STRUCTURE.md. No changes under src/.
+- S1 re-verified: re-check every row of the S1 table against the current tree and correct
+  anything that has moved. Quote file:line.
+- The role → landing → bar table (S2), exactly as the AF winners implemented it; where an
+  AF winner improved on Part S, say so and take the improvement.
+- The route map (S3) as a table AND as the literal TypeScript array CS1 will paste into
+  src/lib/nav/route-map.ts: { from: string, to: string, kind: 'redirect' | 'new' }[],
+  with Next-style params (:e, :groupId, :deliverableId, :extractionId, :hotelId).
+- The family page spec (S4), naming for each section the EXISTING read that fills it
+  (function name + file). Any section with no existing read: mark MISSING and name the
+  column/view/RPC it would need — do not design a migration.
+- The 14 flows (S5) with before/after taps, and N1–N10 (S6) with their pass conditions.
+Read first: UI4-ARENA-PROMPTS.md Part S, design/arena/AF*.tsx, src/lib/sections/{config.tsx,v3.ts},
+  src/lib/departments.ts, src/lib/events/paths.ts, src/components/native/NativeBridge.tsx,
+  src/proxy.ts, the (app)/v2/[eventCode] route list
+Files you may change: docs/STRUCTURE.md, DECISIONS.md
+Done when: every S1 row has a verified file:line, every family-page section names its read
+  or is marked MISSING, and git status shows nothing under src/.
+```
+
+## CS1 — The route map and the redirects
+
+```
+[PREAMBLE + structure lines]
+Design source: docs/STRUCTURE.md §route map
+
+TASK: Make every new URL resolve and every old URL redirect, from ONE table.
+1. src/lib/nav/route-map.ts — the array from STRUCTURE.md, exported, with a one-paragraph
+   header comment saying it is the only place a route move is recorded.
+2. Redirects: read src/proxy.ts and next.config.ts first and decide WHERE redirects run
+   relative to the NEXT_PUBLIC_UI=v2 rewrite (Next applies next.config redirects before
+   middleware/proxy — verify this against the installed Next 16 docs in node_modules, do not
+   trust this sentence). Implement them from route-map.ts so the table cannot drift from
+   behaviour. Preserve the query string and hash.
+3. New thin pages for every 'new' entry, composing existing components with the SAME guards
+   the page they replace uses (copy the guard line for line, as the v2 production page
+   did). The family page and the merged call flow are placeholders here that render the
+   existing screens (rsvp/status content for now) — CS5 and CS6 build them properly.
+4. tests/route-map.test.ts: every 'redirect' entry's `from` is reachable in the old tree and
+   its `to` exists as a page in the new tree; no `to` is itself a `from` (no chains); no
+   duplicate `from`.
+5. Update tests/v2-route-parity.test.ts's allowlist for the genuinely new routes, and say
+   which in DECISIONS.md.
+6. Update internal links that point at a replaced URL (grep for each `from`) so the app never
+   relies on its own redirects for normal navigation (a redirect is a wasted round trip,
+   T5). List every file changed.
+Read first: docs/STRUCTURE.md, src/proxy.ts, next.config.ts, tests/v2-route-parity.test.ts,
+  src/lib/sections/config.tsx
+Files you may change: src/lib/nav/route-map.ts, src/proxy.ts OR next.config.ts (whichever
+  step 2 chose — not both), the new page files, files with links to replaced URLs,
+  tests/route-map.test.ts, tests/v2-route-parity.test.ts, DECISIONS.md
+Done when: typecheck + tests clean, and `curl -sI` against `npm run dev` for five old URLs
+  shows a 308 to the right new URL (paste the output).
+```
+
+## CS2 — Land every role in the right place
+
+```
+[PREAMBLE + structure lines]
+Design source: docs/STRUCTURE.md §landings
+
+TASK: Implement the S2 landing table.
+- departmentHomePath (src/lib/departments.ts): management → /{e} (Today), rsvp →
+  /{e}/calls, hospitality → /{e}/hospitality, hamper → /{e}/hampers, logistics →
+  /{e}/logistics/arrivals, production → /{e}/setup. Rewrite the comment on management — it
+  currently justifies campaigns; say why Today now.
+- eventHomePath (src/lib/events/paths.ts): client → /{e}/families.
+- The root page (src/app/page.tsx) for admins: the last-opened event from a NEW device key
+  `ef_last_event` (localStorage, try/catch, written when an event layout mounts); fall back
+  to the first membership, then /events. Do NOT touch any nuvent_* key (CLAUDE.md §12).
+- Returning staff: if the code session is live, open on the name picker with yesterday's
+  name pre-selected (read the existing staff cookie; do not rename it).
+- tests/landing.test.ts: one assertion per row of the S2 table.
+Read first: src/lib/departments.ts, src/lib/events/paths.ts, src/app/page.tsx,
+  src/app/pick-staff/*, src/lib/auth/cookies.ts (read only)
+Files you may change: src/lib/departments.ts, src/lib/events/paths.ts, src/app/page.tsx,
+  src/app/pick-staff/*, the event layout that writes ef_last_event, tests/landing.test.ts,
+  existing tests that pin the old landings (update deliberately), DECISIONS.md
+Done when: every role lands per S2 and the tests prove it.
+```
+
+## CS3 — The bars, per role
+
+```
+[PREAMBLE + structure lines]
+Design source: docs/STRUCTURE.md §bars, design/arena/AF1-*.tsx, AF2, AF5
+
+TASK: Implement the S2 bars in src/lib/sections/v3.ts (and config.tsx only where a child's
+label/order/href must change).
+- Lead: Today · Calls · Hospitality · Logistics. Organiser: + Control (a new SectionId
+  'control', admin-only, href /{e}/control). Hampers leaves the lead's bar and is reached
+  from Hospitality and the family page; the hamper RUNNER still gets Hampers as their whole
+  app with no bar.
+- Caller: Next · List · Review (Auto-call removed from the caller's bar; for the lead it is
+  an entry at the top of List).
+- Hospitality: Rooms · Check-in · Rooming list. Logistics: Arrivals · Departures · Trips ·
+  Fleet. Hamper and Setup: no bar.
+- The department predicates (who may SEE what) do not change. Only the bar shape changes.
+- Update tests/v3-nav.test.ts and tests/nav-model.test.ts deliberately; replace old
+  assertions with the S2 table rather than deleting them. Record which in DECISIONS.md.
+Read first: src/lib/sections/{config.tsx,v3.ts,sidebar.ts}, src/components/nav/BottomTabs.tsx,
+  tests/v3-nav.test.ts, tests/nav-model.test.ts
+Files you may change: those, DECISIONS.md
+Done when: each role's bar matches S2 exactly and every nav test passes.
+```
+
+## CS4 — Android back and tabs that keep their place
+
+```
+[PREAMBLE + structure lines]
+Design source: Part S §S6 N3–N5, AF1–AF4 winners (their back-button behaviour)
+
+TASK: Replace history.back() with the N4 order, and give tabs memory.
+1. src/lib/nav/back.ts — a PURE function resolveBack(state) → action, where state = { open
+   sheets count, current tab, current tab's stack, role landing tab, lastBackAt } and action
+   ∈ close-sheet | pop | to-tab-root | to-landing | confirm-exit | exit. tests/back.test.ts
+   covers every branch, including "opened by a deep link with no history" (→ tab root, not
+   exit).
+2. A small sheet registry: BottomSheet registers its onClose on open and unregisters on close
+   (a module-level stack; no new dependency). NativeBridge's backButton listener asks the
+   registry first, then resolveBack. Keep NativeBridge's web no-op guard (isNativePlatform).
+3. Per-tab stacks (N3): record each tab's last URL and scroll position in sessionStorage
+   (try/catch) on navigation; the tab bar links to the remembered URL; tapping the active tab
+   goes to its root then to top. Pure reducer + tests.
+4. Every detail page declares its parent URL (N5) and the back link uses it — grep for
+   router.back() in page code and replace. List every file.
+5. "Press back again to close EventFlow" as a 2s toast using the existing toast/UndoBar
+   surface.
+Read first: src/components/native/NativeBridge.tsx, src/components/ui/BottomSheet.tsx,
+  src/components/ui/BackRow.tsx, src/components/nav/BottomTabs.tsx, src/lib/native/platform.ts
+Files you may change: src/lib/nav/back.ts, src/lib/nav/tab-stack.ts, NativeBridge.tsx,
+  BottomSheet.tsx, BottomTabs.tsx, BackRow.tsx, detail pages using router.back(),
+  tests/back.test.ts, tests/tab-stack.test.ts, DECISIONS.md
+Done when: tests clean, and on a HANDSET (this is native behaviour — a browser cannot prove
+  it): sheet open → back closes it; Calls → family → back ×3 goes list → Calls root → Today;
+  a deep-linked family → back goes to its tab root, not out of the app. Report what you ran;
+  if no handset was available, say this is UNVERIFIED.
+```
+
+## CS5 — The family page
+
+```
+[PREAMBLE + structure lines]
+Design source: docs/STRUCTURE.md §family page, design/arena/AF3-*.tsx
+
+TASK: Build /{e}/families/[groupId] (placeholder from CS1) per S4.
+- src/lib/family/next-action.ts: a PURE function familyNextAction(family, viewer) →
+  'call' | 'call-back' | 'check-in' | 'deliver-hamper' | null, per the S4 table.
+  tests/family-next-action.test.ts: one case per row, plus "viewer's department cannot do
+  it" → null.
+- Sections render from the EXISTING reads named in STRUCTURE.md, fetched in parallel
+  (Promise.all, T5). A MISSING read → the section is omitted with a TODO naming the gap;
+  do not add a query to src/lib/supabase and do not write a migration.
+- Section visibility uses the same department predicates as config.tsx (import them — no
+  new permission logic). Client: Answer, Travel, Stay, read-only, no phone, no staff names.
+- Anchors #answer #travel #stay #hamper #calls for N8 deep links.
+- Point every "open this family" link in the app at this page: search results, queue rows'
+  secondary tap, arrivals rows, rooming list rows, room sheet occupants, Today's Needs-you
+  rows. List every file.
+Read first: docs/STRUCTURE.md, design/arena/AF3-*.tsx, the reads it names,
+  src/lib/sections/config.tsx, src/lib/rsvp-queue.ts
+Files you may change: the family route folder, src/lib/family/*, the link sites listed,
+  tests/family-next-action.test.ts, DECISIONS.md
+Done when: every phase in AF3 renders its right primary action, role hiding works, and the
+  link sites all land here.
+```
+
+## CS6 — One URL for a call
+
+```
+[PREAMBLE + structure lines]
+Design source: design/arena/AF2-*.tsx, docs/STRUCTURE.md
+
+TASK: /{e}/families/[groupId]/call becomes the whole call: step 1 before-dial, step 2
+in-call (return from dialler), step 3 outcome. Old rsvp/call/[groupId] and
+rsvp/status/[groupId] already redirect (CS1).
+THE INVARIANTS — the diff is rejected if any changes (CLAUDE.md §5.4, §6, §12):
+- The call_attempts row is written BEFORE the dial fires; its id goes to sessionStorage;
+  on resume the flow rehydrates from it (resume-first). Dial via openExternalUrl only.
+- Step 1–2 stamp last_opened_by_staff presence exactly as the call screen does now, and
+  neither claim nor release the lock.
+- Step 3 claims the lock on mount, exactly where the status screen claims it today
+  (claimGroupForCall), and releases after a successful save (releaseGroupAfterCall), guarded
+  so a caller only releases their own lock.
+- The outcome is written once; the row freezes.
+- The steps are ONE route with the step in state + ?step= in the URL, so a WebView discard
+  during the dial restores to the right step.
+- Auto-advance to /{e}/calls after save (1.2s) — the next family is the queue's job.
+Do NOT touch the recorder (next series). Reuse CallScreen and RsvpLogForm internals; move
+them only if unavoidable, and list every move.
+Read first: src/components/call/CallScreen.tsx, rsvp/call/[groupId]/*, rsvp/status/[groupId]/*,
+  src/lib/rsvp-queue.ts, src/lib/native/navigation.ts, CLAUDE.md §5.4 §6 §12
+Files you may change: the families/[groupId]/call route folder, the two old route folders
+  (redirect stubs only), src/components/call/CallScreen.tsx (composition only), DECISIONS.md
+Done when: on a handset, Next → Call → dialler → return → outcome → Save → next family works;
+  killing the WebView during the dial and reopening lands on step 2 with the same attempt id;
+  and you have re-read the diff against each invariant and quoted the lines that keep it.
+```
+
+## CS7 — Merge the duplicates
+
+```
+[PREAMBLE + structure lines]
+Design source: docs/STRUCTURE.md §route map
+
+TASK: One place per job (N10). For each pair, the new URL renders the screen and the old one
+already redirects (CS1); here you remove the second implementation's navigation entries and
+make the remaining one complete.
+- Hampers: /{e}/hampers[/id] only. Remove the "borrowed child" plumbing in config.tsx for
+  hamper if nothing else needs it; DeliveryDetail's exits point at /{e}/hampers.
+- Families directory: /{e}/families = the guest list + search, merged; the find route's
+  search logic is reused (docs/guest-search-explain.md), not rewritten.
+- Room creation: ONE form, reached from Control → Hotels & rooms; the hospitality "new
+  room" entry links there.
+- Import: Control → Import offers "Guest list" and "Hotels & rooms" as two choices, each the
+  existing import flow.
+- Unmatched recordings: a filter on Review (?show=no-family), same component.
+- Setup: /{e}/setup renders the production screen.
+Read first: src/lib/sections/config.tsx, the route folders involved, docs/STRUCTURE.md
+Files you may change: those route folders, config.tsx, DECISIONS.md
+Done when: grep shows each job linked from exactly one nav location, and route-map tests pass.
+```
+
+## CS8 — The new-event setup checklist
+
+```
+[PREAMBLE + structure lines]
+Design source: design/arena/AF1-*.tsx (journey 3)
+
+TASK: After creating an event, Today shows a setup checklist until it is done:
+Import the guest list · Add staff names · Add hotels & rooms · Share the team code.
+- Every tick is DERIVED from data that already exists — guest_groups count > 0,
+  staff_members count > 0, hotels count > 0, a team code revealed at least once
+  (code_reveal_log, written by the existing reveal action). No stored "done" flag: a stored
+  flag drifts (the same reasoning as CLAUDE.md §5.4's counters).
+- Admin and lead see it; runners never do. It disappears when all four are ticked.
+- Each item is one tap to its Control screen.
+- Creating an event lands on the new event's Today (not the admin dashboard).
+- If one of the four counts has no existing read, STOP and name it — no new query layer.
+Read first: CreateEventForm.tsx, src/lib/actions/access-codes.ts, the Today page and _home
+Files you may change: the Today page/_home, a new _home/SetupChecklist.tsx,
+  CreateEventForm.tsx (destination only), DECISIONS.md
+Done when: a fresh event shows 0/4, each step ticks as it is done, and the card is gone at 4/4.
+```
+
+## CS9 — Measure the structure
+
+```
+[PREAMBLE + structure lines]
+Design source: docs/STRUCTURE.md §flows, §N1–N10
+
+TASK: Prove Part S. No features.
+1. Add the 14 S5 flows as task definitions to e2e/v12-tasks.mjs (the file
+   scripts/tap-budget.mjs and the spec both read), with the "after" count as the budget.
+   Seed what they need through e2e/v12-seed.mjs.
+2. Run node scripts/tap-budget.mjs against a production build (read its header for how) and
+   paste the output. Before/after table into docs/STRUCTURE.md.
+3. One test per navigation rule N1–N10 that can be checked without a handset; list the ones
+   that can only be checked on a handset (N4 at least) and add them to docs/HANDSET-TEST.md.
+Files you may change: e2e/v12-tasks.mjs, e2e/v12-seed.mjs, tests/nav-rules.test.ts,
+  docs/STRUCTURE.md, docs/HANDSET-TEST.md, DECISIONS.md
+Done when: every flow has a measured count or is marked NOT MEASURED with the reason.
+```
+
+---
+
 # PART C — CLAUDE CODE PORT PROMPTS
+
+**Paths after Part CS.** C6–C14 name files as they are on `37347b3`. If a CS session moved
+or replaced a route, use the new location — `src/lib/nav/route-map.ts` and
+`docs/STRUCTURE.md` are the lookup. The C-series changes how screens LOOK; it must not undo
+a structure decision.
 
 ## C0 — Lock the design decision (docs only)
 
@@ -904,11 +1509,8 @@ TASK: Replace the two phone shells (staff and admin) with one.
    switcher sheet built on the existing EventSwitcher data and logic; admin also sees "All
    events" → /admin/events and "New event"), search and avatar right, solid background, rule
    fades in on scroll via an IntersectionObserver sentinel (NOT a scroll listener, F6).
-2. Tab bar: in src/lib/sections/v3.ts, for `management` viewers who are admins, the bar is
-   Today · Calls · Hospitality · Logistics · Control; Hampers moves under Hospitality as a
-   segment for management ONLY. Department runners keep exactly today's behaviour — the
-   department predicates do not change. Control = a new SectionId `control`, admin-only,
-   href /{eventCode}/control.
+2. Tab bar: already reshaped by CS3 (per role, incl. the admin-only Control tab). Only
+   restyle it to A1 here; do not change which tabs a role gets.
 3. The (admin) layout on phones: below md, it renders inside the same header + tab bar as the
    event app (Control tab active) instead of its own "Admin" header, "App" back link and
    AdminMobileNav. At md and up it keeps AdminSidebar exactly as now. Delete AdminMobileNav
@@ -1165,13 +1767,24 @@ Done when: every number above is reported as measured, or marked NOT MEASURED wi
 ## Order of play
 
 ```
-A0 → C0 → C1 → C2 → C3            (the language + the performance floor, before any screen)
-A1 + A3 → C4 → C5                 (the admin fix — the actual complaint)
-A4 A5 → C6,  A6 A7 → C7           (admin detail screens)
-A2 → C8,  A8 A9 → C9,  A10 → C10,  A11 → C11
-A12 A13 → C12,  A14 → C13,  A15 A16 → C14
-C15                               (measure; then hand over to the recording series)
+PHASE 1 — STRUCTURE (the skeleton; no restyling yet)
+  Read Part S → AF1…AF6 (arena, pick winners) → CS0 → CS1 → CS2 → CS3 → CS4 → CS5
+  → CS6 → CS7 → CS8 → CS9
+PHASE 2 — LOOK + PERFORMANCE FLOOR
+  A0 → C0 → C1 → C2 → C3
+PHASE 3 — THE ONE SHELL + CONTROL (the admin complaint, finished)
+  A1 + A3 → C4 → C5
+PHASE 4 — SCREENS, on the new routes
+  A4 A5 → C6,  A6 A7 → C7,  A2 → C8,  A8 A9 → C9,  A10 → C10,  A11 → C11,
+  A12 A13 → C12,  A14 → C13,  A15 A16 → C14
+PHASE 5 — PROVE IT
+  C15 (frames, bundle, latency) + re-run CS9 (taps) → hand over to the recording series
 ```
+
+Why structure first: every C prompt restyles a screen at a URL. Restyling `rsvp/status`
+and then merging it into `families/[id]/call` a week later is paying for the same screen
+twice. Phase 1 uses today's components as they are, so it is cheap and fully testable
+before a single pixel changes.
 
 Save every arena winner as `design/arena/<id>-<name>.tsx` and commit them — they are the
 design record, like the migrations are the schema record. When neither arena model wins
