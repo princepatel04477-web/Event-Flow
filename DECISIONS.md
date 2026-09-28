@@ -2948,3 +2948,26 @@ Token VALUES changed, names did not, so every screen re-skinned with no componen
 Verified: typecheck clean, tests as before, `next build` (v2) exit 0, and a 390px Chromium
 screenshot of `/login` shows the serif wordmark, bone ground and indigo button. Not run on a
 handset.
+
+## 28 September 2026 — UI4 step 3: the 60fps contract is a test
+
+`tests/no-expensive-css.test.ts` fails on `backdrop-blur`/`backdrop-filter`, `transition-all`,
+a `transition-[…]` on a layout property, and a layout property (width/height/top/left/margin/
+padding/boxShadow/filter) inside a motion `animate`/`initial`/`exit` object — anywhere under
+`src/`, comment lines excepted. Every offender it found was fixed, none allowlisted:
+
+- Sticky headers (`ScreenHeader`, `StickyHeader`) were `bg-paper/95 backdrop-blur-sm`, which
+  re-blurs the list behind them on every scroll frame. Now solid `bg-paper`. Same for the
+  import preview's sticky bar and the sheet scrim (blur removed, scrim `bg-ink/60`).
+- Both tab bars lifted over the keyboard by transitioning `bottom` — a re-layout per frame. They
+  sit at `bottom: 0` and lift with `translateY(-var(--keyboard-offset))`.
+- Progress bars transitioned `width` (`Progress`, the v1 queue bar) or used `transition-all`
+  (KM dashboard). The width now changes without animation; the entrance is still the `grow-x`
+  transform. The voice-note level bar, which moves every second while recording, is scaled
+  (`scaleX`) instead of resized.
+- `perf-rows` utility (`content-visibility: auto; contain-intrinsic-size: auto 64px`) on the
+  rows of the family queue sheet, the all-contacts list and the staff guest directory — the
+  lists that run to hundreds.
+
+Not done: the per-gesture frame measurement (F10) needs a Playwright run against a seeded
+database with CPU throttling; the sandbox has no database, so that stays open.

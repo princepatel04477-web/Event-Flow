@@ -63,7 +63,7 @@ export function BottomSheet({ open, onClose, label, children, className }: Botto
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 h-full w-full cursor-default bg-ink/70 backdrop-blur-[2px]"
+        className="absolute inset-0 h-full w-full cursor-default bg-ink/60"
       />
 
       <div

@@ -476,6 +476,15 @@
   );
 }
 
+/* A row in a list that can run to hundreds (238 families, 465 guests).
+   `content-visibility: auto` lets the WebView skip layout and paint for rows
+   off screen, and `contain-intrinsic-size` reserves their height so the
+   scrollbar does not jump as they come into view (UI4 §3, F4). */
+@utility perf-rows {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
+}
+
 /* Kill the 300ms grey flash on Android taps. */
 @utility tap {
   touch-action: manipulation;

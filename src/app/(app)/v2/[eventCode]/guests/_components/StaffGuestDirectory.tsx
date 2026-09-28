@@ -217,7 +217,7 @@ export function StaffGuestDirectory({
             aria-busy={showingStale || undefined}
           >
             {list.map((row, index) => (
-              <div key={row.profile.guest_id ?? `${row.profile.guest_name}|${index}`} role="listitem">
+              <div key={row.profile.guest_id ?? `${row.profile.guest_name}|${index}`} role="listitem" className="perf-rows">
                 <GuestResultRow
                   guest={row.profile}
                   term={query}
