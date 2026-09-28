@@ -124,6 +124,7 @@ const NEW_IN_T6 = new Set([
  */
 const NEW_IN_UI4 = new Set([
   'control', // every admin tool for the event, one tap from the bar
+  'families/[groupId]', // one family, everything about them — v1 had no such page
 ])
 
 /** Every route any session added that has no legacy counterpart at all. */

@@ -102,7 +102,7 @@ export function RoomingRoomSheet({ rows, eventCode, onClose }: RoomingRoomSheetP
 
                   {row.groupId !== null ? (
                     <Link
-                      href={`/${eventCode}/rsvp/status/${row.groupId}`}
+                      href={`/${eventCode}/families/${row.groupId}`}
                       className="tap inline-flex min-h-11 items-center rounded-full border border-rule-strong px-3.5 text-xs font-semibold text-ink"
                     >
                       Family details

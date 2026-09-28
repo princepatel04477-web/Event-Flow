@@ -240,7 +240,7 @@ export function StaffGuestDirectory({
         // sheet without the button rather than linking to a dead end.
         familyHref={
           canOpenFamilyRecord && open?.groupId
-            ? `/${eventCode}/rsvp/status/${open.groupId}`
+            ? `/${eventCode}/families/${open.groupId}`
             : null
         }
       />

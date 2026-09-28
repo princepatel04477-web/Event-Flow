@@ -2996,3 +2996,28 @@ database with CPU throttling; the sandbox has no database, so that stays open.
 - **Buttons** press with `scale(0.97)` (transform) as well as the colour change, and gain a
   `now` (haldi) variant. The header title is the 32px serif with no faked weight.
 - `adminHeaderFor` moved to `src/lib/admin/header.ts` so the back resolver can reuse it.
+
+## 28 September 2026 — UI4 step 5: the family page, and a setup checklist on Today
+
+- **`/{event}/families/[groupId]`** (UI4 S4). One family on one screen: Answer, Travel, Stay,
+  Hamper, Calls, People, Notes, each linking to its job screen, each shown only if the viewer's
+  department may open that section (the section guards' own predicates). One primary action
+  from `familyNextAction` (6 tests): Call → Call back → Check in → Deliver hamper → none; never
+  an action the viewer's department cannot take. Reads are the per-family reads the RSVP status
+  screen already makes plus the family's active rooms and group hamper, in parallel. "Today" is
+  computed in Asia/Kolkata, not the Seoul server's clock.
+- **Found and fixed while wiring links:** "Family details" on the rooming list and its room
+  sheet, and "Open the family record" in search, went to `rsvp/status/[groupId]`, whose render
+  **claims the 15-minute caller lock** (CLAUDE.md §6) — so reading a rooming list locked
+  families against callers. They now open the family page, which takes no lock. The call screen
+  still goes to `rsvp/status` after a call, which is the one place that should lock.
+- **Setup checklist on Today (admin only):** Import the guest list · Add staff names · Add
+  hotels & rooms · Share the team code. Every tick is derived (row counts; the team code counts
+  as shared once `code_reveal_log` has a row); nothing is stored. Admin-only because
+  `code_reveal_log` is admin-readable. Disappears at 4/4.
+- **Hero card on Today for leads:** "Guests expected" in the 64px serif, families and
+  still-to-call under it, the whole card a link to the guest list (R4). Same `totalPax` the page
+  already read.
+
+Not verified against data: the sandbox has no database, so the family page and checklist were
+checked by typecheck, tests and build only.
