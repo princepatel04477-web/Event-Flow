@@ -5,6 +5,45 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — F7: the Rooms summary shows occupied / with bed / extra bed / not placed
+
+### Client answer
+
+"Guest with bed" means guests who **got a real bed**; the rest are on an extra
+mattress (asked and answered 3 Oct 2026).
+
+### What changed
+
+- `src/lib/rooms/board.ts` — new pure helpers, all unit-tested:
+  - `bedSummary(rooms)` → `{ occupied, withBed, extraBed }`, where per room
+    `withBed = min(placed, capacity)` and `extraBed = max(0, placed − capacity)`.
+    This is why the override rooms are right: a guest past capacity is on an
+    extra mattress, not a bed.
+  - `notPlacedYet(confirmedGuests, occupied)` = `confirmed − occupied`, floored
+    at zero.
+  - `roomBedLine(occupied, capacity)` → "3 / 2 beds · 1 extra" / "2 / 2 beds" /
+    "1 / 2 beds". Named `roomBedLine` because RoomsBoard already had a local
+    `bedLine(bedsFree, waiting)` for the bottom bar.
+- `RoomsBoard.tsx` — the header's two tiles become the four F7 figures, each a
+  button (R4): Occupied guests / With bed / Extra bed into the room list under
+  the matching occupancy filter, Not placed yet into the waiting list. The
+  `Progress` bar was replaced by the "With bed" figure. Each room card now reads
+  via `roomBedLine`. Everything is computed from the grid `readRoomsGrid` already
+  loads, so the figures follow the existing optimistic moves and roll back with
+  them.
+
+### Notes / limits
+
+- "Not placed yet" is `confirmed − occupied` (a guest placed but not yet
+  confirmed is not subtracted per family). The alternative — a per-family join
+  against `unplaced` — needs a read the screen does not make, and F7's own
+  definition is "confirmed guests with no room".
+- The "Extra bed" filter is the closest existing occupancy status (`full`); the
+  board has no separate `over` status. The figure itself is exact.
+- No client-facing Rooms screen exists, so only the one board changed.
+
+---
+
 ## 3 October 2026 — F6: migration to split the EXPECTED headcount into adults/children (NOT applied)
 
 ### Client answer

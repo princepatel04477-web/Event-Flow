@@ -143,6 +143,72 @@ export function bedsLabel(occupied: number, capacity: number): string {
   return `${occupied} of ${capacity} ${capacity === 1 ? 'bed' : 'beds'}`
 }
 
+/** A room as the bed maths needs it: its capacity and who is in it. */
+export interface BedRoom {
+  capacity: number
+  occupants: readonly unknown[]
+}
+
+export interface BedSummary {
+  /** Guests currently placed in any room. */
+  occupied: number
+  /** For each room, min(placed, capacity), summed — the guests with a real bed. */
+  withBed: number
+  /** For each room, max(0, placed − capacity), summed — the extra-mattress beds. */
+  extraBed: number
+}
+
+/**
+ * F7 — the three figures the Rooms summary derives from the loaded grid.
+ *
+ * "Guests with a bed" is `min(placed, capacity)` per room, NOT the raw occupant
+ * count: a room that went through the capacity override holds guests past its
+ * beds, and those guests are on an extra mattress, not on a bed. "Extra bed" is
+ * exactly that overflow. Both are quantities of PEOPLE, so the caller adds the
+ * count of rooms (a different unit) if it wants one.
+ *
+ * "Not placed yet" is deliberately NOT here: it is a subtraction against the
+ * event's confirmed headcount, which this module does not know.
+ */
+export function bedSummary(rooms: readonly BedRoom[]): BedSummary {
+  let occupied = 0
+  let withBed = 0
+  let extraBed = 0
+  for (const room of rooms) {
+    const placed = room.occupants.length
+    occupied += placed
+    withBed += Math.min(placed, room.capacity)
+    extraBed += Math.max(0, placed - room.capacity)
+  }
+  return { occupied, withBed, extraBed }
+}
+
+/**
+ * F7 — "Not placed yet": confirmed guests with no room, never negative.
+ *
+ * A guest placed in a room but not (yet) confirmed is not counted here, so this
+ * is `confirmed − occupied` floored at zero rather than a per-family join.
+ */
+export function notPlacedYet(confirmedGuests: number, occupied: number): number {
+  return Math.max(0, confirmedGuests - occupied)
+}
+
+/**
+ * "3 / 2 beds · 1 extra" (over), "2 / 2 beds" (full), "1 / 2 beds" (space).
+ *
+ * The overflow past capacity is spelled out — a coordinator repeating the line
+ * back needs to know the room is over, not just "full". Named `roomBedLine`,
+ * not `bedLine`: RoomsBoard already has a local `bedLine(bedsFree, waiting)`
+ * for the bottom bar, and the two must not be confused.
+ */
+export function roomBedLine(occupied: number, capacity: number): string {
+  const unit = capacity === 1 ? 'bed' : 'beds'
+  const extra = Math.max(0, occupied - capacity)
+  return extra > 0
+    ? `${occupied} / ${capacity} ${unit} · ${extra} extra`
+    : `${occupied} / ${capacity} ${unit}`
+}
+
 /** "6 guests · no room yet" / "6 guests · 2 placed, 4 to go". */
 export function waitingLabel(headcount: number, placed: number): string {
   const people = `${headcount} ${headcount === 1 ? 'guest' : 'guests'}`

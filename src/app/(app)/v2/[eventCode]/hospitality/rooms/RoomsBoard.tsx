@@ -12,7 +12,6 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { LinkButton } from '@/components/ui/LinkButton'
 import { LoadingRows } from '@/components/ui/LoadingRows'
-import { Progress } from '@/components/ui/Progress'
 import { Row } from '@/components/ui/Row'
 import { Segmented } from '@/components/ui/Segmented'
 import { Select } from '@/components/ui/Select'
@@ -31,7 +30,14 @@ import {
 import { roomGuardMessage } from '@/lib/errors'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { queryKeys } from '@/lib/query/keys'
-import { groupRoomsByHotelFloor, matchesTerm, waitingLabel } from '@/lib/rooms/board'
+import {
+  bedSummary,
+  groupRoomsByHotelFloor,
+  matchesTerm,
+  notPlacedYet,
+  roomBedLine,
+  waitingLabel,
+} from '@/lib/rooms/board'
 import {
   activeRoomFilterCount,
   matchesRoomFilters,
@@ -504,50 +510,66 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
     )
   }
 
+  // F7 — the four figures as quantities of PEOPLE. "Not placed yet" is the
+  // confirmed headcount minus the guests actually in a room.
+  const beds = bedSummary(grid.rooms)
+  const notPlaced = notPlacedYet(grid.totals.confirmedGuests, beds.occupied)
+
   return (
     <div className="flex flex-col gap-5 pb-nav-bottombar">
-      {/* The screen's state in one bar. Rooms is maroon (SPEC-V3 §2), and the
-          bar is the label + done/total + a line of what is left. */}
+      {/* The screen's state in four figures (F7). Each is a door into the list
+          behind it (R4): Occupied / With bed / Extra bed into the room list
+          under the matching occupancy filter, Not placed into the waiting
+          list. Same tile style the screen already used. */}
       <section className="flex flex-col gap-3 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1">
         {isPending ? (
           <p role="status" className="text-base text-muted">
             Counting beds…
           </p>
         ) : (
-          <>
-            <Progress
-              label="Guests with a bed"
-              done={grid.totals.guestsWithBed}
-              total={grid.totals.confirmedGuests}
-              tone="brand"
-            />
-            {/* The two figures in this card are the screen's count tiles, and
-                each is a door into the list behind it: the bar into the rooms
-                (a bed is a room), the waiting line into the families still to
-                place. They were prose before — the numbers a coordinator reads
-                first and could not act on. Two buttons, never nested: the
-                second is a sibling, not a child of the first. */}
-            <div className="flex items-stretch gap-2">
-              <button
-                type="button"
-                onClick={() => setTab('rooms')}
-                aria-pressed={tab === 'rooms'}
-                className="tap min-h-11 min-w-0 flex-1 rounded-xl border border-rule-strong px-3 py-2 text-left text-sm text-muted transition-colors duration-press ease-ledger active:bg-surface-2"
-              >
-                {grid.totals.bedsFree} {grid.totals.bedsFree === 1 ? 'bed' : 'beds'} free
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('waiting')}
-                aria-pressed={tab === 'waiting'}
-                className="tap min-h-11 min-w-0 flex-1 rounded-xl border border-rule-strong px-3 py-2 text-left text-sm text-muted transition-colors duration-press ease-ledger active:bg-surface-2"
-              >
-                {waiting.length === 0
-                  ? 'Every family has a bed'
-                  : `${waiting.length} ${waiting.length === 1 ? 'family' : 'families'} waiting`}
-              </button>
-            </div>
-          </>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setTab('rooms')
+                setFilters((f) => ({ ...f, statuses: [] }))
+              }}
+              className="tap min-h-14 rounded-xl border border-rule-strong px-3 py-2 text-left transition-colors duration-press ease-ledger active:bg-surface-2"
+            >
+              <span className="figure block text-xl font-semibold text-ink">{beds.occupied}</span>
+              <span className="block text-xs text-muted">Occupied guests</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab('rooms')
+                setFilters((f) => ({ ...f, statuses: ['partly', 'full'] }))
+              }}
+              className="tap min-h-14 rounded-xl border border-rule-strong px-3 py-2 text-left transition-colors duration-press ease-ledger active:bg-surface-2"
+            >
+              <span className="figure block text-xl font-semibold text-ink">{beds.withBed}</span>
+              <span className="block text-xs text-muted">With bed</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab('rooms')
+                setFilters((f) => ({ ...f, statuses: ['full'] }))
+              }}
+              className="tap min-h-14 rounded-xl border border-rule-strong px-3 py-2 text-left transition-colors duration-press ease-ledger active:bg-surface-2"
+            >
+              <span className="figure block text-xl font-semibold text-ink">{beds.extraBed}</span>
+              <span className="block text-xs text-muted">Extra bed</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('waiting')}
+              className="tap min-h-14 rounded-xl border border-rule-strong px-3 py-2 text-left transition-colors duration-press ease-ledger active:bg-surface-2"
+            >
+              <span className="figure block text-xl font-semibold text-ink">{notPlaced}</span>
+              <span className="block text-xs text-muted">Not placed yet</span>
+            </button>
+          </div>
         )}
       </section>
 
@@ -975,7 +997,7 @@ function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) =
             glance and "3 of 3 beds" is the number a coordinator repeats back. */}
         {room.isBlocked ? null : (
           <span className="mt-0.5 block text-xs text-muted">
-            {occupied}/{room.capacity} beds
+            {roomBedLine(occupied, room.capacity)}
           </span>
         )}
       </span>

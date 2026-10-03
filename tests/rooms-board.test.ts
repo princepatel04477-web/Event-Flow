@@ -9,11 +9,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  bedSummary,
   bedsLabel,
   boardSummary,
   compareRoomNumbers,
   groupRoomsByHotelFloor,
   matchesTerm,
+  notPlacedYet,
+  roomBedLine,
   waitingLabel,
 } from '@/lib/rooms/board'
 
@@ -114,5 +117,38 @@ describe('row labels', () => {
     expect(waitingLabel(6, 0)).toBe('6 guests · no room yet')
     expect(waitingLabel(6, 2)).toBe('6 guests · 2 placed, 4 to go')
     expect(waitingLabel(1, 0)).toBe('1 guest · no room yet')
+  })
+})
+
+// F7 — the four Rooms figures, one of the rooms over capacity.
+describe('bed summary', () => {
+  const rooms = [
+    { capacity: 2, occupants: ['a', 'b', 'c'] }, // over by one
+    { capacity: 2, occupants: ['d', 'e'] }, // full
+    { capacity: 3, occupants: ['f'] }, // space
+    { capacity: 2, occupants: [] }, // empty
+  ]
+
+  it('counts occupied, with-bed and extra-bed correctly', () => {
+    // occupied 3+2+1+0=6 · with bed 2+2+1+0=5 · extra 1+0+0+0=1
+    expect(bedSummary(rooms)).toEqual({ occupied: 6, withBed: 5, extraBed: 1 })
+  })
+
+  it('does not count the overflow as a real bed', () => {
+    const single = [{ capacity: 2, occupants: ['a', 'b', 'c'] }]
+    expect(bedSummary(single)).toEqual({ occupied: 3, withBed: 2, extraBed: 1 })
+  })
+
+  it('subtracts occupancy from the confirmed headcount, floored at zero', () => {
+    expect(notPlacedYet(8, 6)).toBe(2)
+    expect(notPlacedYet(6, 6)).toBe(0)
+    expect(notPlacedYet(4, 9)).toBe(0)
+  })
+
+  it('spells out the overflow on the room line', () => {
+    expect(roomBedLine(3, 2)).toBe('3 / 2 beds · 1 extra')
+    expect(roomBedLine(2, 2)).toBe('2 / 2 beds')
+    expect(roomBedLine(1, 2)).toBe('1 / 2 beds')
+    expect(roomBedLine(0, 1)).toBe('0 / 1 bed')
   })
 })
