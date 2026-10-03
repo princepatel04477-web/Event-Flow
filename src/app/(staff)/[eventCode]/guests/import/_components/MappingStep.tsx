@@ -7,6 +7,7 @@ import { Card, CardBody } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { isBlankCell } from '@/lib/import/cells'
 import {
+  detectContactColumnFromData,
   parseCustomMapping,
   resolveContactsSheet,
   type ContactsParseSuccess,
@@ -82,9 +83,17 @@ export function MappingStep({
   const autoMapping = useMemo(() => {
     const res = resolveContactsSheet(headers)
     if (res.ok) {
+      let contactIndex = res.sheet.contactIndex
+      if (contactIndex === null) {
+        contactIndex = detectContactColumnFromData(
+          currentSheet.grid,
+          headerRowIndex,
+          new Set([res.sheet.nameIndex]),
+        )
+      }
       return {
         nameIndex: res.sheet.nameIndex,
-        contactIndex: res.sheet.contactIndex,
+        contactIndex,
         paxIndex: res.sheet.paxIndex ?? null,
         cityIndex: res.sheet.cityIndex ?? null,
         groupCodeIndex: res.sheet.groupCodeIndex ?? null,
@@ -92,16 +101,21 @@ export function MappingStep({
         roomIndex: res.sheet.roomIndex ?? null,
       }
     }
+    const detectedPhone = detectContactColumnFromData(
+      currentSheet.grid,
+      headerRowIndex,
+      new Set([0]),
+    )
     return {
       nameIndex: 0,
-      contactIndex: null,
+      contactIndex: detectedPhone,
       paxIndex: null,
       cityIndex: null,
       groupCodeIndex: null,
       remarksIndex: null,
       roomIndex: null,
     }
-  }, [headers])
+  }, [headers, currentSheet.grid, headerRowIndex])
 
   const [nameCol, setNameCol] = useState<number>(() => autoMapping.nameIndex)
   const [contactCol, setContactCol] = useState<number | null>(() => autoMapping.contactIndex)
@@ -122,11 +136,26 @@ export function MappingStep({
     const res = resolveContactsSheet(newHeaders)
     if (res.ok) {
       setNameCol(res.sheet.nameIndex)
-      setContactCol(res.sheet.contactIndex)
+      let contactIdx = res.sheet.contactIndex
+      if (contactIdx === null) {
+        contactIdx = detectContactColumnFromData(
+          currentSheet.grid,
+          newIndex,
+          new Set([res.sheet.nameIndex]),
+        )
+      }
+      setContactCol(contactIdx)
       setPaxCol(res.sheet.paxIndex ?? null)
       setCityCol(res.sheet.cityIndex ?? null)
       setGroupCodeCol(res.sheet.groupCodeIndex ?? null)
       setRemarksCol(res.sheet.remarksIndex ?? null)
+    } else {
+      const detectedPhone = detectContactColumnFromData(
+        currentSheet.grid,
+        newIndex,
+        new Set([0]),
+      )
+      setContactCol(detectedPhone)
     }
   }
 
@@ -145,14 +174,27 @@ export function MappingStep({
       const res = resolveContactsSheet(newHeaders)
       if (res.ok) {
         setNameCol(res.sheet.nameIndex)
-        setContactCol(res.sheet.contactIndex)
+        let contactIdx = res.sheet.contactIndex
+        if (contactIdx === null) {
+          contactIdx = detectContactColumnFromData(
+            sheet.grid,
+            rowIdx,
+            new Set([res.sheet.nameIndex]),
+          )
+        }
+        setContactCol(contactIdx)
         setPaxCol(res.sheet.paxIndex ?? null)
         setCityCol(res.sheet.cityIndex ?? null)
         setGroupCodeCol(res.sheet.groupCodeIndex ?? null)
         setRemarksCol(res.sheet.remarksIndex ?? null)
       } else {
         setNameCol(0)
-        setContactCol(null)
+        const detectedPhone = detectContactColumnFromData(
+          sheet.grid,
+          rowIdx,
+          new Set([0]),
+        )
+        setContactCol(detectedPhone)
         setPaxCol(null)
         setCityCol(null)
         setGroupCodeCol(null)

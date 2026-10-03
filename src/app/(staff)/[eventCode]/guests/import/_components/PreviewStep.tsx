@@ -76,6 +76,7 @@ export function PreviewStep({
   const [commitError, setCommitError] = useState<string | null>(null)
 
   const blocked = result.families.filter((f) => !f.canImport).length
+  const hasNoPhones = result.families.length > 0 && result.families.every((f) => !f.primaryMobile)
 
   async function handleCommit() {
     setBusy(true)
@@ -114,6 +115,34 @@ export function PreviewStep({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Top of the screen: warning if no phone numbers are detected */}
+      {hasNoPhones ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-warning bg-tint-warning p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <ShieldAlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
+            <div>
+              <p className="text-sm font-semibold text-warning">
+                No phone numbers detected
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-fg">
+                None of the imported guests have a phone number. If your sheet has phone numbers, click &ldquo;Select Phone Column&rdquo; to choose the correct column.
+              </p>
+            </div>
+          </div>
+          {onAdjustMapping ? (
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={onAdjustMapping}
+              className="shrink-0 self-start sm:self-auto"
+            >
+              Select Phone Column
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Top of the screen: whether this was read as a simple/flexible list */}
       {outcome.contactsFallback ? (
         <div className="flex flex-col gap-2 rounded-2xl border border-info bg-tint-info p-4 sm:flex-row sm:items-center sm:justify-between">
