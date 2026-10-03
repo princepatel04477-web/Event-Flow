@@ -9,7 +9,9 @@ import { LinkButton } from '@/components/ui/LinkButton'
 import { NowCard } from '@/components/ui/NowCard'
 import { Progress } from '@/components/ui/Progress'
 import { Row } from '@/components/ui/Row'
+import { NoGuestListPopup } from '@/components/guests/NoGuestListPopup'
 import { readBoard } from '@/lib/actions/dashboard'
+
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { v2DepartmentHome } from '@/lib/departments'
 import { SetupChecklist } from './_home/SetupChecklist'
@@ -116,6 +118,11 @@ export default async function AppHomePage({ params }: PageProps) {
   if (board && board.totalGroups === 0) {
     return (
       <div className="flex flex-col gap-4">
+        <NoGuestListPopup
+          eventCode={event.code}
+          eventName={event.name}
+          hasGuests={false}
+        />
         {access === 'admin' ? <SetupChecklist eventId={event.id} eventCode={event.code} /> : null}
         <EmptyState
           icon={<UsersIcon className="h-7 w-7" />}

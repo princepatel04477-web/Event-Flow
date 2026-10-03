@@ -385,3 +385,25 @@ export async function readAttention(eventId: string): Promise<AttentionRow> {
     hampersPending: board?.hampersPending ?? 0,
   }
 }
+
+export async function hasGuestList(eventId: string): Promise<boolean> {
+  const key = `has_guest_list:${eventId}`
+  return perRequest(key, async () => {
+    const hit = PERF_BASELINE ? undefined : (cache30.get(key) as boolean | undefined)
+    if (hit !== undefined) return hit
+
+    const supabase = await createClient()
+    const { count, error } = await supabase
+      .from('guest_groups')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+
+    if (error) {
+      return true // On error, fail-safe so we never show a false empty warning
+    }
+
+    const exists = (count ?? 0) > 0
+    cache30.set(key, exists)
+    return exists
+  })
+}

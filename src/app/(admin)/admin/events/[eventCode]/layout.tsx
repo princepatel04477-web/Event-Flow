@@ -5,6 +5,8 @@ import { resolveEventByCode } from '@/lib/supabase/queries'
 import { v3TabsFor } from '@/lib/sections/v3'
 import { AppTabs } from '@/app/(app)/v2/[eventCode]/_components/AppTabs'
 import { NavTracker } from '@/components/nav/NavTracker'
+import { hasGuestList } from '@/lib/actions/dashboard'
+import { NoGuestListPopup } from '@/components/guests/NoGuestListPopup'
 
 type EventLayoutProps = {
   children: ReactNode
@@ -25,6 +27,9 @@ export default async function EventLayout({ children, params }: EventLayoutProps
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
 
+  const hasGuests = await hasGuestList(event.id)
+
+
   /**
    * Which event is the real one, from config rather than a literal.
    *
@@ -43,6 +48,12 @@ export default async function EventLayout({ children, params }: EventLayoutProps
 
   return (
     <div className="flex flex-col gap-4">
+      <NoGuestListPopup
+        eventCode={event.code}
+        eventName={event.name}
+        hasGuests={hasGuests}
+      />
+
       {/* The "Active event" strip that sat here is now the event pill in
           the header (UI4 Part S), on every admin screen and every app screen
           alike — one place the event is named, not two. */}

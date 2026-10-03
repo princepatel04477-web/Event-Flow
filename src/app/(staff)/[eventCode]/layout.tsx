@@ -9,7 +9,10 @@ import { StaffWelcomeBanner } from '@/components/nav/StaffWelcomeBanner'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
 import { StickyHeader } from '@/components/ui/StickyHeader'
 import { UndoBar } from '@/components/ui/UndoBar'
+import { NoGuestListPopup } from '@/components/guests/NoGuestListPopup'
+import { hasGuestList } from '@/lib/actions/dashboard'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
+
 import { getSessionClaims } from '@/lib/auth/server'
 import { bottomTabsFor } from '@/lib/sections/config'
 import { getEventAccess, getViewer, resolveEventByCode } from '@/lib/supabase/queries'
@@ -74,6 +77,7 @@ export default async function EventLayout({ children, params }: LayoutProps) {
   // nothing beneath it. This used to be `access !== 'client'`, which was the
   // bar's rule before runners could have no bar.
   const showTabs = bottomTabsFor(event.code, access, department).length > 0
+  const hasGuests = access !== 'client' ? await hasGuestList(event.id) : true
 
   const subtitle =
     formatDateRange(event.starts_on, event.ends_on) ?? event.venue_city ?? event.code
@@ -89,7 +93,16 @@ export default async function EventLayout({ children, params }: LayoutProps) {
       data-theme={access === 'client' ? 'client' : undefined}
       className="flex min-h-dvh flex-col bg-paper text-ink"
     >
+      {access !== 'client' ? (
+        <NoGuestListPopup
+          eventCode={event.code}
+          eventName={event.name}
+          hasGuests={hasGuests}
+        />
+      ) : null}
+
       <StickyHeader
+
         title={event.name}
         subtitle={subtitle}
         right={

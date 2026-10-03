@@ -10,6 +10,8 @@ import { getSessionClaims } from '@/lib/auth/server'
 import { v3TabsFor } from '@/lib/sections/v3'
 import { sidebarGroupsFor } from '@/lib/sections/sidebar'
 import { getEventAccess, getViewer, resolveEventByCode } from '@/lib/supabase/queries'
+import { hasGuestList } from '@/lib/actions/dashboard'
+import { NoGuestListPopup } from '@/components/guests/NoGuestListPopup'
 import { cn } from '@/lib/utils'
 
 import { AppHeader } from './_components/AppHeader'
@@ -19,6 +21,7 @@ import { DeniedNote } from './_components/DeniedNote'
 import { SectionSwitch } from './_components/SectionSwitch'
 import { NavTracker } from '@/components/nav/NavTracker'
 import { v2DepartmentHome } from '@/lib/departments'
+
 
 /* The offline training line that used to live here as a constant now lives in
    `src/lib/offline-note.ts`, because the banner that renders it is mounted by
@@ -118,6 +121,7 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
    * stays: there is nothing fixed to clear.
    */
   const contentBottom = showTabs ? 'pb-nav' : 'pb-8'
+  const hasGuests = access !== 'client' ? await hasGuestList(event.id) : true
 
   return (
     // The skin is a property of WHO IS LOOKING, not of an OS setting.
@@ -128,13 +132,15 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
       data-theme={access === 'client' ? 'client' : undefined}
       className={cn('flex min-h-dvh flex-col bg-paper text-ink', showSidebar && 'lg:pl-64')}
     >
-      {/* NO OFFLINE BANNER HERE, DELIBERATELY. The root layout renders it,
-          once, on every route, and only while the device is actually offline
-          (`OfflineBanner` returns null otherwise) — so the v3 rule "keep ONE
-          small offline pill, only when offline" is already satisfied by that
-          one component. This shell used to render a second one. */}
-
       {showSidebar ? <AppSidebar groups={sidebar} /> : null}
+
+      {access !== 'client' ? (
+        <NoGuestListPopup
+          eventCode={event.code}
+          eventName={event.name}
+          hasGuests={hasGuests}
+        />
+      ) : null}
 
       <AppHeader
         event={{

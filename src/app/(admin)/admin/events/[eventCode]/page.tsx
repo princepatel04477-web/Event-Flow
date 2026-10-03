@@ -10,6 +10,7 @@ import { readHotelImportContext } from '@/lib/actions/import-hotels'
 import { BuildingIcon, ChevronRightIcon, UsersIcon } from '@/components/icons'
 import { Card } from '@/components/ui/Card'
 import { Row } from '@/components/ui/Row'
+import { hasGuestList } from '@/lib/actions/dashboard'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 
@@ -21,14 +22,16 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
   if (!event) notFound()
 
   const supabase = await createClient()
-  const [staffCount, hotelContext] = await Promise.all([
+  const [staffCount, hotelContext, hasGuests] = await Promise.all([
     supabase
       .from('staff_members')
       .select('id', { count: 'exact', head: true })
       .eq('event_id', event.id)
       .then(r => r.count),
     readHotelImportContext(event.id),
+    hasGuestList(event.id),
   ])
+
 
   return (
     <div className="flex flex-col gap-8">
@@ -48,10 +51,28 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
 
       <DashboardClient eventId={event.id} eventCode={event.code} />
 
-      {/* Two ways out of the dashboard, in the register's own row shape: a
-          40px glyph, a name, one muted meta line, and the whole row is the
-          tap target. */}
+      {/* Navigation rows in the register's own row shape */}
       <Card>
+        <Link
+          href={hasGuests ? `/${event.code}/guests/list` : `/${event.code}/guests/import`}
+          className="tap block border-b border-rule last:border-b-0"
+        >
+          <Row
+            heading={hasGuests ? 'Guest list' : 'Add guest list'}
+            meta={
+              hasGuests
+                ? 'View attendees, family groups, and RSVP calling records'
+                : 'No guests added yet — tap to import Excel calling sheet'
+            }
+            badge={
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-tint text-brand">
+                <UsersIcon className="h-5 w-5" />
+              </span>
+            }
+            trailing={<ChevronRightIcon className="h-5 w-5" aria-hidden />}
+          />
+        </Link>
+
         <Link
           href={`/admin/events/${event.code}/staff`}
           className="tap block border-b border-rule last:border-b-0"
