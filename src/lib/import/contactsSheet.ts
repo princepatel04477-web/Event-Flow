@@ -83,14 +83,90 @@ export const CONTACT_ALIASES = [
   'mob no',
   'ph',
   'ph no',
+  'mo no',
+  'mono',
+  'm no',
+  'mno',
+  'mbl',
+  'mbl no',
   'calling no',
   'calling number',
+  'calling mobile',
   'primary mobile',
+  'primary phone',
+  'primary contact',
   'handphone',
   'contact details',
   'phone details',
   'mobile details',
+  'mobile whatsapp',
+  'whatsapp mobile',
+  'phone whatsapp',
+  'whatsapp phone',
+  'contact mobile',
+  'mobile contact',
+  'calling whatsapp',
+  'whatsapp calling',
+  'phone mobile',
+  'mobile phone',
+  'mobile 1',
+  'phone 1',
+  'contact 1',
+  'mobile calling',
+  'phone calling',
+  'cell phone',
+  'contact dial',
+  'dial',
 ]
+
+/** Priority order when multiple contact columns match in a sheet. */
+export const CONTACT_PRIORITY = [
+  'primary mobile',
+  'primary phone',
+  'primary contact',
+  'mobile',
+  'mobile no',
+  'mobile number',
+  'phone',
+  'phone no',
+  'phone number',
+  'whatsapp',
+  'whatsapp no',
+  'whatsapp number',
+  'contact',
+  'contact no',
+  'contact number',
+  'calling no',
+  'calling number',
+  'cell',
+  'cell no',
+  'telephone',
+]
+
+/**
+ * Checks whether a normalised header represents a contact / mobile column.
+ * Handles compound headers like "Mobile / WhatsApp" and keywords.
+ */
+export function isContactHeader(norm: string): boolean {
+  if (!norm) return false
+  if (CONTACT_ALIASES.includes(norm)) return true
+
+  // Negative checks: exclude headers that clearly mean something else
+  if (
+    /\b(name|person|address|city|email|mail|status|remark|note|id|code|pax|headcount|date|time|mode|details)\b/i.test(
+      norm,
+    )
+  ) {
+    return false
+  }
+
+  // Positive checks: keywords or abbreviations indicating a phone/contact number
+  return (
+    /\b(mobile|phone|whatsapp|cell|telephon|calling|dial|contact)\b/i.test(norm) ||
+    /\b(mo|ph|mob|mbl|m)\s*(no|num|number)\b/i.test(norm) ||
+    /^(mo|mob|ph)\b/i.test(norm)
+  )
+}
 
 /**
  * Name spellings accepted for the guest name column.
@@ -204,9 +280,70 @@ export function normaliseHeader(value: unknown): string {
   if (value === null || value === undefined) return ''
   return String(value)
     .toLowerCase()
-    .replace(/[_\-.]/g, ' ')
+    .replace(/[/\\&(),:;#_\-.]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+/**
+ * Detects which column contains phone numbers by inspecting data cells in the grid.
+ * Scans up to sampleRowCount non-empty rows beneath the header and tests for valid 10-digit mobile numbers.
+ */
+export function detectContactColumnFromData(
+  grid: unknown[][],
+  headerRowIndex: number,
+  excludeColumns?: Set<number>,
+  sampleRowCount = 30,
+): number | null {
+  if (!grid || grid.length <= headerRowIndex + 1) return null
+
+  const startRow = headerRowIndex + 1
+  const endRow = Math.min(grid.length, startRow + sampleRowCount)
+
+  let maxCols = 0
+  for (let r = startRow; r < endRow; r++) {
+    const row = grid[r]
+    if (row && row.length > maxCols) maxCols = row.length
+  }
+
+  let bestCol: number | null = null
+  let bestScore = 0
+
+  for (let col = 0; col < maxCols; col++) {
+    if (excludeColumns?.has(col)) continue
+
+    let validPhones = 0
+    let nonBlank = 0
+
+    for (let r = startRow; r < endRow; r++) {
+      const cell = grid[r]?.[col]
+      if (isBlankCell(cell)) continue
+      nonBlank++
+
+      const norm = normaliseMobile(cell)
+      if (norm.value) {
+        validPhones++
+      } else {
+        const digits = String(cell).replace(/\D/g, '')
+        if (digits.length >= 10 && digits.length <= 13) {
+          validPhones++
+        }
+      }
+    }
+
+    if (nonBlank > 0 && validPhones > 0) {
+      const ratio = validPhones / nonBlank
+      if (ratio >= 0.3) {
+        const score = ratio * 100 + validPhones
+        if (score > bestScore) {
+          bestScore = score
+          bestCol = col
+        }
+      }
+    }
+  }
+
+  return bestCol
 }
 
 /**
@@ -272,7 +409,7 @@ export function resolveContactsSheet(
   const contactHits: number[] = []
   norm.forEach((h, i) => {
     if (h && NAME_ALIASES.includes(h)) nameHits.push(i)
-    if (h && CONTACT_ALIASES.includes(h)) contactHits.push(i)
+    if (h && isContactHeader(h)) contactHits.push(i)
   })
 
   if (nameHits.length === 0) {
@@ -286,15 +423,28 @@ export function resolveContactsSheet(
     }
   }
 
-  const requireContact = options?.requireContact ?? true
-  if (contactHits.length > 1) {
-    return {
-      ok: false,
-      reason: `"Contact" appears ${contactHits.length} times — I cannot tell which column holds the phone number.`,
+  let contactIndex: number | null = null
+  if (contactHits.length === 1) {
+    contactIndex = contactHits[0]
+  } else if (contactHits.length > 1) {
+    // Multiple contact columns match (e.g. Mobile + WhatsApp or Calling + Alt)
+    // Select the highest priority column based on CONTACT_PRIORITY
+    let bestPriority = 9999
+    let bestIdx = contactHits[0]
+    for (const idx of contactHits) {
+      const h = norm[idx]
+      const prio = CONTACT_PRIORITY.indexOf(h)
+      const p = prio >= 0 ? prio : 1000
+      if (p < bestPriority) {
+        bestPriority = p
+        bestIdx = idx
+      }
     }
+    contactIndex = bestIdx
   }
 
-  if (requireContact && contactHits.length === 0) {
+  const requireContact = options?.requireContact ?? true
+  if (requireContact && contactIndex === null) {
     return {
       ok: false,
       reason: 'No column named "Contact" (or "Mobile", "Phone", "Number") was found — a contacts sheet needs one.',
@@ -302,8 +452,6 @@ export function resolveContactsSheet(
   }
 
   const nameIndex = nameHits[0]
-  const contactIndex = contactHits.length > 0 ? contactHits[0] : null
-
   const claimed = new Set<number>([nameIndex])
   if (contactIndex !== null) claimed.add(contactIndex)
 
@@ -354,56 +502,85 @@ export function resolveContactsGrid(
   const limit = Math.min(grid.length, maxScanRows)
   const requireContactFirst = options?.requireContact ?? true
 
-  // Pass 1: Try finding a header row with requireContact (standard contacts sheets with Name & Phone)
+  interface Candidate {
+    headerRowIndex: number
+    resolved: ContactsColumns
+    hasPhone: boolean
+    dataRowCount: number
+  }
+
+  const candidates: Candidate[] = []
+
   for (let r = 0; r < limit; r++) {
     const row = grid[r] ?? []
     if (!row.some((c) => !isBlankCell(c))) continue
 
     const headers = row.map((h) => (isBlankCell(h) ? null : String(h)))
-    const resolved = resolveContactsSheet(headers, { requireContact: requireContactFirst })
+    const resolved = resolveContactsSheet(headers, { requireContact: false })
     if (resolved.ok) {
-      const rows: RawSheetRow[] = []
-      for (let i = r + 1; i < grid.length; i++) {
-        const cells = grid[i] ?? []
-        if (!cells.some((c) => !isBlankCell(c))) continue
-        rows.push({ sheetRowNumber: i + 1, cells })
+      let contactIndex = resolved.sheet.contactIndex
+      // If contact was not found from headers, try data-driven detection from cells below
+      if (contactIndex === null) {
+        const detectedCol = detectContactColumnFromData(
+          grid,
+          r,
+          new Set([resolved.sheet.nameIndex]),
+        )
+        if (detectedCol !== null) {
+          contactIndex = detectedCol
+          resolved.sheet.contactIndex = detectedCol
+        }
       }
 
-      const sheet: ContactsSheet = {
-        sheetName,
-        headerRowIndex: r,
-        ...resolved.sheet,
-        rows,
+      // Count data rows below this header
+      let dataRowCount = 0
+      for (let i = r + 1; i < grid.length; i++) {
+        const cells = grid[i] ?? []
+        if (cells.some((c) => !isBlankCell(c))) dataRowCount++
       }
-      return { ok: true, sheet }
+
+      candidates.push({
+        headerRowIndex: r,
+        resolved: resolved.sheet,
+        hasPhone: contactIndex !== null,
+        dataRowCount,
+      })
     }
   }
 
-  // Pass 2: If requireContact was not explicitly forced true by caller, try scanning without requiring Contact
-  if (options?.requireContact === undefined && requireContactFirst) {
-    for (let r = 0; r < limit; r++) {
-      const row = grid[r] ?? []
-      if (!row.some((c) => !isBlankCell(c))) continue
-
-      const headers = row.map((h) => (isBlankCell(h) ? null : String(h)))
-      const resolved = resolveContactsSheet(headers, { requireContact: false })
-      if (resolved.ok) {
-        const rows: RawSheetRow[] = []
-        for (let i = r + 1; i < grid.length; i++) {
-          const cells = grid[i] ?? []
-          if (!cells.some((c) => !isBlankCell(c))) continue
-          rows.push({ sheetRowNumber: i + 1, cells })
-        }
-
-        const sheet: ContactsSheet = {
-          sheetName,
-          headerRowIndex: r,
-          ...resolved.sheet,
-          rows,
-        }
-        return { ok: true, sheet }
-      }
+  let viable = candidates
+  if (options?.requireContact === true) {
+    viable = candidates.filter((c) => c.hasPhone)
+  } else if (requireContactFirst) {
+    const withPhone = candidates.filter((c) => c.hasPhone)
+    if (withPhone.length > 0) {
+      viable = withPhone
     }
+  }
+
+  if (viable.length > 0) {
+    viable.sort((a, b) => {
+      if (a.hasPhone !== b.hasPhone) return a.hasPhone ? -1 : 1
+      if (b.dataRowCount !== a.dataRowCount) return b.dataRowCount - a.dataRowCount
+      return a.headerRowIndex - b.headerRowIndex
+    })
+
+    const best = viable[0]
+    const r = best.headerRowIndex
+    const rows: RawSheetRow[] = []
+    for (let i = r + 1; i < grid.length; i++) {
+      const cells = grid[i] ?? []
+      if (!cells.some((c) => !isBlankCell(c))) continue
+      rows.push({ sheetRowNumber: i + 1, cells })
+    }
+
+    const sheet: ContactsSheet = {
+      sheetName,
+      headerRowIndex: r,
+      ...best.resolved,
+      rows,
+    }
+    return { ok: true, sheet }
   }
 
   // If still not resolved, return failure reason from the first non-empty row

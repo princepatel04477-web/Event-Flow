@@ -6,8 +6,10 @@ import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query
 import { ShieldAlertIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LinkButton } from '@/components/ui/LinkButton'
+import { NoGuestListPopup } from '@/components/guests/NoGuestListPopup'
 import { StaffWelcomeBanner } from '@/components/nav/StaffWelcomeBanner'
 import { readBoard } from '@/lib/actions/dashboard'
+
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
 import { departmentHomePath } from '@/lib/departments'
@@ -108,7 +110,13 @@ export default async function AppHomePage({ params, searchParams }: PageProps) {
   if (totalGroups === 0) {
     return (
       <div className="flex flex-col gap-4">
+        <NoGuestListPopup
+          eventCode={event.code}
+          eventName={event.name}
+          hasGuests={false}
+        />
         <DeniedNote note={deniedNote} />
+
 
         <EmptyState
           icon={<UsersIcon className="h-7 w-7" />}

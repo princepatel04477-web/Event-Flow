@@ -7,6 +7,7 @@ import { resolveEventByCode } from '@/lib/supabase/queries'
 import { DashboardClient } from './DashboardClient'
 import { ArchiveEventCard } from './ArchiveEventCard'
 import { readHotelImportContext } from '@/lib/actions/import-hotels'
+import { hasGuestList } from '@/lib/actions/dashboard'
 import { BuildingIcon, UsersIcon } from '@/components/icons'
 
 export const metadata: Metadata = { title: 'Dashboard' }
@@ -19,14 +20,16 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
   if (!event) notFound()
 
   const supabase = await createClient()
-  const [staffCount, hotelContext] = await Promise.all([
+  const [staffCount, hotelContext, hasGuests] = await Promise.all([
     supabase
       .from('staff_members')
       .select('id', { count: 'exact', head: true })
       .eq('event_id', event.id)
       .then(r => r.count),
     readHotelImportContext(event.id),
+    hasGuestList(event.id),
   ])
+
 
   return (
     <div className="flex flex-col gap-8">
@@ -48,9 +51,39 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
       <DashboardClient eventId={event.id} eventCode={event.code} />
 
       <Link
+        href={hasGuests ? `/${event.code}/guests/list` : `/${event.code}/guests/import`}
+        className={
+          hasGuests
+            ? 'tap flex items-center gap-4 rounded-2xl border border-rule bg-surface p-4 transition-colors hover:bg-surface-2 active:bg-surface-2'
+            : 'tap flex items-center gap-4 rounded-2xl border border-dashed border-brand/50 bg-brand-tint/20 p-4 transition-colors hover:bg-brand-tint/30 active:bg-brand-tint/30'
+        }
+      >
+        <div
+          className={
+            hasGuests
+              ? 'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-tint text-brand'
+              : 'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand text-brand-fg'
+          }
+        >
+          <UsersIcon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-fg">
+            {hasGuests ? 'Guest list' : 'Add guest list'}
+          </p>
+          <p className="text-sm text-muted">
+            {hasGuests
+              ? 'View attendees, family groups, and RSVP calling records'
+              : 'No guests added yet — tap to import Excel calling sheet'}
+          </p>
+        </div>
+      </Link>
+
+      <Link
         href={`/admin/events/${event.code}/staff`}
         className="tap flex items-center gap-4 rounded-2xl border border-rule bg-surface p-4 transition-colors hover:bg-surface-2 active:bg-surface-2"
       >
+
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-tint text-brand">
           <UsersIcon className="h-5 w-5" />
         </div>

@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { notFound } from 'next/navigation'
 
 import { resolveEventByCode } from '@/lib/supabase/queries'
+import { hasGuestList } from '@/lib/actions/dashboard'
+import { NoGuestListPopup } from '@/components/guests/NoGuestListPopup'
 
 type EventLayoutProps = {
   children: ReactNode
@@ -22,6 +24,9 @@ export default async function EventLayout({ children, params }: EventLayoutProps
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
 
+  const hasGuests = await hasGuestList(event.id)
+
+
   /**
    * Which event is the real one, from config rather than a literal.
    *
@@ -40,7 +45,14 @@ export default async function EventLayout({ children, params }: EventLayoutProps
 
   return (
     <div className="flex flex-col gap-4">
+      <NoGuestListPopup
+        eventCode={event.code}
+        eventName={event.name}
+        hasGuests={hasGuests}
+      />
+
       <div className="rounded-xl border border-rule bg-surface-2 px-4 py-2.5">
+
         <p className="font-mono text-[0.625rem] font-bold uppercase tracking-[0.1em] text-subtle">
           Active event
         </p>

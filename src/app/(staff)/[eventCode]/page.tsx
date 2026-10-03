@@ -6,7 +6,9 @@ import { AttentionPanel } from '@/components/dashboard/AttentionPanel'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { ShieldAlertIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { NoGuestListPopup } from '@/components/guests/NoGuestListPopup'
 import { readBoard } from '@/lib/actions/dashboard'
+
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { departmentHomePath } from '@/lib/departments'
 import {
@@ -134,7 +136,13 @@ export default async function EventHomePage({ params, searchParams }: PageProps)
   if (totalGroups === 0) {
     return (
       <div className="flex flex-col gap-4">
+        <NoGuestListPopup
+          eventCode={event.code}
+          eventName={event.name}
+          hasGuests={false}
+        />
         <DeniedNote note={deniedNote} />
+
 
         <EmptyState
           icon={<UsersIcon className="h-7 w-7" />}

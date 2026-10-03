@@ -6,11 +6,14 @@ import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { getSessionClaims } from '@/lib/auth/server'
 import { bottomTabsFor } from '@/lib/sections/config'
 import { getEventAccess, getViewer, resolveEventByCode } from '@/lib/supabase/queries'
+import { hasGuestList } from '@/lib/actions/dashboard'
+import { NoGuestListPopup } from '@/components/guests/NoGuestListPopup'
 import { cn } from '@/lib/utils'
 
 import { AppHeader } from './_components/AppHeader'
 import { AppTabs } from './_components/AppTabs'
 import { FirstRunCards } from './_components/FirstRunCards'
+
 
 /* The offline training line that used to live here as a constant now lives in
    `src/lib/offline-note.ts`, because the banner that renders it is mounted by
@@ -93,6 +96,7 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
   // all — still resolves to `/{event}/hamper` rather than to the dashboard that
   // would bounce them straight back off it.
   const homeHref = tabs[0]?.href ?? `/${event.code}`
+  const hasGuests = access !== 'client' ? await hasGuestList(event.id) : true
 
   return (
     // The skin is a property of WHO IS LOOKING, not of an OS setting.
@@ -103,7 +107,16 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
       data-theme={access === 'client' ? 'client' : undefined}
       className="flex min-h-dvh flex-col bg-paper text-ink"
     >
+      {access !== 'client' ? (
+        <NoGuestListPopup
+          eventCode={event.code}
+          eventName={event.name}
+          hasGuests={hasGuests}
+        />
+      ) : null}
+
       {/* NO OFFLINE BANNER HERE, DELIBERATELY. The root layout renders it, once,
+
           on every route — this shell used to render a second one and the root
           layout skipped its own under v2, which cost `/login`, `/pick-staff` and
           `/admin/**` their banner. The extra sentence this surface wants is

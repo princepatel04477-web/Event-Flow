@@ -12,7 +12,12 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { parseContactsSheet, resolveContactsSheet } from '@/lib/import/contactsSheet'
+import {
+  detectContactColumnFromData,
+  parseContactsSheet,
+  resolveContactsGrid,
+  resolveContactsSheet,
+} from '@/lib/import/contactsSheet'
 import type { ContactsSheet } from '@/lib/import/contactsSheet'
 import type { ParseFamiliesOptions } from '@/lib/import/families'
 
@@ -83,13 +88,33 @@ describe('resolveContactsSheet — header detection', () => {
     expect(result.reason).toContain('Contact')
   })
 
-  it('refuses when Name appears twice — a guess here means a wrong column', () => {
-    // Two columns that EXACTLY match the Name alias, so the resolver cannot
-    // tell which holds the guest name.
-    const result = resolveContactsSheet(['Name', 'Contact', 'Name'])
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.reason).toContain('appears 2 times')
+  it('accepts compound and Indian abbreviation Contact spellings', () => {
+    for (const header of [
+      'Mobile / WhatsApp',
+      'Mobile/WhatsApp',
+      'Mobile & WhatsApp',
+      'Mo. No.',
+      'Mob. No.',
+      'Mo No',
+      'Ph. No.',
+      'Phone / Mobile',
+      'Primary Mobile',
+      'Mobile (Calling)',
+      'Contact:',
+      'Phone #',
+    ]) {
+      const result = resolveContactsSheet(['Name', header])
+      expect(result.ok, `"${header}" should resolve`).toBe(true)
+    }
+  })
+
+  it('selects the primary contact column when multiple contact columns are present', () => {
+    const result = resolveContactsSheet(['Name', 'WhatsApp', 'Mobile', 'City'])
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.sheet.nameIndex).toBe(0)
+    // Mobile has higher priority than WhatsApp in CONTACT_PRIORITY
+    expect(result.sheet.contactIndex).toBe(2)
   })
 })
 
@@ -188,5 +213,32 @@ describe('parseContactsSheet — one family per row', () => {
     expect(outcome.ok).toBe(false)
     if (outcome.ok) return
     expect(outcome.reason).toContain('no rows')
+  })
+})
+
+describe('detectContactColumnFromData & resolveContactsGrid', () => {
+  it('detects a column of 10-digit mobile numbers from cell data', () => {
+    const grid = [
+      ['Guest Name', 'Random Unrecognised Column', 'Remarks'],
+      ['Priya Sharma', '9876543210', 'Family friend'],
+      ['Rahul Patel', '9123456780', 'Colleague'],
+      ['Amit Verma', '8877665544', 'Relative'],
+    ]
+    const detected = detectContactColumnFromData(grid, 0, new Set([0]))
+    expect(detected).toBe(1)
+  })
+
+  it('automatically resolves contact column from cell data in resolveContactsGrid when header is custom', () => {
+    const grid = [
+      ['Guest Name', 'Unknown Col #3', 'City'],
+      ['Priya Sharma', '9876543210', 'Surat'],
+      ['Rahul Patel', '9123456780', 'Ahmedabad'],
+    ]
+    const result = resolveContactsGrid(grid, 'Sheet1')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.sheet.nameIndex).toBe(0)
+    expect(result.sheet.contactIndex).toBe(1)
+    expect(result.sheet.cityIndex).toBe(2)
   })
 })

@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Spinner } from '@/components/ui/Spinner'
 import { StatCard } from '@/components/dashboard/StatCard'
-import { ShieldAlertIcon } from '@/components/icons'
+import { ShieldAlertIcon, UploadIcon } from '@/components/icons'
 import { readDashboard, readTodayLegs, readAttention, type DashboardRow, type TodayLeg, type AttentionRow } from '@/lib/actions/dashboard'
 
 import { TodayPanel } from './TodayPanel'
 import { AttentionPanel } from '@/components/dashboard/AttentionPanel'
+import { NoGuestListPopup } from '@/components/guests/NoGuestListPopup'
+
 
 interface Props {
   eventId: string
@@ -82,8 +84,35 @@ export function DashboardClient({ eventId, eventCode }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+      {dash.totalGroups === 0 ? (
+        <>
+          <NoGuestListPopup
+            eventCode={eventCode}
+            hasGuests={false}
+          />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-brand/40 bg-surface p-4 shadow-e1">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-brand">
+                <UploadIcon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-base font-semibold text-fg">No guest list yet</p>
+                <p className="text-xs text-muted">Import calling list to activate RSVPs, rooms, and arrivals</p>
+              </div>
+            </div>
+            <Link
+              href={`/${eventCode}/guests/import`}
+              className="tap flex min-h-10 items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-brand-fg active:opacity-90"
+            >
+              Import guest list
+            </Link>
+          </div>
+        </>
+      ) : null}
+
       {/* ---- Numbers ---- */}
       <section>
+
         <h2 className="eyebrow mb-3">RSVP</h2>
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Total groups" value={dash.totalGroups} note="families on the list" />

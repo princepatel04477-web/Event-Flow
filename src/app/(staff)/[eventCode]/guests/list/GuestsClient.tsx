@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 
-import { ChevronRightIcon, SearchIcon, UsersIcon } from '@/components/icons'
+import { ChevronRightIcon, SearchIcon, UploadIcon, UsersIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
+import { NoGuestListPopup } from '@/components/guests/NoGuestListPopup'
+
 import type { GuestSearchRow } from '@/lib/actions/search-guests'
 import { traceFetch } from '@/lib/perf'
 import { queryKeys } from '@/lib/query/keys'
@@ -238,12 +240,28 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
           ))}
         </div>
       ) : total === 0 && !search ? (
-        <EmptyState
-          icon={<UsersIcon className="h-7 w-7" />}
-          title="No guest details yet"
-          description="Nothing has been shared on this event yet. Usually that means the guest list has not been imported, or your account is on the event but no guests are linked to it. Ask your event team — nothing has gone wrong."
-        />
+        <>
+          <NoGuestListPopup
+            eventCode={eventCode}
+            hasGuests={false}
+          />
+          <EmptyState
+            icon={<UsersIcon className="h-7 w-7" />}
+            title="No guest details yet"
+            description="Nothing has been shared on this event yet. Usually that means the guest list has not been imported, or your account is on the event but no guests are linked to it. Ask your event team — nothing has gone wrong."
+            action={
+              <Link
+                href={`/${eventCode}/guests/import`}
+                className="tap flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 text-center text-sm font-semibold text-brand-fg transition-colors active:opacity-90"
+              >
+                <UploadIcon className="h-4 w-4" aria-hidden />
+                <span>Import guest list</span>
+              </Link>
+            }
+          />
+        </>
       ) : searchActive && isSearching && !activeSearchRows ? (
+
         // Search is in flight AND there is nothing to show yet (300ms debounce +
         // RPC round trip on a cold term). Show a skeleton, NOT a false "Nothing
         // matches" — the empty state must only appear once the server actually
