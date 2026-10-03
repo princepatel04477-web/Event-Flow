@@ -5,6 +5,58 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — F8a: migration for room-wise hampers (NOT applied)
+
+### Client answer
+
+One hamper **per room**; when a family is split across rooms, **each room gets
+its own** hamper (asked and answered 3 Oct 2026).
+
+### The migration
+
+`supabase/migrations/20261003091000_deliverables_room_target.sql`:
+
+- `deliverables.group_id` becomes nullable, and a CHECK
+  `num_nonnulls(room_id, group_id, guest_id) = 1` makes the target polymorphic.
+  Existing family hampers keep the family as their target: their incidental
+  `room_id` is cleared so the CHECK holds.
+- Uniqueness moves from per-family to per-target: one per
+  `(room_id, kind)`, one per `(group_id, kind)` (legacy), one per
+  `(guest_id, kind)`. The per-room index is the client's "one hamper per room"
+  enforced in the database, so two phones cannot make two.
+- `app.ensure_hamper_for_assignment()` now creates a **room** hamper
+  (`room_id` set, `group_id` null), with a backfill for every room that has an
+  active assignment.
+- `delivery_proofs` gains a nullable `room_id`, snapshotted from the deliverable
+  by a BEFORE INSERT trigger. Proofs stay insert-only — a column and a before-
+  insert trigger only, existing proofs untouched.
+- RLS is additive: a client may SELECT room-targeted hampers for their own
+  event. Family/guest hampers and every proof photo (`delivery_proofs`, storage
+  paths) stay `app.is_staff`.
+
+**Event scoping is the existing composite FKs** `(room_id, event_id)`,
+`(group_id, event_id)`, `(guest_id, event_id)` — a constraint, not a trigger, so
+PostgREST and the service role are covered too. `quantity` is already
+`integer not null default 1 check (quantity > 0)`, stored at assignment.
+
+### ⚠ Apply order — read before applying
+
+This migration ALONE breaks the current writer:
+`generateDeliverables()` (`src/lib/actions/deliveries.ts`) inserts `group_id +
+room_id` together, which the new exactly-one CHECK rejects. **F8b must update
+that action (and the hamper screen) in the same release.** Do not apply while a
+real event is running.
+
+### Status
+
+Migration + `supabase/tests/f8_hamper_room.sql` written and **NOT applied**;
+database types **NOT regenerated**. F8b (the "By room" screen) needs the
+migration applied first and is not in this commit. The SQL test asserts the
+three F8a guarantees (cross-event room rejected, two targets rejected, event B
+team sees none of event A's room hampers) plus the one-per-room unique.
+
+---
+
 ## 3 October 2026 — F7: the Rooms summary shows occupied / with bed / extra bed / not placed
 
 ### Client answer
