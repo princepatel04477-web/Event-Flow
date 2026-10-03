@@ -27,7 +27,7 @@ describe('v3TabsFor — event lead', () => {
     // UI4 Part S, S2: Control replaces Hampers in slot five, admin only.
     expect(labels(v3TabsFor(EV, 'admin', 'management'))).toEqual([
       'Today',
-      'Calls',
+      'RSVP',
       'Hospitality',
       'Logistics',
       'Control',
@@ -38,7 +38,7 @@ describe('v3TabsFor — event lead', () => {
     // A lead who is not an admin never sees a tab the page guard would refuse.
     expect(labels(v3TabsFor(EV, 'event_team', 'management'))).toEqual([
       'Today',
-      'Calls',
+      'RSVP',
       'Hospitality',
       'Logistics',
     ])
@@ -198,7 +198,7 @@ describe('v3ActiveChild', () => {
 describe('v3ScreenTitle', () => {
   it('names the section beside the event root', () => {
     expect(v3ScreenTitle('')).toBe('Today')
-    expect(v3ScreenTitle('rsvp')).toBe('Calls')
+    expect(v3ScreenTitle('rsvp')).toBe('RSVP')
     expect(v3ScreenTitle('logistics')).toBe('Logistics')
     expect(v3ScreenTitle('hospitality')).toBe('Hospitality')
   })

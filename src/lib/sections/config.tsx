@@ -122,7 +122,7 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     ],
   },
   rsvp: {
-    id: 'rsvp', label: 'RSVP calls', tabLabel: 'Calls',
+    id: 'rsvp', label: 'RSVP', tabLabel: 'RSVP',
     icon: <PhoneIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
     departments: ['management'],

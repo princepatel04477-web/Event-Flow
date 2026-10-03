@@ -304,7 +304,7 @@ export default async function FamilyPage({ params }: PageProps) {
       ) : null}
 
       {can.answer ? (
-        <Section id="calls" title="Calls" href={`/${e}/rsvp/queue`} linkLabel="Call list">
+        <Section id="calls" title="RSVP" href={`/${e}/rsvp/queue`} linkLabel="Call list">
           {(attemptsRes.data ?? []).length === 0 ? (
             <p className="text-base text-muted">Nobody has called them yet.</p>
           ) : (

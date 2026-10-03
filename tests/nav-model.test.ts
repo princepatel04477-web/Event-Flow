@@ -26,12 +26,12 @@ const hrefs = (tabs: NavTab[]) => tabs.map((t) => t.href)
 describe('bottomTabsFor — event lead', () => {
   it('gives an admin five tabs and no more', () => {
     const tabs = bottomTabsFor(EV, 'admin', 'management')
-    expect(labels(tabs)).toEqual(['Home', 'Guests', 'Calls', 'Logistics', 'Hospitality'])
+    expect(labels(tabs)).toEqual(['Home', 'Guests', 'RSVP', 'Logistics', 'Hospitality'])
   })
 
   it('gives a management team member the same five', () => {
     const tabs = bottomTabsFor(EV, 'event_team', 'management')
-    expect(labels(tabs)).toEqual(['Home', 'Guests', 'Calls', 'Logistics', 'Hospitality'])
+    expect(labels(tabs)).toEqual(['Home', 'Guests', 'RSVP', 'Logistics', 'Hospitality'])
   })
 
   it('lands each tab on its default child, not a bare section root', () => {

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { LoadingRows } from '@/components/ui/LoadingRows'
-import { Progress } from '@/components/ui/Progress'
+import { progressPercent } from '@/lib/ui/metrics'
 import { startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
 import { saveRsvpLog } from '@/lib/actions/rsvp'
 import {
@@ -153,11 +153,20 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn }: CallNextProps
   const allRows = useMemo(() => rawRows ?? [], [rawRows])
 
   const totalCount = allRows.length
-  const doneCount = allRows.filter(
+  // A family is "called" once an outcome is logged or an attempt exists.
+  const calledRows = allRows.filter(
     (r) =>
       (r.rsvp_status && r.rsvp_status !== 'not_started') ||
       (r.attempt_count !== null && r.attempt_count > 0),
-  ).length
+  )
+  const doneCount = calledRows.length
+  // Guests called = the headcount of every called family, using the same
+  // `confirmed_pax ?? expected_pax` the rest of the app uses. No new read:
+  // `v_rsvp_queue` already returns both columns on every row.
+  const guestsCalled = calledRows.reduce(
+    (sum, r) => sum + (r.confirmed_pax ?? r.expected_pax ?? 0),
+    0,
+  )
 
   // The chip -> row mapping lives in `@/lib/rsvp-queue` so this screen, the
   // sheet and the tests cannot drift apart. `not_coming` is `declined` ONLY:
@@ -460,13 +469,35 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn }: CallNextProps
           section switcher now (UI4), shown to management only. */}
 
       {totalCount > 0 ? (
-        <Progress
-          label="Families called"
-          done={doneCount}
-          total={totalCount}
-          tone="green"
-          ariaLabel={`${doneCount} of ${totalCount} families called`}
-        />
+        // "Guests called 312 · 146 families" (F3). Guests is the big number;
+        // families is the small one. Hand-rolled rather than `Progress` because
+        // that component renders a single `done/total` figure and cannot carry
+        // the secondary count — and it is shared by other screens, so it is not
+        // this screen's to change. The bar is kept, so the glance stays.
+        <div className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 truncate text-base leading-snug font-medium text-ink">
+              Guests called
+            </span>
+            <span className="shrink-0 text-sm text-muted">
+              <span className="figure text-xl font-semibold text-ink">{guestsCalled}</span>
+              {` · ${doneCount} ${doneCount === 1 ? 'family' : 'families'}`}
+            </span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label={`${guestsCalled} guests called across ${doneCount} of ${totalCount} families`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progressPercent(doneCount, totalCount)}
+            className="h-2 w-full overflow-hidden rounded-full bg-surface-2"
+          >
+            <div
+              className="grow-x h-full rounded-full bg-ledger-green"
+              style={{ width: `${progressPercent(doneCount, totalCount)}%` }}
+            />
+          </div>
+        </div>
       ) : null}
 
       {writeError ? (

@@ -5,6 +5,59 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — F3: the section is "RSVP", and the queue counts guests called
+
+### 1. "Calls" → "RSVP" (display only)
+
+Every place a person reads the section name now says **RSVP**:
+
+- `src/lib/sections/v3.ts` `V3_TAB_LABEL.rsvp` — the v3 bottom-bar tab and
+  `v3ScreenTitle`.
+- `src/lib/sections/config.tsx` — `rsvp`'s `label` and `tabLabel` (v1 bar, desktop
+  sidebar, section strip a11y).
+- `src/lib/departments.ts` `DEPARTMENT_LABELS.rsvp` and
+  `src/lib/section-locks.ts` `LOCKABLE_SECTIONS` ("RSVP / Calls" → "RSVP") —
+  user-facing section labels found by the "every occurrence" sweep, though not in
+  item 3's original list.
+- `rsvp/queue/page.tsx` browser title; `help/HelpScreen.tsx` help key; the
+  `families/[groupId]` "Calls" card heading (`id="calls"` kept — it is an anchor).
+
+**Not renamed** (F3 forbids, or they are not the section): the section id `rsvp`,
+the route segment `/rsvp`, the table `call_attempts`, the `BackToCalls` component,
+and the ordinary wording "Call list" / "Call notes" / "Auto-call" / "Calling…" /
+the `Calls` Excel column (call count). `tests/nav-model.test.ts` and
+`tests/v3-nav.test.ts` were updated to the new label.
+
+**No duplicate tab:** the v3 bar is Today · RSVP · Hospitality · Logistics ·
+Control; the v1 bar is Home · Guests · RSVP · Logistics · Hospitality. No two tabs
+say "RSVP", so no STOP was needed. "RSVP" (4 chars) is shorter than "Calls" (5),
+so the bottom-bar label still fits 360px.
+
+`docs/GLOSSARY.md` had no "Calls" row; a new `rsvp` (section name) → "RSVP" row was
+added instead.
+
+### 2. "Guests called" on the queue screen
+
+`rsvp/queue/CallNext.tsx` now reads **"Guests called 312 · 146 families"** — guests
+big, families small — over the existing progress bar. `guestsCalled` is summed in
+TypeScript from `confirmed_pax ?? expected_pax` on the rows the screen already
+loads (`v_rsvp_queue` returns both). No new read.
+
+Hand-rolled rather than `Progress`: that shared component renders one `done/total`
+figure and cannot carry the secondary count, and it is not in F3's file scope. The
+bar is kept so the glance does not regress.
+
+### BLOCKED — Today's counter, deliberately not done
+
+Today's bar is `label: 'Families called'` (`_home/today.ts:244`). Its
+`TodayNumbers` carries only aggregates (`v_event_board`), with no per-family pax
+retained — so "guests called" is NOT computable from what the screen loads.
+F3 says STOP rather than add a database read, so Today is left as-is. The fix
+needs either an aggregate column on `v_event_board` or a new read; that is a
+separate task.
+
+---
+
 ## 3 October 2026 — F2: vehicle planning failed silently because it swallowed the supabase error
 
 ### What the client reported

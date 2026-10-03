@@ -22,7 +22,7 @@ import type { NavTab } from '@/lib/sections/config'
 const WHAT_IT_IS_FOR: Record<string, string> = {
   // The v3 labels (src/lib/sections/v3.ts, `V3_TAB_LABEL`) come first.
   Today: 'What needs you right now.',
-  Calls: 'Call the next family and log it.',
+  RSVP: 'Call the next family and log it.',
   Logistics: 'Who is arriving, and their car.',
   Hospitality: 'Families still waiting for a room.',
   Hampers: 'Hampers left to deliver.',

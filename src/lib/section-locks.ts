@@ -9,7 +9,7 @@
 export type LockableSection = 'rsvp' | 'hospitality' | 'hamper' | 'logistics'
 
 export const LOCKABLE_SECTIONS: readonly { id: LockableSection; label: string }[] = [
-  { id: 'rsvp', label: 'RSVP / Calls' },
+  { id: 'rsvp', label: 'RSVP' },
   { id: 'hospitality', label: 'Hospitality' },
   { id: 'hamper', label: 'Hampers' },
   { id: 'logistics', label: 'Logistics' },

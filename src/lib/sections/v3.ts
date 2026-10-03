@@ -67,7 +67,7 @@ const V3_BAR: readonly SectionId[] = [
 /** What a section is called in the v3 bar. */
 const V3_TAB_LABEL: Partial<Record<SectionId, string>> = {
   dashboard: 'Today',
-  rsvp: 'Calls',
+  rsvp: 'RSVP',
   hospitality: 'Hospitality',
   hamper: 'Hampers',
   logistics: 'Logistics',

@@ -26,7 +26,7 @@ export const DEPARTMENT_LABELS: Record<StaffDepartment, string> = {
   hospitality: 'Hospitality',
   hamper: 'Hampers',
   production: 'Setup',
-  rsvp: 'RSVP / Calls',
+  rsvp: 'RSVP',
 }
 
 /** Sections each department may open. Management sees everything. */
