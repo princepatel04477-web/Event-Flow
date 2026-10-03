@@ -27,7 +27,7 @@ import { buildSheetDefinitions } from '@/lib/export/definitions'
 import { buildWorkbook } from '@/lib/export/workbook'
 import type { ExportData, GuestGroupRow } from '@/lib/export/sheets'
 import type { ParseFamiliesOptions } from '@/lib/import/families'
-import { parseImportFile } from '@/lib/import/knownSheet'
+import { parseImportFile, parseCustomMapping } from '@/lib/import/knownSheet'
 
 /** 3–8 December 2026, matching tests/helpers/sheet.ts. */
 const EVENT: ParseFamiliesOptions = {
@@ -245,5 +245,107 @@ describe('the shipped template', () => {
     expect(outcome.result.counts.orphans).toBe(0)
     expect(outcome.result.families[0].headName).toBe('RAMESH SHARMA')
     expect(outcome.result.families[0].primaryMobile).toBe('9876543210')
+  })
+})
+
+describe('flexible sheets & manual mapping', () => {
+  it('detects headers beneath a title banner row', async () => {
+    const file = sheetFile([
+      {
+        name: 'Wedding RSVP',
+        aoa: [
+          ['Wedding Guest Directory - 2026', ''],
+          ['Guest Name', 'Phone Number', 'Pax', 'City'],
+          ['Anand Verma', '9898989898', 4, 'Mumbai'],
+          ['Deepa Shah', '9797979797', 2, 'Surat'],
+        ],
+      },
+    ])
+
+    const outcome = await parseImportFile(file, EVENT)
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+
+    expect(outcome.headerRowNumber).toBe(2)
+    expect(outcome.result.counts.families).toBe(2)
+    expect(outcome.result.families[0].headName).toBe('Anand Verma')
+    expect(outcome.result.families[0].primaryMobile).toBe('9898989898')
+    expect(outcome.result.families[0].expectedPax).toBe(4)
+    expect(outcome.result.families[0].place).toBe('Mumbai')
+  })
+
+  it('imports sheets with names and no phone numbers', async () => {
+    const file = sheetFile([
+      {
+        name: 'VIP Guests',
+        aoa: [
+          ['Full Name', 'Pax', 'Native Place', 'Remarks'],
+          ['Vikram Malhotra', 2, 'Jaipur', 'VIP seating requested'],
+        ],
+      },
+    ])
+
+    const outcome = await parseImportFile(file, EVENT)
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+
+    expect(outcome.result.counts.families).toBe(1)
+    expect(outcome.result.families[0].headName).toBe('Vikram Malhotra')
+    expect(outcome.result.families[0].primaryMobile).toBeNull()
+    expect(outcome.result.families[0].expectedPax).toBe(2)
+    expect(outcome.result.families[0].place).toBe('Jaipur')
+    expect(outcome.result.families[0].remark).toBe('VIP seating requested')
+    expect(outcome.notes.some((n) => n.column === 'contact')).toBe(true)
+  })
+
+  it('allows arbitrary columns to be manually mapped via parseCustomMapping', async () => {
+    const grid = [
+      ['Title Row - Not Headers'],
+      ['Invitee', 'Dial', 'Headcount', 'Town', 'Notes'],
+      ['Kiran Patel', '9988776655', 3, 'Baroda', 'Close friend'],
+    ]
+
+    const parsed = parseCustomMapping(
+      grid,
+      'CustomSheet',
+      1,
+      {
+        nameIndex: 0,
+        contactIndex: 1,
+        paxIndex: 2,
+        cityIndex: 3,
+        remarksIndex: 4,
+      },
+      EVENT,
+    )
+
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+
+    expect(parsed.result.counts.families).toBe(1)
+    const fam = parsed.result.families[0]
+    expect(fam.headName).toBe('Kiran Patel')
+    expect(fam.primaryMobile).toBe('9988776655')
+    expect(fam.expectedPax).toBe(3)
+    expect(fam.place).toBe('Baroda')
+    expect(fam.remark).toBe('Close friend')
+  })
+
+  it('attaches workbookGrids on both success and failure for the interactive mapping screen', async () => {
+    const file = sheetFile([
+      {
+        name: 'UnrecognizedSheet',
+        aoa: [
+          ['Column A', 'Column B'],
+          ['Val 1', 'Val 2'],
+        ],
+      },
+    ])
+
+    const outcome = await parseImportFile(file, EVENT)
+    expect(outcome.workbookGrids).toBeDefined()
+    const targetSheet = outcome.workbookGrids?.sheets.find((s) => s.sheetName === 'UnrecognizedSheet')
+    expect(targetSheet).toBeDefined()
+    expect(targetSheet?.grid.length).toBe(2)
   })
 })

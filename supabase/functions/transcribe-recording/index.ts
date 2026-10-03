@@ -26,7 +26,9 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
  * IDEMPOTENCY: `transcripts_recording_id_uq` (unique on recording_id) means a
  * duplicate webhook delivery cannot create a second transcript. A redelivery
  * lands on the existing row: 'complete' is left alone (never re-bill STT),
- * 'pending'/'processing'/'failed' are picked up and retried.
+ * 'pending'/'processing'/'failed' are picked up and retried. A 'processing'
+ * row whose raw_response holds a started Sarvam job id RESUMES polling that
+ * job instead of creating (and paying for) a new one.
  *
  * COST: ~₹45/hour. Re-running STT costs ~₹0.75/call; re-running extraction
  * costs ~₹0.03. That asymmetry is why `raw_response` stores the ENTIRE Sarvam
@@ -34,8 +36,9 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
  * ever paying for STT twice.
  *
  * SECURITY (do not weaken):
- *   * SARVAM_API_KEY lives in Edge Function secrets only. The APK is a zip
- *     file; anything in the client bundle is public.
+ *   * SARVAM_API_KEY lives on the server only (Edge Function secret or Vault,
+ *     see Secrets below). The APK is a zip file; anything in the client
+ *     bundle is public.
  *   * This function's ONLY write targets are `transcripts` rows. It holds the
  *     service role key, so the restraint is enforced by review + the RLS test
  *     in tests/l2_transcribe.sql, not by the grant system.
@@ -45,12 +48,60 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const sarvamApiKey = Deno.env.get('SARVAM_API_KEY')!
-const webhookSecret = Deno.env.get('TRANSCRIBE_WEBHOOK_SECRET')!
 
 const db = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false },
 })
+
+// ---------------------------------------------------------------------------
+// Secrets
+// ---------------------------------------------------------------------------
+
+/**
+ * SARVAM_API_KEY and TRANSCRIBE_WEBHOOK_SECRET come from Supabase Vault
+ * through public.pipeline_secret() (migration 20260926093324), which only the
+ * service role may execute. Edge Function secrets of the same name are only a
+ * fallback when Vault has no value.
+ *
+ * Vault wins because the database trigger reads its webhook secret from Vault
+ * too: one source of truth means the two sides cannot drift. They did — a
+ * stale TRANSCRIBE_WEBHOOK_SECRET left in the function's env from August
+ * 401'd every call on 2026-09-26 until this order was flipped. Rotating the
+ * Sarvam key is one `vault.update_secret` in the SQL Editor. Either way the
+ * key lives only on the server — never in the APK, the web bundle, or a log
+ * line.
+ *
+ * Cached per instance for CONFIG_TTL_MS so a rotation takes effect within
+ * minutes without a redeploy.
+ */
+const CONFIG_TTL_MS = 5 * 60_000
+
+let sarvamApiKey = ''
+let webhookSecret = ''
+let configLoadedAt = 0
+
+async function readSecret(envName: string, vaultName: string): Promise<string | null> {
+  const { data, error } = await db.rpc('pipeline_secret', { p_name: vaultName })
+  if (error) {
+    console.error(`transcribe-recording: could not read ${vaultName} from Vault:`, error.message)
+  } else if (typeof data === 'string' && data !== '') {
+    return data
+  }
+  return Deno.env.get(envName) || null
+}
+
+async function loadConfig(): Promise<boolean> {
+  if (sarvamApiKey && webhookSecret && Date.now() - configLoadedAt < CONFIG_TTL_MS) return true
+  const [key, secret] = await Promise.all([
+    readSecret('SARVAM_API_KEY', 'sarvam_api_key'),
+    readSecret('TRANSCRIBE_WEBHOOK_SECRET', 'transcribe_webhook_secret'),
+  ])
+  if (!key || !secret) return false
+  sarvamApiKey = key
+  webhookSecret = secret
+  configLoadedAt = Date.now()
+  return true
+}
 
 // ---------------------------------------------------------------------------
 // Tunables. These are the settings that matter more than the code.
@@ -59,10 +110,26 @@ const db = createClient(supabaseUrl, serviceRoleKey, {
 /** Below this, a call is a misdial. Skipping saves ₹0.75 a pop. */
 const MIN_DURATION_SEC = 10
 
-/** Batch STT is slower than realtime. */
-const SARVAM_TIMEOUT_MS = 180_000
+/**
+ * Sarvam batch jobs run asynchronously. Every HTTP step (create, upload,
+ * start, status, download) gets its own timeout; the job itself is waited on
+ * by polling, bounded by POLL_DEADLINE_MS below.
+ */
+const REQUEST_TIMEOUT_MS = 30_000
 
-/** 3 retries on 5xx/timeout. NEVER on 4xx — a 4xx is our bug, not theirs. */
+/** How often to ask Sarvam whether the job has finished. */
+const POLL_INTERVAL_MS = 5_000
+
+/**
+ * Stop waiting in THIS invocation after this long. The job id is saved on the
+ * transcript row before the job starts, so a later invocation (webhook
+ * redelivery, backlog retry, manual re-run) resumes polling the SAME job
+ * instead of paying for a second one. Kept well under the Edge Function
+ * wall-clock limit.
+ */
+const POLL_DEADLINE_MS = 120_000
+
+/** 3 retries on 5xx/429/timeout. NEVER on other 4xx — those are our bug, not theirs. */
 const MAX_ATTEMPTS = 3
 const BACKOFF_BASE_MS = 2_000
 
@@ -70,7 +137,7 @@ const RUPEES_PER_HOUR = 45
 /** Ceiling is ~40 cumulative hours. Past this, something is looping. */
 const COST_ALERT_HOURS = 50
 
-/** Signed URL lifetime — long enough for a 180s batch call, no longer. */
+/** Signed URL lifetime — only used to pull the audio into this function. */
 const SIGNED_URL_TTL_SEC = 600
 
 // ---------------------------------------------------------------------------
@@ -78,67 +145,74 @@ const SIGNED_URL_TTL_SEC = 600
 // ---------------------------------------------------------------------------
 
 /**
- * Sarvam Saaras v3, batch, with diarization.
+ * Sarvam Saaras v3, BATCH job API, with diarization.
+ *
+ * Why batch and not POST /speech-to-text: the synchronous REST endpoint
+ * accepts at most 30 seconds of audio and does not diarize. A real RSVP call
+ * is 1–5 minutes and extraction needs to know who said each number, so the
+ * REST endpoint fails on exactly the calls that matter. The batch API takes
+ * up to 2 hours per file and returns diarized_transcript.entries.
+ * (docs.sarvam.ai → Speech-to-Text → "Which API to use", verified 2026-09-26.)
+ *
+ * Wire flow, taken from Sarvam's official SDK (sarvamai, speech_to_text_job):
+ *   1. POST {BASE}                    { job_parameters }         → job_id
+ *   2. POST {BASE}/upload-files       { job_id, files: [name] }  → upload_urls[name].file_url
+ *   3. PUT  file_url  (x-ms-blob-type: BlockBlob)                → audio bytes
+ *   4. POST {BASE}/{job_id}/start
+ *   5. GET  {BASE}/{job_id}/status    → job_state Accepted|Pending|Running|Completed|Failed,
+ *                                       job_details[].{state, outputs[].file_name, error_message}
+ *   6. POST {BASE}/download-files     { job_id, files: [output] } → download_urls[output].file_url
+ *   7. GET  file_url                  → the transcript JSON normalise() reads
+ * Auth header on Sarvam calls: api-subscription-key. The presigned upload and
+ * download URLs take no auth header.
  *
  * Config rationale (these are deliberate, do not "simplify" them):
  *   * language_code 'unknown' = AUTO-DETECT. Do NOT pin hi-IN. These calls
  *     switch to English mid-sentence and the switches land exactly on dates,
  *     flight numbers and "confirm" — the tokens extraction depends on.
- *   * with_diarization: this is what the extra ₹15/hr over plain STT buys.
+ *   * with_diarization + num_speakers 2: one staff member, one guest.
  *     Extraction is materially worse when it cannot tell who said a number.
  *   * with_timestamps: the review screen scrubs audio to an evidence span.
- *     Without word timings that interaction cannot exist.
- *   * output codemix (Devanagari for Hindi, Latin for English), NOT translate.
+ *     Without timings that interaction cannot exist.
+ *   * mode 'codemix' (Devanagari for Hindi, Latin for English), NOT translate.
  *     Translating to English destroys number and date precision, which is the
  *     entire point of transcribing the call.
- *
- * VERIFY BEFORE FIRST LIVE RUN: endpoint path and response field names are
- * written against Sarvam's documented batch STT shape. If Sarvam has moved,
- * this is the ONLY function that changes — normalise() consumes the parsed
- * result, not the wire format.
  */
-const SARVAM_ENDPOINT = 'https://api.sarvam.ai/speech-to-text'
+const SARVAM_BASE = 'https://api.sarvam.ai/speech-to-text/job/v1'
 const SARVAM_MODEL = 'saaras:v3'
+const SARVAM_MODE = 'codemix'
 
-type SarvamCallResult =
-  | { kind: 'ok'; payload: unknown }
+type HttpFailure = { error: string; terminal: boolean }
+type HttpSuccess = { body: unknown }
+
+type HttpAttempt =
+  | { kind: 'ok'; body: unknown }
   | { kind: 'client_error'; status: number; detail: string }
   | { kind: 'server_error'; status: number; detail: string }
   | { kind: 'timeout'; detail: string }
 
-async function callSarvamOnce(audio: Blob, filename: string): Promise<SarvamCallResult> {
-  const form = new FormData()
-  form.append('file', audio, filename)
-  form.append('model', SARVAM_MODEL)
-  form.append('language_code', 'unknown') // auto-detect; see rationale above
-  form.append('with_diarization', 'true')
-  form.append('with_timestamps', 'true')
-  form.append('output_script', 'codemix')
-
+async function httpOnce(url: string, init: RequestInit, expectJson: boolean): Promise<HttpAttempt> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), SARVAM_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
   try {
-    const res = await fetch(SARVAM_ENDPOINT, {
-      method: 'POST',
-      headers: { 'api-subscription-key': sarvamApiKey },
-      body: form,
-      signal: controller.signal,
-    })
-
+    const res = await fetch(url, { ...init, signal: controller.signal })
     const text = await res.text()
 
     if (res.ok) {
+      if (!expectJson) return { kind: 'ok', body: text }
       try {
-        return { kind: 'ok', payload: JSON.parse(text) }
+        return { kind: 'ok', body: text === '' ? {} : JSON.parse(text) }
       } catch {
         // A 200 we cannot parse is not retryable — retrying returns the same
-        // unparseable body and bills us again.
+        // unparseable body.
         return { kind: 'client_error', status: res.status, detail: `Unparseable success body: ${text.slice(0, 500)}` }
       }
     }
 
-    if (res.status >= 500) {
+    // 429 is back-pressure, not a bad request: waiting and retrying is correct
+    // and costs nothing.
+    if (res.status >= 500 || res.status === 429) {
       return { kind: 'server_error', status: res.status, detail: text.slice(0, 500) }
     }
     return { kind: 'client_error', status: res.status, detail: text.slice(0, 500) }
@@ -152,38 +226,217 @@ async function callSarvamOnce(audio: Blob, filename: string): Promise<SarvamCall
 }
 
 /**
- * Retry 3x with exponential backoff on 5xx and timeouts. NEVER on 4xx —
- * a 401/413/422 will fail identically every time and each attempt is billable.
+ * Retry 3x with exponential backoff on 5xx, 429 and timeouts. NEVER on other
+ * 4xx — a 401/413/422 fails identically every time.
  */
-async function callSarvamWithRetry(
-  audio: Blob,
-  filename: string,
-): Promise<{ payload: unknown } | { error: string }> {
+async function httpWithRetry(
+  step: string,
+  url: string,
+  init: RequestInit,
+  expectJson: boolean,
+): Promise<HttpSuccess | HttpFailure> {
   let last = ''
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const res = await callSarvamOnce(audio, filename)
+    const res = await httpOnce(url, init, expectJson)
 
-    if (res.kind === 'ok') return { payload: res.payload }
+    if (res.kind === 'ok') return { body: res.body }
 
     if (res.kind === 'client_error') {
-      // Terminal by design.
-      return { error: `Sarvam ${res.status} (not retried): ${res.detail}` }
+      return { error: `Sarvam ${step}: ${res.status} (not retried): ${res.detail}`, terminal: true }
     }
 
     last =
       res.kind === 'timeout'
-        ? `timeout after ${SARVAM_TIMEOUT_MS}ms: ${res.detail}`
-        : `Sarvam ${res.status}: ${res.detail}`
+        ? `timeout after ${REQUEST_TIMEOUT_MS}ms: ${res.detail}`
+        : `${res.status}: ${res.detail}`
 
-    console.warn(`transcribe-recording: attempt ${attempt}/${MAX_ATTEMPTS} failed — ${last}`)
+    console.warn(`transcribe-recording: ${step} attempt ${attempt}/${MAX_ATTEMPTS} failed — ${last}`)
 
     if (attempt < MAX_ATTEMPTS) {
       await new Promise((r) => setTimeout(r, BACKOFF_BASE_MS * 2 ** (attempt - 1)))
     }
   }
 
-  return { error: `Exhausted ${MAX_ATTEMPTS} attempts. Last: ${last}` }
+  return { error: `Sarvam ${step}: exhausted ${MAX_ATTEMPTS} attempts. Last: ${last}`, terminal: false }
+}
+
+function field(obj: unknown, key: string): unknown {
+  if (obj === null || typeof obj !== 'object') return undefined
+  return (obj as Record<string, unknown>)[key]
+}
+
+function stringField(obj: unknown, key: string): string | null {
+  const v = field(obj, key)
+  return typeof v === 'string' && v !== '' ? v : null
+}
+
+/** Reads `<container>[name].file_url` from an upload/download-links response. */
+function signedFileUrl(body: unknown, container: 'upload_urls' | 'download_urls', name: string): string | null {
+  return stringField(field(field(body, container), name), 'file_url')
+}
+
+function sarvamPost(body: unknown): RequestInit {
+  return {
+    method: 'POST',
+    headers: { 'api-subscription-key': sarvamApiKey, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }
+}
+
+async function sarvamCreateJob(): Promise<{ jobId: string } | HttpFailure> {
+  const res = await httpWithRetry(
+    'create job',
+    SARVAM_BASE,
+    sarvamPost({
+      job_parameters: {
+        model: SARVAM_MODEL,
+        mode: SARVAM_MODE,
+        language_code: 'unknown', // auto-detect; see rationale above
+        with_timestamps: true,
+        with_diarization: true,
+        num_speakers: 2,
+      },
+    }),
+    true,
+  )
+  if ('error' in res) return res
+
+  const jobId = stringField(res.body, 'job_id')
+  if (!jobId) {
+    return { error: `Sarvam create job: no job_id in ${JSON.stringify(res.body).slice(0, 300)}`, terminal: true }
+  }
+  return { jobId }
+}
+
+async function sarvamUploadAndStart(
+  jobId: string,
+  audio: Blob,
+  filename: string,
+  mimeType: string,
+): Promise<{ ok: true } | HttpFailure> {
+  const links = await httpWithRetry('upload links', `${SARVAM_BASE}/upload-files`, sarvamPost({ job_id: jobId, files: [filename] }), true)
+  if ('error' in links) return links
+
+  const uploadUrl = signedFileUrl(links.body, 'upload_urls', filename)
+  if (!uploadUrl) {
+    return { error: `Sarvam upload links: no upload URL for ${filename}`, terminal: true }
+  }
+
+  const put = await httpWithRetry(
+    'upload',
+    uploadUrl,
+    { method: 'PUT', headers: { 'x-ms-blob-type': 'BlockBlob', 'content-type': mimeType }, body: audio },
+    false,
+  )
+  if ('error' in put) return put
+
+  const start = await httpWithRetry(
+    'start job',
+    `${SARVAM_BASE}/${encodeURIComponent(jobId)}/start`,
+    { method: 'POST', headers: { 'api-subscription-key': sarvamApiKey } },
+    true,
+  )
+  if ('error' in start) return start
+
+  return { ok: true }
+}
+
+type PollOutcome =
+  | { kind: 'done'; outputFile: string }
+  | { kind: 'failed'; error: string }
+  | { kind: 'still_running'; state: string; detail: string }
+
+/**
+ * Waits for the job, bounded by POLL_DEADLINE_MS. A status call that keeps
+ * failing transiently is NOT a failed job — the job may well be fine — so it
+ * reports still_running and leaves the job id in place for a later resume.
+ */
+async function sarvamPoll(jobId: string): Promise<PollOutcome> {
+  const deadline = Date.now() + POLL_DEADLINE_MS
+  let state = 'unknown'
+
+  for (;;) {
+    const res = await httpWithRetry(
+      'status',
+      `${SARVAM_BASE}/${encodeURIComponent(jobId)}/status`,
+      { method: 'GET', headers: { 'api-subscription-key': sarvamApiKey } },
+      true,
+    )
+
+    if ('error' in res) {
+      if (res.terminal) return { kind: 'failed', error: res.error }
+      return { kind: 'still_running', state, detail: res.error }
+    }
+
+    state = stringField(res.body, 'job_state') ?? 'unknown'
+
+    if (state === 'Completed') {
+      const details = field(res.body, 'job_details')
+      const list = Array.isArray(details) ? details : []
+      for (const d of list) {
+        const outputs = field(d, 'outputs')
+        const first = Array.isArray(outputs) ? outputs[0] : undefined
+        const outputFile = stringField(first, 'file_name')
+        if (stringField(d, 'state') === 'Success' && outputFile) {
+          return { kind: 'done', outputFile }
+        }
+      }
+      const taskError = list.map((d) => stringField(d, 'error_message')).find((m) => m !== null)
+      return { kind: 'failed', error: `Sarvam job completed without output: ${taskError ?? 'no error message'}` }
+    }
+
+    if (state === 'Failed') {
+      return { kind: 'failed', error: `Sarvam job failed: ${stringField(res.body, 'error_message') ?? 'no error message'}` }
+    }
+
+    if (Date.now() + POLL_INTERVAL_MS > deadline) {
+      return { kind: 'still_running', state, detail: `not finished after ${POLL_DEADLINE_MS / 1000}s` }
+    }
+
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
+  }
+}
+
+async function sarvamDownload(jobId: string, outputFile: string): Promise<{ payload: unknown } | HttpFailure> {
+  const links = await httpWithRetry(
+    'download links',
+    `${SARVAM_BASE}/download-files`,
+    sarvamPost({ job_id: jobId, files: [outputFile] }),
+    true,
+  )
+  if ('error' in links) return links
+
+  const downloadUrl = signedFileUrl(links.body, 'download_urls', outputFile)
+  if (!downloadUrl) {
+    return { error: `Sarvam download links: no download URL for ${outputFile}`, terminal: true }
+  }
+
+  const file = await httpWithRetry('download', downloadUrl, { method: 'GET' }, true)
+  if ('error' in file) return file
+
+  return { payload: file.body }
+}
+
+/**
+ * What the transcript row remembers about an in-flight Sarvam job, stored in
+ * raw_response until the real payload replaces it. phase 'started' is the only
+ * state worth resuming: a job created but never started would sit in
+ * 'Accepted' forever, so it is abandoned and a fresh job is created instead.
+ */
+type JobMarker = { sarvam_job_id: string; phase: 'created' | 'started'; updated_at: string }
+
+function readJobMarker(raw: unknown): JobMarker | null {
+  const jobId = stringField(raw, 'sarvam_job_id')
+  const phase = stringField(raw, 'phase')
+  if (!jobId || (phase !== 'created' && phase !== 'started')) return null
+  return { sarvam_job_id: jobId, phase, updated_at: stringField(raw, 'updated_at') ?? '' }
+}
+
+async function saveJobMarker(transcriptId: string, jobId: string, phase: JobMarker['phase']) {
+  const marker: JobMarker = { sarvam_job_id: jobId, phase, updated_at: new Date().toISOString() }
+  const { error } = await db.from('transcripts').update({ raw_response: marker }).eq('id', transcriptId)
+  if (error) console.error(`transcribe-recording: could not save job marker (${phase}):`, error.message)
 }
 
 // ---------------------------------------------------------------------------
@@ -371,6 +624,12 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Method not allowed' }, { status: 405 })
   }
 
+  if (!(await loadConfig())) {
+    // Fail closed. Without the webhook secret nothing can be authenticated,
+    // and without the Sarvam key nothing can be transcribed.
+    return Response.json({ error: 'Pipeline secrets are not configured' }, { status: 503 })
+  }
+
   // Shared-secret gate. Without this, anyone who learns the URL can bill us
   // ₹0.75 per request and fill the table with junk.
   if (req.headers.get('x-webhook-secret') !== webhookSecret) {
@@ -382,6 +641,23 @@ Deno.serve(async (req) => {
     body = await req.json()
   } catch {
     return Response.json({ error: 'Invalid request' }, { status: 400 })
+  }
+
+  // Setup check: does Sarvam accept the key? Asks for the status of a job id
+  // that cannot exist — free, and a bad key answers 401/403 before the lookup.
+  if (stringField(body, 'check') === 'sarvam') {
+    const probe = await httpOnce(
+      `${SARVAM_BASE}/00000000-0000-0000-0000-000000000000/status`,
+      { method: 'GET', headers: { 'api-subscription-key': sarvamApiKey } },
+      false,
+    )
+    const status = probe.kind === 'ok' ? 200 : probe.kind === 'timeout' ? 0 : probe.status
+    return Response.json({
+      ok: true,
+      sarvam_http_status: status,
+      key_accepted: status !== 0 && status !== 401 && status !== 403,
+      detail: probe.kind === 'ok' ? null : probe.detail.slice(0, 200),
+    })
   }
 
   const recordingId = extractRecordingId(body)
@@ -426,7 +702,7 @@ Deno.serve(async (req) => {
   //    empty string until the real transcript lands.
   const { data: existing } = await db
     .from('transcripts')
-    .select('id, status')
+    .select('id, status, raw_response')
     .eq('recording_id', recordingId)
     .maybeSingle()
 
@@ -472,49 +748,152 @@ Deno.serve(async (req) => {
 
   await db.from('transcripts').update({ status: 'processing' }).eq('id', transcriptId)
 
-  // 4. Signed URL → download server-side. Audio never streams through the
-  //    client; the bucket is private and stays private.
-  const { data: signed, error: signErr } = await db.storage
-    .from(rec.storage_bucket)
-    .createSignedUrl(rec.storage_path, SIGNED_URL_TTL_SEC)
+  // 4. Resume an in-flight Sarvam job rather than paying for a second one. A
+  //    'failed' row always starts fresh — its old job is dead by definition.
+  const marker = existing?.status === 'failed' ? null : readJobMarker(existing?.raw_response)
+  const resumeJobId = marker?.phase === 'started' ? marker.sarvam_job_id : null
 
-  if (signErr || !signed?.signedUrl) {
-    await markFailed(transcriptId, `Could not sign storage URL: ${signErr?.message ?? 'unknown'}`)
-    return Response.json({ error: 'Could not access audio' }, { status: 500 })
+  // 5. The batch job takes longer than the 5s pg_net enqueue timeout, so the
+  //    work runs as a background task and the webhook gets an immediate 202.
+  //    Every outcome — complete, failed, still running — is written to the
+  //    transcript row, which is what v_transcription_backlog and the review
+  //    queue read. Nothing depends on this HTTP response.
+  const recording: RecordingRow = {
+    id: rec.id,
+    event_id: rec.event_id,
+    storage_bucket: rec.storage_bucket,
+    storage_path: rec.storage_path,
+    duration_sec: rec.duration_sec,
+    mime_type: rec.mime_type,
   }
-
-  let audio: Blob
-  try {
-    const audioRes = await fetch(signed.signedUrl)
-    if (!audioRes.ok) throw new Error(`storage returned ${audioRes.status}`)
-    audio = await audioRes.blob()
-  } catch (err) {
+  const job = runTranscription(recording, transcriptId, resumeJobId).catch(async (err) => {
     const detail = err instanceof Error ? err.message : String(err)
-    await markFailed(transcriptId, `Audio download failed: ${detail}`)
-    return Response.json({ error: 'Could not download audio' }, { status: 500 })
+    console.error('transcribe-recording: background task crashed:', detail)
+    await markFailed(transcriptId, `Background task crashed: ${detail}`)
+  })
+  EdgeRuntime.waitUntil(job)
+
+  return Response.json(
+    {
+      ok: true,
+      status: 'processing',
+      transcript_id: transcriptId,
+      resumed_job: resumeJobId,
+    },
+    { status: 202 },
+  )
+})
+
+// ---------------------------------------------------------------------------
+// Background work: audio → Sarvam batch job → transcript row
+// ---------------------------------------------------------------------------
+
+type RecordingRow = {
+  id: string
+  event_id: string
+  storage_bucket: string
+  storage_path: string
+  duration_sec: number | null
+  mime_type: string | null
+}
+
+async function runTranscription(rec: RecordingRow, transcriptId: string, resumeJobId: string | null): Promise<void> {
+  let jobId = resumeJobId
+
+  if (!jobId) {
+    // 5a. Signed URL → download server-side. Audio never streams through the
+    //     client; the bucket is private and stays private.
+    const { data: signed, error: signErr } = await db.storage
+      .from(rec.storage_bucket)
+      .createSignedUrl(rec.storage_path, SIGNED_URL_TTL_SEC)
+
+    if (signErr || !signed?.signedUrl) {
+      await markFailed(transcriptId, `Could not sign storage URL: ${signErr?.message ?? 'unknown'}`)
+      return
+    }
+
+    let audio: Blob
+    try {
+      const audioRes = await fetch(signed.signedUrl)
+      if (!audioRes.ok) throw new Error(`storage returned ${audioRes.status}`)
+      audio = await audioRes.blob()
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      await markFailed(transcriptId, `Audio download failed: ${detail}`)
+      return
+    }
+
+    // 5b. Create → remember → upload → start → remember as started. The job
+    //     id is on the row before any audio leaves, so a crash after this
+    //     point is resumable rather than silently re-billed.
+    const created = await sarvamCreateJob()
+    if ('error' in created) {
+      await markFailed(transcriptId, created.error)
+      return
+    }
+    jobId = created.jobId
+    await saveJobMarker(transcriptId, jobId, 'created')
+
+    const filename = rec.storage_path.split('/').pop() ?? 'call.m4a'
+    const mimeType = rec.mime_type || audio.type || 'audio/mp4'
+    const started = await sarvamUploadAndStart(jobId, audio, filename, mimeType)
+    if ('error' in started) {
+      await markFailed(transcriptId, started.error)
+      return
+    }
+    await saveJobMarker(transcriptId, jobId, 'started')
   }
 
-  // 5. Sarvam.
-  const filename = rec.storage_path.split('/').pop() ?? 'call.m4a'
-  const result = await callSarvamWithRetry(audio, filename)
+  // 6. Wait for Sarvam.
+  const outcome = await sarvamPoll(jobId)
 
-  if ('error' in result) {
+  if (outcome.kind === 'still_running') {
+    // Not a failure. The row stays 'processing' with the job id saved;
+    // v_transcription_backlog lists it, and re-invoking this function with
+    // the same recording_id resumes polling this job at no extra cost.
+    const note = `Sarvam job ${jobId} still ${outcome.state} (${outcome.detail}). Re-run to resume; no new job will be billed.`
+    console.warn(`transcribe-recording: ${note}`)
+    await db.from('transcripts').update({ error_text: note }).eq('id', transcriptId)
+    return
+  }
+
+  if (outcome.kind === 'failed') {
     // Terminal. The call STILL reaches the review queue — a staff member is
     // never blocked by this pipeline; they enter the RSVP by hand.
-    await markFailed(transcriptId, result.error)
-    return Response.json({ ok: false, status: 'failed', transcript_id: transcriptId, error: result.error })
+    await markFailed(transcriptId, outcome.error)
+    return
   }
 
-  // 6. Normalise. raw_response keeps the ENTIRE payload — including fields we
-  //    do not read today. Re-running extraction is ₹0.03; re-running STT is
-  //    ₹0.75. Never discard anything that would force the expensive path.
-  const norm = normalise(result.payload)
+  const downloaded = await sarvamDownload(jobId, outcome.outputFile)
+  if ('error' in downloaded) {
+    if (downloaded.terminal) {
+      await markFailed(transcriptId, downloaded.error)
+    } else {
+      // The job finished and is paid for; only the download was flaky. Keep
+      // the row resumable instead of marking it failed and re-billing.
+      await db
+        .from('transcripts')
+        .update({ error_text: `${downloaded.error}. Re-run to resume; no new job will be billed.` })
+        .eq('id', transcriptId)
+    }
+    return
+  }
+
+  // 7. Normalise. raw_response keeps the ENTIRE payload — including fields we
+  //    do not read today — plus the job id for traceability. Re-running
+  //    extraction is ₹0.03; re-running STT is ₹0.75. Never discard anything
+  //    that would force the expensive path.
+  const norm = normalise(downloaded.payload)
+  const payloadObject =
+    downloaded.payload !== null && typeof downloaded.payload === 'object' && !Array.isArray(downloaded.payload)
+      ? (downloaded.payload as Record<string, unknown>)
+      : { payload: downloaded.payload }
 
   const { error: updErr } = await db
     .from('transcripts')
     .update({
       status: 'complete',
-      raw_response: result.payload as Record<string, unknown>,
+      raw_response: { ...payloadObject, sarvam_job_id: jobId },
       full_text: norm.fullText,
       text: norm.fullText, // legacy NOT NULL column, kept in sync
       segments: { segments: norm.segments, assumption: norm.speakerAssumption },
@@ -524,20 +903,23 @@ Deno.serve(async (req) => {
     .eq('id', transcriptId)
 
   if (updErr) {
-    // The spend already happened. Losing the payload here would mean paying
-    // again, so surface loudly.
+    // The spend already happened. The job marker is still on the row, so a
+    // re-run downloads the finished job again instead of paying twice.
     console.error('transcribe-recording: PAID BUT UNSAVED —', updErr.message)
-    await markFailed(transcriptId, `Transcribed but could not save: ${updErr.message}`)
-    return Response.json({ error: 'Could not save transcript' }, { status: 500 })
+    await db
+      .from('transcripts')
+      .update({ error_text: `Transcribed but could not save: ${updErr.message}. Re-run to resume.` })
+      .eq('id', transcriptId)
+    return
   }
 
-  // 7. Cost. Derived, not stored.
+  // 8. Cost. Derived, not stored.
   const thisCallHours = (rec.duration_sec ?? 0) / 3600
   const thisCallRupees = thisCallHours * RUPEES_PER_HOUR
   const totalHours = await cumulativeHours(rec.event_id)
 
-  console.log(
-    `transcribe-recording: ${recordingId} ok — ${rec.duration_sec ?? '?'}s, ` +
+  console.info(
+    `transcribe-recording: ${rec.id} ok — job ${jobId}, ${rec.duration_sec ?? '?'}s, ` +
       `₹${thisCallRupees.toFixed(2)}, cumulative ${totalHours?.toFixed(2) ?? '?'}h`,
   )
 
@@ -549,15 +931,4 @@ Deno.serve(async (req) => {
         `(₹${(totalHours * RUPEES_PER_HOUR).toFixed(0)}). Expected ceiling is ~40h.`,
     )
   }
-
-  return Response.json({
-    ok: true,
-    status: 'complete',
-    transcript_id: transcriptId,
-    segments: norm.segments.length,
-    detected_languages: norm.detectedLanguages,
-    cost_rupees: Number(thisCallRupees.toFixed(2)),
-    cumulative_hours: totalHours === null ? null : Number(totalHours.toFixed(2)),
-    cost_alert: totalHours !== null && totalHours > COST_ALERT_HOURS,
-  })
-})
+}

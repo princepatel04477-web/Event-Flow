@@ -45,6 +45,7 @@ export interface PreviewStepProps {
   outcome: PreviewOutcome
   context: ImportContext
   onCommitted: () => void
+  onAdjustMapping?: () => void
 }
 
 /**
@@ -60,6 +61,7 @@ export function PreviewStep({
   outcome,
   context,
   onCommitted,
+  onAdjustMapping,
 }: PreviewStepProps) {
   const { result } = outcome
   const { counts, dateWindow } = result
@@ -103,24 +105,28 @@ export function PreviewStep({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Top of the screen, not buried in the warnings list: whether this was
-          read as a simple name/number list is the one thing that changes what
-          the operator should expect from the preview below it. */}
+      {/* Top of the screen: whether this was read as a simple/flexible list */}
       {outcome.contactsFallback ? (
-        // A name column and a phone column are a COMPLETE guest list, not a
-        // degraded one, so this states what was read rather than raising an
-        // alarm. It still needs saying: an operator who expected travel dates
-        // and pax to come across should know they were not in this file.
-        <div className="rounded-2xl border border-info bg-tint-info px-4 py-3">
-          <p className="text-sm font-semibold text-info">
-            Simple list: names and phone numbers.
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-fg">
-            This file has a name column and a phone column and nothing else, so
-            each row imports as one guest. Travel dates, pax and rooms are not in
-            it — expected for a plain contact list. If you meant to import those,
-            upload the app&apos;s export (the Guest Master tab) instead.
-          </p>
+        <div className="flex flex-col gap-2 rounded-2xl border border-info bg-tint-info p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-info">
+              Flexible / Custom list
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-fg">
+              Guests were parsed using detected columns. Travel legs are not included in this layout.
+            </p>
+          </div>
+          {onAdjustMapping ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={onAdjustMapping}
+              className="shrink-0 self-start sm:self-auto"
+            >
+              Adjust columns
+            </Button>
+          ) : null}
         </div>
       ) : null}
 

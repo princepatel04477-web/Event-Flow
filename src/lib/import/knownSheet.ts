@@ -27,6 +27,7 @@ import {
   readSheetGrid,
   toSheetRows,
   SheetNotFoundError,
+  type WorkbookGrids,
 } from './parse'
 import {
   parseContactsSheet,
@@ -45,25 +46,27 @@ export interface KnownSheetSuccess {
   /** Optional columns (ID / Romm / bed) that were absent, and similar. */
   notes: LayoutNote[]
   result: ParsedFamilySheet
+  workbookGrids?: WorkbookGrids
 }
 
 export interface KnownSheetFailure extends KnownLayoutFailure {
   sheetName: string
   availableSheets: string[]
   headers: (string | null)[]
+  workbookGrids?: WorkbookGrids
 }
 
 export type KnownSheetOutcome = KnownSheetSuccess | KnownSheetFailure
 
 /**
  * A workbook that parsed as either the known CALLING_MASTER_LIST layout or as
- * a simple contacts sheet. Both share the `ParsedFamilySheet` result shape,
+ * a flexible contacts sheet. Both share the `ParsedFamilySheet` result shape,
  * so the preview and commit paths are identical for both.
  */
 export type ImportOutcome =
-  | KnownSheetSuccess
-  | KnownSheetFailure
-  | ContactsParseSuccess
+  | (KnownSheetSuccess & { workbookGrids?: WorkbookGrids })
+  | (KnownSheetFailure & { workbookGrids?: WorkbookGrids })
+  | (ContactsParseSuccess & { workbookGrids?: WorkbookGrids })
 
 /**
  * Parses a workbook against the known layout.
@@ -111,17 +114,8 @@ export async function parseKnownWorkbook(
  *
  * The sheet is FOUND, not demanded. Every tab is tried against the known
  * CALLING_MASTER_LIST layout first — it is the richer read (travel legs, pax,
- * remarks) — and then against the simple contacts shape (a Name column and a
- * Contact column). Only when neither shape is found anywhere does this fail,
- * and then it names the column that was missing rather than the twenty that
- * were.
- *
- * This is what makes the app's own export re-importable. That export's guest
- * tab is named "Guest Master"; the previous version required a tab called
- * "Sheet1", so the file the app wrote could not be read back by the app.
- * `sheetName` is now a PREFERENCE (tried first when present), never a gate.
- *
- * Throws only for a file that cannot be opened as a workbook at all.
+ * remarks) — and then against the flexible contacts shape (a Name column and
+ * optional phone / pax / city / remarks / group columns).
  */
 export async function parseImportFile(
   file: File,
@@ -129,6 +123,7 @@ export async function parseImportFile(
   sheetName: string = KNOWN_SHEET_NAME,
 ): Promise<ImportOutcome> {
   const { sheetNames, sheets } = await readAllSheetGrids(file)
+  const workbookGrids: WorkbookGrids = { sheetNames, sheets }
 
   // The preferred tab first, then the rest in workbook order.
   const wanted = sheetName.trim().toLowerCase()
@@ -156,6 +151,7 @@ export async function parseImportFile(
         layout: located.layout,
         notes: located.notes,
         result: parseFamilies({ headers, rows, blankRowsSkipped }, located.layout, options),
+        workbookGrids,
       }
     }
 
@@ -169,7 +165,7 @@ export async function parseImportFile(
     }
   }
 
-  // Pass 2 — the simple contacts shape (a Name column and a Contact column).
+  // Pass 2 — the flexible contacts/guest shape (searches candidate rows for Name and optional columns).
   let contactsReason: string | null = null
   for (const { sheetName: name, grid } of ordered) {
     const contacts = resolveContactsGrid(grid, name)
@@ -178,15 +174,18 @@ export async function parseImportFile(
       continue
     }
     const parsed = parseContactsSheet(contacts.sheet, options)
-    if (parsed.ok) return parsed
+    if (parsed.ok) {
+      return {
+        ...parsed,
+        availableSheets: sheetNames,
+        workbookGrids,
+      }
+    }
     if (contactsReason === null) contactsReason = parsed.reason
   }
 
-  // Nothing resolved anywhere. A near-miss master (a column or two short)
-  // reads best as the master's own missing-column list; anything else is
-  // served better by the plain "it needs a Name and a Contact" line, which
-  // names a column the operator can actually go and add.
-  const plain = contactsReason ?? 'It needs a column of names and a column of phone numbers.'
+  // Nothing resolved anywhere.
+  const plain = contactsReason ?? 'It needs a column of guest or family names.'
   const nearMiss = closest !== null && closest.missing.length <= 3
 
   if (nearMiss && closest) {
@@ -197,6 +196,7 @@ export async function parseImportFile(
       sheetName: closestSheet,
       availableSheets: sheetNames,
       headers: closestHeaders,
+      workbookGrids,
     }
   }
 
@@ -207,7 +207,11 @@ export async function parseImportFile(
     sheetName: closestSheet,
     availableSheets: sheetNames,
     headers: closestHeaders,
+    workbookGrids,
   }
 }
 
 export { SheetNotFoundError, KNOWN_SHEET_NAME }
+export { parseCustomMapping } from './contactsSheet'
+export type { WorkbookGrids } from './parse'
+

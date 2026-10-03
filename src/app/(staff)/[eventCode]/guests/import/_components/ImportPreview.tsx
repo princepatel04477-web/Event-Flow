@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { LinkButton } from '@/components/ui/LinkButton'
 import type { ImportContext } from '@/lib/actions/import'
-import type { ImportOutcome, KnownSheetFailure } from '@/lib/import/knownSheet'
+import type { ContactsParseSuccess } from '@/lib/import/contactsSheet'
+import type { ImportOutcome, KnownSheetFailure, WorkbookGrids } from '@/lib/import/knownSheet'
 
+import { MappingStep } from './MappingStep'
 import { PreviewStep } from './PreviewStep'
 import { UploadStep } from './UploadStep'
 
@@ -22,16 +24,10 @@ export interface ImportPreviewProps {
 }
 
 /**
- * Upload → preview. Two steps, and no third.
+ * Upload → preview (or mapping → preview).
  *
- * The manual column-mapping step is gone from this flow. It existed to make an
- * unknown workbook importable, and there is no import here to make anything
- * importable FOR; meanwhile a sheet that does not resolve against the known
- * layout is a sheet whose CONTACT column we cannot swear to, and a preview
- * built on a guessed column mapping is a preview that lies quietly. So a
- * layout mismatch stops and names the missing headers. `mapper.ts` and
- * `parseWorkbook` are untouched in the library for the second event's
- * differently-shaped workbook.
+ * Supports known CALLING MASTER LIST layout, smart contacts detection,
+ * and flexible manual column mapping so no valid guest list format is ever blocked.
  */
 export function ImportPreview({
   eventId,
@@ -42,16 +38,33 @@ export function ImportPreview({
   const [fileName, setFileName] = useState('')
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showMapping, setShowMapping] = useState(false)
 
   function handleResult(name: string, next: ImportOutcome) {
     setFileName(name)
     setOutcome(next)
     setError(null)
+    // If auto-detection could not find the columns and we have the workbook grids,
+    // open the mapping step so the user can easily map their columns.
+    if (!next.ok && next.workbookGrids) {
+      setShowMapping(true)
+    } else {
+      setShowMapping(false)
+    }
   }
 
   function handleStartOver() {
     setFileName('')
     setOutcome(null)
+    setError(null)
+    setShowMapping(false)
+  }
+
+  function handleParsedFromMapping(
+    parsed: ContactsParseSuccess & { workbookGrids: WorkbookGrids },
+  ) {
+    setOutcome(parsed)
+    setShowMapping(false)
     setError(null)
   }
 
@@ -118,6 +131,16 @@ export function ImportPreview({
           onResult={handleResult}
           onError={setError}
         />
+      ) : showMapping && outcome.workbookGrids ? (
+        <MappingStep
+          fileName={fileName}
+          workbookGrids={outcome.workbookGrids}
+          initialSheetName={outcome.sheetName}
+          initialHeaderRowIndex={'headerRowNumber' in outcome ? outcome.headerRowNumber - 1 : 0}
+          options={{ eventStartsOn, eventEndsOn }}
+          onParsed={handleParsedFromMapping}
+          onCancel={handleStartOver}
+        />
       ) : outcome.ok ? (
         <>
           <PreviewStep
@@ -130,6 +153,7 @@ export function ImportPreview({
             outcome={{ ...outcome, contactsFallback: !('layout' in outcome) }}
             context={context}
             onCommitted={handleStartOver}
+            onAdjustMapping={() => setShowMapping(true)}
           />
           <Button variant="secondary" fullWidth onClick={handleStartOver}>
             Choose a different file
@@ -138,6 +162,11 @@ export function ImportPreview({
       ) : (
         <>
           <LayoutMismatch fileName={fileName} failure={outcome} />
+          {outcome.workbookGrids ? (
+            <Button variant="primary" fullWidth onClick={() => setShowMapping(true)}>
+              Map columns by hand
+            </Button>
+          ) : null}
           <Button variant="secondary" fullWidth onClick={handleStartOver}>
             Choose a different file
           </Button>

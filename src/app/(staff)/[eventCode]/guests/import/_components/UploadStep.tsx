@@ -65,26 +65,19 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
         <div>
           <p className="text-base font-semibold text-fg">Choose the guest list</p>
           <p className="mt-1 text-sm text-muted">
-            .xlsx or .xls. A plain list with a{' '}
-            <span className="font-medium text-fg">Name</span> column and a phone-number column is
-            all it takes — one guest per row. The app&apos;s own export works too: its{' '}
-            <span className="font-medium text-fg">Guest Master</span> tab is read in full, travel
-            and pax included.
+            .xlsx, .xls, or .csv. Upload any guest list — whether it&apos;s a plain list with names and
+            numbers, or a detailed master sheet with headcount and cities.
           </p>
           <p className="mt-1 text-sm text-muted">
-            The tab can be called anything. The file is read on this phone and is not uploaded
-            anywhere.
+            Columns are auto-detected, and you can easily map or adjust columns if needed.
+            The file is processed on this device and not uploaded to any external server.
           </p>
         </div>
 
         <input
           ref={inputRef}
           type="file"
-          // Broad accept on purpose: Android's document picker matches MIME
-          // types, not bare extensions, and with ".xlsx,.xls" alone it can
-          // offer no spreadsheet apps at all. The MIME types cover the
-          // realistic set; the parser still rejects anything it can't read.
-          accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+          accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
           className="sr-only"
           onChange={(e) => handleFiles(e.target.files)}
           disabled={busy}
