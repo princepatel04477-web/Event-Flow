@@ -35,7 +35,7 @@ export interface PreviewOutcome {
    * families and guests, and silently discards Pax and every travel column.
    * Those are exactly the headers someone writes when inventing their own
    * sheet, and the gap only surfaces later, when room allocation has no
-   * headcount to work with.
+   * headcount to work with. It is therefore stated plainly on the preview.
    */
   contactsFallback: boolean
 }
@@ -51,6 +51,7 @@ export interface PreviewStepProps {
    * see `CommitSummary`. The parent resets the preview and keeps showing them.
    */
   onCommitted: (summary: CommitResult['summary']) => void
+  onAdjustMapping?: () => void
 }
 
 /**
@@ -66,6 +67,7 @@ export function PreviewStep({
   outcome,
   context,
   onCommitted,
+  onAdjustMapping,
 }: PreviewStepProps) {
   const { result } = outcome
   const { counts, dateWindow } = result
@@ -112,35 +114,28 @@ export function PreviewStep({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Top of the screen, not buried in the warnings list. This is the one
-          thing that changes what the operator should DO — everything below it
-          describes an import that is about to drop half their columns. */}
+      {/* Top of the screen: whether this was read as a simple/flexible list */}
       {outcome.contactsFallback ? (
-        <div
-          role="alert"
-          className="rounded-2xl border border-ledger-red bg-red-tint px-4 py-3"
-        >
-          <p className="text-sm font-semibold text-ledger-red">
-            Reading this as a contacts sheet: name and mobile only.
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-fg">
-            The full calling-list columns were not found, so{' '}
-            <span className="font-semibold">Guest counts and every travel column will be
-            ignored</span>{' '}
-            — arrival and departure dates, times, modes, pickup and drop. Names
-            and phone numbers still import correctly.
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-fg">
-            If you expected those to import, stop and{' '}
-            <a
-              href="/nuvent-guest-list-template.xlsx"
-              download
-              className="font-semibold text-ledger-red underline underline-offset-2"
+        <div className="flex flex-col gap-2 rounded-2xl border border-info bg-tint-info p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-info">
+              Flexible / Custom list
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-fg">
+              Guests were parsed using detected columns. Travel legs are not included in this layout.
+            </p>
+          </div>
+          {onAdjustMapping ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={onAdjustMapping}
+              className="shrink-0 self-start sm:self-auto"
             >
-              download the template
-            </a>{' '}
-            — its headers are the ones this importer looks for.
-          </p>
+              Adjust columns
+            </Button>
+          ) : null}
         </div>
       ) : null}
 

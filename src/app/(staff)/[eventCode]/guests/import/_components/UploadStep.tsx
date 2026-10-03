@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { buildExportTemplateWorkbook } from '@/lib/export/template'
 import { parseImportFile, type ImportOutcome } from '@/lib/import/knownSheet'
-import { KNOWN_SHEET_NAME } from '@/lib/import/parse'
 
 export interface UploadStepProps {
   /** `events.starts_on`. Ordinal dates ("4TH") cannot resolve without it. */
@@ -78,28 +77,20 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
         </span>
 
         <div>
-          <p className="text-base font-semibold text-fg">Choose the calling list</p>
+          <p className="text-base font-semibold text-fg">Choose the guest list</p>
           <p className="mt-1 text-sm text-muted">
-            .xlsx or .xls. The app&apos;s own export is read in full, and so is a full
-            CALLING MASTER LIST (the{' '}
-            <span className="font-medium text-fg">{KNOWN_SHEET_NAME}</span> tab) — travel, rooms,
-            guest counts. The right tab is found by its headers, so neither has to be renamed. A
-            plain list with just <span className="font-medium text-fg">Name</span> and{' '}
-            <span className="font-medium text-fg">Contact</span> columns works too — each row
-            becomes one guest to call.
+            .xlsx, .xls, or .csv. Upload any guest list — whether it&apos;s a plain list with names and
+            numbers, or a detailed master sheet with headcount and cities.
           </p>
           <p className="mt-1 text-sm text-muted">
-            The file is read on this phone and is not uploaded anywhere.
+            Columns are auto-detected, and you can easily map or adjust columns if needed.
+            The file is processed on this device and not uploaded to any external server.
           </p>
         </div>
         <input
           ref={inputRef}
           type="file"
-          // Broad accept on purpose: Android's document picker matches MIME
-          // types, not bare extensions, and with ".xlsx,.xls" alone it can
-          // offer no spreadsheet apps at all. The MIME types cover the
-          // realistic set; the parser still rejects anything it can't read.
-          accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+          accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
           className="sr-only"
           onChange={(e) => handleFiles(e.target.files)}
           disabled={busy}
@@ -107,13 +98,6 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
         <Button type="button" size="lg" loading={busy} onClick={() => inputRef.current?.click()}>
           {busy ? 'Reading file…' : 'Choose file'}
         </Button>
-        {/* The template is the cheapest fix for the most expensive failure.
-            Column resolution is EXACT-MATCH ONLY — deliberately, because a
-            fuzzily-matched header gives every family someone else's phone
-            number and nobody can see it happened. This button hands over the
-            export format itself, not a copy of it: the workbook is built from
-            the exporter's own sheet definitions, so a file filled in against
-            these headers re-imports cleanly. */}
         <Button type="button" variant="secondary" size="lg" onClick={handleTemplate}>
           Download template
         </Button>
@@ -121,8 +105,6 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
           The same sheets the app exports, headers only. Fill it in and it imports
           back unchanged.
         </p>
-        {/* The legacy calling-list template, kept because its path is a frozen
-            identifier and it is still a valid starting point. */}
         <a
           href="/nuvent-guest-list-template.xlsx"
           download
@@ -130,6 +112,10 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
         >
           Download the blank calling-list template
         </a>
+        <p className="-mt-2 text-xs leading-relaxed text-subtle">
+          Starting from scratch? The template is a plain two-column list — name
+          and number — ready to fill.
+        </p>
       </CardBody>
     </Card>
   )

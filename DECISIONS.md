@@ -2868,3 +2868,179 @@ remaining twelve once a test fails, so the structural sweep was exercised by the
 `scripts/tap-budget.mjs` instead (nine routes, findings listed under 4).
 **No handset, no camera, no real venue Wi-Fi** — every number here is a desktop Chromium at a
 360px viewport with CDP throttling.
+
+---
+
+## 2026-09-25 — Import: the app's own export was the file it could not read
+
+**The bug the operator reported as "it insists on a fixed format".** The import tried one tab,
+by name: `Sheet1`. `buildSheetDefinitions()` names the export's guest tab **"Guest Master"**,
+so exporting the guest list and re-importing it failed with `That workbook has no sheet named
+"Sheet1"` — a file the app itself wrote. A plain contact list (a name column and a phone
+column) hit the same wall: the contacts fallback ran only *after* the name-gated read had
+already thrown.
+
+**Fix, all in `src/lib/import/`:**
+- `parse.ts` gains `readAllSheetGrids()` — the workbook is read once, every tab.
+- `parseImportFile()` now FINDS the sheet. Every tab is tried against the known
+  CALLING_MASTER_LIST layout first (the richer read: travel, pax, remarks), then against the
+  simple contacts shape (name + number). `sheetName` is a preference, never a gate.
+- `contactsSheet.ts` resolves a grid it is handed (`resolveContactsGrid`, split out of
+  `readContactsSheet`) and accepts the export's own spellings — "Head name", "Family head",
+  "Phone", "Tel", "Cell".
+- A file that resolves nowhere now names the column it needs ("a column of names and a column
+  of phone numbers") instead of listing the seventeen master columns that were absent.
+- The Download-template asset is now the simple two-column list the operator actually has
+  (name, number, city), not the twenty-column calling list.
+
+**Round-trip test, `tests/importRoundTrip.test.ts` (7 tests).** Proved failing first — 5 of 6
+red on `SheetNotFoundError` — green after. It builds the real export workbook, hands it to the
+real `parseImportFile`, and asserts same families, zero orphans, zero criticals; and it reads
+the SHIPPED template off disk through the same parser, so a template that does not import
+cannot ship again.
+
+**Scope deliberately not taken.** Pax / Side / RSVP columns on the simple path: `ParsedFamily`
+carries neither side nor group type, so mapping them widens the `commit_guest_import` contract
+— a migration — and the operator asked only for name + number. The export's full columns still
+import through the known layout.
+
+**Also cleared:** a corrupted generated `.next/dev/types/routes.d.ts` (a truncated write) was
+failing `next build` with a type error in `.next/`, unrelated to this change. Removing `.next`
+regenerated it clean.
+
+### Verification
+`npx tsc --noEmit` exit 0. `npx eslint` on the changed files: clean. `npx vitest run`:
+**23 files / 287 tests, all pass**. `NEXT_PUBLIC_UI=v2 npm run build`: exit 0.
+
+
+## 2026-09-26 — transcribe-recording moves to Sarvam's BATCH job API
+
+**What was wrong.** The function posted audio to `POST https://api.sarvam.ai/speech-to-text`
+while its own comments said "batch, with diarization". That endpoint is Sarvam's synchronous
+REST API: 30 seconds of audio maximum, no diarization. Every real RSVP call is longer than
+30 s, so the first live run would have failed on every call. The header comment already said
+"VERIFY BEFORE FIRST LIVE RUN"; this is that verification.
+
+**What changed.** `callSarvamOnce`/`callSarvamWithRetry` are replaced by the batch flow
+(create → upload-files → PUT with `x-ms-blob-type: BlockBlob` → start → status → download-files),
+wire shapes taken from Sarvam's official SDK (`sarvamai.speech_to_text_job`). `mode: codemix`
+replaces the REST-only `output_script` field. `num_speakers: 2`.
+
+**Why a background task.** A batch job takes longer than pg_net's 5 s enqueue timeout, so the
+handler returns 202 and runs the job under `EdgeRuntime.waitUntil`. Every outcome lands on the
+transcript row; nothing reads the HTTP response.
+
+**Why the job marker.** The job id is written to `transcripts.raw_response`
+(`{sarvam_job_id, phase}`) before the job starts. `phase = 'started'` is resumable: a re-run for
+the same recording polls the existing job instead of paying for a new one. `phase = 'created'`
+is not resumed — a job that was never started would sit in `Accepted` forever. On completion
+`raw_response` becomes the full Sarvam payload plus `sarvam_job_id`, so nothing downstream sees
+a new shape. No migration was needed.
+
+**429 is now retried** alongside 5xx and timeouts. It is back-pressure, not a bad request, and
+the old "never retry 4xx" rule was written about billable bad requests.
+
+**Verified:** `deno check` clean; offline harness with fake Sarvam and fake Supabase covering
+happy path, redelivery after complete, deadline then resume without a second job, failed job,
+consent refused. **Not verified against the real Sarvam API** — see `docs/CALL-5-TEST.md`, C1.
+
+**Also found, not changed:** the deployed `transcribe-recording` is v1 (8 Aug) and predates the
+consent gate; `extract-rsvp` is not deployed; the live Vault holds no webhook secrets; the
+extract webhook migration is not applied. Setup steps are in `docs/CALL-5-TEST.md`.
+
+
+## 2026-09-26 — The pipeline webhooks never fired, and extraction called a retired model
+
+**`extensions.net.http_post` is not a function name Postgres can resolve.** A three-part
+name is database.schema.function, so every call raised `0A000 cross-database references are
+not implemented`. `app.enqueue_transcription()` and `app.enqueue_extraction()` both swallow
+every error by design (an enqueue failure must never block the insert), so the failure was a
+WARNING in the logs and nothing else. pg_net's `http_post` lives in schema `net`. Checked on
+the live project with `explain select extensions.net.http_post(...)` before changing it.
+The swallow-everything design is still right; it is also why this stayed invisible. Anything
+wrapped in `exception when others` needs its happy path tested once against the real
+database, not only its failure path.
+
+**The extraction trigger was missing on the live project** although
+`supabase_migrations.schema_migrations` lists `20260812100000` as applied: no
+`app.enqueue_extraction`, no `transcripts_enqueue_extraction_*`, no `v_extraction_backlog`.
+Cause unknown (likely recorded without its body running). Restored.
+
+Both fixes are one migration, `20260926091112_fix_pipeline_webhooks.sql`, applied to the live
+project on 2026-09-26 (no event was live; next event UNICOS279 starts 2026-10-01). The file's
+timestamp is the version the database recorded, so `db push` will not re-run it. Still inert
+until the Vault secrets exist.
+
+**`extract-rsvp` model: `claude-sonnet-4-20250514` → `claude-sonnet-4-6`.** The old id was
+retired 2026-06-15 (Anthropic model-deprecations page), so every extraction would have failed.
+`claude-sonnet-4-6` is the replacement Anthropic lists for it; request shape (forced tool use)
+is unchanged. This keeps extraction working; it does not settle Claude vs DeepSeek.
+
+**Secrets are set by `scripts/setup-call-pipeline.ps1`**, which Prince runs: keys are read
+hidden and passed through a temp env file that is deleted immediately, webhook secrets are
+generated locally, and the Vault SQL goes to the clipboard. Nothing secret is in the repo.
+
+
+## 2026-09-26 — Pipeline secrets move to Vault; transcription is live
+
+Prince could not run the Supabase CLI, and this session cannot set Edge Function secrets
+(no management token; the Supabase MCP has no secrets tool). So `transcribe-recording` now
+reads `sarvam_api_key` and `transcribe_webhook_secret` from **Vault** through
+`public.pipeline_secret()` (migration `20260926093324`): security definer, empty search_path,
+an allow-list of four names, EXECUTE granted to `service_role` only. Checked: service role
+reads it; `authenticated` gets `42501 permission denied`; a non-allow-listed name returns null.
+
+**Vault first, env second.** The first deploy read env first and every call 401'd: a
+`TRANSCRIBE_WEBHOOK_SECRET` left in the function env from August no longer matched anything.
+The trigger reads its secret from Vault, so the function must too — one source, no drift.
+
+The webhook secret was generated INSIDE the database (`gen_random_bytes`) and has never been
+printed. The Sarvam key was pasted into a chat by Prince and must be rotated
+(`docs/CALL-5-TEST.md` has the one-line SQL).
+
+Deployed `transcribe-recording` v3 from this session. Verified live via `net.http_post`:
+wrong secret → 401; recording without consent → refused before any spend; `{"check":"sarvam"}`
+→ Sarvam answered 400 "job_id must match format" (i.e. authenticated; a bad key is 401/403).
+**Still unverified: a real recording through a real Sarvam batch job** — no consented audio
+exists yet. That is call C1.
+
+
+## 2026-09-26 — Every recorded call becomes a row in a live Excel file
+
+**Goal (Prince):** "whenever I record a call I want that Excel entry."
+
+**Chain, all server-side, all live:**
+`call_recordings` insert → transcribe-recording (Sarvam batch STT) → transcript `complete`
+→ extract-rsvp (call notes) → `rsvp_extractions` → **call-log-excel** rebuilds
+`eventflow-exports/{event_id}/call-log-live.xlsx`. The rebuild is fired by triggers on
+`call_recordings` (insert), `transcripts` (status change) and `rsvp_extractions` (insert, or a
+change to status/parsed), so a row appears the moment the recording lands ("Waiting"), then fills
+in (transcript → AI draft → "Checked" once someone accepts it on the review screen). Migration
+`20260926124422_call_log_live_excel.sql`. The file is a read-only view; it never writes guest data.
+
+**Where to get it:** admin → event → Files → history row `call_log_live · XLSX` (one row per event,
+kept on top — each rebuild updates its `created_at`). Fallback: Supabase → Storage →
+eventflow-exports → {event_id} → call-log-live.xlsx.
+
+**Extraction now runs on Sarvam `sarvam-105b`**, the same key as transcription; Claude is used only
+if an `anthropic_api_key` is added to Vault. Findings while switching:
+- extract-rsvp had never run successfully: it queried `events.event_date` (does not exist) and then
+  checked `event.data` on an already-destructured row, so it always returned "Event not found".
+- Its RSVP values `callback_requested` / `no_answer` and travel mode `car` are not in the
+  `app.rsvp_status` / `app.travel_mode` enums, so `apply_rsvp_extraction()` would have failed the
+  cast on accept. Now mapped to `callback` / `unreachable`, and modes are `cab` / `self_drive`.
+- `special_requests` now also written as `remarks` (the key the RPC reads, CLAUDE.md §9).
+- The model now receives speaker-labelled turns with time spans (from `transcripts.segments`),
+  not the flat text — rule 1 of the prompt (only GUEST turns are authoritative) needs that.
+- sarvam-105b is a reasoning model: at 4096 max_tokens it spent the whole budget thinking and
+  returned `content: null`. Now `reasoning_effort: low`, `max_tokens: 12000`, plain-JSON reply mode.
+- Measured live on a Hindi-English test call: correct on every field (Coming, 4 people,
+  2026-12-20 10:30, air, 6E 5074, Ahmedabad Airport, wheelchair). JSON mode 93 s, function-call
+  mode 137 s — JSON is the default because the slower one risks the background-task wall clock.
+
+**Also:** extract-rsvp and call-log-excel run their work after replying (202) because pg_net
+gives up after 5 s. Idempotent: a redelivered webhook does not create a second review item.
+
+**Not verified end to end:** a real phone recording through all four steps. The first consented
+test call is that test. If an extraction ever outlives the wall clock, the transcript sits in
+`v_extraction_backlog` and the Excel row says "Reading the call"; nothing is lost.

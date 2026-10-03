@@ -152,6 +152,36 @@ export async function readSheetGrid(
   return { sheetName: match, availableSheets, grid: readGrid(workbook.Sheets[match]) }
 }
 
+export interface WorkbookGrids {
+  /** Every tab name, in workbook order. */
+  sheetNames: string[]
+  /** Each tab's raw grid, in the same order. */
+  sheets: { sheetName: string; grid: unknown[][] }[]
+}
+
+/**
+ * Reads EVERY sheet into a raw grid, in workbook order.
+ *
+ * "Which sheet" used to be a hard requirement — `readSheetGrid` wanted a tab
+ * literally called "Sheet1" and threw otherwise. That made the app's own
+ * export unimportable: its guest tab is named "Guest Master". Import is now a
+ * "which tab holds the guests" question, answered by trying the layouts
+ * against every sheet, so the caller needs them all in one read of the file.
+ */
+export async function readAllSheetGrids(file: File): Promise<WorkbookGrids> {
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: false })
+
+  const sheetNames = [...workbook.SheetNames]
+  return {
+    sheetNames,
+    sheets: sheetNames.map((sheetName) => ({
+      sheetName,
+      grid: readGrid(workbook.Sheets[sheetName]),
+    })),
+  }
+}
+
 export interface SheetRows {
   headers: (string | null)[]
   /** Non-blank data rows below the header, with true sheet row numbers. */

@@ -1,7 +1,9 @@
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
+
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 /**
- * extract-rsvp — Claude extraction of structured RSVP data from a transcript.
+ * extract-rsvp — AI extraction of structured RSVP data from a transcript.
  *
  * This is the EXTRACTION step only. STT (transcribe-recording) runs first and
  * writes transcripts; this function reads one and produces an rsvp_extractions
@@ -13,8 +15,15 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
  * directly with {transcript_id}. The webhook migration for this must also set
  * up vault secrets for EXTRACT_WEBHOOK_SECRET.
  *
+ * MODEL: Sarvam `sarvam-105b` (chat completions, forced function call) by
+ * default — the same Sarvam key that transcribes the call. If an
+ * `anthropic_api_key` is present in Vault, Claude is used instead. Both return
+ * the same extract_rsvp tool payload, so everything downstream is identical.
+ *
  * SECURITY:
- *   * ANTHROPIC_API_KEY lives in Edge Function secrets only.
+ *   * Keys and the webhook secret are read from Supabase Vault through
+ *     public.pipeline_secret() (service role only); an Edge Function secret of
+ *     the same name is the fallback. Nothing secret is in the client bundle.
  *   * This function's ONLY write target is `rsvp_extractions`.
  *   * Callers must present the shared webhook secret.
  *
@@ -25,19 +34,74 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY')!
-const webhookSecret = Deno.env.get('EXTRACT_WEBHOOK_SECRET')!
 
 const db = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false },
 })
 
 // ---------------------------------------------------------------------------
+// Secrets — Vault first (one source of truth with the database trigger), env
+// fallback. Cached per instance for CONFIG_TTL_MS so rotation needs no redeploy.
+// ---------------------------------------------------------------------------
+
+const CONFIG_TTL_MS = 5 * 60_000
+
+let webhookSecret = ''
+let sarvamApiKey = ''
+let anthropicApiKey = ''
+let configLoadedAt = 0
+
+async function readSecret(envName: string, vaultName: string): Promise<string | null> {
+  const { data, error } = await db.rpc('pipeline_secret', { p_name: vaultName })
+  if (error) {
+    console.error(`extract-rsvp: could not read ${vaultName} from Vault:`, error.message)
+  } else if (typeof data === 'string' && data !== '') {
+    return data
+  }
+  return Deno.env.get(envName) || null
+}
+
+async function loadConfig(): Promise<boolean> {
+  if (webhookSecret && (sarvamApiKey || anthropicApiKey) && Date.now() - configLoadedAt < CONFIG_TTL_MS) return true
+  const [secret, sarvam, anthropic] = await Promise.all([
+    readSecret('EXTRACT_WEBHOOK_SECRET', 'extract_webhook_secret'),
+    readSecret('SARVAM_API_KEY', 'sarvam_api_key'),
+    readSecret('ANTHROPIC_API_KEY', 'anthropic_api_key'),
+  ])
+  if (!secret || (!sarvam && !anthropic)) return false
+  webhookSecret = secret
+  sarvamApiKey = sarvam ?? ''
+  anthropicApiKey = anthropic ?? ''
+  configLoadedAt = Date.now()
+  return true
+}
+
+// ---------------------------------------------------------------------------
 // Tunables
 // ---------------------------------------------------------------------------
 
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
-const PROMPT_VERSION = 'v1'
+// claude-sonnet-4-20250514 was RETIRED on 2026-06-15 (Anthropic model
+// deprecations page); claude-sonnet-4-6 is its named replacement. Used only
+// when an anthropic_api_key is in Vault.
+const CLAUDE_MODEL = 'claude-sonnet-4-6'
+/** Default extraction model: Sarvam's own LLM, same key as transcription. */
+const SARVAM_MODEL = 'sarvam-105b'
+const SARVAM_CHAT_URL = 'https://api.sarvam.ai/v1/chat/completions'
+const LLM_TIMEOUT_MS = 120_000
+/**
+ * sarvam-105b is a reasoning model: it thinks in `reasoning_content` before it
+ * answers, and the thinking counts against max_tokens. With 4096 tokens and the
+ * default effort it spent the whole budget thinking and returned content: null
+ * (seen live 2026-09-26). Low effort + a larger budget leaves room to answer.
+ */
+type SarvamOptions = { reasoningEffort: 'low' | 'high' | 'max'; maxTokens: number; useTools: boolean }
+/**
+ * useTools false = plain JSON reply. Measured live 2026-09-26 on the same test
+ * call: JSON 93 s, forced function call 137 s, identical output. The slower one
+ * risks the Edge Function background-task wall clock, so JSON is the default.
+ */
+const SARVAM_DEFAULTS: SarvamOptions = { reasoningEffort: 'low', maxTokens: 12_000, useTools: false }
+const PROMPT_VERSION = 'v2'
 const MAX_RETRIES = 1 // one retry on validation failure
 
 // ---------------------------------------------------------------------------
@@ -151,9 +215,9 @@ const EXTRACTION_TOOL = {
       },
       arrival_mode: {
         type: 'object',
-        description: 'air, train, bus, car, or null',
+        description: 'air, train, bus, cab (hired car/taxi), self_drive (own car), or null',
         properties: {
-          value: { type: ['string', 'null'], enum: ['air', 'train', 'bus', 'car', null] },
+          value: { type: ['string', 'null'], enum: ['air', 'train', 'bus', 'cab', 'self_drive', null] },
           confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
           evidence: { type: 'string' },
           evidence_start_ms: { type: 'number' },
@@ -216,9 +280,9 @@ const EXTRACTION_TOOL = {
       },
       departure_mode: {
         type: 'object',
-        description: 'air, train, bus, car, or null',
+        description: 'air, train, bus, cab (hired car/taxi), self_drive (own car), or null',
         properties: {
-          value: { type: ['string', 'null'], enum: ['air', 'train', 'bus', 'car', null] },
+          value: { type: ['string', 'null'], enum: ['air', 'train', 'bus', 'cab', 'self_drive', null] },
           confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
           evidence: { type: 'string' },
           evidence_start_ms: { type: 'number' },
@@ -301,7 +365,6 @@ async function buildGroundingContext(
     { data: group },
     { data: members },
     { data: event },
-    { data: eventDay },
     { data: hotels },
     { data: prevExtraction },
   ] = await Promise.all([
@@ -312,11 +375,8 @@ async function buildGroundingContext(
       .select('full_name, is_head')
       .eq('group_id', groupId).eq('event_id', eventId),
     db.from('events')
-      .select('name, event_date')
-      .eq('id', eventId).single(),
-    db.from('event_days')
-      .select('day_date, label')
-      .eq('event_id', eventId).order('day_date', { ascending: true }),
+      .select('name, starts_on, ends_on, venue_city')
+      .eq('id', eventId).maybeSingle(),
     db.from('hotels')
       .select('name')
       .eq('event_id', eventId),
@@ -329,13 +389,12 @@ async function buildGroundingContext(
   ])
 
   if (!group) return { error: 'Group not found' }
-  if (!event.data) return { error: 'Event not found' }
+  if (!event) return { error: 'Event not found' }
 
   const memberNames = (members ?? [])
     .map((m) => m.full_name)
     .filter(Boolean)
   const hotelNames = (hotels ?? []).map((h) => h.name).filter(Boolean)
-  const eventDates = (eventDay as { day_date: string; label: string }[] | null) ?? []
   const nowIST = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
 
   const parts: string[] = [
@@ -353,11 +412,9 @@ async function buildGroundingContext(
     `KNOWN FAMILY MEMBERS (roster, use canonical spellings): ${memberNames.length > 0 ? memberNames.join(', ') : '(none on file)'}`,
     '',
     'EVENT:',
-    `  Name: ${event.data.name}`,
-    `  Event date: ${event.data.event_date ?? 'unknown'}`,
-    ...(eventDates.length > 0
-      ? [`  Schedule: ${eventDates.map((d) => `${d.label}: ${d.day_date}`).join(' | ')}`]
-      : []),
+    `  Name: ${event.name}`,
+    `  Event dates: ${event.starts_on ?? 'unknown'} to ${event.ends_on ?? event.starts_on ?? 'unknown'}`,
+    `  Venue city: ${event.venue_city ?? 'unknown'}`,
     '',
     'KNOWN HOTELS: ' + (hotelNames.length > 0 ? hotelNames.join(', ') : '(none on file)'),
     '',
@@ -365,7 +422,7 @@ async function buildGroundingContext(
     '  Ahmedabad Airport (AMD), Ahmedabad Jn railway station, Sabarmati station, self-arranged',
     '',
     `TODAY IN IST: ${nowIST}`,
-    `EVENT DATE: ${event.data.event_date ?? 'unknown'} — resolve "ek din pehla" / "the day before" against this, not today`,
+    `EVENT STARTS: ${event.starts_on ?? 'unknown'} — resolve "ek din pehla" / "the day before" against this, not today`,
     '',
   ]
 
@@ -410,25 +467,180 @@ async function buildGroundingContext(
 }
 
 // ---------------------------------------------------------------------------
-// Claude
+// Model calls. Both return the same extract_rsvp payload.
 // ---------------------------------------------------------------------------
+
+function systemPromptFor(context: string): string {
+  return `You are an extraction engine that turns wedding guest call transcripts into structured RSVP data.
+
+You work for an event operations team. The call is between a staff member (who placed the call) and a family head (the guest).
+The transcript is in Gujarati, Hindi, and English (code-mixed). Each line is one speaker turn, prefixed with its time span and
+STAFF or GUEST. The GUEST is the only authoritative source for their own travel plans. Use the time spans for
+evidence_start_ms / evidence_end_ms.
+
+${context}`
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function missingRequired(input: Record<string, unknown>): string | null {
+  for (const key of EXTRACTION_TOOL.input_schema.required) {
+    if (!(key in input) || input[key] === null || typeof input[key] !== 'object') return key
+  }
+  return null
+}
+
+/** Pulls a JSON object out of text that may be wrapped in ``` fences or preceded by reasoning. */
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  const cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)
+  const candidate = fenced ? fenced[1] : cleaned.slice(cleaned.indexOf('{'), cleaned.lastIndexOf('}') + 1)
+  try {
+    const parsed = JSON.parse(candidate)
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Sarvam chat completions (OpenAI-compatible), forcing the extract_rsvp
+ * function. If the model answers in plain text instead of a tool call, the
+ * JSON in that text is accepted as long as every required field is present.
+ */
+async function callSarvam(
+  transcript: string,
+  context: string,
+  opts: SarvamOptions = SARVAM_DEFAULTS,
+): Promise<{ result: ExtractionOutput } | { error: string }> {
+  let lastError = ''
+  const jsonInstruction =
+    'Reply with ONLY one JSON object (no prose, no code fences) whose keys are exactly the fields of this JSON schema, ' +
+    'each value being {value, confidence, evidence, evidence_start_ms, evidence_end_ms, reasoning}:\n' +
+    JSON.stringify(EXTRACTION_TOOL.input_schema)
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let res: Response
+    try {
+      res = await fetchWithTimeout(SARVAM_CHAT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-subscription-key': sarvamApiKey },
+        body: JSON.stringify({
+          model: SARVAM_MODEL,
+          temperature: 0.1,
+          max_tokens: opts.maxTokens,
+          reasoning_effort: opts.reasoningEffort,
+          messages: [
+            { role: 'system', content: systemPromptFor(context) },
+            {
+              role: 'user',
+              content: opts.useTools
+                ? `TRANSCRIPT:\n${transcript}\n\nCall the extract_rsvp function with every field. Use null values for anything not discussed.`
+                : `TRANSCRIPT:\n${transcript}\n\n${jsonInstruction}`,
+            },
+          ],
+          ...(opts.useTools
+            ? {
+                tools: [
+                  {
+                    type: 'function',
+                    function: {
+                      name: EXTRACTION_TOOL.name,
+                      description: EXTRACTION_TOOL.description,
+                      parameters: EXTRACTION_TOOL.input_schema,
+                    },
+                  },
+                ],
+                tool_choice: { type: 'function', function: { name: EXTRACTION_TOOL.name } },
+              }
+            : { response_format: { type: 'json_object' } }),
+        }),
+      })
+    } catch (err) {
+      lastError = `Sarvam request failed: ${err instanceof Error ? err.message : String(err)}`
+      continue
+    }
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      lastError = `Sarvam ${res.status}: ${text.slice(0, 500)}`
+      const retryable = res.status >= 500 || res.status === 429
+      if (attempt < MAX_RETRIES && retryable) {
+        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))
+        continue
+      }
+      return { error: lastError }
+    }
+
+    const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
+    const choices = data?.choices
+    const choice = Array.isArray(choices) ? (choices[0] as Record<string, unknown> | undefined) : undefined
+    const finishReason = typeof choice?.finish_reason === 'string' ? choice.finish_reason : 'unknown'
+    const message = choice?.message as Record<string, unknown> | undefined
+    if (!message) {
+      lastError = `Sarvam response had no message: ${JSON.stringify(data).slice(0, 300)}`
+      continue
+    }
+
+    let input: Record<string, unknown> | null = null
+    const toolCalls = message.tool_calls
+    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+      const fn = (toolCalls[0] as Record<string, unknown>).function as Record<string, unknown> | undefined
+      const args = fn?.arguments
+      input =
+        typeof args === 'string'
+          ? parseJsonObject(args)
+          : args !== null && typeof args === 'object'
+            ? (args as Record<string, unknown>)
+            : null
+    }
+    if (!input && typeof message.content === 'string') input = parseJsonObject(message.content)
+
+    if (!input) {
+      const reasoningChars = typeof message.reasoning_content === 'string' ? message.reasoning_content.length : 0
+      lastError =
+        `Sarvam returned no parseable extraction (finish_reason ${finishReason}, ${reasoningChars} chars of reasoning): ` +
+        JSON.stringify({ ...message, reasoning_content: undefined }).slice(0, 300)
+      continue
+    }
+    const missing = missingRequired(input)
+    if (missing) {
+      lastError = `Extraction missing required field: ${missing}`
+      continue
+    }
+    return { result: input as unknown as ExtractionOutput }
+  }
+  return { error: lastError || 'Exhausted retries' }
+}
+
+async function callLlm(
+  transcript: string,
+  context: string,
+  sarvamOpts: SarvamOptions = SARVAM_DEFAULTS,
+): Promise<{ result: ExtractionOutput; model: string } | { error: string; model: string }> {
+  if (anthropicApiKey) {
+    const r = await callClaude(transcript, context)
+    return 'error' in r ? { error: r.error, model: CLAUDE_MODEL } : { result: r.result, model: CLAUDE_MODEL }
+  }
+  const r = await callSarvam(transcript, context, sarvamOpts)
+  return 'error' in r ? { error: r.error, model: SARVAM_MODEL } : { result: r.result, model: SARVAM_MODEL }
+}
 
 async function callClaude(
   transcript: string,
   context: string,
 ): Promise<{ result: ExtractionOutput } | { error: string }> {
-  const systemPrompt = `You are an extraction engine that turns wedding guest call transcripts into structured RSVP data.
-
-You work for an event operations team. The call is between a staff member (who placed the call) and a family head (the guest).
-The transcript is in Gujarati, Hindi, and English (code-mixed). Speaker turns are separated; the GUEST is the only authoritative source for their own travel plans.
-
-${context}
-
-TRANSCRIPT:
-${transcript}`
+  const systemPrompt = systemPromptFor(context)
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -445,7 +657,7 @@ ${transcript}`
             content: [
               {
                 type: 'text',
-                text: transcript,
+                text: `TRANSCRIPT:\n${transcript}`,
               },
             ],
           },
@@ -512,12 +724,26 @@ function computeOverallConfidence(fields: ExtractionOutput): 'high' | 'medium' |
   return 'high'
 }
 
+/** Extraction vocabulary → app.rsvp_status, which apply_rsvp_extraction casts to. */
+const RSVP_STATUS_TO_DB: Record<string, string> = {
+  confirmed: 'confirmed',
+  declined: 'declined',
+  tentative: 'tentative',
+  callback_requested: 'callback',
+  no_answer: 'unreachable',
+}
+
 function mapToParsedJson(fields: ExtractionOutput): Record<string, unknown> {
   const str = (f: FieldResult): string | null =>
-    typeof f.value === 'string' ? f.value : f.value != null ? String(f.value) : null
+    typeof f.value === 'string' && f.value !== '' ? f.value : f.value != null && typeof f.value !== 'object' ? String(f.value) : null
+  const rawStatus = str(fields.rsvp_status)
+  const specialRequests =
+    fields.special_requirements.value != null && Array.isArray(fields.special_requirements.value) && fields.special_requirements.value.length > 0
+      ? fields.special_requirements.value.join(', ')
+      : null
 
   return {
-    rsvp_status: str(fields.rsvp_status),
+    rsvp_status: rawStatus ? (RSVP_STATUS_TO_DB[rawStatus] ?? null) : null,
     confirmed_pax: typeof fields.pax_confirmed.value === 'number' ? fields.pax_confirmed.value : null,
     arrival: {
       date: str(fields.arrival_date),
@@ -535,10 +761,9 @@ function mapToParsedJson(fields: ExtractionOutput): Record<string, unknown> {
       point: null,
       pax: null,
     },
-    special_requests:
-      fields.special_requirements.value != null && Array.isArray(fields.special_requirements.value)
-        ? fields.special_requirements.value.join(', ')
-        : null,
+    // CLAUDE.md §9: apply_rsvp_extraction reads `remarks`, not special_requests.
+    remarks: specialRequests,
+    special_requests: specialRequests,
     language: null,
   }
 }
@@ -575,6 +800,122 @@ function mapToFieldsJson(fields: ExtractionOutput): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
+// Transcript formatting: speaker turns with time spans, so the model can tell
+// staff questions from guest answers and cite evidence timestamps.
+// ---------------------------------------------------------------------------
+
+function formatTranscript(segmentsJson: unknown, fallback: string): string {
+  const inner =
+    segmentsJson !== null && typeof segmentsJson === 'object' && !Array.isArray(segmentsJson)
+      ? (segmentsJson as Record<string, unknown>).segments
+      : segmentsJson
+  if (!Array.isArray(inner) || inner.length === 0) return fallback
+  const lines: string[] = []
+  for (const seg of inner) {
+    if (seg === null || typeof seg !== 'object') continue
+    const o = seg as Record<string, unknown>
+    const text = typeof o.text === 'string' ? o.text.trim() : ''
+    if (!text) continue
+    const who = o.speaker === 'staff' ? 'STAFF' : 'GUEST'
+    const start = typeof o.start_ms === 'number' ? o.start_ms : 0
+    const end = typeof o.end_ms === 'number' ? o.end_ms : start
+    lines.push(`[${start}-${end}ms] ${who}: ${text}`)
+  }
+  return lines.length > 0 ? lines.join('\n') : fallback
+}
+
+// ---------------------------------------------------------------------------
+// The work for one transcript. Runs as a background task: an LLM call takes
+// far longer than the 5 s pg_net enqueue timeout.
+// ---------------------------------------------------------------------------
+
+async function extractTranscript(transcriptId: string): Promise<void> {
+  const { data: transcript, error: txErr } = await db
+    .from('transcripts')
+    .select('id, event_id, recording_id, full_text, text, segments, status')
+    .eq('id', transcriptId)
+    .maybeSingle()
+  if (txErr || !transcript) {
+    console.error(`extract-rsvp: transcript ${transcriptId} not found`)
+    return
+  }
+  if (transcript.status !== 'complete') return
+
+  // Idempotent: a webhook redelivery must not create a second review item.
+  const { data: already } = await db
+    .from('rsvp_extractions')
+    .select('id')
+    .eq('transcript_id', transcript.id)
+    .neq('status', 'draft')
+    .limit(1)
+  if (already && already.length > 0) return
+
+  const plain = (transcript.full_text ?? transcript.text ?? '').trim()
+  const transcriptText = formatTranscript(transcript.segments, plain)
+  if (!transcriptText.trim()) return
+
+  const { data: recording } = await db
+    .from('call_recordings')
+    .select('group_id, call_attempt_id')
+    .eq('id', transcript.recording_id)
+    .maybeSingle()
+  if (!recording?.group_id) {
+    console.error(`extract-rsvp: recording for transcript ${transcript.id} has no family`)
+    return
+  }
+
+  const grounding = await buildGroundingContext(transcript.event_id, recording.group_id)
+  if ('error' in grounding) {
+    console.error(`extract-rsvp: grounding failed for ${transcript.id}: ${grounding.error}`)
+    return
+  }
+
+  const llm = await callLlm(transcriptText, grounding.contextText)
+  if ('error' in llm) {
+    // Still write a draft row so this appears in the review queue as "extraction failed".
+    const { error: insErr } = await db.from('rsvp_extractions').insert({
+      event_id: transcript.event_id,
+      transcript_id: transcript.id,
+      call_attempt_id: recording.call_attempt_id ?? null,
+      group_id: recording.group_id,
+      status: 'draft',
+      model: llm.model.startsWith('sarvam') ? 'sarvam' : 'anthropic',
+      model_version: llm.model,
+      prompt_version: PROMPT_VERSION,
+      parsed: {},
+      confidence: {},
+      overall_confidence: 'low',
+      fields: {},
+      review_notes: `Extraction failed: ${llm.error}`,
+    })
+    if (insErr) console.error('extract-rsvp: could not write failure draft:', insErr.message)
+    return
+  }
+
+  const fields = llm.result
+  const confidenceMap: Record<string, number> = {}
+  for (const [key, val] of Object.entries(fields) as [string, FieldResult][]) {
+    confidenceMap[key] = val.confidence === 'high' ? 0.95 : val.confidence === 'medium' ? 0.7 : 0.4
+  }
+
+  const { error: insErr } = await db.from('rsvp_extractions').insert({
+    event_id: transcript.event_id,
+    transcript_id: transcript.id,
+    call_attempt_id: recording.call_attempt_id ?? null,
+    group_id: recording.group_id,
+    status: 'pending', // ready for review — the status the review screen reads
+    model: llm.model.startsWith('sarvam') ? 'sarvam' : 'anthropic',
+    model_version: llm.model,
+    prompt_version: PROMPT_VERSION,
+    parsed: mapToParsedJson(fields),
+    confidence: confidenceMap,
+    overall_confidence: computeOverallConfidence(fields),
+    fields: mapToFieldsJson(fields),
+  })
+  if (insErr) console.error(`extract-rsvp: could not write extraction for ${transcript.id}:`, insErr.message)
+}
+
+// ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
 
@@ -593,117 +934,56 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Method not allowed' }, { status: 405 })
   }
 
+  if (!(await loadConfig())) {
+    return Response.json({ error: 'Pipeline secrets are not configured' }, { status: 503 })
+  }
+
   if (req.headers.get('x-webhook-secret') !== webhookSecret) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: { transcript_id?: string }
+  let body: Record<string, unknown>
   try {
-    body = await req.json()
+    const parsed = await req.json()
+    body = parsed !== null && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
   } catch {
     return Response.json({ error: 'Invalid request' }, { status: 400 })
   }
 
-  if (!body.transcript_id) {
+  // Setup check: run the model on a supplied transcript and return what it
+  // extracted. Writes nothing. Used to verify the model end to end.
+  if (body.check === 'extract' && typeof body.transcript === 'string') {
+    const context = typeof body.context === 'string' ? body.context : 'No family record is available for this check.'
+    const effort = body.reasoning_effort
+    const opts: SarvamOptions = {
+      reasoningEffort: effort === 'high' || effort === 'max' ? effort : SARVAM_DEFAULTS.reasoningEffort,
+      maxTokens: typeof body.max_tokens === 'number' ? body.max_tokens : SARVAM_DEFAULTS.maxTokens,
+      useTools: typeof body.use_tools === 'boolean' ? body.use_tools : SARVAM_DEFAULTS.useTools,
+    }
+    const started = Date.now()
+    const llm = await callLlm(body.transcript, context, opts)
+    const ms = Date.now() - started
+    if ('error' in llm) return Response.json({ ok: false, model: llm.model, ms, opts, error: llm.error })
+    return Response.json({
+      ok: true,
+      model: llm.model,
+      ms,
+      opts,
+      parsed: mapToParsedJson(llm.result),
+      overall_confidence: computeOverallConfidence(llm.result),
+      fields: mapToFieldsJson(llm.result),
+    })
+  }
+
+  const transcriptId = typeof body.transcript_id === 'string' ? body.transcript_id : null
+  if (!transcriptId) {
     return Response.json({ error: 'transcript_id required' }, { status: 400 })
   }
 
-  // 1. Load the transcript and its recording/group
-  const { data: transcript, error: txErr } = await db
-    .from('transcripts')
-    .select('id, event_id, recording_id, full_text, text, status')
-    .eq('id', body.transcript_id)
-    .maybeSingle()
-
-  if (txErr || !transcript) {
-    return Response.json({ error: 'Transcript not found' }, { status: 404 })
-  }
-
-  if (transcript.status !== 'complete') {
-    return Response.json({ error: `Transcript not complete (status: ${transcript.status})` }, { status: 400 })
-  }
-
-  const transcriptText = transcript.full_text ?? transcript.text ?? ''
-  if (!transcriptText.trim()) {
-    return Response.json({ error: 'Transcript text is empty' }, { status: 400 })
-  }
-
-  const { data: recording } = await db
-    .from('call_recordings')
-    .select('group_id')
-    .eq('id', transcript.recording_id)
-    .maybeSingle()
-
-  if (!recording?.group_id) {
-    return Response.json({ error: 'Recording has no group — cannot extract without a family to ground against' }, { status: 400 })
-  }
-
-  // 2. Build grounding context
-  const grounding = await buildGroundingContext(transcript.event_id, recording.group_id)
-  if ('error' in grounding) {
-    return Response.json({ error: `Could not build grounding context: ${grounding.error}` }, { status: 500 })
-  }
-
-  // 3. Call Claude
-  const claude = await callClaude(transcriptText, grounding.contextText)
-  if ('error' in claude) {
-    // Still write a draft row so this appears in review queue as "extraction failed"
-    const { error: insErr } = await db.from('rsvp_extractions').insert({
-      event_id: transcript.event_id,
-      transcript_id: transcript.id,
-      group_id: recording.group_id,
-      status: 'draft',
-      model_version: CLAUDE_MODEL,
-      prompt_version: PROMPT_VERSION,
-      parsed: {},
-      confidence: {},
-      overall_confidence: 'low',
-      fields: {},
-      review_notes: `Extraction failed: ${claude.error}`,
-    })
-    if (insErr) console.error('extract-rsvp: could not write failure draft:', insErr.message)
-    return Response.json({ ok: false, error: claude.error, wrote_failure_draft: !insErr })
-  }
-
-  const fields = claude.result
-  const overallConfidence = computeOverallConfidence(fields)
-  const parsedJson = mapToParsedJson(fields)
-  const fieldsJson = mapToFieldsJson(fields)
-
-  // Build confidence map for the existing confidence column (flat dotted-path map)
-  const confidenceMap: Record<string, number> = {}
-  for (const [key, val] of Object.entries(fields) as [string, FieldResult][]) {
-    const score = val.confidence === 'high' ? 0.95 : val.confidence === 'medium' ? 0.7 : 0.4
-    confidenceMap[key] = score
-  }
-
-  // 4. Write the extraction
-  const { data: inserted, error: insErr } = await db
-    .from('rsvp_extractions')
-    .insert({
-      event_id: transcript.event_id,
-      transcript_id: transcript.id,
-      group_id: recording.group_id,
-      status: 'pending', // ready for review — maps to the 'pending' status the screen reads
-      model_version: CLAUDE_MODEL,
-      prompt_version: PROMPT_VERSION,
-      parsed: parsedJson,
-      confidence: confidenceMap,
-      overall_confidence: overallConfidence,
-      fields: fieldsJson,
-    })
-    .select('id')
-    .single()
-
-  if (insErr) {
-    return Response.json({ error: `Could not write extraction: ${insErr.message}` }, { status: 500 })
-  }
-
-  return Response.json({
-    ok: true,
-    extraction_id: inserted.id,
-    overall_confidence: overallConfidence,
-    model: CLAUDE_MODEL,
-    prompt_version: PROMPT_VERSION,
-  })
+  EdgeRuntime.waitUntil(
+    extractTranscript(transcriptId).catch((err) => {
+      console.error('extract-rsvp: background task crashed:', err instanceof Error ? err.message : String(err))
+    }),
+  )
+  return Response.json({ ok: true, status: 'processing', transcript_id: transcriptId }, { status: 202 })
 })
