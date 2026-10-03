@@ -5,6 +5,48 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — F4: the trip planner uses the call log's rows, not a box per trip
+
+### Which list "logistics log" means — the assumption
+
+F0 flagged this as an open question (item 5, and Questions for Prince #6): the
+repo has no component or route named "logistics log". The candidates were the v2
+arrivals/departures board (`TravelBoard`, already compact `Row`s — not it), the
+v1 arrival/departure cards, and the **trip planner**.
+
+Chosen: the **trip planner** (`(staff)/[eventCode]/logistics/LogisticsClient.tsx`,
+mounted by the live v2 `logistics/trips/page.tsx`, reached from the board's "Plan
+vehicles for this board"). Reasons: it is the only remaining big-box logistics
+list under the live v2 tree; item 2 and item 5 are the same area in the client's
+feedback; and F4's own example row ("Tempo Traveller TT-2 assigned to Mehta family
+· 6 guests") is a `trip_passengers` assignment, which is what that screen lists.
+If the client meant the v1 arrivals/departure cards, this is the wrong screen —
+say so and it is a small follow-up.
+
+### What changed
+
+- The call log's row is the shared `src/components/ui/Row.tsx`, so it is used
+  **directly** — no `LogRow.tsx` was created (F4 allows it "only if needed").
+- Each trip's padded `Card`/`CardBody` is replaced by one `Row` per family on a
+  trip, inside the same bordered `<ul>` the call log uses: heading = time
+  (`travelTime ?? scheduledTime`), meta = family · vehicle · guest count,
+  status = Arriving/Leaving. Same `Row` means identical height, padding,
+  divider and 64px tap target.
+- **Nothing is lost.** The vehicle, seats used/capacity, driver name, pickup
+  point, scheduled time, the maps Directions link and the full family list move
+  into a `BottomSheet` opened by tapping a row.
+- Data loading, the summary block, the unplaced list, the commit action and the
+  tab switcher are unchanged.
+
+### Not verified here
+
+The call log (`RsvpLogForm` / `Row`) was not touched, so it is unchanged by
+construction. The "identical row height at 390px" check is structural (same
+component) — this sandbox cannot launch a browser, so no screenshot was taken;
+it still needs a handset pass.
+
+---
+
 ## 3 October 2026 — F3: the section is "RSVP", and the queue counts guests called
 
 ### 1. "Calls" → "RSVP" (display only)

@@ -3,13 +3,15 @@
 import { useCallback, useState } from 'react'
 
 import { Badge } from '@/components/ui/Badge'
+import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LinkButton } from '@/components/ui/LinkButton'
+import { Row } from '@/components/ui/Row'
 import {
   CarIcon,
-  MapPinIcon,
+  ChevronRightIcon,
   ShieldAlertIcon,
   UsersIcon,
 } from '@/components/icons'
@@ -21,6 +23,7 @@ import {
   type TravelLegForLogistics,
   type VehicleForPacking,
   type LogisticsProposal,
+  type ProposedTrip,
 } from '@/lib/actions/logistics'
 import { traceFetch } from '@/lib/perf'
 import { useStableData } from '@/lib/use-stable-data'
@@ -61,6 +64,7 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
   const [saving, setSaving] = useState(false)
   const [committed, setCommitted] = useState(false)
   const [commitError, setCommitError] = useState<string | null>(null)
+  const [activeTrip, setActiveTrip] = useState<ProposedTrip | null>(null)
 
   const loadFor = useCallback(
     (dir: 'arrival' | 'departure'): Promise<LoadResult> =>
@@ -308,65 +312,33 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
             </div>
           </div>
 
-          {/* Trips */}
-          <div className="flex flex-col gap-3">
-            {proposal.trips.map((trip, i) => (
-              <Card key={`${trip.vehicleId}-${i}`}>
-                <CardBody>
-                  <div className="mb-2 flex items-center gap-2">
-                    <h3 className="font-semibold text-fg">
-                      {trip.vehicleLabel ?? 'Unnamed vehicle'}
-                    </h3>
-                    <Badge tone="neutral" size="sm">
-                      {trip.seatsUsed}/{trip.capacity}
-                    </Badge>
-                    {trip.driverName && (
-                      <span className="ml-auto text-xs text-muted">{trip.driverName}</span>
-                    )}
-                  </div>
-
-                  <div className="mb-2 flex gap-2 text-xs text-muted">
-                    <span>{trip.pickupPoint}</span>
-                    {trip.scheduledTime && <span>· {trip.scheduledTime}</span>}
-                    {/* §5.7: source → destination directions link. Plain maps
-                        deep link, no API. Opens in the OS, never the WebView. */}
-                    {(() => {
-                      const href = mapsDirectionsHref(trip.pickupPoint, null)
-                      if (!href) return null
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => openExternalAppUrl(href)}
-                          aria-label={`Directions for ${trip.pickupPoint || 'this trip'}`}
-                          className="tap ml-auto inline-flex min-h-8 items-center gap-1 rounded-md px-2 font-medium text-brand active:opacity-70"
-                        >
-                          <MapPinIcon className="h-4 w-4" />
-                          Directions
-                        </button>
-                      )
-                    })()}
-                  </div>
-
-                  <ul className="flex flex-col gap-1">
-                    {trip.groups.map((g) => (
-                      <li
-                        key={g.travelLegId}
-                        className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-sm"
-                      >
-                        <span className="min-w-0 flex-1 truncate font-medium">{g.headName}</span>
-                        <span className="shrink-0 text-muted">
-                          {g.pax} {g.pax === 1 ? 'person' : 'people'}
-                        </span>
-                        {g.travelTime && (
-                          <span className="shrink-0 text-xs text-subtle">{g.travelTime}</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </CardBody>
-              </Card>
-            ))}
-          </div>
+          {/* Trips — the same compact `Row` the call log uses, one per family
+              on a trip, instead of a padded box per trip. Everything the box
+              showed (vehicle, seats, driver, pickup, directions, the rest of
+              the trip) is behind a tap on the row, not deleted (F4). */}
+          <ul
+            className="flex flex-col overflow-hidden rounded-2xl border border-rule bg-surface"
+            role="list"
+          >
+            {proposal.trips.flatMap((trip) =>
+              trip.groups.map((g) => (
+                <li key={g.travelLegId}>
+                  <Row
+                    heading={g.travelTime ?? trip.scheduledTime ?? 'No time'}
+                    meta={[
+                      g.headName,
+                      trip.vehicleLabel ?? 'Unnamed vehicle',
+                      `${g.pax} ${g.pax === 1 ? 'guest' : 'guests'}`,
+                    ].join(' · ')}
+                    status={trip.direction === 'arrival' ? 'Arriving' : 'Leaving'}
+                    tone="waiting"
+                    trailing={<ChevronRightIcon className="h-4 w-4" aria-hidden />}
+                    onPress={() => setActiveTrip(trip)}
+                  />
+                </li>
+              )),
+            )}
+          </ul>
 
           {/* Unplaced */}
           {proposal.unplaced.length > 0 && (
@@ -406,6 +378,71 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
           </LinkButton>
         )}
       </div>
+
+      {/* The trip detail the compact row no longer shows inline. Nothing is
+          lost: vehicle, seats, driver, pickup, directions and every family on
+          the trip are here. */}
+      <BottomSheet
+        open={activeTrip !== null}
+        onClose={() => setActiveTrip(null)}
+        label={activeTrip ? `${activeTrip.vehicleLabel ?? 'Vehicle'} trip` : 'Trip'}
+      >
+        {activeTrip ? (
+          <div className="flex flex-col gap-4 pb-2">
+            <div className="flex items-center gap-2">
+              <h3 className="font-display text-xl font-semibold text-ink">
+                {activeTrip.vehicleLabel ?? 'Unnamed vehicle'}
+              </h3>
+              <Badge tone="neutral" size="sm">
+                {activeTrip.seatsUsed}/{activeTrip.capacity}
+              </Badge>
+              <span className="ml-auto text-sm text-muted">
+                {activeTrip.direction === 'arrival' ? 'Arriving' : 'Leaving'}
+              </span>
+            </div>
+
+            <p className="text-sm text-muted">
+              {[activeTrip.pickupPoint, activeTrip.scheduledTime].filter(Boolean).join(' · ')}
+            </p>
+
+            {activeTrip.driverName ? (
+              <p className="text-sm text-muted">Driver: {activeTrip.driverName}</p>
+            ) : null}
+
+            {/* §5.7: source → destination directions link. Plain maps deep
+                link, no API. Opens in the OS, never the WebView. */}
+            {(() => {
+              const href = mapsDirectionsHref(activeTrip.pickupPoint, null)
+              if (!href) return null
+              return (
+                <Button variant="secondary" fullWidth onClick={() => openExternalAppUrl(href)}>
+                  Directions to {activeTrip.pickupPoint || 'pickup'}
+                </Button>
+              )
+            })()}
+
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-muted">
+                {activeTrip.groups.length}{' '}
+                {activeTrip.groups.length === 1 ? 'family' : 'families'}
+              </p>
+              <ul className="flex flex-col gap-1">
+                {activeTrip.groups.map((g) => (
+                  <li
+                    key={g.travelLegId}
+                    className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-sm"
+                  >
+                    <span className="min-w-0 flex-1 truncate font-medium">{g.headName}</span>
+                    <span className="shrink-0 text-muted">
+                      {g.pax} {g.pax === 1 ? 'guest' : 'guests'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : null}
+      </BottomSheet>
     </div>
   )
 }
