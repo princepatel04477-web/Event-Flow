@@ -395,9 +395,12 @@ export function VoiceNoteRecorder({
         ) : null}
 
         <div className="h-1.5 w-full rounded-full bg-surface-2">
+          {/* Scaled, not resized: the bar moves every second while
+              recording, and a width transition re-lays-out the sheet each
+              frame (UI4 §3, F1). transform stays on the compositor. */}
           <div
-            className="h-1.5 rounded-full bg-danger transition-all duration-1000"
-            style={{ width: `${pct}%` }}
+            className="h-1.5 w-full origin-left rounded-full bg-danger transition-transform duration-1000 ease-linear"
+            style={{ transform: `scaleX(${Math.min(Math.max(pct, 0), 100) / 100})` }}
           />
         </div>
 

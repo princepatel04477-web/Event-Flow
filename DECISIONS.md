@@ -3044,3 +3044,176 @@ gives up after 5 s. Idempotent: a redelivered webhook does not create a second r
 **Not verified end to end:** a real phone recording through all four steps. The first consented
 test call is that test. If an extraction ever outlives the wall clock, the transcript sits in
 `v_extraction_backlog` and the Excel row says "Reading the call"; nothing is lost.
+## 28 September 2026 — UI4 structure, step 1: Control tab, section switcher, admin inside the one app
+
+Source: `UI4-ARENA-PROMPTS.md` Part S (S1–S3, N1). Built directly rather than through arena
+prototypes, at the owner's request.
+
+### What changed
+
+- **Control (`/{event}/control`, v2 tree).** A grouped list of every admin tool for the event —
+  Staff, Access codes, Import, Export, Files, Hotels & rooms, Send, Templates, Sent log, Ledger,
+  Section locks, Arrival alerts — with live counts read in parallel, a filter box, the "no staff
+  names" warning, and Archive alone at the foot. Admin only: `requireSection` admits management,
+  so the gate is `access !== 'admin'` → `?denied=admin`. Row destinations are data in
+  `src/lib/admin/control.ts` so a test can prove every `EVENT_NAV` page is one tap from it.
+- **A fifth tab for admins.** New `SectionId` `control` (roles `['admin']`, not in the v1 bar).
+  The v3 bar is now Today · Calls · Hospitality · Logistics · Control for an admin, four tabs for
+  a non-admin lead. **Hampers left the lead's bar** — it is a screen inside Hospitality now, and
+  the hamper runner still gets it as their whole app with no bar (unchanged).
+- **Section switcher** (`_components/SectionSwitch.tsx`), one row of pills under the header for
+  leads and admins. Found while doing this: the v3 shell had dropped the section strip, so an
+  event lead had **no nav entry** for Check in, Rooming list, Hampers, Departures, Fleet, Trips or
+  Call notes. Runners are unaffected (their bar already is their section's screens).
+- **Calls' front door is the call list.** `queue` is the default child; `campaigns` (Auto-call)
+  is last and management-only, so a calling runner's first tab is no longer a campaign board.
+  The Rooms child is labelled "Rooms" (it sat beside Check in labelled "Hospitality").
+- **Admin on a phone is inside the one app.** `AdminMobileNav` (Events · Dashboard · Msgs · More)
+  is deleted. Admin event screens draw the event's own tab bar with Control lit (`AppTabs`
+  gained `activeSection`), and the header (`AdminHeader`) names the tool and goes back to
+  Control instead of the fixed "Admin" title with a back link labelled "App".
+
+### What deliberately did NOT change
+
+- `departmentHomePath('management')` still returns `rsvp/campaigns`. It was changed and
+  reverted in this session: v1's dashboard redirects departments through the same function, so
+  pointing it at `/{event}` is a redirect loop on v1. v2 already lands the lead on Today
+  (`v2DepartmentHome` returns null), which is the tree this work targets.
+- No route moved and nothing was deleted except `AdminMobileNav`. The route map (S3), the family
+  page (S4) and Android back (N4) are later steps.
+
+### Tests changed on purpose
+
+`v3-nav`, `nav-model`, `sidebar-model`, `v2-route-parity` and `admin-nav` pinned the old bar,
+the Auto-call default and the More sheet. Each assertion was rewritten to pin the new contract
+(Control for admins only; queue as Calls' default; "every EVENT_NAV page is reachable from
+Control"), not deleted. New: `tests/admin-header.test.ts`.
+
+### Verification
+
+`tsc --noEmit` clean. `vitest run`: 60 files pass; `caller-lock` fails at import because the
+sandbox has no Supabase URL/key (it failed identically before this change). `next build` with
+`NEXT_PUBLIC_UI=v2`: exit 0. `eslint` on the changed files: clean. **Not run on a handset** —
+the sandbox has no device, so this is committed, not verified (CLAUDE.md §14).
+
+## 28 September 2026 — UI4 step 2: the "Haldi & Ink" re-skin
+
+Token VALUES changed, names did not, so every screen re-skinned with no component edits
+(`src/app/globals.css`, `:root` and `[data-theme='client']`):
+
+- Ground bone `#f4f1ea`, ink `#141311`, action indigo `#2f2bd8` (7.6:1 on bone, white on it
+  8.5:1), haldi marigold `#f5b301` as a fill with ink text (10.0:1), green `#16794a`, red
+  `#c62a1e`, amber `#8a5a00`. Every text pair was computed with the WCAG formula and is AA or
+  better; the ratios are annotated at each token.
+- Fonts (`src/app/layout.tsx`): Instrument Serif (display, one weight, italic for the hero
+  unit), Geist (body), Geist Mono (figures). IBM Plex Sans Devanagari kept; Noto Sans Gujarati
+  added for family names written in Gujarati. `.font-display` sets `font-synthesis: none`,
+  because screens written for Bricolage pair it with `font-semibold` and a faked bold on a serif
+  reads as a printing fault.
+- Radii: cards 24px (`rounded-2xl`), sheets 32px (`rounded-3xl`). Motion 90/160/240ms on
+  `cubic-bezier(0.16, 1, 0.3, 1)`; `src/lib/motion/tokens.ts` mirrors it (the test pins the pair)
+  and gains `SHEET_SPRING` for the sheet rebuild.
+- `global-error.tsx` keeps inline hex (no stylesheet exists there) with the new values and
+  ratios; `manifest.ts` and `themeColor` follow the new ground.
+- **Not followed: the native launch chain** (`colors.xml`, splash) is still `#f8f9fa`. It needs
+  an APK rebuild. Light-on-light, so no dark flash — the ground shifts slightly on first paint.
+
+Verified: typecheck clean, tests as before, `next build` (v2) exit 0, and a 390px Chromium
+screenshot of `/login` shows the serif wordmark, bone ground and indigo button. Not run on a
+handset.
+
+## 28 September 2026 — UI4 step 3: the 60fps contract is a test
+
+`tests/no-expensive-css.test.ts` fails on `backdrop-blur`/`backdrop-filter`, `transition-all`,
+a `transition-[…]` on a layout property, and a layout property (width/height/top/left/margin/
+padding/boxShadow/filter) inside a motion `animate`/`initial`/`exit` object — anywhere under
+`src/`, comment lines excepted. Every offender it found was fixed, none allowlisted:
+
+- Sticky headers (`ScreenHeader`, `StickyHeader`) were `bg-paper/95 backdrop-blur-sm`, which
+  re-blurs the list behind them on every scroll frame. Now solid `bg-paper`. Same for the
+  import preview's sticky bar and the sheet scrim (blur removed, scrim `bg-ink/60`).
+- Both tab bars lifted over the keyboard by transitioning `bottom` — a re-layout per frame. They
+  sit at `bottom: 0` and lift with `translateY(-var(--keyboard-offset))`.
+- Progress bars transitioned `width` (`Progress`, the v1 queue bar) or used `transition-all`
+  (KM dashboard). The width now changes without animation; the entrance is still the `grow-x`
+  transform. The voice-note level bar, which moves every second while recording, is scaled
+  (`scaleX`) instead of resized.
+- `perf-rows` utility (`content-visibility: auto; contain-intrinsic-size: auto 64px`) on the
+  rows of the family queue sheet, the all-contacts list and the staff guest directory — the
+  lists that run to hundreds.
+
+Not done: the per-gesture frame measurement (F10) needs a Playwright run against a seeded
+database with CPU throttling; the sandbox has no database, so that stays open.
+
+## 28 September 2026 — UI4 step 4: event pill, draggable sheets, Android back, button press
+
+- **Event pill** (`src/components/nav/EventPill.tsx`) replaces the header's date line on every
+  event screen and every admin event screen: the event code and name, one tap opens a sheet to
+  switch. Switching keeps you on the same tab in the other event (`switchTarget`, N9; tested);
+  Control survives the switch for admins only. Admins also get "All events" and "New event"
+  (`/admin/events#new`). The event switcher and the Admin link left the account menu, and the
+  admin event layout's "Active event" strip is gone — the pill is the one place the event is
+  named.
+- **Bottom sheets drag to dismiss** (`BottomSheet.tsx`). The handle strip follows the finger by
+  writing `transform` straight to the panel's style (no React state per frame) and closes past
+  30% of its height or on a flick; otherwise it springs back on the out-expo ease. motion's drag
+  was not used because it needs the larger `domMax` bundle. The scrim is unblurred ink at 50%,
+  the body scrolls with `overscroll-behavior: contain`, the sheet's radius is 32px. `.sheet-in`
+  is no longer disabled on coarse pointers: a sheet rising is the response to the tap.
+- **Android back follows N4** (`src/lib/nav/back.ts`, `resolveBack`, 9 tests): close the top
+  sheet (sheets register in `src/lib/nav/sheet-stack.ts`) → back within the same tab → up from a
+  detail screen (admin tools go up to Control) → the viewer's landing tab → "Press back again to
+  close EventFlow" → exit. `NavTracker` records visits and the landing (a runner's is their own
+  section). "Up" uses `router.replace` so the detail screen does not linger in history.
+  **This is native behaviour and has NOT been run on a handset.**
+- **Buttons** press with `scale(0.97)` (transform) as well as the colour change, and gain a
+  `now` (haldi) variant. The header title is the 32px serif with no faked weight.
+- `adminHeaderFor` moved to `src/lib/admin/header.ts` so the back resolver can reuse it.
+
+## 28 September 2026 — UI4 step 5: the family page, and a setup checklist on Today
+
+- **`/{event}/families/[groupId]`** (UI4 S4). One family on one screen: Answer, Travel, Stay,
+  Hamper, Calls, People, Notes, each linking to its job screen, each shown only if the viewer's
+  department may open that section (the section guards' own predicates). One primary action
+  from `familyNextAction` (6 tests): Call → Call back → Check in → Deliver hamper → none; never
+  an action the viewer's department cannot take. Reads are the per-family reads the RSVP status
+  screen already makes plus the family's active rooms and group hamper, in parallel. "Today" is
+  computed in Asia/Kolkata, not the Seoul server's clock.
+- **Found and fixed while wiring links:** "Family details" on the rooming list and its room
+  sheet, and "Open the family record" in search, went to `rsvp/status/[groupId]`, whose render
+  **claims the 15-minute caller lock** (CLAUDE.md §6) — so reading a rooming list locked
+  families against callers. They now open the family page, which takes no lock. The call screen
+  still goes to `rsvp/status` after a call, which is the one place that should lock.
+- **Setup checklist on Today (admin only):** Import the guest list · Add staff names · Add
+  hotels & rooms · Share the team code. Every tick is derived (row counts; the team code counts
+  as shared once `code_reveal_log` has a row); nothing is stored. Admin-only because
+  `code_reveal_log` is admin-readable. Disappears at 4/4.
+- **Hero card on Today for leads:** "Guests expected" in the 64px serif, families and
+  still-to-call under it, the whole card a link to the guest list (R4). Same `totalPax` the page
+  already read.
+
+Not verified against data: the sandbox has no database, so the family page and checklist were
+checked by typecheck, tests and build only.
+
+## 28 September 2026 — UI4 step 6: checked against a real (local) database
+
+A local Supabase (Docker, all 64 migrations applied clean) was seeded with a fake SHARMA26 —
+40 families across every answer, 20 arrival legs, a 24-room hotel, 4 staff — and the app was
+signed into as an admin and screenshotted at 390px: Today, Calls, Rooms, Arrivals, Control,
+Access codes, and a family page. No page errors. What that found and fixed:
+
+- **Family page, two real bugs the types did not catch:** call outcomes were mapped from
+  invented values — the enum is `connected, no_answer, busy, switched_off, wrong_number,
+  callback, declined, other`; and `special_requirements` is `text[] not null default '{}'`, so an
+  empty array was truthy (an empty Notes card on every family) and a non-empty one rendered with
+  no separators. Stay rows are two lines (room + checked-in pill, then hotel · guests) instead of
+  one truncated line; travel mode reads "Flight/Train/Cab" not the enum.
+- **Double navigation removed:** Arrivals/Departures had an in-page toggle under the section
+  switcher (and under the logistics runner's own bar) — dropped by not passing `otherHref`. The
+  call list's "Auto-call rounds" link duplicated the new Auto-call pill — `AdminCampaignsLink`
+  deleted.
+- **Control** repeated its title under the header; now just the event dates line.
+- **The account menu** used the same sliders glyph as the Control tab; it is a person glyph now.
+
+Still not verified: anything on a handset (Android back, drag, the WebView), the call flow with a
+real dial, and the frame budget under CPU throttling.

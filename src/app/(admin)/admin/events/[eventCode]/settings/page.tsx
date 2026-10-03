@@ -30,7 +30,8 @@ export default async function AdminEventSettingsPage({ params }: PageProps) {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-xl leading-tight font-semibold tracking-tight text-ink">
+        {/* Named by the admin header (UI4); kept for screen readers. */}
+        <h1 className="sr-only">
           Settings
         </h1>
         <p className="mt-1 text-sm text-muted">

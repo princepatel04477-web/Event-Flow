@@ -16,6 +16,9 @@ import { AppHeader } from './_components/AppHeader'
 import { AppSidebar } from './_components/AppSidebar'
 import { AppTabs } from './_components/AppTabs'
 import { DeniedNote } from './_components/DeniedNote'
+import { SectionSwitch } from './_components/SectionSwitch'
+import { NavTracker } from '@/components/nav/NavTracker'
+import { v2DepartmentHome } from '@/lib/departments'
 
 /* The offline training line that used to live here as a constant now lives in
    `src/lib/offline-note.ts`, because the banner that renders it is mounted by
@@ -169,6 +172,11 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
               used to live only inside Today, which a department runner never
               sees (`docs/BUGS.md` M3, M7). Suspense because it reads a query
               parameter. */}
+          {/* The screens inside this tab (UI4 Part S) — leads and admins only;
+              a runner's bar already carries them. */}
+          {access !== 'client' ? (
+            <SectionSwitch eventCode={event.code} access={access} department={department} />
+          ) : null}
           <Suspense fallback={null}>
             <DeniedNote />
           </Suspense>
@@ -189,6 +197,17 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
         </div>
       </main>
       <AppTabs tabs={tabs} model="v3" />
+
+      {/* Where this viewer lands, and where they have been, for the Android
+          back button (UI4 N4). A runner's landing is their own section; a
+          lead's, an admin's and a client's is this event's root. */}
+      <NavTracker
+        landing={
+          access === 'event_team' && department
+            ? v2DepartmentHome(event.code, department) ?? `/${event.code}`
+            : `/${event.code}`
+        }
+      />
 
       {/* Undo bar mounted in the shell for global 7-second cross-screen undo capability */}
       <UndoBar />

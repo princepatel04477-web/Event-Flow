@@ -1,10 +1,11 @@
 @import "tailwindcss";
 
 /* ====================================================================
-   EventFlow tokens — v3 "Simple" (`.brain/SPEC-V3.md` §1)
+   EventFlow tokens — UI4 "Haldi & Ink" (`UI4-ARENA-PROMPTS.md` §2)
 
    Field software, not a dashboard: high contrast, 16px base, big touch
-   targets, readable on a cheap Android phone held in one hand.
+   targets, readable on a cheap Android phone held in one hand, and every
+   motion cheap enough to hold 60fps on it (§3, F1–F10).
 
    Tailwind v4 is CSS-first. There is no tailwind.config.js and there
    must not be one.
@@ -13,9 +14,9 @@
    ---------------
    The app has exactly two skins and neither follows the OS.
 
-   1. Staff — warm paper (#F7F3EC) with a maroon accent and near-black
-      ink. Calm, quiet, high-contrast. Fixed light so a caller's screen
-      looks the same as the person's next to them when they compare a row.
+   1. Staff — bone (#F4F1EA) with ink-black type and one indigo action
+      colour. Fixed light so a caller's screen looks the same as the person's
+      next to them when they compare a row.
 
    2. Client — a slightly brighter cream, scoped by
       `[data-theme='client']`. Read in a hotel lobby in daylight, by the
@@ -23,107 +24,107 @@
 
    The skin is a property of WHO IS LOOKING, not of a system setting.
 
-   THE COLOUR RULE (v3)
-   --------------------
-   - Maroon (#7F1D3A) is the accent: the primary action, the active tab,
-     the figure being read. Not a status.
-   - Green (#1E7A4F) means DONE or COMING, and only that.
-   - Amber (#A86412) means WAITING or CALL BACK.
-   - Red (#B42318) means PROBLEM.
-   - Marigold (#E8A33D) is the ONE highlight, and it lives on the dark
-     "Now" card only — its eyebrow and its button. Marigold on paper is a
-     2:1 wash and is never used there.
-   - The Now card is the dark plane: ink background, white headline,
-     #D6CFC4 secondary text.
+   THE COLOUR RULE (UI4)
+   ---------------------
+   - Indigo (#2F2BD8, "neel") is ACTION: the primary button, the active tab,
+     the selected pill, links, the focus ring. Nothing decorative is indigo.
+   - Haldi (#F5B301, marigold) is "happening now": a FILL, always with ink
+     text on it, at most one per screen. Never marigold text on bone.
+   - Green (#16794A) means COMPLETED, and only that.
+   - Amber (#8A5A00) means WAITING, MAYBE or CALL BACK.
+   - Red (#C62A1E) means ATTENTION: overdue, over capacity, failed,
+     destructive. "Not coming" is an answer, not a problem — it is ink.
+   - The Now card is the one dark plane per screen: ink ground, bone
+     headline, #A8A294 secondary.
 
    Every text-on-surface pair below is annotated with its measured WCAG
    ratio. AA is the floor (4.5:1 for body, 3:1 for large text and for
-   non-text UI). Where a value from the spec failed AA it was darkened by
-   the minimum amount and the deviation is commented at the token —
-   `--ef-subtle` and `--ef-highlight-fg` are the two that moved.
+   non-text UI).
 
-   WHAT CHANGED FROM "ROYAL IVORY & GOLD"
-   --------------------------------------
+   WHAT CHANGED FROM v3 "SIMPLE"
+   -----------------------------
    The names are unchanged, deliberately: every screen reads these token
    names, which is the same property that lets the whole re-skin land here
-   rather than across 76 routes. The values moved from ivory/gold to
-   paper/maroon, the display face moved from Be Vietnam Pro to Bricolage
-   Grotesque, and `--ef-brand-strong` (champagne) is gone with the gold.
+   rather than across 76 routes. Values moved from paper/maroon to
+   bone/indigo/haldi; the display face moved from Bricolage Grotesque to
+   Instrument Serif, the body from Figtree to Geist, figures from IBM Plex
+   Mono to Geist Mono; radii grew (cards 20→24, sheets 32); motion moved to
+   90/160/240ms on an out-expo curve. REVERT: restore this file, `layout.tsx`
+   and `src/lib/motion/tokens.ts` from the commit before this re-skin.
 
-   WHAT STAYED
-   -----------
-   Motion (one ease family, everything fast, because staff are in a
-   corridor) and the `figure` monospace role. The one removal there is the
-   mono uppercase eyebrow: v3 deletes the tracked capital labels, so the
-   `eyebrow` utility is now a quiet sans label rather than a monospace one.
+   NOT YET FOLLOWED (needs an APK rebuild): the native launch chain —
+   `android/app/src/main/res/values/colors.xml` (#f8f9fa) and the splash —
+   is still the earlier ivory. It is one light tone against another, so
+   there is no dark flash; the ground shifts slightly on first paint.
    ==================================================================== */
 
 :root {
   color-scheme: light;
 
-  /* Ground — warm paper. */
-  --ef-paper: #f7f3ec;
-  /* A step off the ground: alternating bands, inset wells, the nav shelf. */
-  --ef-paper-band: #f1eadf;
-  /* Cards are the bright plane. */
+  /* Ground — bone. Warm, not white: a screen read in a hotel lobby all day. */
+  --ef-paper: #f4f1ea;
+  /* A step off the ground: alternating bands, inset wells, pressed rows. */
+  --ef-paper-band: #ede8dd;
+  /* Cards and sheets are the bright plane. */
   --ef-surface: #ffffff;
-  --ef-surface-2: #f1eadf;
+  --ef-surface-2: #efebe2;
 
-  /* Near-black ink. 16.3:1 on paper, 17.4:1 on white. */
-  --ef-ink: #1c1917;
-  /* Warm secondary. 5.3:1 on paper. */
-  --ef-muted: #6b645a;
-  /* Tertiary. 4.8:1 on paper. The spec's #8A8276 measures 3.5:1 and fails
-     AA, so this is darkened by the minimum that clears it. */
-  --ef-subtle: #6e6659;
+  /* Ink. 16.5:1 on paper, 18.6:1 on white. */
+  --ef-ink: #141311;
+  /* Secondary. 6.4:1 on paper, 7.2:1 on white. */
+  --ef-muted: #5c574e;
+  /* Tertiary, placeholders. 4.9:1 on paper, 4.7:1 on surface-2. */
+  --ef-subtle: #6e685c;
 
-  /* Hairline. Alpha so one value adapts to both the paper and the card. */
-  --ef-rule: #e7e0d3;
-  --ef-rule-strong: #d8cfbf;
+  /* Hairlines. Structure only, never the only carrier of meaning. */
+  --ef-rule: #e3ddd0;
+  --ef-rule-strong: #d2cab8;
 
-  /* Problem — the only red, and only for "something is wrong". 6.6:1. */
-  --ef-ledger-red: #b42318;
-  --ef-ledger-red-strong: #8f1c13;
-  --ef-red-tint: #fdecea;
+  /* ATTENTION only — overdue, over capacity, failed, destructive.
+     5.0:1 on paper, 4.7:1 on its own tint. */
+  --ef-ledger-red: #c62a1e;
+  --ef-ledger-red-strong: #9e2016;
+  --ef-red-tint: #fbe7e4;
 
-  /* Done / coming. 5.2:1 on paper, 4.7:1 on its own tint. */
-  --ef-ledger-green: #1e7a4f;
-  --ef-ledger-green-strong: #17603e;
-  --ef-green-tint: #e6f2ec;
+  /* COMPLETED only — confirmed, delivered, checked in. 4.8:1 on paper,
+     4.6:1 on its own tint. */
+  --ef-ledger-green: #16794a;
+  --ef-ledger-green-strong: #10603a;
+  --ef-green-tint: #e1f1e8;
 
-  /* Waiting / call back. The spec's #A86412 measures 4.22:1 on paper and
-     4.14:1 on its own tint — a fail for body text — so it is darkened by the
-     minimum that clears AA. 4.80:1 on paper, 4.71:1 on its own tint. */
-  --ef-ledger-amber: #9c5c10;
-  --ef-ledger-amber-strong: #7f4a0c;
-  --ef-amber-tint: #fbf0df;
+  /* Waiting / maybe / call back. 5.3:1 on paper, 5.2:1 on its own tint. */
+  --ef-ledger-amber: #8a5a00;
+  --ef-ledger-amber-strong: #6e4800;
+  --ef-amber-tint: #fbf0d6;
 
-  /* Maroon — the accent. 9.8:1 on paper, and white on it is 10.0:1, so one
-     token serves both the tooltip-free text usage and the primary fill. */
-  --ef-brand: #7f1d3a;
-  --ef-brand-hover: #5e1229;
+  /* Neel — indigo, the ACTION colour: the primary button, the active tab,
+     the selected pill, links, the focus ring. Nothing decorative is indigo.
+     7.6:1 on paper as text; white on it is 8.5:1 (11.0:1 pressed). */
+  --ef-brand: #2f2bd8;
+  --ef-brand-hover: #2320b0;
   --ef-brand-fg: #ffffff;
-  --ef-brand-tint: #f3e6ea;
+  /* Selected row / active tab seat. Indigo text on it is 6.9:1. */
+  --ef-brand-tint: #e6e5fb;
 
-  /* Marigold — the ONE highlight, on the dark "Now" card only. 7.4:1 on
-     ink. Never placed on paper (2:1). */
-  --ef-highlight: #e8a33d;
-  /* A label sitting ON marigold must be dark ink: white on marigold is
-     2.2:1. */
-  --ef-highlight-fg: #1c1917;
-  /* Marigold at 18% — eyebrows and hairlines on the dark plane. */
-  --ef-highlight-tint: #e8a33d2e;
+  /* Haldi — marigold, "happening now". A FILL, never text on a light
+     ground (1.6:1). Ink on it is 10.0:1, and on the dark Now plane it is
+     10.0:1 as text. At most one haldi element per screen. */
+  --ef-highlight: #f5b301;
+  --ef-highlight-fg: #141311;
+  /* Haldi at 20% — the in-progress wash. */
+  --ef-highlight-tint: #f5b30133;
 
-  /* The dark "Now" plane. */
-  --ef-now: #1c1917;
-  --ef-now-fg: #ffffff;
-  --ef-now-muted: #d6cfc4;
+  /* The ONE dark surface: the Now card (current family, live call, today's
+     headline). Bone text on it 16.5:1, secondary 7.3:1. */
+  --ef-now: #141311;
+  --ef-now-fg: #f4f1ea;
+  --ef-now-muted: #a8a294;
 
   /* The margin rule down the leading edge of a register. */
   --ef-margin-rule: var(--ef-ledger-red);
 
-  /* Focus ring — maroon. */
-  --ef-ring: #7f1d3a;
+  /* Focus ring — the action colour. */
+  --ef-ring: #2f2bd8;
 
   /* The tab bar sits one step off the ground so it reads as a shelf. */
   --ef-nav: #ffffff;
@@ -138,11 +139,11 @@
 
   /* Motion. One ease family; everything fast, because staff are in a
      corridor. Collapses entirely under prefers-reduced-motion. */
-  --ef-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --ef-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ef-ease-seal: cubic-bezier(0.65, 0, 0.35, 1);
-  --ef-duration-press: 100ms;
-  --ef-duration-fade: 150ms;
-  --ef-duration-enter: 280ms;
+  --ef-duration-press: 90ms;
+  --ef-duration-fade: 160ms;
+  --ef-duration-enter: 240ms;
 
   /* Type scale. 4px base. Display carries the one thing on the row; body
      carries everything else; mono carries every figure in tabular form
@@ -154,21 +155,21 @@
   --ef-text-xl: 1.5rem;     /* 24px — display */
   --ef-text-2xl: 1.75rem;   /* 28px — the one thing on the screen */
 
-  /* The screen title: 30px Bricolage. Its own token because "the title of
-     the screen" is a decision, not a step on the body scale. */
-  --ef-text-title: 1.875rem;
+  /* The screen title: 32px Instrument Serif. Its own token because "the
+     title of the screen" is a decision, not a step on the body scale. */
+  --ef-text-title: 2rem;
 
   /* Eyebrow tracking. v3 keeps the small tracked label for the marigold
      eyebrow on the Now card and nothing else; it is no longer monospace
      and no longer uppercase-by-default. */
-  --ef-tracking-eyebrow: 0.06em;
+  --ef-tracking-eyebrow: 0.08em;
 
   /* Elevation & Depth. Very light, warm-tinted, two layers: a tight
      contact shadow plus a diffuse ambient one. On a paper ground a heavy
      shadow reads as grime, so these stay between 3% and 6%. */
-  --ef-shadow-e1: 0 1px 2px -1px rgba(28, 25, 23, 0.05), 0 2px 6px 0 rgba(28, 25, 23, 0.04);
-  --ef-shadow-e2: 0 4px 6px -2px rgba(28, 25, 23, 0.04), 0 12px 24px -4px rgba(28, 25, 23, 0.06);
-  --ef-shadow-e3: 0 -4px 6px -1px rgba(28, 25, 23, 0.04), 0 -16px 32px -4px rgba(28, 25, 23, 0.06);
+  --ef-shadow-e1: 0 1px 2px -1px rgba(20, 19, 17, 0.05), 0 2px 6px 0 rgba(20, 19, 17, 0.04);
+  --ef-shadow-e2: 0 4px 6px -2px rgba(20, 19, 17, 0.04), 0 12px 24px -4px rgba(20, 19, 17, 0.06);
+  --ef-shadow-e3: 0 -4px 6px -1px rgba(20, 19, 17, 0.04), 0 -16px 32px -4px rgba(20, 19, 17, 0.06);
 }
 
 /* --------------------------------------------------------------------
@@ -179,44 +180,47 @@
 [data-theme='client'] {
   color-scheme: light;
 
+  /* A brighter cream than staff bone, for the family reading in a lobby.
+     Same ink and the same indigo — the family view gets no second accent.
+     Ink 17.4:1, muted 6.7:1, indigo 8.0:1 on this ground. */
   --ef-paper: #fbf7f0;
   --ef-paper-band: #f2ebdf;
   --ef-surface: #ffffff;
   --ef-surface-2: #f4eee3;
 
-  --ef-ink: #1c1917;
-  --ef-muted: #6b645a;
-  --ef-subtle: #6e6659;
+  --ef-ink: #141311;
+  --ef-muted: #5c574e;
+  --ef-subtle: #6e685c;
 
   --ef-rule: #e7e0d3;
   --ef-rule-strong: #d8cfbf;
 
-  --ef-ledger-red: #b42318;
-  --ef-ledger-red-strong: #8f1c13;
-  --ef-red-tint: #fdecea;
+  --ef-ledger-red: #c62a1e;
+  --ef-ledger-red-strong: #9e2016;
+  --ef-red-tint: #fbe7e4;
 
-  --ef-ledger-green: #1e7a4f;
-  --ef-ledger-green-strong: #17603e;
-  --ef-green-tint: #e6f2ec;
+  --ef-ledger-green: #16794a;
+  --ef-ledger-green-strong: #10603a;
+  --ef-green-tint: #e1f1e8;
 
-  --ef-ledger-amber: #9c5c10;
-  --ef-ledger-amber-strong: #7f4a0c;
-  --ef-amber-tint: #fbf0df;
+  --ef-ledger-amber: #8a5a00;
+  --ef-ledger-amber-strong: #6e4800;
+  --ef-amber-tint: #fbf0d6;
 
-  --ef-brand: #7f1d3a;
-  --ef-brand-hover: #5e1229;
+  --ef-brand: #2f2bd8;
+  --ef-brand-hover: #2320b0;
   --ef-brand-fg: #ffffff;
-  --ef-brand-tint: #f3e6ea;
+  --ef-brand-tint: #e6e5fb;
 
-  --ef-highlight: #e8a33d;
-  --ef-highlight-fg: #1c1917;
-  --ef-highlight-tint: #e8a33d2e;
+  --ef-highlight: #f5b301;
+  --ef-highlight-fg: #141311;
+  --ef-highlight-tint: #f5b30133;
 
-  --ef-now: #1c1917;
-  --ef-now-fg: #ffffff;
-  --ef-now-muted: #d6cfc4;
+  --ef-now: #141311;
+  --ef-now-fg: #f4f1ea;
+  --ef-now-muted: #a8a294;
 
-  --ef-ring: #7f1d3a;
+  --ef-ring: #2f2bd8;
   --ef-nav: #ffffff;
 
   /* The client app has no tab bar, so nothing stacks above the bar. The
@@ -225,9 +229,9 @@
   --ef-tabbar-h: 0rem;
   --ef-bottombar-h: 5.5rem;
 
-  --ef-shadow-e1: 0 1px 2px -1px rgba(28, 25, 23, 0.05), 0 2px 6px 0 rgba(28, 25, 23, 0.04);
-  --ef-shadow-e2: 0 4px 6px -2px rgba(28, 25, 23, 0.04), 0 12px 24px -4px rgba(28, 25, 23, 0.06);
-  --ef-shadow-e3: 0 -4px 6px -1px rgba(28, 25, 23, 0.04), 0 -16px 32px -4px rgba(28, 25, 23, 0.06);
+  --ef-shadow-e1: 0 1px 2px -1px rgba(20, 19, 17, 0.05), 0 2px 6px 0 rgba(20, 19, 17, 0.04);
+  --ef-shadow-e2: 0 4px 6px -2px rgba(20, 19, 17, 0.04), 0 12px 24px -4px rgba(20, 19, 17, 0.06);
+  --ef-shadow-e3: 0 -4px 6px -1px rgba(20, 19, 17, 0.04), 0 -16px 32px -4px rgba(20, 19, 17, 0.06);
 }
 
 @theme inline {
@@ -293,23 +297,24 @@
   --color-tint-danger: var(--ef-red-tint);
   --color-tint-info: var(--ef-surface-2);
 
-  /* Type roles.
-     - sans: Figtree. Body, rows, buttons, every label.
-     - display: Bricolage Grotesque. Screen titles, big numbers, the
-       Now-card headline. Nothing else.
-     - The Devanagari cut stays immediately after the sans stack. Figtree
-       and Bricolage have no Devanagari coverage, and family names come off
-       the Excel sheet in Hindi ("शर्मा परिवार") inline with Latin on the
-       same row — without this they fall back to whatever the WebView ships.
-     - mono: IBM Plex Mono, which carries every figure in the app AND every
-       phone number and flight/train number. Those two are the only places
-       mono is used in v3. */
-  --font-sans: var(--font-figtree), var(--font-plex-devanagari),
+  /* Type roles (UI4 "Haldi & Ink").
+     - sans: Geist. Body, rows, buttons, every label.
+     - display: Instrument Serif. Screen titles, the one hero number, the
+       Now-card headline, empty-state titles. One weight (400) — the serif
+       carries the emphasis, so a `font-semibold` beside `font-display` must
+       not be faked (see `font-synthesis` on `.font-display` below).
+     - The Devanagari and Gujarati cuts stay immediately after the Latin
+       face. Family names come off the Excel sheet in Hindi and Gujarati
+       ("शर्मा परिवार", "રમેશભાઈ શાહ") inline with Latin on the same row, and
+       without these they fall back to whatever the WebView ships.
+     - mono: Geist Mono, every figure (tabular) plus phone and flight
+       numbers. */
+  --font-sans: var(--font-geist), var(--font-plex-devanagari), var(--font-noto-gujarati),
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Noto Sans", "Noto Sans Devanagari", sans-serif;
-  --font-display: var(--font-bricolage), var(--font-plex-devanagari),
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono",
+  --font-display: var(--font-instrument-serif), var(--font-plex-devanagari),
+    var(--font-noto-gujarati), ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono",
     SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
   --ease-ledger: var(--ef-ease);
@@ -320,14 +325,16 @@
 
   --tracking-eyebrow: var(--ef-tracking-eyebrow);
 
-  /* Radii — v3: cards 20, rows 14, buttons 14–16, chips pill.
+  /* Radii — UI4: controls 14, cards 24, sheets 32, chips pill.
      Mapped by ACTUAL USAGE rather than by key name: this codebase dresses
      cards in `rounded-2xl` and controls in `rounded-xl`, so those are the
-     two that must land on 20 and 14. `rounded-lg` stays the small step for
-     nested elements (a segment inside its track, an avatar). */
+     two that must land on 24 and 14. `rounded-lg` stays the small step for
+     nested elements (a segment inside its track, an avatar); `rounded-3xl`
+     is the sheet. */
   --radius-lg: 0.625rem;
   --radius-xl: 0.875rem;
-  --radius-2xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
 
   /* Spacing scale, 4px base. */
   --spacing-1: 0.25rem;
@@ -388,6 +395,15 @@
   :focus-visible {
     outline: 2px solid var(--ef-ring);
     outline-offset: 2px;
+  }
+
+  /* Instrument Serif ships ONE weight. Screens written for the old display
+     face pair `font-display` with `font-semibold`/`font-bold`; without this
+     the WebView fakes a bold by smearing the outline, which on a serif reads
+     as a printing fault. The serif carries the emphasis on its own. */
+  .font-display {
+    font-synthesis: none;
+    letter-spacing: -0.01em;
   }
 }
 
@@ -460,6 +476,15 @@
   );
 }
 
+/* A row in a list that can run to hundreds (238 families, 465 guests).
+   `content-visibility: auto` lets the WebView skip layout and paint for rows
+   off screen, and `contain-intrinsic-size` reserves their height so the
+   scrollbar does not jump as they come into view (UI4 §3, F4). */
+@utility perf-rows {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
+}
+
 /* Kill the 300ms grey flash on Android taps. */
 @utility tap {
   touch-action: manipulation;
@@ -476,6 +501,9 @@
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: var(--ef-tracking-eyebrow);
+  /* UI4: small tracked capitals again, in the sans (not mono) — the group
+     titles on Control and the section labels read like signage. */
+  text-transform: uppercase;
   color: var(--ef-muted);
 }
 
@@ -653,8 +681,11 @@
 @media (pointer: coarse) {
   .list-fade,
   .grow-x,
-  .push-in,
-  .sheet-in {
+  .push-in {
     animation: none;
   }
+  /* UI4: `.sheet-in` is NOT killed here any more. A sheet rising is the
+     response to the tap that opened it (confirmation, not transition), it is
+     transform-only, and it is what makes the drag-to-dismiss read as one
+     physical object. The navigation entrances above stay off. */
 }

@@ -36,15 +36,18 @@ export function AdminPageTitle({
   actions,
   className,
 }: AdminPageTitleProps) {
+  // UI4: the admin header (`AdminHeader`) now names the tool in the serif
+  // title on every screen, so a second visible title here repeated it. The
+  // name stays for screen readers; the context line and the actions — the
+  // parts the header does not carry — stay visible.
+  if (!context && !actions) return <p className="sr-only">{children}</p>
   return (
     <div className={cn('flex items-end justify-between gap-3', className)}>
       <div className="min-w-0">
+        <p className="sr-only">{children}</p>
         {context ? (
           <p className="truncate text-sm leading-tight text-muted">{context}</p>
         ) : null}
-        <h1 className="truncate font-display text-[1.875rem] leading-[1.15] font-semibold tracking-tight text-ink">
-          {children}
-        </h1>
       </div>
 
       {actions ? (

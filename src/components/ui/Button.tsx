@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import { cn } from '@/lib/utils'
 import { Spinner } from './Spinner'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost'
+export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost' | 'now'
 /**
  * - `sm` 44px — the floor. An icon button, or a control inside a row.
  * - `md` 52px — the v3 secondary height, and the default for a secondary.
@@ -62,14 +62,17 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const BASE =
   'tap inline-flex items-center justify-center gap-2 rounded-xl border font-semibold ' +
   'leading-none whitespace-nowrap select-none ' +
-  'transition-[background-color,border-color,color] duration-press ease-ledger ' +
+  // UI4 press: a 0.97 scale on top of the colour change. Transform is on the
+  // compositor, so the press reads as physical at no layout cost (§3, F1).
+  'transition-[background-color,border-color,color,transform] duration-press ease-ledger ' +
+  'active:scale-[0.97] disabled:active:scale-100 ' +
   'disabled:cursor-not-allowed disabled:border-rule disabled:bg-surface-2 disabled:text-muted ' +
   'aria-disabled:border-rule aria-disabled:bg-surface-2 aria-disabled:text-muted'
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  // Maroon fill, white text (10.0:1), and the only solid maroon fill on any
-  // screen, so "the commit" is never ambiguous. The shadow is a hairline lift
-  // (shadow-e1) on the paper ground.
+  // Indigo fill, white text (8.5:1; 11.0:1 pressed), and the only solid
+  // indigo fill on any screen, so "the commit" is never ambiguous. The shadow
+  // is a hairline lift (shadow-e1) on the bone ground.
   primary:
     'border-transparent bg-brand text-brand-fg shadow-e1 ' +
     'hover:bg-brand-hover active:bg-brand-hover',
@@ -105,6 +108,11 @@ const VARIANTS: Record<ButtonVariant, string> = {
   danger:
     'border-transparent bg-ledger-red text-paper hover:bg-ledger-red-strong active:bg-ledger-red-strong',
   ghost: 'border-transparent bg-transparent text-ink hover:bg-surface-2 active:bg-surface-2',
+  // Haldi — "happening now": the Call button on the Now card, the next
+  // delivery. Ink on marigold is 10.0:1. At most one per screen (UI4 §2.1).
+  now:
+    'border-transparent bg-highlight text-highlight-fg ' +
+    'hover:brightness-95 active:brightness-95',
 }
 
 const SIZES: Record<ButtonSize, string> = {

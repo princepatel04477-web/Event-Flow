@@ -54,8 +54,14 @@ const V3_BAR: readonly SectionId[] = [
   'dashboard',
   'rsvp',
   'hospitality',
-  'hamper',
   'logistics',
+  // UI4 Part S: Control replaces Hampers in slot five, and only an admin gets
+  // it (`SECTIONS.control.roles`). Hampers did not disappear: for an event
+  // lead it is a screen inside Hospitality (the section switcher shows it
+  // beside Rooms and Check in), and for the hamper team it is still their
+  // whole app with no bar at all — the runner branch below never needed the
+  // hamper section to be in this list to give them nothing.
+  'control',
 ]
 
 /** What a section is called in the v3 bar. */
@@ -65,6 +71,7 @@ const V3_TAB_LABEL: Partial<Record<SectionId, string>> = {
   hospitality: 'Hospitality',
   hamper: 'Hampers',
   logistics: 'Logistics',
+  control: 'Control',
 }
 
 /**
@@ -98,6 +105,10 @@ function v3SectionTab(
   // (`docs/BUGS.md` M1). Management passes for every section and an admin is
   // exempt outright, so this only ever removes a tab that would bounce.
   if (access !== 'admin' && !sectionAllowedForDepartment(section, department)) return null
+
+  // The role gate. Every section in the bar used to admit both staff roles,
+  // so this check was implied; Control is the first that admits admins only.
+  if (!SECTIONS[section].roles.includes(access)) return null
 
   // `visibleChildren` is reused rather than re-derived: it already encodes
   // the role check AND the department check for a borrowed child, and the
@@ -175,6 +186,11 @@ export function v3TabsFor(
   )
 }
 
+/** Is this section shown as a child of another section (e.g. `hamper` under Hospitality)? */
+function isBorrowed(segment: string): boolean {
+  return Object.values(SECTIONS).some((s) => s.children.some((c) => c.href === segment))
+}
+
 /**
  * Which v3 tab a path belongs to, for highlighting.
  *
@@ -198,7 +214,9 @@ export function v3ActiveSection(rest: string): SectionId | null {
   // A real section id wins outright. In v3 that includes `hamper`, which is
   // now its own tab — the borrowed-child hop below would resolve it to
   // `hospitality` (as the v2 nav model does) and light the wrong tab.
-  if (segment in SECTIONS) return segment as SectionId
+  if (segment in SECTIONS && (V3_BAR.includes(segment as SectionId) || !isBorrowed(segment))) {
+    return segment as SectionId
+  }
 
   // Only for a section that is still borrowed: `/{event}/production` is
   // shown as a child of Hospitality, so Hospitality has to light.
@@ -234,6 +252,13 @@ export function v3ActiveChild(rest: string): string | null {
  */
 const V3_TITLE_OVERRIDES: Record<string, string> = {
   'hospitality/deliveries': 'Hampers',
+  // Borrowed sections resolve to their host tab for highlighting, but the
+  // screen is still named for itself.
+  hamper: 'Hampers',
+  production: 'Setup',
+  // The family page (UI4 S4) belongs to no section; it is named for itself.
+  families: 'Family',
+  find: 'Find',
   help: 'Help',
 }
 
@@ -246,7 +271,10 @@ export function v3ScreenTitle(rest: string): string {
   // as its list, and a whole-path key would miss the moment an id followed.
   // A one-segment path slices to itself, so `help` is covered by the same
   // lookup.
-  const override = V3_TITLE_OVERRIDES[segments.slice(0, 2).join('/')]
+  // A one-segment override (`hamper`, `families`) also names that screen's
+  // detail routes (`hamper/{id}`, `families/{id}`).
+  const override =
+    V3_TITLE_OVERRIDES[segments.slice(0, 2).join('/')] ?? V3_TITLE_OVERRIDES[segments[0]]
   if (override) return override
 
   const sectionId = v3ActiveSection(rest)

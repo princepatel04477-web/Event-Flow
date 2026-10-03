@@ -34,7 +34,7 @@ export function CallbackCaptureStep({
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-2xl border-2 border-brand/35 bg-surface p-4 shadow-e2 transition-all animate-in fade-in slide-in-from-top-2 duration-200"
+      className="flex flex-col gap-3 rounded-2xl border-2 border-brand/35 bg-surface p-4 shadow-e2 animate-in fade-in slide-in-from-top-2 duration-200"
       role="region"
       aria-label="Pick callback time"
     >

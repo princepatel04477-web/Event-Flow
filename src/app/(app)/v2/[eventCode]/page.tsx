@@ -12,6 +12,7 @@ import { Row } from '@/components/ui/Row'
 import { readBoard } from '@/lib/actions/dashboard'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { v2DepartmentHome } from '@/lib/departments'
+import { SetupChecklist } from './_home/SetupChecklist'
 import { queryKeys } from '@/lib/query/keys'
 import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import { traceFetch } from '@/lib/perf'
@@ -115,6 +116,7 @@ export default async function AppHomePage({ params }: PageProps) {
   if (board && board.totalGroups === 0) {
     return (
       <div className="flex flex-col gap-4">
+        {access === 'admin' ? <SetupChecklist eventId={event.id} eventCode={event.code} /> : null}
         <EmptyState
           icon={<UsersIcon className="h-7 w-7" />}
           title="No guests on this event yet"
@@ -171,6 +173,29 @@ export default async function AppHomePage({ params }: PageProps) {
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <div className="flex flex-col gap-5">
+        {access === 'admin' ? <SetupChecklist eventId={event.id} eventCode={event.code} /> : null}
+
+        {/* The headline (UI4 A2): how many people this wedding is feeding, in
+            the serif at hero size, and the two facts that qualify it. The
+            whole card is a door to the list it counts (R4). A lead's view
+            only — a runner is redirected to their own section above. */}
+        {focus === 'management' ? (
+          <Link
+            href={`/${event.code}/guests`}
+            className="tap block rounded-2xl bg-now p-5 text-now-fg transition-transform duration-press ease-ledger active:scale-[0.99]"
+          >
+            <p className="eyebrow text-highlight">Guests expected</p>
+            <p className="mt-2 font-display text-[4rem] leading-none">
+              <span className="tabular-nums">{numbers.totalPax}</span>{' '}
+              <span className="text-3xl italic text-now-muted">guests</span>
+            </p>
+            <p className="mt-2 text-base text-now-muted">
+              from {numbers.totalGroups} {numbers.totalGroups === 1 ? 'family' : 'families'}
+              {numbers.rsvpPending > 0 ? ` · ${numbers.rsvpPending} still to call` : ' · everyone called'}
+            </p>
+          </Link>
+        ) : null}
+
         <NowCard
           eyebrow="Right now"
           headline={now.headline}

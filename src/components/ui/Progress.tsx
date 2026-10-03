@@ -73,10 +73,12 @@ export function Progress({
         className="h-2 w-full overflow-hidden rounded-full bg-surface-2"
       >
         <div
-          // `grow-x` is the left-to-right entrance; on a coarse pointer it is
-          // disabled by the media query in globals.css, so a phone renders the
-          // final width immediately rather than animating on every paint.
-          className={cn('grow-x h-full rounded-full transition-[width] duration-enter', FILL[tone])}
+          // `grow-x` is the left-to-right entrance (a transform); on a coarse
+          // pointer it is disabled by the media query in globals.css, so a
+          // phone renders the final width immediately. A later CHANGE of
+          // width is not transitioned: width is a layout property, and
+          // animating it re-lays-out the row every frame (UI4 §3, F1).
+          className={cn('grow-x h-full rounded-full', FILL[tone])}
           style={{ width: `${percent}%` }}
         />
       </div>

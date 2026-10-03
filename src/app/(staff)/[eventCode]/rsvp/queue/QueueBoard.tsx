@@ -275,7 +275,7 @@ export function QueueBoard({
             aria-label={`${progress.contacted} of ${progress.total} families contacted`}
           >
             <div
-              className="h-full rounded-full bg-linear-to-r from-brand to-ledger-green transition-[width] duration-500 ease-ledger"
+              className="h-full rounded-full bg-linear-to-r from-brand to-ledger-green"
               style={{ width: `${(progress.contacted / progress.total) * 100}%` }}
             />
           </div>

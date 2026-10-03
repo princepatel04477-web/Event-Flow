@@ -23,22 +23,23 @@ const labels = (tabs: ReturnType<typeof v3TabsFor>) => tabs.map((t) => t.label)
 const hrefs = (tabs: ReturnType<typeof v3TabsFor>) => tabs.map((t) => t.href)
 
 describe('v3TabsFor — event lead', () => {
-  it('gives an admin the five v3 tabs, in v3 order', () => {
+  it('gives an admin the five UI4 tabs, Control last', () => {
+    // UI4 Part S, S2: Control replaces Hampers in slot five, admin only.
     expect(labels(v3TabsFor(EV, 'admin', 'management'))).toEqual([
       'Today',
       'Calls',
       'Hospitality',
-      'Hampers',
       'Logistics',
+      'Control',
     ])
   })
 
-  it('gives a management team member the same five', () => {
+  it('gives a management team member the same four, without Control', () => {
+    // A lead who is not an admin never sees a tab the page guard would refuse.
     expect(labels(v3TabsFor(EV, 'event_team', 'management'))).toEqual([
       'Today',
       'Calls',
       'Hospitality',
-      'Hampers',
       'Logistics',
     ])
   })
@@ -48,8 +49,8 @@ describe('v3TabsFor — event lead', () => {
       `/${EV}`,
       `/${EV}/rsvp`,
       `/${EV}/hospitality`,
-      `/${EV}/hamper`,
       `/${EV}/logistics`,
+      `/${EV}/control`,
     ])
   })
 
@@ -115,7 +116,7 @@ describe('v3TabsFor — runners', () => {
     // hamper section — so their bar is the two screens they can actually
     // open, not a tab that bounces them to `?denied=section`.
     expect(labels(v3TabsFor(EV, 'event_team', 'hospitality'))).toEqual([
-      'Hospitality',
+      'Rooms',
       'Check in / out',
     ])
   })
@@ -164,14 +165,14 @@ describe('v3ActiveSection', () => {
   })
 
   it('resolves a borrowed child to the section that shows it', () => {
-    // `/EVENT/hamper` starts with a real section id, but for the BAR it has
-    // to light Hampers — and for the header it has to title itself "Hampers".
-    expect(v3ActiveSection('hamper')).toBe('hamper')
-    // Setup has no tab in the v3 bar at all (it is flag-gated and borrowed),
-    // so it resolves to itself and simply lights nothing — which is the
-    // honest answer rather than lighting Rooms for a screen Rooms does not
-    // contain.
-    expect(v3ActiveSection('production')).toBe('production')
+    // UI4: Hampers left the bar and is a screen inside Hospitality (the
+    // section switcher shows it), so `/EVENT/hamper` lights Hospitality. The
+    // header still titles it "Hampers" (see v3ScreenTitle). Setup is the same
+    // shape: borrowed, shown in Hospitality's switcher, lights Hospitality.
+    expect(v3ActiveSection('hamper')).toBe('hospitality')
+    expect(v3ActiveSection('production')).toBe('hospitality')
+    expect(v3ScreenTitle('hamper')).toBe('Hampers')
+    expect(v3ScreenTitle('production')).toBe('Setup')
   })
 
   it('still resolves a section that is no longer in the bar', () => {
@@ -219,7 +220,13 @@ describe('v3ScreenTitle', () => {
   })
 
   it('falls back to the section name on a detail route', () => {
-    expect(v3ScreenTitle('hospitality/rooms/104')).toBe('Hospitality')
+    // The Rooms child is named "Rooms" in UI4 (it sits beside Check in in the
+    // section switcher), and a room detail keeps its list's name.
+    expect(v3ScreenTitle('hospitality/rooms/104')).toBe('Rooms')
+  })
+
+  it('names the family page for itself', () => {
+    expect(v3ScreenTitle('families/abc-123')).toBe('Family')
   })
 
   it('never returns an empty string', () => {
@@ -235,7 +242,7 @@ describe('the v3 bar keeps the shared section table honest', () => {
     // labels live in `V3_TAB_LABEL`; this walks the SECTIONS the bar can
     // reach and proves each one is named.
     const drawn = new Set(v3TabsFor(EV, 'admin', 'management').map((t) => t.sectionId))
-    expect(drawn).toEqual(new Set(['dashboard', 'rsvp', 'hospitality', 'hamper', 'logistics']))
+    expect(drawn).toEqual(new Set(['dashboard', 'rsvp', 'hospitality', 'logistics', 'control']))
     for (const id of drawn) {
       expect(SECTIONS[id]).toBeDefined()
     }

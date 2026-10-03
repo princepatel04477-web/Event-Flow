@@ -14,7 +14,11 @@ import { SectionHead } from '@/components/ui/SectionHead'
 import { StampPill, StatusPill } from '@/components/ui/StatusPill'
 import { SyncChip } from '@/components/ui/SyncChip'
 import { StatCard } from '@/components/dashboard/StatCard'
-import { InboxIcon } from '@/components/icons'
+import { InboxIcon, BuildingIcon, CarIcon, GridIcon, PhoneIcon, SlidersIcon } from '@/components/icons'
+import { EventPill } from '@/components/nav/EventPill'
+import { BottomSheet } from '@/components/ui/BottomSheet'
+import { NowCard } from '@/components/ui/NowCard'
+import { useState } from 'react'
 import { statusLabel, statusTone } from '@/lib/status'
 
 /**
@@ -41,13 +45,15 @@ const LEDGER_SAMPLES = ['balanced', 'departure_missing', 'no_arrival'] as const
 const ROOM_SAMPLES = ['empty', 'partly_full', 'full', 'over_capacity'] as const
 
 const PALETTE = [
-  { name: 'Ivory', token: 'bg-paper', hex: '#F8F9FA', note: 'the page' },
-  { name: 'Surface', token: 'bg-surface', hex: '#FFFFFF', note: 'every card' },
-  { name: 'Charcoal', token: 'bg-ink', hex: '#191C1D', note: 'reading text · 16.8:1' },
-  { name: 'Warm slate', token: 'bg-muted', hex: '#4D4635', note: 'secondary · 8.9:1' },
-  { name: 'Gold', token: 'bg-brand', hex: '#735C00', note: 'the accent · 7.4:1' },
-  { name: 'Emerald', token: 'bg-ledger-green', hex: '#006B59', note: 'COMPLETED · 6.4:1' },
-  { name: 'Signal', token: 'bg-ledger-red', hex: '#BA1A1A', note: 'ATTENTION · 6.2:1' },
+  { name: 'Bone', token: 'bg-paper', hex: '#F4F1EA', note: 'the ground' },
+  { name: 'Surface', token: 'bg-surface', hex: '#FFFFFF', note: 'cards and sheets' },
+  { name: 'Ink', token: 'bg-ink', hex: '#141311', note: 'reading text · 16.5:1' },
+  { name: 'Muted', token: 'bg-muted', hex: '#5C574E', note: 'secondary · 6.4:1' },
+  { name: 'Neel', token: 'bg-brand', hex: '#2F2BD8', note: 'ACTION · 7.6:1' },
+  { name: 'Haldi', token: 'bg-highlight', hex: '#F5B301', note: 'NOW · fill only' },
+  { name: 'Green', token: 'bg-ledger-green', hex: '#16794A', note: 'COMPLETED · 4.8:1' },
+  { name: 'Amber', token: 'bg-ledger-amber', hex: '#8A5A00', note: 'WAITING · 5.3:1' },
+  { name: 'Red', token: 'bg-ledger-red', hex: '#C62A1E', note: 'ATTENTION · 5.0:1' },
 ]
 
 export default function EvidencePage() {
@@ -57,9 +63,11 @@ export default function EvidencePage() {
         EventFlow
       </PageTitle>
 
+      <Ui4Shell />
+
       {/* Palette */}
       <section className="mt-8 flex flex-col gap-3">
-        <SectionHead eyebrow="Ground" title="Seven colours, and only seven" />
+        <SectionHead eyebrow="Ground" title="Nine colours, four meanings" />
         <ul className="flex flex-col gap-2">
           {PALETTE.map((c) => (
             <li key={c.name} className="flex items-center gap-3">
@@ -341,5 +349,101 @@ export default function EvidencePage() {
         </div>
       </section>
     </main>
+  )
+}
+
+/**
+ * UI4 "Haldi & Ink" — the shell pieces, arranged as a phone screen would show
+ * them: the header with its event pill, the section switcher, the Now card,
+ * the buttons, a draggable sheet and the tab bar. Real components where they
+ * exist; the switcher and bar are drawn statically because theirs read the
+ * router and the section model.
+ */
+function Ui4Shell() {
+  const [sheet, setSheet] = useState(false)
+  return (
+    <section className="mt-6 flex flex-col gap-5">
+      <div className="flex flex-col items-start gap-1">
+        <EventPill
+          event={{ code: 'SHARMA26', name: 'Sharma–Patel Wedding' }}
+          memberships={[
+            { eventId: 'a', eventCode: 'SHARMA26', eventName: 'Sharma–Patel Wedding', role: 'event_team' },
+            { eventId: 'b', eventCode: 'PATEL27', eventName: 'Patel–Desai Wedding', role: 'event_team' },
+          ]}
+          isAdmin
+        />
+        <h2 className="font-display text-[2rem] leading-[1.1] text-ink">Hospitality</h2>
+      </div>
+
+      <nav aria-label="Hospitality screens" className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none]">
+        {['Rooms', 'Check in / out', 'Rooming list', 'Hampers'].map((label, i) => (
+          <span
+            key={label}
+            className={
+              'flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-full border px-4 text-sm font-medium ' +
+              (i === 0 ? 'border-brand bg-brand text-brand-fg' : 'border-rule-strong bg-surface text-ink')
+            }
+          >
+            {label}
+          </span>
+        ))}
+      </nav>
+
+      <div className="rounded-2xl bg-now p-5 text-now-fg shadow-e2">
+        <p className="eyebrow text-highlight">Today</p>
+        <p className="mt-2 font-display text-[4.5rem] leading-none">
+          412 <span className="text-3xl italic text-now-muted">guests</span>
+        </p>
+        <p className="mt-2 text-base text-now-muted">from 238 families · 62 still to call</p>
+      </div>
+
+      <NowCard
+        eyebrow="Call next"
+        headline="Shah Parivar — રમેશભાઈ શાહ"
+        context="Surat · 6 invited · No answer yesterday 7:40pm"
+        actionLabel="Call Rameshbhai"
+        onPress={() => {}}
+      />
+
+      <div className="grid grid-cols-2 gap-3">
+        <Button>Save</Button>
+        <Button variant="secondary">Not now</Button>
+        <Button variant="now">Call</Button>
+        <Button variant="danger">Remove</Button>
+      </div>
+
+      <Button variant="secondary" onClick={() => setSheet(true)}>
+        Open a sheet — drag its handle down
+      </Button>
+      <BottomSheet open={sheet} onClose={() => setSheet(false)} label="Example sheet">
+        <h3 className="font-display text-2xl text-ink">Place the Shah family</h3>
+        <p className="mt-2 text-base text-muted">Drag the handle down past a third of the sheet, or flick it, to close.</p>
+        <div className="mt-4">
+          <Button fullWidth onClick={() => setSheet(false)}>
+            Put in room 304
+          </Button>
+        </div>
+      </BottomSheet>
+
+      <nav aria-label="Tab bar example" className="-mx-4 grid grid-cols-5 border-t border-rule bg-nav">
+        {[
+          { label: 'Today', icon: <GridIcon className="h-6 w-6" /> },
+          { label: 'Calls', icon: <PhoneIcon className="h-6 w-6" /> },
+          { label: 'Hospitality', icon: <BuildingIcon className="h-6 w-6" />, active: true },
+          { label: 'Logistics', icon: <CarIcon className="h-6 w-6" /> },
+          { label: 'Control', icon: <SlidersIcon className="h-6 w-6" /> },
+        ].map((tab) => (
+          <span
+            key={tab.label}
+            className={'flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium ' + (tab.active ? 'text-brand' : 'text-muted')}
+          >
+            <span className={'flex h-7 w-9 items-center justify-center rounded-full ' + (tab.active ? 'bg-brand-tint' : '')}>
+              {tab.icon}
+            </span>
+            <span className="max-w-full truncate">{tab.label}</span>
+          </span>
+        ))}
+      </nav>
+    </section>
   )
 }

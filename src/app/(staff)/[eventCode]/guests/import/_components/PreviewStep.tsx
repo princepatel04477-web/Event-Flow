@@ -256,7 +256,7 @@ function ConfirmImportBar({
     // next to the bottom of a 238-row list. No `pb-nav-bottombar` clearance is
     // needed for the same reason — that is for a FIXED bar, which reserves
     // nothing and would cover the last families.
-    <div className="sticky bottom-nav z-40 -mx-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur-sm md:bottom-0 md:pb-safe">
+    <div className="sticky bottom-nav z-40 -mx-4 border-t border-border bg-bg px-4 py-3 md:bottom-0 md:pb-safe">
       <p className="text-sm text-muted">
         {commitable} of {total} famil{total === 1 ? 'y' : 'ies'} will be written.
         {blocked > 0 ? ` ${blocked} blocked famil${blocked === 1 ? 'y' : 'ies'} will be recorded as failed.` : ''}{' '}

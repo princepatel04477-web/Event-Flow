@@ -1,22 +1,54 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useRef } from 'react'
 
+import { dropLastVisit, getLanding, previousVisit, resolveBack } from '@/lib/nav/back'
+import { closeTopSheet, openSheetCount } from '@/lib/nav/sheet-stack'
 import { isNativePlatform } from '@/lib/native/platform'
+
+/**
+ * A two-second note at the foot of the screen, in plain DOM. The back button
+ * is a native event outside React, and this is the only thing it ever needs
+ * to say, so it does not warrant a component or a store.
+ */
+function showExitNote() {
+  const note = document.createElement('div')
+  note.textContent = 'Press back again to close EventFlow'
+  note.setAttribute('role', 'status')
+  note.style.cssText =
+    'position:fixed;left:50%;bottom:calc(var(--ef-tabbar-h) + env(safe-area-inset-bottom,0px) + 16px);' +
+    'transform:translateX(-50%);z-index:70;padding:10px 16px;border-radius:999px;' +
+    'background:var(--ef-now);color:var(--ef-now-fg);font-size:14px;font-weight:500;' +
+    'white-space:nowrap;pointer-events:none'
+  document.body.appendChild(note)
+  window.setTimeout(() => note.remove(), 2000)
+}
 
 /**
  * Native bridge wiring — mounted once in the root layout.
  *
  * - appStateChange → refreshSession(): Android suspends JS timers in the
  *   background, so the auto-refresh interval stalls. Refresh on resume.
- * - backButton → navigate back through history; exit only at the root. This
- *   overrides the default "any back press kills the app" behaviour.
+ * - backButton → `resolveBack` (UI4 N4): close the top sheet, else step back
+ *   within the current tab, else go up from a detail screen, else go to the
+ *   viewer's landing tab, else "press back again to close". It used to be a
+ *   bare `history.back()`, which navigated away from under an open sheet,
+ *   walked back through every tab switch, and exited from any deep-linked
+ *   screen.
  *
  * Skipped entirely on the web, so this component is safe to render everywhere.
  * (The old guard tested for the `window.Capacitor` global and claimed it was
  * "absent on the web" — it is not; see lib/native/platform.ts.)
  */
 export function NativeBridge() {
+  const router = useRouter()
+  const routerRef = useRef(router)
+  useEffect(() => {
+    routerRef.current = router
+  }, [router])
+  const lastExitPrompt = useRef<number | null>(null)
+
   useEffect(() => {
     if (!isNativePlatform()) return
 
@@ -35,10 +67,37 @@ export function NativeBridge() {
       })
 
       const backHandle = await App.addListener('backButton', ({ canGoBack }) => {
-        if (canGoBack) {
-          window.history.back()
-        } else {
-          void App.exitApp()
+        const action = resolveBack({
+          openSheets: openSheetCount(),
+          current: window.location.pathname,
+          // Only trust our own record of the previous screen when the WebView
+          // agrees there is somewhere to go back to.
+          previous: canGoBack ? previousVisit() : null,
+          landing: getLanding(),
+          lastExitPromptAt: lastExitPrompt.current,
+          now: Date.now(),
+        })
+
+        switch (action.type) {
+          case 'close-sheet':
+            closeTopSheet()
+            return
+          case 'history-back':
+            dropLastVisit()
+            window.history.back()
+            return
+          case 'go':
+            // Replace, not push: going UP must not leave the detail screen
+            // behind it in history, or the next back would return to it.
+            dropLastVisit()
+            routerRef.current.replace(action.href)
+            return
+          case 'confirm-exit':
+            lastExitPrompt.current = Date.now()
+            showExitNote()
+            return
+          case 'exit':
+            void App.exitApp()
         }
       })
 

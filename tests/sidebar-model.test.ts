@@ -28,7 +28,12 @@ describe('sidebarGroupsFor', () => {
       'hamper',
       'logistics',
       'guests',
+      // UI4 Part S: an admin's Control section, appended after the ordered
+      // list (SIDEBAR_ORDER leaves unlisted sections in declaration order).
+      'control',
     ])
+    // A lead who is not an admin never gets it.
+    expect(ids(sidebarGroupsFor(EV, 'event_team', 'management'))).not.toContain('control')
   })
 
   it('gives a client no sidebar at all', () => {

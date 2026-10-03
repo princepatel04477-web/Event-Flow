@@ -103,7 +103,7 @@ export function KmDashboard({ eventId }: Props) {
                     <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
                       <div
                         className={cn(
-                          'absolute inset-y-0 left-1/2 rounded-full transition-all duration-500',
+                          'absolute inset-y-0 left-1/2 rounded-full',
                           over
                             ? 'bg-ledger-red'
                             : under
