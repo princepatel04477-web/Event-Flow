@@ -5,6 +5,80 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — F8b: applied the migrations, built the By-room hamper view
+
+### Migrations applied to the linked project (EventFlow, xktxnkuz…)
+
+Applied `20261003090000_guest_groups_expected_split.sql` (F6) and
+`20261003091000_deliverables_room_target.sql` (F8a) with
+`supabase db query --linked -f <file>` and recorded them with
+`supabase migration repair --status applied …`.
+
+**Why not `db push`:** the remote history already contained
+`20261003105439_resume_stuck_transcriptions`, a teammate's migration that is NOT
+in the repo, so `db push` refused with "Remote migration versions not found in
+local migrations directory". Rather than repair it away (which would desync the
+history from the schema), the two migrations were applied directly. **Repo
+hygiene owed: someone should add that teammate migration file** so `db push`
+works again.
+
+F8a needed one fix before it would apply: the backfill `INSERT … SELECT` needed
+`'hamper'::app.deliverable_kind`, or Postgres rejects the text literal against
+the enum (the whole file runs in one transaction, so the first attempt rolled
+back cleanly — verified, then re-applied).
+
+### Types regenerated
+
+`supabase gen types typescript --linked --schema public,app` — **`--schema` is
+required**: without it the generated file loses the `app` schema and every
+`Database['app']['Enums']` reference breaks. The regenerated types surfaced the
+real nullability changes:
+
+- `deliverables.group_id` is now `string | null`. Fixed the consumers to treat a
+  room-targeted hamper as having no family: `deliveries.ts` (`DeliveryRunRow`),
+  `rooming-list.ts`, `CheckInClient.tsx`, `DeparturesBoard.tsx`, `sheets.ts`
+  (Deliverables + Exceptions).
+- `delivery_proofs.room_id` and `guest_groups.expected_adults/expected_children`
+  added to the test fixtures.
+
+### F8b build
+
+- `src/lib/actions/deliveries.ts` — `generateDeliverables` now creates **room**
+  hampers (one per room, deduped on `room_id`); new `readHamperRooms`,
+  `assignHampersToRooms` (idempotent) and `unassignHampersFromRooms` (Undo, only
+  pending rows).
+- `HamperRun.tsx` — a `By room` / `By family` `Segmented`, **By room default**;
+  the old run is unchanged under the second tab.
+- `HamperByRoom.tsx` (new) — rooms grouped hotel → floor via the SAME pure
+  `groupRoomsByHotelFloor` the Rooms tab uses; each room shows its families,
+  guests and hamper status (`StatusPill`); multi-select then "Assign hamper to N
+  rooms · N hampers"; optimistic set with rollback on failure; a 5s inline Undo;
+  a camera control opens the existing proof screen for a room that has a hamper.
+- Export — a **"Hampers by room"** sheet (Hotel, Room, Families, Guests, Hamper
+  type, Qty, Status, Delivered by, Delivered at), added to the `hampers` kind and
+  the full backup.
+
+### Deliberate deviations, stated
+
+- **The Rooms grid component was not reused.** `RoomsBoard` is a whole screen
+  (`eventId`-bound, with its own places/waiting state), not a component that
+  takes props. F8b says STOP and name it if a component cannot be reused — this
+  is that note. The **pure** `groupRoomsByHotelFloor` grouping is shared, and the
+  hamper list is purpose-built for selection.
+- **Undo is a local 5s control**, not the shared `undo-store`/`UndoBar`
+  machinery, to avoid changing that store under time pressure. It calls
+  `unassignHampersFromRooms`, which never deletes a delivered hamper.
+- **Client view (F8b #7) not built** — there is no client-facing hamper screen in
+  the app; the additive RLS policy from F8a is in place for when one exists.
+
+### Verified
+
+`tsc` clean · 843 tests / 70 files pass · eslint clean on touched files ·
+`NEXT_PUBLIC_UI=v2 npm run build` run before the deploy. Not verified on a
+handset (no browser/device here).
+
+---
+
 ## 3 October 2026 — F9: verification and the client note
 
 **Suite:** 843 tests in 70 files, all passing. **Build:** `NEXT_PUBLIC_UI=v2

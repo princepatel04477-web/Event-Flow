@@ -372,11 +372,82 @@ export function buildDeliverableRows(data: ExportData): DeliverableRowExport[] {
   return data.deliverables.map((d) => {
     const proof = proofByDeliverable.get(d.id)
     return {
-      headName: groupById.get(d.group_id)?.head_name ?? '',
+      headName: (d.group_id ? groupById.get(d.group_id)?.head_name : null) ?? '',
       kind: d.kind === 'hamper' ? 'Hamper' : 'Return gift',
       itemName: d.item_name ?? '',
       quantity: d.quantity,
       status: d.status,
+      deliveredAt: proof?.recorded_at ?? null,
+      deliveredBy: proof
+        ? (proof.captured_by_staff
+            ? data.staffNames[proof.captured_by_staff]
+            : proof.captured_by
+              ? data.profileNames[proof.captured_by] ?? null
+              : null) ?? null
+        : null,
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Sheet — Hampers by room (F8b)
+// ---------------------------------------------------------------------------
+
+export interface HamperRoomExportRow {
+  hotel: string
+  roomNumber: string
+  families: string
+  guests: number
+  itemName: string
+  quantity: number
+  status: string
+  deliveredBy: string | null
+  deliveredAt: string | null
+}
+
+/** One row per room: who is in it, and its hamper's state. Computed from the
+ *  event data the export already reads — no new query. */
+export function buildHamperByRoomRows(data: ExportData): HamperRoomExportRow[] {
+  const groupById = new Map(data.groups.map((g) => [g.id, g]))
+  const hotelById = new Map(data.hotels.map((h) => [h.id, h]))
+
+  const hamperByRoom = new Map<string, DeliverableRow>()
+  for (const d of data.deliverables) {
+    if (d.kind === 'hamper' && d.room_id) hamperByRoom.set(d.room_id, d)
+  }
+
+  const proofByDeliverable = new Map<string, DeliveryProofRow>()
+  for (const p of data.proofs) {
+    const existing = proofByDeliverable.get(p.deliverable_id)
+    if (!existing || p.recorded_at > existing.recorded_at) {
+      proofByDeliverable.set(p.deliverable_id, p)
+    }
+  }
+
+  const familiesByRoom = new Map<string, Set<string>>()
+  const guestsByRoom = new Map<string, number>()
+  for (const a of data.assignments) {
+    if (a.released_at !== null) continue
+    guestsByRoom.set(a.room_id, (guestsByRoom.get(a.room_id) ?? 0) + 1)
+    const head = groupById.get(a.group_id)?.head_name
+    if (head) {
+      const set = familiesByRoom.get(a.room_id) ?? new Set<string>()
+      set.add(head)
+      familiesByRoom.set(a.room_id, set)
+    }
+  }
+
+  return data.rooms.map((room) => {
+    const hamper = hamperByRoom.get(room.id)
+    const proof = hamper ? proofByDeliverable.get(hamper.id) : undefined
+    return {
+      hotel: hotelById.get(room.hotel_id)?.name ?? '',
+      roomNumber: room.room_number,
+      families: [...(familiesByRoom.get(room.id) ?? [])].join(', '),
+      guests: guestsByRoom.get(room.id) ?? 0,
+      itemName: hamper?.item_name ?? '',
+      quantity: hamper?.quantity ?? 0,
+      status: !hamper ? 'No hamper' : hamper.status === 'delivered' ? 'Delivered' : 'Assigned',
       deliveredAt: proof?.recorded_at ?? null,
       deliveredBy: proof
         ? (proof.captured_by_staff
@@ -404,7 +475,9 @@ export function buildExceptionRows(data: ExportData): ExceptionRow[] {
   const deliveredHamper = new Map<string, boolean>()
   const deliveredReturnGift = new Map<string, boolean>()
   for (const d of data.deliverables) {
-    if (d.status === 'delivered') {
+    // A room-targeted hamper (group_id null) is not a family's hamper, so it
+    // cannot clear a family's "hamper undelivered" exception.
+    if (d.status === 'delivered' && d.group_id) {
       if (d.kind === 'hamper') deliveredHamper.set(d.group_id, true)
       else deliveredReturnGift.set(d.group_id, true)
     }

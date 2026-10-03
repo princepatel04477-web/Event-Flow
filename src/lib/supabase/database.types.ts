@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   app: {
     Tables: {
@@ -42,6 +42,7 @@ export type Database = {
         Args: { p_code_id: string; p_event_id: string }
         Returns: undefined
       }
+      resume_stuck_transcriptions: { Args: never; Returns: number }
       revoke_access_code: { Args: { p_code_id: string }; Returns: undefined }
       role_in_event: {
         Args: { p_event_id: string }
@@ -84,15 +85,12 @@ export type Database = {
       group_type: "family" | "couple" | "friends" | "single"
       message_status: "queued" | "sent" | "delivered" | "read" | "failed"
       recording_source: "harvested" | "voice_note"
-      rsvp_status:
-        | "not_started"
-        | "attempted"
-        | "callback"
-        | "tentative"
-        | "confirmed"
-        | "declined"
-        | "unreachable"
-      rsvp_campaign_status: "draft" | "scheduled" | "running" | "paused" | "completed"
+      rsvp_campaign_status:
+        | "draft"
+        | "scheduled"
+        | "running"
+        | "paused"
+        | "completed"
       rsvp_campaign_wave: "wave_1" | "wave_2" | "wave_3"
       rsvp_job_status:
         | "pending"
@@ -104,6 +102,15 @@ export type Database = {
         | "dnd"
         | "skipped"
         | "callback"
+      rsvp_status:
+        | "not_started"
+        | "attempted"
+        | "callback"
+        | "tentative"
+        | "confirmed"
+        | "declined"
+        | "unreachable"
+      side: "bride" | "groom" | "both" | "other"
       staff_department:
         | "management"
         | "logistics"
@@ -111,7 +118,6 @@ export type Database = {
         | "hamper"
         | "production"
         | "rsvp"
-      side: "bride" | "groom" | "both" | "other"
       travel_direction: "arrival" | "departure"
       travel_mode: "air" | "train" | "bus" | "cab" | "self_drive"
       trip_status: "planned" | "dispatched" | "completed" | "cancelled"
@@ -285,6 +291,13 @@ export type Database = {
             foreignKeyName: "call_attempts_group_id_event_id_fkey"
             columns: ["group_id", "event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
+          },
+          {
+            foreignKeyName: "call_attempts_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
             referencedRelation: "v_rsvp_queue"
             referencedColumns: ["group_id", "event_id"]
           },
@@ -399,6 +412,13 @@ export type Database = {
             foreignKeyName: "call_recordings_group_id_event_id_fkey"
             columns: ["group_id", "event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
+          },
+          {
+            foreignKeyName: "call_recordings_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
             referencedRelation: "v_rsvp_queue"
             referencedColumns: ["group_id", "event_id"]
           },
@@ -483,7 +503,7 @@ export type Database = {
           assigned_to: string | null
           created_at: string
           event_id: string
-          group_id: string
+          group_id: string | null
           guest_id: string | null
           id: string
           item_name: string | null
@@ -498,7 +518,7 @@ export type Database = {
           assigned_to?: string | null
           created_at?: string
           event_id: string
-          group_id: string
+          group_id?: string | null
           guest_id?: string | null
           id?: string
           item_name?: string | null
@@ -513,7 +533,7 @@ export type Database = {
           assigned_to?: string | null
           created_at?: string
           event_id?: string
-          group_id?: string
+          group_id?: string | null
           guest_id?: string | null
           id?: string
           item_name?: string | null
@@ -559,6 +579,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "guest_groups"
             referencedColumns: ["id", "event_id"]
+          },
+          {
+            foreignKeyName: "deliverables_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
           },
           {
             foreignKeyName: "deliverables_group_id_event_id_fkey"
@@ -612,6 +639,7 @@ export type Database = {
           photo_sha256: string | null
           received_by_name: string | null
           recorded_at: string
+          room_id: string | null
           storage_bucket: string
           storage_path: string
         }
@@ -629,6 +657,7 @@ export type Database = {
           photo_sha256?: string | null
           received_by_name?: string | null
           recorded_at?: string
+          room_id?: string | null
           storage_bucket?: string
           storage_path: string
         }
@@ -646,6 +675,7 @@ export type Database = {
           photo_sha256?: string | null
           received_by_name?: string | null
           recorded_at?: string
+          room_id?: string | null
           storage_bucket?: string
           storage_path?: string
         }
@@ -890,6 +920,103 @@ export type Database = {
           },
         ]
       }
+      event_notification_settings: {
+        Row: {
+          arrivals_enabled: boolean
+          event_id: string
+          updated_at: string
+        }
+        Insert: {
+          arrivals_enabled?: boolean
+          event_id: string
+          updated_at?: string
+        }
+        Update: {
+          arrivals_enabled?: boolean
+          event_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_notification_settings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_notification_settings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "event_notification_settings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "v_event_board"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "event_notification_settings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "v_event_dashboard"
+            referencedColumns: ["event_id"]
+          },
+        ]
+      }
+      event_section_locks: {
+        Row: {
+          event_id: string
+          locked_at: string
+          locked_by: string | null
+          section: string
+        }
+        Insert: {
+          event_id: string
+          locked_at?: string
+          locked_by?: string | null
+          section: string
+        }
+        Update: {
+          event_id?: string
+          locked_at?: string
+          locked_by?: string | null
+          section?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_section_locks_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_section_locks_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "event_section_locks_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_board"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "event_section_locks_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_dashboard"
+            referencedColumns: ["event_id"]
+          },
+        ]
+      }
       events: {
         Row: {
           archived_at: string | null
@@ -937,6 +1064,68 @@ export type Database = {
           venue_city?: string | null
         }
         Relationships: []
+      }
+      export_files: {
+        Row: {
+          bytes: number
+          created_at: string
+          created_by: string | null
+          event_id: string
+          format: string
+          id: string
+          kind: string
+          path: string
+        }
+        Insert: {
+          bytes?: number
+          created_at?: string
+          created_by?: string | null
+          event_id: string
+          format: string
+          id?: string
+          kind: string
+          path: string
+        }
+        Update: {
+          bytes?: number
+          created_at?: string
+          created_by?: string | null
+          event_id?: string
+          format?: string
+          id?: string
+          kind?: string
+          path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "export_files_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "export_files_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "export_files_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_board"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "export_files_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_dashboard"
+            referencedColumns: ["event_id"]
+          },
+        ]
       }
       extraction_field_reviews: {
         Row: {
@@ -1023,6 +1212,8 @@ export type Database = {
           created_by: string | null
           created_by_staff: string | null
           event_id: string
+          expected_adults: number | null
+          expected_children: number | null
           expected_pax: number
           group_code: string | null
           group_type: Database["app"]["Enums"]["group_type"]
@@ -1056,6 +1247,8 @@ export type Database = {
           created_by?: string | null
           created_by_staff?: string | null
           event_id: string
+          expected_adults?: number | null
+          expected_children?: number | null
           expected_pax?: number
           group_code?: string | null
           group_type?: Database["app"]["Enums"]["group_type"]
@@ -1089,6 +1282,8 @@ export type Database = {
           created_by?: string | null
           created_by_staff?: string | null
           event_id?: string
+          expected_adults?: number | null
+          expected_children?: number | null
           expected_pax?: number
           group_code?: string | null
           group_type?: Database["app"]["Enums"]["group_type"]
@@ -1234,6 +1429,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "guest_groups"
             referencedColumns: ["id", "event_id"]
+          },
+          {
+            foreignKeyName: "guests_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
           },
           {
             foreignKeyName: "guests_group_id_event_id_fkey"
@@ -1490,6 +1692,13 @@ export type Database = {
             foreignKeyName: "import_rows_group_id_event_id_fkey"
             columns: ["group_id", "event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
+          },
+          {
+            foreignKeyName: "import_rows_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
             referencedRelation: "v_rsvp_queue"
             referencedColumns: ["group_id", "event_id"]
           },
@@ -1700,6 +1909,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "guest_groups"
             referencedColumns: ["id", "event_id"]
+          },
+          {
+            foreignKeyName: "messages_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
           },
           {
             foreignKeyName: "messages_group_id_event_id_fkey"
@@ -1969,6 +2185,13 @@ export type Database = {
             foreignKeyName: "room_assignments_group_id_event_id_fkey"
             columns: ["group_id", "event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
+          },
+          {
+            foreignKeyName: "room_assignments_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
             referencedRelation: "v_rsvp_queue"
             referencedColumns: ["group_id", "event_id"]
           },
@@ -2098,7 +2321,7 @@ export type Database = {
           group_id: string
           id: string
           last_dialed_at: string | null
-          status: Database['app']['Enums']['rsvp_job_status']
+          status: Database["app"]["Enums"]["rsvp_job_status"]
           updated_at: string
         }
         Insert: {
@@ -2115,7 +2338,7 @@ export type Database = {
           group_id: string
           id?: string
           last_dialed_at?: string | null
-          status?: Database['app']['Enums']['rsvp_job_status']
+          status?: Database["app"]["Enums"]["rsvp_job_status"]
           updated_at?: string
         }
         Update: {
@@ -2132,10 +2355,102 @@ export type Database = {
           group_id?: string
           id?: string
           last_dialed_at?: string | null
-          status?: Database['app']['Enums']['rsvp_job_status']
+          status?: Database["app"]["Enums"]["rsvp_job_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "rsvp_campaign_jobs_call_attempt_id_fkey"
+            columns: ["call_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "call_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_call_recording_id_fkey"
+            columns: ["call_recording_id"]
+            isOneToOne: false
+            referencedRelation: "call_recordings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_call_recording_id_fkey"
+            columns: ["call_recording_id"]
+            isOneToOne: false
+            referencedRelation: "v_transcription_backlog"
+            referencedColumns: ["recording_id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_campaign_id_event_id_fkey"
+            columns: ["campaign_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "rsvp_campaigns"
+            referencedColumns: ["id", "event_id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_board"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_dashboard"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_extraction_id_fkey"
+            columns: ["extraction_id"]
+            isOneToOne: false
+            referencedRelation: "rsvp_extractions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "guest_groups"
+            referencedColumns: ["id", "event_id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "v_rsvp_queue"
+            referencedColumns: ["group_id", "event_id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaign_jobs_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "v_travel_ledger"
+            referencedColumns: ["group_id", "event_id"]
+          },
+        ]
       }
       rsvp_campaigns: {
         Row: {
@@ -2146,9 +2461,9 @@ export type Database = {
           label: string
           max_concurrent: number
           scheduled_for: string | null
-          status: Database['app']['Enums']['rsvp_campaign_status']
+          status: Database["app"]["Enums"]["rsvp_campaign_status"]
           updated_at: string
-          wave: Database['app']['Enums']['rsvp_campaign_wave']
+          wave: Database["app"]["Enums"]["rsvp_campaign_wave"]
         }
         Insert: {
           created_at?: string
@@ -2158,9 +2473,9 @@ export type Database = {
           label: string
           max_concurrent?: number
           scheduled_for?: string | null
-          status?: Database['app']['Enums']['rsvp_campaign_status']
+          status?: Database["app"]["Enums"]["rsvp_campaign_status"]
           updated_at?: string
-          wave: Database['app']['Enums']['rsvp_campaign_wave']
+          wave: Database["app"]["Enums"]["rsvp_campaign_wave"]
         }
         Update: {
           created_at?: string
@@ -2170,11 +2485,40 @@ export type Database = {
           label?: string
           max_concurrent?: number
           scheduled_for?: string | null
-          status?: Database['app']['Enums']['rsvp_campaign_status']
+          status?: Database["app"]["Enums"]["rsvp_campaign_status"]
           updated_at?: string
-          wave?: Database['app']['Enums']['rsvp_campaign_wave']
+          wave?: Database["app"]["Enums"]["rsvp_campaign_wave"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "rsvp_campaigns_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaigns_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaigns_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_board"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "rsvp_campaigns_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_dashboard"
+            referencedColumns: ["event_id"]
+          },
+        ]
       }
       rsvp_extractions: {
         Row: {
@@ -2284,6 +2628,13 @@ export type Database = {
             foreignKeyName: "rsvp_extractions_group_id_event_id_fkey"
             columns: ["group_id", "event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
+          },
+          {
+            foreignKeyName: "rsvp_extractions_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
             referencedRelation: "v_rsvp_queue"
             referencedColumns: ["group_id", "event_id"]
           },
@@ -2305,6 +2656,13 @@ export type Database = {
             foreignKeyName: "rsvp_extractions_transcript_id_fkey"
             columns: ["transcript_id"]
             isOneToOne: false
+            referencedRelation: "v_extraction_backlog"
+            referencedColumns: ["transcript_id"]
+          },
+          {
+            foreignKeyName: "rsvp_extractions_transcript_id_fkey"
+            columns: ["transcript_id"]
+            isOneToOne: false
             referencedRelation: "v_transcription_backlog"
             referencedColumns: ["transcript_id"]
           },
@@ -2314,7 +2672,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
-          department: Database['app']['Enums']['staff_department']
+          department: Database["app"]["Enums"]["staff_department"]
           event_id: string
           full_name: string
           id: string
@@ -2324,7 +2682,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
-          department?: Database['app']['Enums']['staff_department']
+          department?: Database["app"]["Enums"]["staff_department"]
           event_id: string
           full_name: string
           id?: string
@@ -2334,7 +2692,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
-          department?: Database['app']['Enums']['staff_department']
+          department?: Database["app"]["Enums"]["staff_department"]
           event_id?: string
           full_name?: string
           id?: string
@@ -2580,6 +2938,13 @@ export type Database = {
             foreignKeyName: "travel_legs_group_id_event_id_fkey"
             columns: ["group_id", "event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
+          },
+          {
+            foreignKeyName: "travel_legs_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
             referencedRelation: "v_rsvp_queue"
             referencedColumns: ["group_id", "event_id"]
           },
@@ -2655,6 +3020,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "guest_groups"
             referencedColumns: ["id", "event_id"]
+          },
+          {
+            foreignKeyName: "trip_passengers_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
           },
           {
             foreignKeyName: "trip_passengers_group_id_event_id_fkey"
@@ -3245,6 +3617,113 @@ export type Database = {
         }
         Relationships: []
       }
+      v_event_rsvp_buckets: {
+        Row: {
+          bucket: string | null
+          event_id: string | null
+          group_id: string | null
+          head_name: string | null
+          pax: number | null
+        }
+        Insert: {
+          bucket?: never
+          event_id?: string | null
+          group_id?: string | null
+          head_name?: never
+          pax?: never
+        }
+        Update: {
+          bucket?: never
+          event_id?: string | null
+          group_id?: string | null
+          head_name?: never
+          pax?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_groups_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_groups_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "guest_groups_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_board"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "guest_groups_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_dashboard"
+            referencedColumns: ["event_id"]
+          },
+        ]
+      }
+      v_extraction_backlog: {
+        Row: {
+          event_id: string | null
+          group_id: string | null
+          recording_id: string | null
+          transcribed_at: string | null
+          transcript_chars: number | null
+          transcript_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcripts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transcripts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_attention"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "transcripts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_board"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "transcripts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v_event_dashboard"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "transcripts_recording_id_fkey"
+            columns: ["recording_id"]
+            isOneToOne: false
+            referencedRelation: "call_recordings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transcripts_recording_id_fkey"
+            columns: ["recording_id"]
+            isOneToOne: false
+            referencedRelation: "v_transcription_backlog"
+            referencedColumns: ["recording_id"]
+          },
+        ]
+      }
       v_review_queue: {
         Row: {
           duration_sec: number | null
@@ -3371,6 +3850,13 @@ export type Database = {
             foreignKeyName: "call_recordings_group_id_event_id_fkey"
             columns: ["group_id", "event_id"]
             isOneToOne: false
+            referencedRelation: "v_event_rsvp_buckets"
+            referencedColumns: ["group_id", "event_id"]
+          },
+          {
+            foreignKeyName: "call_recordings_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
             referencedRelation: "v_rsvp_queue"
             referencedColumns: ["group_id", "event_id"]
           },
@@ -3440,6 +3926,8 @@ export type Database = {
           created_by: string | null
           created_by_staff: string | null
           event_id: string
+          expected_adults: number | null
+          expected_children: number | null
           expected_pax: number
           group_code: string | null
           group_type: Database["app"]["Enums"]["group_type"]
@@ -3544,6 +4032,8 @@ export type Database = {
           created_by: string | null
           created_by_staff: string | null
           event_id: string
+          expected_adults: number | null
+          expected_children: number | null
           expected_pax: number
           group_code: string | null
           group_type: Database["app"]["Enums"]["group_type"]
@@ -3581,12 +4071,27 @@ export type Database = {
         }
         Returns: Json
       }
+      create_event_with_defaults: {
+        Args: {
+          p_bride_name: string
+          p_client_hash: string
+          p_client_last_four: string
+          p_code: string
+          p_ends_on: string
+          p_groom_name: string
+          p_name: string
+          p_starts_on: string
+          p_team_hash: string
+          p_team_last_four: string
+        }
+        Returns: Json
+      }
       create_rooms_bulk: {
         Args: {
           p_capacity?: number
           p_event_id: string
           p_hotel_id: string
-          p_max_capacity?: number | null
+          p_max_capacity?: number
           p_prefix?: string
           p_qty: number
           p_room_type: string
@@ -3663,6 +4168,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      pipeline_secret: { Args: { p_name: string }; Returns: string }
       release_group: { Args: { p_group_id: string }; Returns: undefined }
       save_rsvp_log: {
         Args: {
@@ -3690,6 +4196,8 @@ export type Database = {
           created_by: string | null
           created_by_staff: string | null
           event_id: string
+          expected_adults: number | null
+          expected_children: number | null
           expected_pax: number
           group_code: string | null
           group_type: Database["app"]["Enums"]["group_type"]
@@ -3784,12 +4292,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3813,11 +4321,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3838,11 +4346,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3863,11 +4371,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3880,11 +4388,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3958,6 +4466,7 @@ export const Constants = {
         "declined",
         "unreachable",
       ],
+      side: ["bride", "groom", "both", "other"],
       staff_department: [
         "management",
         "logistics",
@@ -3966,7 +4475,6 @@ export const Constants = {
         "production",
         "rsvp",
       ],
-      side: ["bride", "groom", "both", "other"],
       travel_direction: ["arrival", "departure"],
       travel_mode: ["air", "train", "bus", "cab", "self_drive"],
       trip_status: ["planned", "dispatched", "completed", "cancelled"],

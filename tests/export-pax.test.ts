@@ -41,6 +41,8 @@ function group(spec: GroupSpec) {
     confirmed_pax: spec.confirmed,
     adults_confirmed: null,
     children_confirmed: null,
+    expected_adults: null,
+    expected_children: null,
     rsvp_status: 'not_started' as const,
     needs_return_gift: false,
     priority: 0,

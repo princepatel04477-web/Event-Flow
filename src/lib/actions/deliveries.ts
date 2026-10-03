@@ -90,31 +90,41 @@ export async function generateDeliverables(eventId: string): Promise<GenerateRes
   // already there.
   const { data: existing, error: existingErr } = await supabase
     .from('deliverables')
-    .select('kind, group_id')
+    .select('kind, group_id, room_id')
     .eq('event_id', eventId)
   if (existingErr) {
     return { ok: false, error: `Could not read existing deliverables: ${existingErr.message}`, summary: { hampersCreated: 0, returnGiftsCreated: 0, existingHampers: 0, existingReturnGifts: 0 } }
   }
 
-  const seen = new Set(existing.map((d) => `${d.group_id}:${d.kind}`))
+  // Hampers are ROOM-targeted (F8a, client answer "one hamper per room"), so
+  // they dedupe on room_id; return gifts stay group-targeted.
+  const seenRooms = new Set(
+    existing.filter((d) => d.room_id).map((d) => `${d.room_id}:${d.kind}`),
+  )
+  const seenGroups = new Set(
+    existing.filter((d) => d.group_id).map((d) => `${d.group_id}:${d.kind}`),
+  )
+  const existingHampers = existing.filter((d) => d.kind === 'hamper').length
+  const existingReturnGifts = existing.filter((d) => d.kind === 'return_gift').length
+
   let hampersCreated = 0
   let returnGiftsCreated = 0
 
-  const hamperRows = (hampers ?? [])
-    .filter((h) => h.group_id)
-    .map((h) => ({
+  // Distinct ROOMS (not families) with an active assignment — one hamper each.
+  const roomIds = [...new Set((hampers ?? []).map((h) => h.room_id).filter((id): id is string => id !== null))]
+  const hamperRows = roomIds
+    .filter((roomId) => !seenRooms.has(`${roomId}:hamper`))
+    .map((roomId) => ({
       event_id: eventId,
-      group_id: h.group_id,
-      room_id: h.room_id,
+      room_id: roomId,
       kind: 'hamper' as const,
       quantity: 1,
       item_name: 'Welcome hamper',
     }))
-    .filter((r) => !seen.has(`${r.group_id}:${r.kind}`))
   if (hamperRows.length > 0) {
     const { error } = await supabase.from('deliverables').insert(hamperRows)
     if (error) {
-      return { ok: false, error: `Could not create hampers: ${error.message}`, summary: { hampersCreated: 0, returnGiftsCreated: 0, existingHampers: seenHampers(seen), existingReturnGifts: seenGifts(seen) } }
+      return { ok: false, error: `Could not create hampers: ${error.message}`, summary: { hampersCreated: 0, returnGiftsCreated: 0, existingHampers, existingReturnGifts } }
     }
     hampersCreated = hamperRows.length
   }
@@ -127,11 +137,11 @@ export async function generateDeliverables(eventId: string): Promise<GenerateRes
       quantity: 1,
       item_name: 'Return gift',
     }))
-    .filter((r) => !seen.has(`${r.group_id}:${r.kind}`))
+    .filter((r) => !seenGroups.has(`${r.group_id}:${r.kind}`))
   if (giftRows.length > 0) {
     const { error } = await supabase.from('deliverables').insert(giftRows)
     if (error) {
-      return { ok: false, error: `Could not create return gifts: ${error.message}`, summary: { hampersCreated, returnGiftsCreated: 0, existingHampers: seenHampers(seen) + hampersCreated, existingReturnGifts: seenGifts(seen) } }
+      return { ok: false, error: `Could not create return gifts: ${error.message}`, summary: { hampersCreated, returnGiftsCreated: 0, existingHampers: existingHampers + hampersCreated, existingReturnGifts } }
     }
     returnGiftsCreated = giftRows.length
   }
@@ -142,24 +152,18 @@ export async function generateDeliverables(eventId: string): Promise<GenerateRes
     summary: {
       hampersCreated,
       returnGiftsCreated,
-      existingHampers: seenHampers(seen),
-      existingReturnGifts: seenGifts(seen),
+      existingHampers,
+      existingReturnGifts,
     },
   }
-}
-
-function seenHampers(seen: Set<string>): number {
-  return [...seen].filter((k) => k.endsWith(':hamper')).length
-}
-function seenGifts(seen: Set<string>): number {
-  return [...seen].filter((k) => k.endsWith(':return_gift')).length
 }
 
 export interface DeliveryRunRow {
   id: string
   kind: 'hamper' | 'return_gift'
   status: string
-  group_id: string
+  /** null on a room-targeted hamper (F8a — the target is the room, not a family). */
+  group_id: string | null
   head_name: string | null
   primary_mobile: string | null
   hotel_name: string | null
@@ -227,4 +231,175 @@ export async function readDeliveryRun(eventId: string): Promise<DeliveryRunResul
   timing.report()
 
   return { ok: true, error: null, rows }
+}
+
+// ---------------------------------------------------------------------------
+// F8b — hampers by ROOM. One hamper per room (the client's answer); a family
+// split across rooms gets one in each. The room is the target, so a hamper no
+// longer needs a family.
+// ---------------------------------------------------------------------------
+
+export interface HamperRoomRow {
+  roomId: string
+  hotelId: string
+  hotelName: string | null
+  floor: string | null
+  roomNumber: string
+  /** Head names of the families with a guest in this room. */
+  families: string[]
+  /** Guests currently placed in this room. */
+  guests: number
+  /** The room's hamper, when one exists. */
+  hamper: { id: string; status: string; quantity: number } | null
+}
+
+export type HamperRoomsResult =
+  | { ok: true; rows: HamperRoomRow[] }
+  | { ok: false; error: string }
+
+export async function readHamperRooms(eventId: string): Promise<HamperRoomsResult> {
+  const access = await getEventAccess(eventId)
+  if (access !== 'admin' && access !== 'event_team') {
+    return { ok: false, error: 'Not permitted.' }
+  }
+
+  const supabase = await createClient()
+  const [roomsRes, assignsRes, groupsRes, hampersRes] = await Promise.all([
+    supabase
+      .from('rooms')
+      .select('id, room_number, floor, hotel_id, hotels ( name )')
+      .eq('event_id', eventId),
+    supabase
+      .from('room_assignments')
+      .select('room_id, group_id')
+      .eq('event_id', eventId)
+      .is('released_at', null),
+    supabase.from('guest_groups').select('id, head_name').eq('event_id', eventId),
+    supabase
+      .from('deliverables')
+      .select('id, room_id, status, quantity')
+      .eq('event_id', eventId)
+      .eq('kind', 'hamper')
+      .not('room_id', 'is', null),
+  ])
+  const failure = [roomsRes, assignsRes, groupsRes, hampersRes].find((r) => r.error)
+  if (failure?.error) {
+    return { ok: false, error: `Could not read the hamper rooms: ${failure.error.message}` }
+  }
+
+  const headByGroup = new Map((groupsRes.data ?? []).map((g) => [g.id, g.head_name]))
+  const familiesByRoom = new Map<string, Set<string>>()
+  const guestsByRoom = new Map<string, number>()
+  for (const a of assignsRes.data ?? []) {
+    if (!a.room_id) continue
+    guestsByRoom.set(a.room_id, (guestsByRoom.get(a.room_id) ?? 0) + 1)
+    const head = a.group_id ? headByGroup.get(a.group_id) : null
+    if (head) {
+      const set = familiesByRoom.get(a.room_id) ?? new Set<string>()
+      set.add(head)
+      familiesByRoom.set(a.room_id, set)
+    }
+  }
+
+  const hamperByRoom = new Map<string, { id: string; status: string; quantity: number }>()
+  for (const d of hampersRes.data ?? []) {
+    if (d.room_id) hamperByRoom.set(d.room_id, { id: d.id, status: d.status as string, quantity: d.quantity })
+  }
+
+  const rows: HamperRoomRow[] = (roomsRes.data ?? []).map((r) => ({
+    roomId: r.id,
+    hotelId: r.hotel_id,
+    hotelName: ((r.hotels as unknown as { name: string } | null)?.name) ?? null,
+    floor: r.floor,
+    roomNumber: r.room_number,
+    families: [...(familiesByRoom.get(r.id) ?? [])],
+    guests: guestsByRoom.get(r.id) ?? 0,
+    hamper: hamperByRoom.get(r.id) ?? null,
+  }))
+
+  return { ok: true, rows }
+}
+
+export interface AssignHampersResult {
+  ok: boolean
+  created: number
+  alreadyThere: number
+  error: string | null
+}
+
+/**
+ * Assign one hamper to each of these rooms. Idempotent: a room that already has
+ * a hamper of this kind is skipped, and the `(room_id, kind)` unique index is
+ * the backstop. Quantity is stored (the rule is one per room), never computed.
+ */
+export async function assignHampersToRooms(
+  eventId: string,
+  roomIds: readonly string[],
+  quantity = 1,
+): Promise<AssignHampersResult> {
+  const access = await getEventAccess(eventId)
+  if (access !== 'admin' && access !== 'event_team') {
+    return { ok: false, created: 0, alreadyThere: 0, error: 'Not permitted.' }
+  }
+  if (roomIds.length === 0) return { ok: true, created: 0, alreadyThere: 0, error: null }
+
+  const supabase = await createClient()
+  const { data: existing, error: readErr } = await supabase
+    .from('deliverables')
+    .select('room_id')
+    .eq('event_id', eventId)
+    .eq('kind', 'hamper')
+    .in('room_id', roomIds as string[])
+  if (readErr) {
+    return { ok: false, created: 0, alreadyThere: 0, error: `Could not read the rooms: ${readErr.message}` }
+  }
+
+  const has = new Set((existing ?? []).map((d) => d.room_id))
+  const toCreate = roomIds.filter((id) => !has.has(id))
+  if (toCreate.length === 0) {
+    return { ok: true, created: 0, alreadyThere: roomIds.length, error: null }
+  }
+
+  const { error: insertErr } = await supabase.from('deliverables').insert(
+    toCreate.map((roomId) => ({
+      event_id: eventId,
+      room_id: roomId,
+      kind: 'hamper' as const,
+      quantity,
+      item_name: 'Welcome hamper',
+    })),
+  )
+  if (insertErr) {
+    return { ok: false, created: 0, alreadyThere: roomIds.length - toCreate.length, error: `Could not assign the hampers: ${insertErr.message}` }
+  }
+
+  return { ok: true, created: toCreate.length, alreadyThere: roomIds.length - toCreate.length, error: null }
+}
+
+/**
+ * Undo an assignment: delete the PENDING room hampers for these rooms. A
+ * delivered hamper (it has a proof) is never deleted — the `(room_id, kind)`
+ * row stays and the caller re-reads.
+ */
+export async function unassignHampersFromRooms(
+  eventId: string,
+  roomIds: readonly string[],
+): Promise<{ ok: boolean; removed: number; error: string | null }> {
+  const access = await getEventAccess(eventId)
+  if (access !== 'admin' && access !== 'event_team') {
+    return { ok: false, removed: 0, error: 'Not permitted.' }
+  }
+  if (roomIds.length === 0) return { ok: true, removed: 0, error: null }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('deliverables')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('kind', 'hamper')
+    .in('room_id', roomIds as string[])
+    .eq('status', 'pending')
+    .select('id')
+  if (error) return { ok: false, removed: 0, error: `Could not undo: ${error.message}` }
+  return { ok: true, removed: (data ?? []).length, error: null }
 }

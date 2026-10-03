@@ -90,7 +90,7 @@ $function$;
 
 -- Backfill: one hamper per room that has an active assignment today.
 insert into public.deliverables (event_id, room_id, kind, quantity, item_name)
-select distinct ra.event_id, ra.room_id, 'hamper', 1, 'Welcome hamper'
+select distinct ra.event_id, ra.room_id, 'hamper'::app.deliverable_kind, 1, 'Welcome hamper'
   from public.room_assignments ra
  where ra.released_at is null
    and ra.room_id is not null

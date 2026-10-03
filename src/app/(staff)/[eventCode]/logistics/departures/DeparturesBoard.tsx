@@ -86,7 +86,9 @@ export function DeparturesBoard({ eventId, eventCode }: DeparturesBoardProps) {
 
       const returnGiftDelivered = new Map<string, boolean>()
       for (const d of deliverables ?? []) {
-        if (d.kind === 'return_gift' && d.status === 'delivered') returnGiftDelivered.set(d.group_id, true)
+        if (d.kind === 'return_gift' && d.status === 'delivered' && d.group_id) {
+          returnGiftDelivered.set(d.group_id, true)
+        }
       }
 
       const groupById = new Map((groups ?? []).map((g) => [g.id, g]))

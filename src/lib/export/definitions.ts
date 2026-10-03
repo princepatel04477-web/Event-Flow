@@ -10,6 +10,7 @@ import {
   buildExceptionRows,
   buildFamilyHeadRows,
   buildGuestMasterRows,
+  buildHamperByRoomRows,
   buildRoomAllocationRows,
   buildArrivalManifestRows,
   buildDepartureManifestRows,
@@ -19,6 +20,7 @@ import {
   type ExportData,
   type FamilyHeadRow,
   type GuestMasterRow,
+  type HamperRoomExportRow,
   type ArrivalManifestRow,
   type DepartureManifestRow,
   type RoomAllocationRow,
@@ -39,6 +41,7 @@ export function buildSheetDefinitions(data: ExportData): ExportSheetDefinition[]
   const familyHeadRows = buildFamilyHeadRows(data)
   const roomRows = buildRoomAllocationRows(data)
   const deliverableRows = buildDeliverableRows(data)
+  const hamperRoomRows = buildHamperByRoomRows(data)
   const exceptionRows = buildExceptionRows(data)
   const callLogRows = buildCallLogRows(data)
   const arrivalRows = buildArrivalManifestRows(data)
@@ -49,6 +52,7 @@ export function buildSheetDefinitions(data: ExportData): ExportSheetDefinition[]
     familyHeadsSheet(familyHeadRows),
     roomAllocationSheet(roomRows),
     deliverablesSheet(deliverableRows),
+    hamperByRoomSheet(hamperRoomRows),
     exceptionsSheet(exceptionRows),
     callLogSheet(callLogRows),
     arrivalManifestSheet(arrivalRows),
@@ -159,6 +163,28 @@ function deliverablesSheet(rows: DeliverableRowExport[]): AnySheetDefinition {
       { key: 'status', header: 'Status', type: 'string', width: 14 },
       { key: 'deliveredAt', header: 'Delivered at', type: 'string', width: 18 },
       { key: 'deliveredBy', header: 'Delivered by', type: 'string', width: 18 },
+    ],
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sheet — Hampers by room (F8b). One row per room.
+// ---------------------------------------------------------------------------
+
+function hamperByRoomSheet(rows: HamperRoomExportRow[]): AnySheetDefinition {
+  return {
+    name: 'Hampers by room',
+    rows,
+    columns: [
+      { key: 'hotel', header: 'Hotel', type: 'string', width: 24 },
+      { key: 'roomNumber', header: 'Room', type: 'string', width: 10 },
+      { key: 'families', header: 'Families', type: 'string', width: 30 },
+      { key: 'guests', header: 'Guests', type: 'number', width: 8 },
+      { key: 'itemName', header: 'Hamper type', type: 'text', width: 20 },
+      { key: 'quantity', header: 'Qty', type: 'number', width: 6 },
+      { key: 'status', header: 'Status', type: 'string', width: 12 },
+      { key: 'deliveredBy', header: 'Delivered by', type: 'string', width: 18 },
+      { key: 'deliveredAt', header: 'Delivered at', type: 'string', width: 18 },
     ],
   }
 }

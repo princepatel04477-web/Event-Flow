@@ -95,6 +95,9 @@ export async function readRoomingList(eventId: string): Promise<RoomingListResul
 
   const hamperByGroup = new Map<string, { id: string; status: string }>()
   for (const d of hampersRes.data ?? []) {
+    // Room-targeted hampers (group_id null) are not a family's hamper, so they
+    // do not appear on the rooming list's per-family cell.
+    if (!d.group_id) continue
     hamperByGroup.set(d.group_id, { id: d.id, status: d.status as string })
   }
 

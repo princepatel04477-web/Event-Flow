@@ -119,7 +119,8 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
 
       const pendingByGroup = new Map<string, string[]>()
       for (const d of deliverables ?? []) {
-        if (d.status === 'delivered') continue
+        // Room-targeted hampers (group_id null) do not belong to a family.
+        if (d.status === 'delivered' || !d.group_id) continue
         const list = pendingByGroup.get(d.group_id) ?? []
         list.push(d.kind === 'hamper' ? 'Hamper' : 'Return gift')
         pendingByGroup.set(d.group_id, list)

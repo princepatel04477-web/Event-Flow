@@ -15,12 +15,15 @@ import { LoadingRows } from '@/components/ui/LoadingRows'
 import { NowCard } from '@/components/ui/NowCard'
 import { Progress } from '@/components/ui/Progress'
 import { Row } from '@/components/ui/Row'
+import { Segmented } from '@/components/ui/Segmented'
 import {
   generateDeliverables,
   readDeliveryRun,
   type DeliveryRunRow,
 } from '@/lib/actions/deliveries'
 import { queryKeys } from '@/lib/query/keys'
+
+import { HamperByRoom } from './HamperByRoom'
 
 const KIND_LABEL: Record<string, string> = {
   hamper: 'Hamper',
@@ -124,6 +127,11 @@ export function HamperRun({
    * coming back puts a runner in front of their round, which is where they work.
    */
   const [fullList, setFullList] = useState(false)
+  /**
+   * F8b — "By room" is the default: the client's answer is one hamper per room,
+   * so the room is the unit of work now. "By family" keeps the old run.
+   */
+  const [view, setView] = useState<'room' | 'family'>('room')
 
   const router = useRouter()
 
@@ -230,6 +238,20 @@ export function HamperRun({
     // hamper team) has no tab bar, and the bar lifts itself above one when it
     // exists — so this is the only clearance the screen needs.
     <div className="flex flex-col gap-5 pb-bottombar">
+      <Segmented
+        label="Hamper view"
+        value={view}
+        options={[
+          { value: 'room', label: 'By room' },
+          { value: 'family', label: 'By family' },
+        ]}
+        onChange={setView}
+      />
+
+      {view === 'room' ? (
+        <HamperByRoom eventId={eventId} eventCode={eventCode} detailBase={detailBase} />
+      ) : (
+        <>
       {/* The progress tile is a door, not a label. Tapping it opens the FULL
           register — every hamper on the event, delivered ones included, in
           walking order — because the number "34/74" makes a runner ask "which
@@ -527,6 +549,8 @@ export function HamperRun({
           ) : null}
         </div>
       </BottomSheet>
+        </>
+      )}
     </div>
   )
 }

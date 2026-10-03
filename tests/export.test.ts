@@ -27,6 +27,8 @@ function makeData(): ExportData {
         confirmed_pax: null,
         adults_confirmed: null,
         children_confirmed: null,
+        expected_adults: null,
+        expected_children: null,
         rsvp_status: 'not_started',
         needs_return_gift: false,
         priority: 0,
@@ -60,6 +62,8 @@ function makeData(): ExportData {
         confirmed_pax: null,
         adults_confirmed: null,
         children_confirmed: null,
+        expected_adults: null,
+        expected_children: null,
         rsvp_status: 'confirmed',
         needs_return_gift: true,
         priority: 0,
@@ -349,7 +353,7 @@ describe('format traps', () => {
     codeAuth.staffNames = { s1: 'Priya Staff' }
     codeAuth.deliverables = [baseDeliv]
     codeAuth.proofs = [{
-      id: 'p1', event_id: 'e1', deliverable_id: 'd1',
+      id: 'p1', event_id: 'e1', deliverable_id: 'd1', room_id: null,
       captured_by: null, captured_by_staff: 's1',
       recorded_at: '2026-08-01T10:00:00Z', storage_bucket: 'delivery-proofs',
       storage_path: 'e1/d1/x.jpg', photo_sha256: 'abc', file_size_bytes: 1,
@@ -364,7 +368,7 @@ describe('format traps', () => {
     legacy.profileNames = { u1: 'Prince Admin' }
     legacy.deliverables = [baseDeliv]
     legacy.proofs = [{
-      id: 'p2', event_id: 'e1', deliverable_id: 'd1',
+      id: 'p2', event_id: 'e1', deliverable_id: 'd1', room_id: null,
       captured_by: 'u1', captured_by_staff: null,
       recorded_at: '2026-08-01T10:00:00Z', storage_bucket: 'delivery-proofs',
       storage_path: 'e1/d1/y.jpg', photo_sha256: 'def', file_size_bytes: 1,

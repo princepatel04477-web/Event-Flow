@@ -47,6 +47,8 @@ function group(overrides: Partial<GuestGroupRow> & Pick<GuestGroupRow, 'id' | 'g
     confirmed_pax: null,
     adults_confirmed: null,
     children_confirmed: null,
+    expected_adults: null,
+    expected_children: null,
     rsvp_status: 'not_started',
     needs_return_gift: false,
     priority: 0,
