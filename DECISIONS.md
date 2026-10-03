@@ -5,6 +5,41 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — F6: migration to split the EXPECTED headcount into adults/children (NOT applied)
+
+### Client answer
+
+A child is anyone aged **under 12**, and children count in the headline
+"guests" number (asked and answered 3 Oct 2026).
+
+### Why a migration, and why this shape
+
+`guest_groups` already has `adults_confirmed` / `children_confirmed`
+(migration `20260806100000`) — the split a caller records on the phone, kept in
+sync with `confirmed_pax` by `app.sync_confirmed_pax()`. F6's "add adults and
+children on the table that stores the family's guest count" is therefore the
+split of the **expected** (invited) count, `expected_pax`, which has none.
+
+New columns are named **`expected_adults` / `expected_children`** rather than the
+prompt's bare `adults` / `children`: a bare pair beside `adults_confirmed` /
+`children_confirmed` would read as two same-named things, and the `expected_*`
+names mirror the confirmed pair exactly. A CHECK requires
+`expected_adults + expected_children = expected_pax` when both are set; either
+side null means "split not entered yet". No backfill — existing families stay
+null.
+
+### Status
+
+Migration written: `supabase/migrations/20261003090000_guest_groups_expected_split.sql`.
+**NOT applied, and database types NOT regenerated** — per the standing rule.
+Everything downstream in F6 (the Adults/Children steppers on the family record,
+the "465 guests · 402 adults · 63 children" counters, the import columns, the
+export columns after PAX) is gated on "apply" and is not in this commit.
+
+GLOSSARY updated now (guests = everyone; adults; children; child under 12).
+
+---
+
 ## 3 October 2026 — F5: departure notes (no migration — the column already existed)
 
 ### Step 1 — the column is NOT missing
