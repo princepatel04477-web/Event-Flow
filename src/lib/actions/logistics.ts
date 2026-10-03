@@ -1,8 +1,27 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { friendlyDbError } from '@/lib/errors'
+import { friendlyDbError, isNetworkError } from '@/lib/errors'
 import { pack } from '@/lib/logistics/pack'
+
+/**
+ * Plain-language copy for a FAILED READ. `friendlyDbError` is written for
+ * writes ("Something went wrong saving that"), which is the wrong sentence on
+ * a screen that only loads. Says what happened; the screen adds what to do and
+ * who to ask (UX-RULES R6).
+ */
+function readError(
+  error: { message?: string | null; code?: string | null } | null,
+  what: string,
+): string {
+  if (isNetworkError(error)) {
+    return 'Could not reach the server. Check your connection and try again.'
+  }
+  if (error?.code === '42501') {
+    return 'The database refused to show this event’s data — your account may not have permission on this event.'
+  }
+  return `Could not read the ${what} from the database.`
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,16 +88,29 @@ export interface LogisticsProposal {
 }
 
 // ---------------------------------------------------------------------------
+// Read result
+//
+// supabase-js returns `{ data, error }` and NEVER throws. Destructuring only
+// `data` makes a failed query indistinguishable from "no rows", which is how
+// vehicle planning failed SILENTLY: a broken read rendered the empty state
+// ("No vehicles in the fleet" / "Nothing to plan") instead of an error. Every
+// read below now returns this shape so the screen can tell a failure from an
+// empty event (UX-RULES R6).
+// ---------------------------------------------------------------------------
+
+export type ReadResult<T> = { ok: true; data: T } | { ok: false; error: string }
+
+// ---------------------------------------------------------------------------
 // Read: legs that need a trip
 // ---------------------------------------------------------------------------
 
 export async function readUnplacedTravelLegs(
   eventId: string,
   direction: 'arrival' | 'departure',
-): Promise<TravelLegForLogistics[]> {
+): Promise<ReadResult<TravelLegForLogistics[]>> {
   const supabase = await createClient()
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('travel_legs')
     .select(
       'id, group_id, direction, mode, travel_date, travel_time, point, reference, pax_on_leg, needs_transport, guest_groups!inner(head_name)',
@@ -89,16 +121,20 @@ export async function readUnplacedTravelLegs(
     .order('travel_date', { ascending: true })
     .order('travel_time', { ascending: true })
 
+  if (error) return { ok: false, error: readError(error, `${direction} travel legs`) }
+
   // Exclude legs already on a trip
-  const { data: placed } = await supabase
+  const { data: placed, error: placedError } = await supabase
     .from('trip_passengers')
     .select('travel_leg_id')
     .eq('event_id', eventId)
     .not('travel_leg_id', 'is', null)
 
+  if (placedError) return { ok: false, error: readError(placedError, `${direction} travel legs`) }
+
   const placedIds = new Set((placed ?? []).map((p: Record<string, unknown>) => p.travel_leg_id as string))
 
-  return ((data ?? []) as unknown as Record<string, unknown>[])
+  const legs = ((data ?? []) as unknown as Record<string, unknown>[])
     .filter((leg) => !placedIds.has(leg.id as string))
     .map((leg) => {
       const group = leg.guest_groups as { head_name: string } | null
@@ -116,28 +152,34 @@ export async function readUnplacedTravelLegs(
         needsTransport: leg.needs_transport as boolean,
       }
     })
+
+  return { ok: true, data: legs }
 }
 
 // ---------------------------------------------------------------------------
 // Read: available vehicles
 // ---------------------------------------------------------------------------
 
-export async function readAvailableVehicles(eventId: string): Promise<VehicleForPacking[]> {
+export async function readAvailableVehicles(eventId: string): Promise<ReadResult<VehicleForPacking[]>> {
   const supabase = await createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('vehicles')
     .select('id, label, capacity, driver_name, driver_mobile')
     .eq('event_id', eventId)
     .neq('status', 'unavailable')
     .order('capacity', { ascending: false })
 
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map((v) => ({
+  if (error) return { ok: false, error: readError(error, 'fleet') }
+
+  const vehicles = ((data ?? []) as unknown as Record<string, unknown>[]).map((v) => ({
     id: v.id as string,
     label: v.label as string | null,
     capacity: v.capacity as number,
     driverName: v.driver_name as string | null,
     driverMobile: v.driver_mobile as string | null,
   }))
+
+  return { ok: true, data: vehicles }
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +214,11 @@ export async function suggestVehiclesForArrival(
   eventId: string,
   pax: number,
 ): Promise<PaxSuggestionResult> {
-  const vehicles = await readAvailableVehicles(eventId)
+  const read = await readAvailableVehicles(eventId)
+  // A failed read yields no suggestions rather than a crash; the planning
+  // screen surfaces the same failure in full (this path has no error UI of
+  // its own).
+  const vehicles = read.ok ? read.data : []
   const result = suggestVehiclesForPax(
     pax,
     vehicles.map((v) => ({ id: v.id, label: v.label, capacity: v.capacity })),
@@ -290,20 +336,22 @@ export async function commitTrips(
 
   // Allocate vehicles
   const vehicleIds = proposal.trips.map((t) => t.vehicleId)
-  const { data: vehicles } = await supabase
+  const { data: vehicles, error: vehiclesError } = await supabase
     .from('vehicles')
     .select('id, status')
     .in('id', vehicleIds)
+  if (vehiclesError) return { ok: false, error: friendlyDbError(vehiclesError, undefined, 'commitTrips') }
   const vehicleMap = new Map<string, string>()
   for (const v of (vehicles ?? [])) {
     vehicleMap.set(v.id, v.status)
   }
 
   // Mark vehicles as assigned
-  await supabase
+  const { error: assignError } = await supabase
     .from('vehicles')
     .update({ status: 'assigned', updated_at: new Date().toISOString() })
     .in('id', vehicleIds)
+  if (assignError) return { ok: false, error: friendlyDbError(assignError, undefined, 'commitTrips') }
 
   let tripCount = 0
   for (const trip of proposal.trips) {

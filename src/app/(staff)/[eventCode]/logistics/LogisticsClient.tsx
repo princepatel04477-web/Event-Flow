@@ -47,6 +47,15 @@ interface EmptyReason {
   reason: 'no-vehicles' | 'no-legs'
 }
 
+/** A read failed. Distinct from EmptyReason: an empty event is not an error. */
+interface LoadFailure {
+  error: string
+  /** Which read failed, for the small reference line (R6). */
+  reference: string
+}
+
+type LoadResult = LogisticsData | EmptyReason | LoadFailure
+
 export function LogisticsClient({ eventId, eventCode }: Props) {
   const [tab, setTab] = useState<Tab>('arrivals')
   const [saving, setSaving] = useState(false)
@@ -54,12 +63,24 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
   const [commitError, setCommitError] = useState<string | null>(null)
 
   const loadFor = useCallback(
-    (dir: 'arrival' | 'departure'): Promise<LogisticsData | EmptyReason> =>
+    (dir: 'arrival' | 'departure'): Promise<LoadResult> =>
       traceFetch(`logistics :: readData(${dir})`, async () => {
-        const [legs, vehicles] = await Promise.all([
+        const [legsRead, vehiclesRead] = await Promise.all([
           readUnplacedTravelLegs(eventId, dir),
           readAvailableVehicles(eventId),
         ])
+
+        // A failed read is NOT an empty event. Before this, the error was
+        // discarded and a broken query rendered "Nothing to plan" — the
+        // client's "planning vehicle is not working" with no clue why.
+        if (!legsRead.ok) {
+          return { error: legsRead.error, reference: `reading ${dir} travel legs` }
+        }
+        if (!vehiclesRead.ok) {
+          return { error: vehiclesRead.error, reference: 'reading the fleet' }
+        }
+        const legs = legsRead.data
+        const vehicles = vehiclesRead.data
 
         // An empty fleet is not the same problem as an empty leg list, and
         // the difference decides what the user must do next — so carry the
@@ -93,11 +114,11 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
   // renders from cache on the second visit instead of re-querying Supabase.
   // The departure direction is mounted lazily — fetching both directions on
   // first load would do ~12s of cumulative work just to show one tab.
-  const arrivals = useStableData<LogisticsData | EmptyReason>(
+  const arrivals = useStableData<LoadResult>(
     `logistics:arrival:${eventId}`,
     () => loadFor('arrival'),
   )
-  const departures = useStableData<LogisticsData | EmptyReason>(
+  const departures = useStableData<LoadResult>(
     `logistics:departure:${eventId}`,
     () => loadFor('departure'),
     // Mount only once the user opens the departures tab; until then the
@@ -115,7 +136,7 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
 
   const handleCommit = async () => {
     const data = active.data
-    if (!data || 'empty' in data || !data.proposal) return
+    if (!data || 'empty' in data || 'error' in data || !data.proposal) return
     setSaving(true)
     const result = await commitTrips(eventId, data.proposal)
     if (result.ok) {
@@ -161,14 +182,35 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
 
   const data = active.data
 
+  // The fetch itself rejected (a transport/offline failure) — useStableData's
+  // own error, separate from a read that came back with a database error.
   if (active.error) {
     return (
-      <EmptyState
-        icon={<ShieldAlertIcon className="h-7 w-7" />}
-        title="Could not load logistics"
-        description="Could not load logistics data."
-        action={<Button onClick={active.reload}>Retry</Button>}
-      />
+      <div className="flex flex-col gap-2">
+        <EmptyState
+          icon={<ShieldAlertIcon className="h-7 w-7" />}
+          title="Could not load the plan"
+          description="The plan could not be read this time — a load failure, not an empty event. Reload the page and try again."
+          action={<Button onClick={active.reload}>Refresh</Button>}
+        />
+        <p className="text-center text-xs text-subtle">Reference: reading the plan</p>
+      </div>
+    )
+  }
+
+  // A read came back with a database error. R6: what happened, what to do,
+  // who to ask; the reference is small and last.
+  if (data && 'error' in data) {
+    return (
+      <div className="flex flex-col gap-2">
+        <EmptyState
+          icon={<ShieldAlertIcon className="h-7 w-7" />}
+          title="Could not load the plan"
+          description={`${data.error} This is a load failure, not an empty event. Reload the page to try again, and tell your event admin if it keeps happening.`}
+          action={<Button onClick={active.reload}>Refresh</Button>}
+        />
+        <p className="text-center text-xs text-subtle">Reference: {data.reference}</p>
+      </div>
     )
   }
 
@@ -359,7 +401,7 @@ export function LogisticsClient({ eventId, eventCode }: Props) {
           </Button>
         )}
         {committed && (
-          <LinkButton fullWidth variant="secondary" href={`/${eventId}/logistics/fleet`}>
+          <LinkButton fullWidth variant="secondary" href={`/${eventCode}/logistics/fleet`}>
             Back to fleet
           </LinkButton>
         )}

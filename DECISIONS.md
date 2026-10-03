@@ -5,6 +5,56 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — F2: vehicle planning failed silently because it swallowed the supabase error
+
+### What the client reported
+
+"Planning vehicle for this board is not working." F0's map is
+`docs/CLIENT-FEEDBACK-03OCT.md`, item 2.
+
+### Root cause (fixed here, only this)
+
+The route and the "Plan vehicles for this board" link are correct. The read
+actions destructured only `data` and discarded `error`, and supabase-js returns
+`{ data, error }` without ever throwing — so any failed query returned `[]`,
+which the screen renders as its empty state ("No vehicles in the fleet" /
+"No … legs need transport right now."). A load failure was indistinguishable
+from an empty event, with no way for staff to tell which.
+
+### Fix
+
+- `readUnplacedTravelLegs` and `readAvailableVehicles` now return
+  `ReadResult<T>` (`{ ok: true; data } | { ok: false; error }`), checking
+  `error` on the travel-legs read, the placed-legs read and the vehicles read.
+- New `readError()` copy: read failures are worth a read sentence, not
+  `friendlyDbError`'s "Something went wrong saving that" (a write message).
+- `LogisticsClient` gains a real error state (UX-RULES R6): what happened, what
+  to do (Refresh), who to ask (your event admin), reference small and last —
+  distinct from the empty state. `commitTrips` now checks the vehicles status
+  read and the status update too.
+- Bug found while tracing: after committing, "Back to fleet" linked to
+  `/{eventId}/logistics/fleet` — the event **UUID**, not the code — a 404. Fixed
+  to `/{eventCode}/logistics/fleet` (matches the empty state's own link).
+- `suggestVehiclesForArrival` unwraps the result (empty fleet on failure); its
+  return shape is unchanged so the v1 arrivals screen is untouched.
+
+### Not changed, deliberately
+
+Vehicle suggestion still reads capacity live from `vehicles.capacity`
+(luggage-adjusted: Sedan 3 / SUV 4 / Tempo 14–20 / Bus 30–50 per the seed) and
+stays advisory — F2 said fix only this cause. The commit path was not converted
+to the optimistic+rollback pattern; it is a single explicit "Commit plan"
+action, and changing that is a separate task.
+
+### Evidence
+
+`tests/vehicle-planning.test.ts` (6 tests) mocks `@/lib/supabase/server` and
+proves: a failed read returns `ok:false` with plain-language copy (not `[]`), a
+42501 says permission was refused, a healthy read maps rows and excludes legs
+already on a trip, and `commitTrips` surfaces a failed vehicle read.
+
+---
+
 ## 3 October 2026 — F1: the export PAX column is the family's guest count, not 1
 
 ### What the client reported
