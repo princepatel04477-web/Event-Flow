@@ -25,6 +25,8 @@ export interface TravelLegLike {
   pax_on_leg: number | null
   arrived_at: string | null
   departed_at: string | null
+  /** The driver/team note on the leg (`travel_legs.notes`); shown under the row. */
+  notes?: string | null
 }
 
 /** The slice of `guest_groups` the board reads. */

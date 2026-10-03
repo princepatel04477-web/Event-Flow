@@ -50,7 +50,7 @@ import {
 
 /** The columns this board paints. Listed so a rename still fails the build. */
 const LEG_COLUMNS =
-  'id, group_id, direction, mode, travel_date, travel_time, reference, point, pax_on_leg, arrived_at, departed_at'
+  'id, group_id, direction, mode, travel_date, travel_time, reference, point, pax_on_leg, arrived_at, departed_at, notes'
 const GROUP_COLUMNS =
   'id, head_name, primary_mobile, expected_pax, adults_confirmed, children_confirmed, needs_pickup, side'
 
@@ -446,6 +446,13 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
                             tone={toneFor(row, direction)}
                             onPress={() => openSheet(row)}
                           />
+                          {/* The departure note (F5), one muted line under the
+                              row when present. */}
+                          {row.leg.notes?.trim() ? (
+                            <p className="px-3 pb-2 text-xs leading-snug text-muted">
+                              {row.leg.notes}
+                            </p>
+                          ) : null}
                         </li>
                       ))}
                     </ul>

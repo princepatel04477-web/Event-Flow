@@ -126,6 +126,7 @@ export interface ArrivalManifestRow {
   arrivalMode: string
   arrivalPoint: string
   arrivalReference: string
+  notes: string
   rsvpStatus: string
 }
 
@@ -138,6 +139,7 @@ export interface DepartureManifestRow {
   departureMode: string
   departurePoint: string
   departureReference: string
+  notes: string
   rsvpStatus: string
 }
 
@@ -520,6 +522,7 @@ export function buildArrivalManifestRows(data: ExportData): ArrivalManifestRow[]
         arrivalMode: l.mode ? TRAVEL_MODE_LABELS[l.mode] ?? l.mode : '',
         arrivalPoint: l.point ?? '',
         arrivalReference: l.reference ?? '',
+        notes: l.notes ?? '',
         rsvpStatus: g ? RSVP_STATUS_LABELS[g.rsvp_status] ?? g.rsvp_status : '',
         dateValue: l.travel_date
           ? new Date(`${l.travel_date}T${l.travel_time ?? '00:00'}:00`)
@@ -557,6 +560,7 @@ export function buildDepartureManifestRows(data: ExportData): DepartureManifestR
         departureMode: l.mode ? TRAVEL_MODE_LABELS[l.mode] ?? l.mode : '',
         departurePoint: l.point ?? '',
         departureReference: l.reference ?? '',
+        notes: l.notes ?? '',
         rsvpStatus: g ? RSVP_STATUS_LABELS[g.rsvp_status] ?? g.rsvp_status : '',
         dateValue: l.travel_date
           ? new Date(`${l.travel_date}T${l.travel_time ?? '00:00'}:00`)

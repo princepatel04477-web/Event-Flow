@@ -5,6 +5,52 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — F5: departure notes (no migration — the column already existed)
+
+### Step 1 — the column is NOT missing
+
+`travel_legs.notes` already exists: `text`, nullable, no length limit, no column
+comment (`supabase/migrations/20260731000200_guests_rsvp.sql:93`). Arrivals and
+departures are the same table (`direction` discriminates), so the column is
+already on departure rows too. **No migration was written**, so there is nothing
+to apply — F5's "show it and STOP" step is skipped with that reason.
+
+The old "arrivals has notes" the client compares against is the RSVP form's Notes
+box, stored in `guest_groups.remarks` (family-level), not a per-leg column. F5
+specifies a per-departure note matching the arrivals *column*, so this wires
+`travel_legs.notes`.
+
+### Step 2 — what was wired
+
+- `src/lib/actions/departures.ts` — `departureSchema` gains `notes`;
+  `saveDeparture` writes `travel_legs.notes` (trimmed, null when blank);
+  `searchDepartureGroups` reads it back into `ExistingDeparture.notes`, so
+  re-opening the form prefills it.
+- `DeparturesClient.tsx` — a `Notes` textarea under the mode/drop fields, same
+  label style as the rest of the form, placeholder "Anything the driver should
+  know", prefilled from the existing leg.
+- `(app)/v2/.../logistics/_components/TravelBoard.tsx` + `_travel.ts` — the board
+  row shows the note as one muted line under the row when present; `notes` added
+  to `LEG_COLUMNS` (and optionally to `TravelLegLike`, so test fixtures did not
+  break).
+- `src/lib/export/` — **both** the Arrivals and Departures manifests gain a
+  `Notes` column after `Reference` (the last travel column). The client asked for
+  the departures sheet "same position as in the arrivals export"; the arrivals
+  sheet had no per-leg Notes column, so adding it to both is what makes them
+  actually the same. The data is the same shared column.
+
+### Not done, deliberately
+
+- **Client Road view**: there is no client-facing road/departure screen in the
+  app (the client surface is guest profiles only), so there is nothing to show
+  the note on. F5 said "(if it shows departures)".
+- **Offline queue**: the departure form has no IndexedDB outbox — it calls the
+  `saveDeparture` server action directly. The notes field goes through that same
+  path, so it behaves exactly like every other field on the form; there is no
+  separate queue to join.
+
+---
+
 ## 3 October 2026 — F4: the trip planner uses the call log's rows, not a box per trip
 
 ### Which list "logistics log" means — the assumption

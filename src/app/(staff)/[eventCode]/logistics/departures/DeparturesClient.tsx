@@ -53,6 +53,7 @@ export function DeparturesClient({ eventId, eventCode }: Props) {
   const [mode, setMode] = useState<string>('cab')
   const [reference, setReference] = useState('')
   const [dropPoint, setDropPoint] = useState('')
+  const [notes, setNotes] = useState('')
   const [pax, setPax] = useState<number>(0)
   // Cab expense
   const [expenseAmount, setExpenseAmount] = useState<number | ''>('')
@@ -66,6 +67,7 @@ export function DeparturesClient({ eventId, eventCode }: Props) {
     setMode(group.existingLeg?.mode ?? 'cab')
     setReference(group.existingLeg?.reference ?? '')
     setDropPoint(group.existingLeg?.point ?? '')
+    setNotes(group.existingLeg?.notes ?? '')
     setExpenseAmount('')
     setExpenseMode('')
     setExpenseNotes('')
@@ -129,6 +131,7 @@ export function DeparturesClient({ eventId, eventCode }: Props) {
       mode: mode as DepartureInput['mode'],
       reference: reference || undefined,
       dropPoint: dropPoint || undefined,
+      notes: notes.trim() ? notes : undefined,
       paxOnLeg: pax,
       expenseAmount: mode === 'cab' && expenseAmount !== '' ? Number(expenseAmount) : undefined,
       expenseMode: mode === 'cab' && expenseMode ? (expenseMode as DepartureInput['expenseMode']) : undefined,
@@ -317,6 +320,17 @@ export function DeparturesClient({ eventId, eventCode }: Props) {
                   onChange={(e) => setPax(Math.max(0, parseInt(e.target.value, 10) || 0))}
                   min={1}
                   className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-fg text-base"
+                />
+              </label>
+
+              <label>
+                <span className="block text-sm font-medium text-fg">Notes</span>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-fg placeholder:text-subtle"
+                  placeholder="Anything the driver should know"
                 />
               </label>
 

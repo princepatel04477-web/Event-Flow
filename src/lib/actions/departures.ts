@@ -26,6 +26,7 @@ export interface ExistingDeparture {
   reference: string | null
   paxOnLeg: number | null
   source: string
+  notes: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +112,7 @@ export async function searchDepartureGroups(
       .in('group_id', allIds),
     supabase
       .from('travel_legs')
-      .select('id, group_id, mode, travel_date, travel_time, point, reference, pax_on_leg, source')
+      .select('id, group_id, mode, travel_date, travel_time, point, reference, pax_on_leg, source, notes')
       .eq('event_id', eventId)
       .eq('direction', 'departure')
       .in('group_id', allIds)
@@ -142,6 +143,7 @@ export async function searchDepartureGroups(
         reference: leg.reference,
         paxOnLeg: leg.pax_on_leg,
         source: leg.source,
+        notes: leg.notes,
       })
     }
   }
@@ -174,6 +176,7 @@ const departureSchema = z.object({
   mode: z.enum(['air', 'train', 'bus', 'cab', 'self_drive']),
   reference: z.string().optional(),
   dropPoint: z.string().optional(),
+  notes: z.string().optional(),
   paxOnLeg: z.number().int().positive('Number of guests must be at least 1'),
   expenseAmount: z.number().positive().nullable().optional(),
   expenseMode: z.enum(['cash', 'upi', 'vendor_bill']).nullable().optional(),
@@ -203,6 +206,7 @@ export async function saveDeparture(
     travel_time: parsed.data.travelTime,
     reference: parsed.data.reference || null,
     point: parsed.data.dropPoint || null,
+    notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
     pax_on_leg: parsed.data.paxOnLeg,
     source,
     updated_at: new Date().toISOString(),
