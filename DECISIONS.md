@@ -5,6 +5,69 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — F1: the export PAX column is the family's guest count, not 1
+
+### What the client reported
+
+"In exporting pax why it is one Qty only." F0's map is
+`docs/CLIENT-FEEDBACK-03OCT.md`, item 1.
+
+### What F0 found, and why it matters here
+
+No export module hardcodes `1`. Every `1` a client can see comes from data:
+
+- `guest_groups.expected_pax` is defaulted to **1** by the contacts-layout import
+  when the sheet had no PAX column (`src/lib/import/contactsSheet.ts:755`), and the
+  Guest Master / Family Heads sheets read `expected_pax` alone.
+- `deliverables.quantity` is a hardcoded `1` at generation
+  (`src/lib/actions/deliveries.ts:110,127`), and the Deliverables sheet's `Qty`
+  faithfully prints it.
+- `pax_on_leg ?? 1` (`src/lib/actions/logistics.ts:115`) makes the Driver-sheets
+  `PAX` read 1 for a leg with no per-leg headcount.
+
+### The rule this session fixes
+
+The family's PAX **is the family's guest count**, and the app already defines that
+as `confirmed_pax ?? expected_pax` (rooms, departures and the travel manifests all
+use it). The export used `expected_pax` alone in the Guest Master, so a family the
+import defaulted to 1 and a caller then confirmed at 6 still exported **1**.
+
+Per-sheet rule, now written here as F1 asks:
+
+- **one row per family** (Guest Master, Arrivals, Departures) — PAX is the family's
+  guest count on that row.
+- **one row per guest** (Room Allocation) — keep one row per guest, and PAX rides on
+  the family head's row only, blank on the other members' rows, so a plain Excel
+  `SUM` of the column is the true total rather than headcount².
+
+### Files changed
+
+- `src/lib/export/sheets.ts` — new `familyGuestCount(g) = confirmed_pax ?? expected_pax`;
+  used by Guest Master, Arrivals, Departures; `RoomAllocationRow` gains `pax`, set on
+  the head's row only.
+- `src/lib/export/definitions.ts` — Room Allocation gains a `PAX` column (after the
+  guest name, existing columns untouched).
+- `tests/export-pax.test.ts` — 3 families (4, 2, 1), the first split into four guest
+  rows; every PAX column must total 7, and a confirmed family exports its confirmed
+  count not the stale 1.
+
+### What was NOT changed, and why
+
+- **Deliverables `Qty`** already reads the stored quantity (`d.quantity`); it is 1
+  because generation stores 1. F1 says do not invent a quantity rule — **F8 decides
+  the hamper quantity**. Left as-is.
+- **Family Heads `Expected pax`** stays `expected_pax` — the column is explicitly the
+  *expected* number, and the sheet already carries confirmed `Adults`/`Children`.
+- **Guest Master remains round-trip safe**: the identity hash (U / name / CONTACT) is
+  unchanged, and the Pax column is still a normal sheet-sourced value on re-import
+  (same as name/city/phone).
+- **Handed back, outside F1's files:** the import default at
+  `src/lib/import/contactsSheet.ts:755` (`paxParsed ?? 1`) is what turns a
+  PAX-less source sheet into "everyone is 1". That is the deeper fix and it needs a
+  session that may touch the importer.
+
+---
+
 ## 22 September 2026 — SHELL: the event lead's Home tab stopped bouncing to Auto-call
 
 ### What was wrong, verified by screenshot before touching anything

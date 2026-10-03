@@ -130,6 +130,10 @@ function roomAllocationSheet(rows: RoomAllocationRow[]): AnySheetDefinition {
       { key: 'roomNumber', header: 'Room', type: 'string', width: 10 },
       { key: 'roomType', header: 'Type', type: 'string', width: 12 },
       { key: 'headName', header: 'Guest', type: 'string', width: 28 },
+      // The family's guest count, on the family head's row only (this sheet is
+      // one row per guest — see RoomAllocationRow.pax). A plain SUM is the
+      // family total.
+      { key: 'pax', header: 'PAX', type: 'number', width: 6 },
       { key: 'checkInDate', header: 'Check-in', type: 'date', width: 14 },
       { key: 'checkInTime', header: 'Time', type: 'time', width: 8 },
       { key: 'checkOutDate', header: 'Check-out', type: 'date', width: 14 },

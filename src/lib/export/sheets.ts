@@ -74,6 +74,14 @@ export interface RoomAllocationRow {
   roomNumber: string
   roomType: string
   headName: string
+  /**
+   * The family's guest count, on the family head's row only; null on the other
+   * members' rows of the same family. This sheet is one row per guest, so a
+   * PAX on every row would multiply the family by its headcount when the
+   * client SUMs the column in Excel. Head-row-only makes a plain SUM the true
+   * total (see DECISIONS.md, F1).
+   */
+  pax: number | null
   checkInDate: Date | null
   checkInTime: string | null
   checkOutDate: Date | null
@@ -212,6 +220,19 @@ function legCell(leg: TravelLegRow | undefined): string {
   return parts.join(' ')
 }
 
+/**
+ * The family's guest count.
+ *
+ * `confirmed_pax` (set when a caller confirms the real number) wins over
+ * `expected_pax` (the invited number, which the import defaults to 1 when the
+ * sheet had no PAX column). This is the same count every operational screen
+ * uses — rooms, departures, the travel manifests — so the export now agrees
+ * with the app instead of showing a stale 1.
+ */
+export function familyGuestCount(g: GuestGroupRow): number {
+  return g.confirmed_pax ?? g.expected_pax
+}
+
 export function buildGuestMasterRows(data: ExportData): GuestMasterRow[] {
   return data.groups.map((g) => {
     const arrival = data.legs.find((l) => l.group_id === g.id && l.direction === 'arrival')
@@ -223,7 +244,7 @@ export function buildGuestMasterRows(data: ExportData): GuestMasterRow[] {
       name: g.head_name,
       place: g.city ?? '',
       contact: g.primary_mobile ?? '',
-      pax: g.expected_pax,
+      pax: familyGuestCount(g),
       arrivalDate: arrival?.travel_date ?? '',
       arrivalTime: arrival?.travel_time ? arrival.travel_time.slice(0, 5) : '',
       arrivalMode: arrival?.mode ? TRAVEL_MODE_LABELS[arrival.mode] ?? arrival.mode : '',
@@ -310,6 +331,9 @@ export function buildRoomAllocationRows(data: ExportData): RoomAllocationRow[] {
         roomNumber: room?.room_number ?? '',
         roomType: room?.room_type ?? '',
         headName: guestName,
+        // One row per guest: the family's guest count rides on the head's row
+        // only, so a SUM of the column is the true total (not headcount²).
+        pax: guest?.is_head && group ? familyGuestCount(group) : null,
         checkInDate: a.check_in_date ? parseDate(a.check_in_date) : null,
         checkInTime: a.check_in_time ?? null,
         checkOutDate: a.check_out_date ? parseDate(a.check_out_date) : null,
@@ -490,7 +514,7 @@ export function buildArrivalManifestRows(data: ExportData): ArrivalManifestRow[]
       return {
         headName: g?.head_name ?? 'Unknown',
         phone: g?.primary_mobile ?? '',
-        pax: g ? (g.confirmed_pax ?? g.expected_pax) : 0,
+        pax: g ? familyGuestCount(g) : 0,
         arrivalDate: l.travel_date ?? '',
         arrivalTime: l.travel_time ? l.travel_time.slice(0, 5) : '',
         arrivalMode: l.mode ? TRAVEL_MODE_LABELS[l.mode] ?? l.mode : '',
@@ -527,7 +551,7 @@ export function buildDepartureManifestRows(data: ExportData): DepartureManifestR
       return {
         headName: g?.head_name ?? 'Unknown',
         phone: g?.primary_mobile ?? '',
-        pax: g ? (g.confirmed_pax ?? g.expected_pax) : 0,
+        pax: g ? familyGuestCount(g) : 0,
         departureDate: l.travel_date ?? '',
         departureTime: l.travel_time ? l.travel_time.slice(0, 5) : '',
         departureMode: l.mode ? TRAVEL_MODE_LABELS[l.mode] ?? l.mode : '',
