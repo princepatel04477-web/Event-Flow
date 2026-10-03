@@ -71,9 +71,32 @@ or an unwanted UI change.
    are not loaded there, so "guests called" needs a new aggregate column on `v_event_board`
    or a new read. May I add that, or should Today keep the families-only wording?
 
-## Done check
+## Status — 3 October 2026
+
+| # | Item | Prompt | Commit | Status | Verified by |
+|---|---|---|---|---|---|
+| 1 | PAX / Qty export | F1 | `8708668` | **DONE** | `tests/export-pax.test.ts` (5); full suite |
+| 2 | Vehicle planning from the board | F2 | `cf8ac9c` | **DONE** | `tests/vehicle-planning.test.ts` (6) |
+| 3 | "Calls" → "RSVP" | F3 | `dc98ecc` | **DONE** | `nav-model.test.ts`, `v3-nav.test.ts`; needs a handset for the 360px label |
+| 4 | "Guests called" counter | F3 | `dc98ecc` | **PARTIAL** | Queue screen done (rows already loaded); **Today blocked** — its `TodayNumbers` is aggregate-only, no per-family pax, so it needs a new count (F3 says stop, not add a read) |
+| 5 | Logistics log rows | F4 | `5ef5776` | **DONE** (assumption) | typecheck + tests; row height is structural (same `Row`) — needs a handset screenshot |
+| 6 | Departure notes | F5 | `93feef7` | **DONE** | no migration — `travel_legs.notes` already existed |
+| 7 | Guests vs adults | F6 | `60b68b1` | **NOT DONE** | migration written, **NOT applied**; UI/import/export/counters gated on "apply" |
+| 8 | Occupied / with bed / extra bed / not placed | F7 | `0de4381` | **DONE** | `tests/rooms-board.test.ts` (4 new); needs a handset pass |
+| 9 | Hampers room-wise | F8a | `93fc65c` | **PARTIAL** | migration + `supabase/tests/f8_hamper_room.sql` written, **NOT applied**; F8b screen blocked on apply |
+
+**Suite:** 843 tests, 70 files, all passing. **Build:** `NEXT_PUBLIC_UI=v2 npm run build` exit 0.
+
+**Not applied (awaiting your "apply"):** `20261003090000_guest_groups_expected_split.sql`
+(F6) and `20261003091000_deliverables_room_target.sql` (F8a). Nothing was pushed
+to any database. **F8a must be applied together with F8b**, or it breaks
+`generateDeliverables` (see DECISIONS).
+
+## Done check (as of F0 — the read-only mapping)
 
 - `docs/CLIENT-FEEDBACK-03OCT.md` (this file) exists.
 - Every row names real files from the live tree (or its v1 origin where the v2 route re-exports it).
 - Both bugs have a stated root cause (item 1 and item 2 above).
-- No app code, migration or database was changed.
+- When F0 ran, no app code, migration or database was changed. Later prompts
+  (F1–F8a) changed app code and added two unapplied migrations — see the Status
+  table above.

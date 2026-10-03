@@ -5,6 +5,33 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — F9: verification and the client note
+
+**Suite:** 843 tests in 70 files, all passing. **Build:** `NEXT_PUBLIC_UI=v2
+npm run build` exit 0 (all 33 v2 routes present). `tsc --noEmit` clean;
+`eslint` clean on every file touched (only the two pre-existing
+`no-unused-vars` warnings in `src/lib/export/sheets.ts` remain, untouched).
+
+Status of the nine items is in `docs/CLIENT-FEEDBACK-03OCT.md` (Status table);
+the plain-English note for the client is `docs/CLIENT-UPDATE-03OCT.md`.
+F1, F2, F3, F5, F7 and F8a are done; item 4 is done on the call list and blocked
+on Today; F6 and F8a's screens await "apply".
+
+**Committed ≠ verified.** Everything below was checked by typecheck, unit tests
+and the production build only. This sandbox cannot launch a browser and there is
+no handset, so these still need a real Android phone (CLAUDE.md §14):
+
+- F3 — the "RSVP" bottom-bar label fits at 360px without truncating.
+- F4 — the trip-planner rows have the same height and styling as the call log
+  at 390px (structural only: the same `Row` component).
+- F5 — a departure note survives a reload, shows on the departures board and in
+  the Excel export; an event_team user of another event cannot read it.
+- F7 — the four Rooms figures update instantly on an optimistic room move and
+  restore on Undo; the four tiles link to the right lists.
+- F6 / F8 — nothing to check until the migrations are applied.
+
+---
+
 ## 3 October 2026 — F8a: migration for room-wise hampers (NOT applied)
 
 ### Client answer
