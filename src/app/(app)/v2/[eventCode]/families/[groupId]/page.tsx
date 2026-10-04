@@ -17,12 +17,12 @@ type PageProps = { params: Promise<{ eventCode: string; groupId: string }> }
 
 /** Plain words for the answer (R2) — not the enum's developer names. */
 const ANSWER: Record<string, { label: string; tone: 'done' | 'wait' | 'ink' | 'muted' }> = {
-  confirmed: { label: 'Coming', tone: 'done' },
-  tentative: { label: 'Maybe', tone: 'wait' },
-  callback: { label: 'Call back', tone: 'wait' },
+  confirmed: { label: 'Confirmed', tone: 'done' },
+  tentative: { label: 'Not sure yet', tone: 'wait' },
+  callback: { label: 'Call back later', tone: 'wait' },
   declined: { label: 'Not coming', tone: 'ink' },
-  unreachable: { label: 'No answer', tone: 'muted' },
-  attempted: { label: 'Tried, no answer yet', tone: 'muted' },
+  unreachable: { label: 'Not picking up', tone: 'muted' },
+  attempted: { label: 'Tried, not picking up', tone: 'muted' },
   not_started: { label: 'Not called yet', tone: 'muted' },
 }
 
@@ -38,11 +38,11 @@ const MODE: Record<string, string> = {
 /** `app.call_outcome` in plain words. */
 const OUTCOME: Record<string, string> = {
   connected: 'Spoke to them',
-  no_answer: 'No answer',
+  no_answer: 'Not picking up',
   busy: 'Busy',
-  switched_off: 'Phone off',
+  switched_off: 'Not reachable',
   wrong_number: 'Wrong number',
-  callback: 'Asked for a call back',
+  callback: 'Call back later',
   declined: 'Not coming',
   other: 'Other',
 }

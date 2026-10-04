@@ -15,7 +15,7 @@ export type RsvpBucketId = 'confirmed' | 'not_coming' | 'maybe' | 'no_answer' | 
 export const RSVP_BUCKETS: readonly { id: RsvpBucketId; label: string }[] = [
   { id: 'confirmed', label: 'Confirmed' },
   { id: 'not_coming', label: 'Not coming' },
-  { id: 'maybe', label: 'Maybe' },
-  { id: 'no_answer', label: 'No answer' },
+  { id: 'maybe', label: 'Not sure yet' },
+  { id: 'no_answer', label: 'Not picking up' },
   { id: 'not_called', label: 'Not called' },
 ]

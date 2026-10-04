@@ -19,12 +19,12 @@ export interface OutcomeOption {
 /** Matches `app.call_outcome` exactly — see database.types.ts. */
 export const CALL_OUTCOMES: OutcomeOption[] = [
   { value: 'connected', label: 'Connected', hint: 'Spoke to them', tone: 'success' },
-  { value: 'no_answer', label: 'No answer', hint: 'Rang out', tone: 'warning' },
+  { value: 'no_answer', label: 'Not picking up', hint: 'Rang out', tone: 'warning' },
   { value: 'busy', label: 'Busy', hint: 'Line engaged', tone: 'warning' },
-  { value: 'switched_off', label: 'Switched off', hint: '', tone: 'warning' },
+  { value: 'switched_off', label: 'Not reachable', hint: 'Phone off', tone: 'warning' },
   { value: 'wrong_number', label: 'Wrong number', hint: 'Not this family', tone: 'danger' },
-  { value: 'callback', label: 'Callback', hint: 'Asked to call later', tone: 'info' },
-  { value: 'declined', label: 'Declined', hint: 'Refused to talk', tone: 'danger' },
+  { value: 'callback', label: 'Call back later', hint: 'Asked to call later', tone: 'info' },
+  { value: 'declined', label: 'Not coming', hint: 'Refused to talk', tone: 'danger' },
   { value: 'other', label: 'Other', hint: 'Use notes below', tone: 'neutral' },
 ]
 

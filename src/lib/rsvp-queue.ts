@@ -32,10 +32,10 @@ export interface FilterChip {
  */
 export const FILTER_CHIPS: readonly FilterChip[] = [
   { id: 'to_call', label: 'To call' },
-  { id: 'coming', label: 'Coming' },
+  { id: 'coming', label: 'Confirmed' },
   { id: 'not_coming', label: 'Not coming' },
-  { id: 'no_answer', label: 'No answer' },
-  { id: 'callback', label: 'Call back' },
+  { id: 'no_answer', label: 'Not picking up' },
+  { id: 'callback', label: 'Call back later' },
   { id: 'all', label: 'All' },
 ]
 
@@ -126,7 +126,7 @@ export interface OutcomeDefinition {
  * coalesces `guest_groups.callback_at` with the frozen attempt's own time.
  */
 export const OUTCOME_DEFINITIONS: Record<OutcomeKey, OutcomeDefinition> = {
-  coming: { status: 'confirmed', callOutcome: 'connected', chip: 'coming', label: 'Coming' },
+  coming: { status: 'confirmed', callOutcome: 'connected', chip: 'coming', label: 'Confirmed' },
   not_coming: {
     status: 'declined',
     callOutcome: 'declined',
@@ -137,10 +137,10 @@ export const OUTCOME_DEFINITIONS: Record<OutcomeKey, OutcomeDefinition> = {
     status: 'unreachable',
     callOutcome: 'no_answer',
     chip: 'no_answer',
-    label: 'No answer',
+    label: 'Not picking up',
   },
-  maybe: { status: 'tentative', callOutcome: 'connected', chip: 'coming', label: 'Maybe' },
-  callback: { status: 'callback', callOutcome: 'callback', chip: 'callback', label: 'Call back' },
+  maybe: { status: 'tentative', callOutcome: 'connected', chip: 'coming', label: 'Not sure yet' },
+  callback: { status: 'callback', callOutcome: 'callback', chip: 'callback', label: 'Call back later' },
 }
 
 /** The definition for one outcome key. */

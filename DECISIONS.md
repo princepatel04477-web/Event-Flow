@@ -5,6 +5,26 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — L3: RSVP outcomes in the callers' words
+
+Outcome display text per section 5 of `docs/COPY-INDIA.md`. In
+`src/lib/rsvp-queue.ts`: filter chips — Confirmed / Not coming / Not picking
+up / Call back later; outcome labels — Confirmed, Not coming, Not picking up,
+Not sure yet, Call back later. Same wording in `src/lib/call/types.ts`
+(`CALL_OUTCOMES`), `src/lib/rsvp-buckets.ts`, `src/lib/status.ts`
+(`RSVP_STATUS_LABELS`), the family page (`ANSWER` / `OUTCOME`) and
+`rsvp/queue/AllContacts.tsx`. `OutcomeButtons.tsx`: chips Confirmed / Not
+coming / Not picking up, and the alternate link "Call back later or Not sure
+yet". Call button "Call now"; the outcome prompt is "What did they say?".
+
+**Server-bound values unchanged** — the `status` / `callOutcome` / `chip` /
+enum values in `OUTCOME_DEFINITIONS` and the outcome `value`s in
+`CALL_OUTCOMES` are untouched; only `label`/`hint` text changed.
+`tests/v3-calls-screens.test.ts` updated. `Maybe` / `No answer` / `Coming` no
+longer appear as visible text in the v2 tree.
+
+---
+
 ## 3 October 2026 — L2: navigation uses trade words
 
 `src/lib/sections/config.tsx` labels: Dashboard; Guests → Guest List / Import

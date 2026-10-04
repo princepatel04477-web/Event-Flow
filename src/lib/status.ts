@@ -57,11 +57,11 @@ export const RSVP_STATUS_OPTIONS: RsvpStatus[] = [
 export const RSVP_STATUS_LABELS: Record<RsvpStatus, string> = {
   not_started: 'Not started',
   attempted: 'Attempted',
-  callback: 'Callback',
-  tentative: 'Tentative',
+  callback: 'Call back later',
+  tentative: 'Not sure yet',
   confirmed: 'Confirmed',
-  declined: 'Declined',
-  unreachable: 'Unreachable',
+  declined: 'Not coming',
+  unreachable: 'Not reachable',
 }
 
 /**

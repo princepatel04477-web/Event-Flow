@@ -176,13 +176,13 @@ describe('Calls: outcome controls', () => {
   )
 
   it('offers exactly the three one-tap outcomes', () => {
-    expect(html).toContain('Coming')
+    expect(html).toContain('Confirmed')
     expect(html).toContain('Not coming')
-    expect(html).toContain('No answer')
+    expect(html).toContain('Not picking up')
   })
 
   it('keeps call-back and maybe behind ONE text link, not two more buttons', () => {
-    expect(html).toContain('Call back later or Maybe')
+    expect(html).toContain('Call back later or Not sure yet')
     expect((html.match(/<button/g) ?? []).length).toBe(4) // three outcomes + the link
   })
 

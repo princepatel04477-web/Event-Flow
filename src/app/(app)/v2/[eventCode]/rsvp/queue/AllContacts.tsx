@@ -5,11 +5,11 @@ import { useMemo, useState } from 'react'
 import type { QueueRow } from './types'
 
 const STATUS: Record<string, { label: string; dot: string }> = {
-  confirmed: { label: 'Coming', dot: 'bg-ledger-green' },
+  confirmed: { label: 'Confirmed', dot: 'bg-ledger-green' },
   declined: { label: 'Not coming', dot: 'bg-ledger-red' },
-  tentative: { label: 'Maybe', dot: 'bg-ledger-amber' },
-  callback: { label: 'Call back', dot: 'bg-ledger-amber' },
-  unreachable: { label: 'No answer', dot: 'bg-ledger-amber' },
+  tentative: { label: 'Not sure yet', dot: 'bg-ledger-amber' },
+  callback: { label: 'Call back later', dot: 'bg-ledger-amber' },
+  unreachable: { label: 'Not picking up', dot: 'bg-ledger-amber' },
   attempted: { label: 'Tried once', dot: 'bg-ledger-amber' },
 }
 

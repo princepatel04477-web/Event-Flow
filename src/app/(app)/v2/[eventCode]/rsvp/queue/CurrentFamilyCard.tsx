@@ -97,7 +97,7 @@ export function CurrentFamilyCard({
           className="shrink-0"
           aria-label={`Call ${headName}`}
         >
-          {dialling ? 'Calling…' : 'Call'}
+          {dialling ? 'Calling…' : 'Call now'}
         </Button>
       </div>
 

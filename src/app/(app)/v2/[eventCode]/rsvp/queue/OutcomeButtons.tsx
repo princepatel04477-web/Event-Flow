@@ -22,7 +22,7 @@ export function OutcomeButtons({
   return (
     <section className="flex flex-col gap-2.5" aria-labelledby="outcome-heading">
       <h3 id="outcome-heading" className="text-sm font-medium text-muted">
-        What happened?
+        What did they say?
       </h3>
 
       <div className="grid grid-cols-3 gap-2" role="group" aria-label="Log call outcome">
@@ -38,7 +38,7 @@ export function OutcomeButtons({
             disabled && 'cursor-not-allowed opacity-55',
           )}
         >
-          Coming
+          Confirmed
         </button>
 
         <button
@@ -64,7 +64,7 @@ export function OutcomeButtons({
             disabled && 'cursor-not-allowed opacity-55',
           )}
         >
-          No answer
+          Not picking up
         </button>
       </div>
 
@@ -74,7 +74,7 @@ export function OutcomeButtons({
         onClick={onOpenAlternate}
         className="tap min-h-11 self-start text-sm font-medium text-brand underline-offset-2 hover:underline active:text-brand-hover disabled:opacity-55"
       >
-        Call back later or Maybe
+        Call back later or Not sure yet
       </button>
     </section>
   )
