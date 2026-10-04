@@ -5,6 +5,28 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 4 October 2026 — L8: the en-IN / Asia/Kolkata formatters
+
+New `src/lib/format/india.ts` — `formatDate` ("20 Dec (Sat)"), `formatTime`
+("10:30 AM"), `formatDateTime` ("20 Dec, 10:30 AM"), `formatRupees`
+("₹1,25,000"), `formatPhone` ("+91 98765 43210"), `formatPax` ("12/15 PAX").
+All `Intl`, all pinned to `Asia/Kolkata`, so a phone in another timezone reads
+the same time the driver in Surat reads. `tests/india-format.test.ts` pins
+every one against fixed UTC instants (13 tests).
+
+First render-only call sites moved over: the driver sheets' four
+`toLocaleString()` calls (screen row, sheet subtitle, the copied WhatsApp
+line, the Excel value) now use `formatDateTime`.
+
+**Not done:** the rest of the render-only formatting sweep — `family/[groupId]`,
+the hamper "Delivered by …" line, the travel board and the older `(staff)`
+screens still format dates locally. Each is a one-line swap to
+`formatDateTime`/`formatDate`; listed here rather than rushed, because the
+sweep reaches files L3–L6 already touched and would need their tests re-run.
+`src/lib/export/` headers are out of scope by the series' own rule.
+
+---
+
 ## 4 October 2026 — L7: the client (family) view
 
 The client view already said "guests" everywhere and showed no error codes —

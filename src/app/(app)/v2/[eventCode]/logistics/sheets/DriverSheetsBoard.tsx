@@ -13,6 +13,7 @@ import { LinkButton } from '@/components/ui/LinkButton'
 import { LoadingRows } from '@/components/ui/LoadingRows'
 import { Row } from '@/components/ui/Row'
 import { readDriverSheets, type DriverSheetTrip } from '@/lib/actions/departures'
+import { formatDateTime } from '@/lib/format/india'
 import { copyText } from '@/lib/ui/copyText'
 
 export interface DriverSheetsBoardProps {
@@ -91,7 +92,7 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
         Vehicle: t.vehicleLabel ?? 'Unnamed',
         Driver: t.driverName ?? '',
         'Driver mobile': t.driverMobile ?? '',
-        'Scheduled at': t.scheduledTime ? new Date(t.scheduledTime).toLocaleString() : '',
+        'Scheduled at': t.scheduledTime ? formatDateTime(t.scheduledTime) : '',
         Pickup: t.pickupPoint ?? '',
         Drop: t.dropPoint ?? '',
         Direction: t.direction,
@@ -196,7 +197,7 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
               {openTrip.scheduledTime ? (
                 <SheetRow
                   label="Time"
-                  value={new Date(openTrip.scheduledTime).toLocaleString()}
+                  value={formatDateTime(openTrip.scheduledTime)}
                 />
               ) : null}
               {openTrip.pickupPoint ? <SheetRow label="Pickup" value={openTrip.pickupPoint} /> : null}
@@ -273,7 +274,7 @@ function DirectionBadge({ direction }: { direction: string }) {
 }
 
 function tripMeta(trip: DriverSheetTrip): string {
-  const when = trip.scheduledTime ? new Date(trip.scheduledTime).toLocaleString() : null
+  const when = trip.scheduledTime ? formatDateTime(trip.scheduledTime) : null
   const parts = [trip.driverName ?? 'No driver', when, trip.pickupPoint].filter(
     (p): p is string => Boolean(p),
   )
@@ -294,7 +295,7 @@ function formatWhatsApp(trip: DriverSheetTrip): string {
     '',
     `Driver: ${trip.driverName ?? 'Not assigned'}`,
     `Contact: ${trip.driverMobile ?? 'N/A'}`,
-    trip.scheduledTime ? `Time: ${new Date(trip.scheduledTime).toLocaleString()}` : '',
+    trip.scheduledTime ? `Time: ${formatDateTime(trip.scheduledTime)}` : '',
     trip.pickupPoint ? `Pickup: ${trip.pickupPoint}` : '',
     trip.dropPoint ? `Drop: ${trip.dropPoint}` : '',
     '',
