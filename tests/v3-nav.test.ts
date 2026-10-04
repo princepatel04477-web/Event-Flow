@@ -26,7 +26,7 @@ describe('v3TabsFor — event lead', () => {
   it('gives an admin the five UI4 tabs, Control last', () => {
     // UI4 Part S, S2: Control replaces Hampers in slot five, admin only.
     expect(labels(v3TabsFor(EV, 'admin', 'management'))).toEqual([
-      'Today',
+      'Dashboard',
       'RSVP',
       'Hospitality',
       'Logistics',
@@ -37,7 +37,7 @@ describe('v3TabsFor — event lead', () => {
   it('gives a management team member the same four, without Control', () => {
     // A lead who is not an admin never sees a tab the page guard would refuse.
     expect(labels(v3TabsFor(EV, 'event_team', 'management'))).toEqual([
-      'Today',
+      'Dashboard',
       'RSVP',
       'Hospitality',
       'Logistics',
@@ -76,7 +76,7 @@ describe('v3TabsFor — event lead', () => {
     // tap straight back with `?denied=section` — controls that cannot work
     // (docs/BUGS.md M1). v1 renders Home alone for this session; this matches it.
     const tabs = v3TabsFor(EV, 'event_team', null)
-    expect(labels(tabs)).toEqual(['Today'])
+    expect(labels(tabs)).toEqual(['Dashboard'])
     expect(hrefs(tabs)).toEqual([`/${EV}`])
   })
 
@@ -101,14 +101,14 @@ describe('v3TabsFor — event lead', () => {
 describe('v3TabsFor — runners', () => {
   it('gives a travel runner their four screens', () => {
     const tabs = v3TabsFor(EV, 'event_team', 'logistics')
-    expect(labels(tabs)).toEqual(['Arrivals', 'Departures', 'Fleet', 'Trips'])
+    expect(labels(tabs)).toEqual(['Arrivals', 'Departures', 'Vehicles', 'Pickup & Drop'])
     expect(hrefs(tabs)).toEqual([
       `/${EV}/logistics/arrivals`,
       `/${EV}/logistics/departures`,
       `/${EV}/logistics/fleet`,
       `/${EV}/logistics/trips`,
     ])
-    expect(labels(tabs)).not.toContain('Today')
+    expect(labels(tabs)).not.toContain('Dashboard')
   })
 
   it('gives a rooms runner their two screens and nothing else', () => {
@@ -116,8 +116,8 @@ describe('v3TabsFor — runners', () => {
     // hamper section — so their bar is the two screens they can actually
     // open, not a tab that bounces them to `?denied=section`.
     expect(labels(v3TabsFor(EV, 'event_team', 'hospitality'))).toEqual([
-      'Rooms',
-      'Check in / out',
+      'Room Allotment',
+      'Check-in / Check-out',
     ])
   })
 
@@ -172,14 +172,14 @@ describe('v3ActiveSection', () => {
     expect(v3ActiveSection('hamper')).toBe('hospitality')
     expect(v3ActiveSection('production')).toBe('hospitality')
     expect(v3ScreenTitle('hamper')).toBe('Hampers')
-    expect(v3ScreenTitle('production')).toBe('Setup')
+    expect(v3ScreenTitle('production')).toBe('Hotel & Room Setup')
   })
 
   it('still resolves a section that is no longer in the bar', () => {
     // Guests is reached from the search button. A guest list with no section
     // would title its own header "EventFlow".
     expect(v3ActiveSection('guests/list')).toBe('guests')
-    expect(v3ScreenTitle('guests/list')).toBe('Guest list')
+    expect(v3ScreenTitle('guests/list')).toBe('Guest List')
   })
 
   it('returns null for a path outside the model', () => {
@@ -197,7 +197,7 @@ describe('v3ActiveChild', () => {
 
 describe('v3ScreenTitle', () => {
   it('names the section beside the event root', () => {
-    expect(v3ScreenTitle('')).toBe('Today')
+    expect(v3ScreenTitle('')).toBe("Today's Status")
     expect(v3ScreenTitle('rsvp')).toBe('RSVP')
     expect(v3ScreenTitle('logistics')).toBe('Logistics')
     expect(v3ScreenTitle('hospitality')).toBe('Hospitality')
@@ -205,7 +205,7 @@ describe('v3ScreenTitle', () => {
 
   it('names a child screen by the child label', () => {
     expect(v3ScreenTitle('logistics/arrivals')).toBe('Arrivals')
-    expect(v3ScreenTitle('hospitality/checkin')).toBe('Check in / out')
+    expect(v3ScreenTitle('hospitality/checkin')).toBe('Check-in / Check-out')
   })
 
   it('names the one Hospitality screen that is not about rooms', () => {
@@ -222,7 +222,7 @@ describe('v3ScreenTitle', () => {
   it('falls back to the section name on a detail route', () => {
     // The Rooms child is named "Rooms" in UI4 (it sits beside Check in in the
     // section switcher), and a room detail keeps its list's name.
-    expect(v3ScreenTitle('hospitality/rooms/104')).toBe('Rooms')
+    expect(v3ScreenTitle('hospitality/rooms/104')).toBe('Room Allotment')
   })
 
   it('names the family page for itself', () => {

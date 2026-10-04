@@ -26,12 +26,12 @@ const hrefs = (tabs: NavTab[]) => tabs.map((t) => t.href)
 describe('bottomTabsFor — event lead', () => {
   it('gives an admin five tabs and no more', () => {
     const tabs = bottomTabsFor(EV, 'admin', 'management')
-    expect(labels(tabs)).toEqual(['Home', 'Guests', 'RSVP', 'Logistics', 'Hospitality'])
+    expect(labels(tabs)).toEqual(['Dashboard', 'Guests', 'RSVP', 'Logistics', 'Hospitality'])
   })
 
   it('gives a management team member the same five', () => {
     const tabs = bottomTabsFor(EV, 'event_team', 'management')
-    expect(labels(tabs)).toEqual(['Home', 'Guests', 'RSVP', 'Logistics', 'Hospitality'])
+    expect(labels(tabs)).toEqual(['Dashboard', 'Guests', 'RSVP', 'Logistics', 'Hospitality'])
   })
 
   it('lands each tab on its default child, not a bare section root', () => {
@@ -57,8 +57,8 @@ describe('bottomTabsFor — event lead', () => {
 describe('bottomTabsFor — runners', () => {
   it('gives a travel runner their four screens, not Home plus a dead tab', () => {
     const tabs = bottomTabsFor(EV, 'event_team', 'logistics')
-    expect(labels(tabs)).toEqual(['Arrivals', 'Departures', 'Fleet', 'Trips'])
-    expect(labels(tabs)).not.toContain('Home')
+    expect(labels(tabs)).toEqual(['Arrivals', 'Departures', 'Vehicles', 'Pickup & Drop'])
+    expect(labels(tabs)).not.toContain('Dashboard')
   })
 
   it('points a travel runner at real section routes', () => {
@@ -75,7 +75,7 @@ describe('bottomTabsFor — runners', () => {
     // `requireSection` would bounce a hospitality runner off both, so a tab
     // for either would be a control that cannot work.
     const tabs = bottomTabsFor(EV, 'event_team', 'hospitality')
-    expect(labels(tabs)).toEqual(['Rooms', 'Check in / out'])
+    expect(labels(tabs)).toEqual(['Room Allotment', 'Check-in / Check-out'])
   })
 
   it('gives a single-screen department no bar at all', () => {
@@ -85,7 +85,7 @@ describe('bottomTabsFor — runners', () => {
 
   it('shows only Home until a team member has picked their name', () => {
     // No department on the JWT yet. The welcome banner is what moves them on.
-    expect(labels(bottomTabsFor(EV, 'event_team', null))).toEqual(['Home'])
+    expect(labels(bottomTabsFor(EV, 'event_team', null))).toEqual(['Dashboard'])
   })
 })
 

@@ -105,16 +105,16 @@ describe('the v3 tab labels a Travel or Hampers runner gets', () => {
    * `(328 − 5) / 5 ≈ 65px`, and the tab label is `text-xs` (12px) under
    * `max-w-full truncate`. Measured at a conservative 7px/char:
    *
-   *   Departures       70px
-   *   Check in / out   98px
-   *   Arrivals         56px
-   *   Hampers          56px
-   *   Hospitality      77px
-     *   Logistics        63px
+   *   Departures           70px
+   *   Check-in / Check-out 133px
+   *   Pickup & Drop        91px
+   *   Room Allotment       98px
+   *   Hospitality          77px
+   *   Logistics            63px
    *
-   * So three labels render as an ellipsis at 360px. Two predate the T3 rename
-   * and one came with it. None are fixed here, and they must not be quietly asserted
-   * as fine: they come from `SECTIONS` in `src/lib/sections/config.tsx`, which
+   * So several labels render as an ellipsis at 360px. None are fixed here, and
+   * they must not be quietly asserted as fine: they come from `SECTIONS` in
+   * `src/lib/sections/config.tsx`, which
    * v1's bottom bar shares, and renaming them moves v1's tabs too. The screen
    * title in the header stays legible regardless — `v3ScreenTitle` returns the
    * child's full label — so these are bar-label issues, not lost screens.
@@ -134,7 +134,9 @@ describe('the v3 tab labels a Travel or Hampers runner gets', () => {
     expect(over, 'labels that truncate at 360px — see the comment above').toEqual([
       'Hospitality',
       'Departures',
-      'Check in / out',
+      'Pickup & Drop',
+      'Room Allotment',
+      'Check-in / Check-out',
     ])
   })
 })

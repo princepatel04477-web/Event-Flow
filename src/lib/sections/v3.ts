@@ -66,7 +66,7 @@ const V3_BAR: readonly SectionId[] = [
 
 /** What a section is called in the v3 bar. */
 const V3_TAB_LABEL: Partial<Record<SectionId, string>> = {
-  dashboard: 'Today',
+  dashboard: 'Dashboard',
   rsvp: 'RSVP',
   hospitality: 'Hospitality',
   hamper: 'Hampers',
@@ -255,7 +255,7 @@ const V3_TITLE_OVERRIDES: Record<string, string> = {
   // Borrowed sections resolve to their host tab for highlighting, but the
   // screen is still named for itself.
   hamper: 'Hampers',
-  production: 'Setup',
+  production: 'Hotel & Room Setup',
   // The family page (UI4 S4) belongs to no section; it is named for itself.
   families: 'Family',
   find: 'Find',
@@ -264,7 +264,7 @@ const V3_TITLE_OVERRIDES: Record<string, string> = {
 
 export function v3ScreenTitle(rest: string): string {
   const segments = rest.split('/').filter(Boolean)
-  if (segments.length === 0) return 'Today'
+  if (segments.length === 0) return "Today's Status"
 
   // Keyed on the first two segments, NOT the whole path: a detail route
   // (`hospitality/deliveries/abc-123`) resolves to the same section and child

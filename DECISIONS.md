@@ -5,6 +5,24 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — L2: navigation uses trade words
+
+`src/lib/sections/config.tsx` labels: Dashboard; Guests → Guest List / Import
+from Excel / Export to Excel; RSVP → Calling List / Call Records / Auto Dialer;
+Logistics → Arrivals / Departures / Vehicles / Pickup & Drop; Hospitality →
+Room Allotment / Rooming List / Check-in / Check-out / Hotel & Room Setup.
+`src/lib/sections/v3.ts`: the bar's home tab is "Dashboard" and its title is
+"Today's Status"; the production title is "Hotel & Room Setup". No route segment,
+section id or href changed — only labels. `tests/nav-model`, `tests/v3-nav` and
+`tests/v3-travel-width` updated.
+
+**Not done:** "Unknown Numbers" has no RSVP nav child in `config.tsx` (the route
+exists, the nav entry does not), so adding it would be a structural change, not a
+label change — left, per the "if a meaning has no matching value, do not add one"
+rule. Legacy `(staff)` nav labels were not touched.
+
+---
+
 ## 3 October 2026 — L1: the Home screen reads like an Indian event team
 
 Home (v2 Today) copy per `docs/COPY-INDIA.md`. `today.ts`: attention headlines

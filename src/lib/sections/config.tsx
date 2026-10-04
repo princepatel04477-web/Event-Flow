@@ -96,7 +96,7 @@ const ALL_DEPTS: StaffDepartment[] = [
  */
 export const SECTIONS: Record<SectionId, SectionDef> = {
   dashboard: {
-    id: 'dashboard', label: 'Home', tabLabel: 'Home',
+    id: 'dashboard', label: 'Dashboard', tabLabel: 'Dashboard',
     icon: <GridIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team', 'client'],
     departments: ALL_DEPTS,
@@ -111,14 +111,14 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     departments: ['management'],
     inTabBar: true,
     children: [
-      { segment: 'list', label: 'Guest list', icon: <UsersIcon className="h-6 w-6" />, roles: ['admin','event_team','client'], isDefault: true },
+      { segment: 'list', label: 'Guest List', icon: <UsersIcon className="h-6 w-6" />, roles: ['admin','event_team','client'], isDefault: true },
       // Import is event_team too, not admin-only. It was admin-only, which is
       // why staff reported the button "missing": a code-auth session is
       // event_team, so the nav entry rendered nowhere for the people actually
       // holding the phones. The preview-before-write step in the wizard is
       // what protects the data here, not the role gate.
-      { segment: 'import', label: 'Import', icon: <UploadIcon className="h-6 w-6" />, roles: ['admin', 'event_team'] },
-      { segment: 'export', label: 'Export', icon: <DownloadIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
+      { segment: 'import', label: 'Import from Excel', icon: <UploadIcon className="h-6 w-6" />, roles: ['admin', 'event_team'] },
+      { segment: 'export', label: 'Export to Excel', icon: <DownloadIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
     ],
   },
   rsvp: {
@@ -132,9 +132,9 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
       // and the caller alike. Auto-call is the lead's view of a campaign, not a
       // caller's job, so it comes last and only for management — a calling
       // runner's first tab used to be a campaign board they had no use for.
-      { segment: 'queue', label: 'Call list', icon: <ListIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
-      { segment: 'review', label: 'Call notes', icon: <FileTextIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
-      { segment: 'campaigns', label: 'Auto-call', icon: <PhoneIcon className="h-6 w-6" />, roles: ['admin','event_team'], departments: ['management'] },
+      { segment: 'queue', label: 'Calling List', icon: <ListIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
+      { segment: 'review', label: 'Call Records', icon: <FileTextIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
+      { segment: 'campaigns', label: 'Auto Dialer', icon: <PhoneIcon className="h-6 w-6" />, roles: ['admin','event_team'], departments: ['management'] },
     ],
   },
   logistics: {
@@ -146,8 +146,8 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     children: [
       { segment: 'arrivals', label: 'Arrivals', icon: <ArrowDownCircleIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
       { segment: 'departures', label: 'Departures', icon: <ArrowUpCircleIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
-      { segment: 'fleet', label: 'Fleet', icon: <CarIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
-      { segment: 'trips', label: 'Trips', icon: <MapPinIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
+      { segment: 'fleet', label: 'Vehicles', icon: <CarIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
+      { segment: 'trips', label: 'Pickup & Drop', icon: <MapPinIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
     ],
   },
   hospitality: {
@@ -160,8 +160,8 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
       // "Rooms", not "Hospitality": this is one screen INSIDE Hospitality, and
       // the section switcher shows it beside Check in and Hampers. The TAB
       // stays "Hospitality" (A3's rename is about the section, not this row).
-      { segment: 'rooms', label: 'Rooms', icon: <BuildingIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
-      { segment: 'checkin', label: 'Check in / out', icon: <ClipboardCheckIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
+      { segment: 'rooms', label: 'Room Allotment', icon: <BuildingIcon className="h-6 w-6" />, roles: ['admin','event_team'], isDefault: true },
+      { segment: 'checkin', label: 'Check-in / Check-out', icon: <ClipboardCheckIcon className="h-6 w-6" />, roles: ['admin','event_team'] },
       // ADMIN ONLY, DELIBERATELY. Every row of this sheet is a door out of the
       // section — the family head opens RSVP status, the hamper opens the hamper
       // proof — and an `event_team` hospitality runner belongs to neither. Marked
@@ -169,7 +169,7 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
       // that bounces. A code-auth session is `event_team`, which means the people
       // on the phones do NOT see this child; that is the intended audience, and
       // the page guard repeats the same check so a typed URL cannot reach it.
-      { segment: 'rooming-list', label: 'Rooming list', icon: <ListIcon className="h-6 w-6" />, roles: ['admin'] },
+      { segment: 'rooming-list', label: 'Rooming List', icon: <ListIcon className="h-6 w-6" />, roles: ['admin'] },
       // Borrowed: lives at /{event}/hamper, shown here so an event lead does
       // not need a sixth tab to reach it.
       {
@@ -179,7 +179,7 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
       },
       // Borrowed likewise, and flag-gated by the `production` section below.
       {
-        segment: 'production', label: 'Setup', icon: <ClipboardCheckIcon className="h-6 w-6" />,
+        segment: 'production', label: 'Hotel & Room Setup', icon: <ClipboardCheckIcon className="h-6 w-6" />,
         roles: ['admin','event_team'], href: 'production',
         departments: ['management', 'production'],
       },
