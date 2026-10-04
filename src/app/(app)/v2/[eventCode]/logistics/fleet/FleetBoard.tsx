@@ -131,7 +131,7 @@ export function FleetBoard({ eventId, eventCode }: FleetBoardProps) {
         <p className="min-w-0 text-sm text-muted">
           {data.vehicles.length === 0
             ? 'No vehicles yet'
-            : `${data.vehicles.length} on the ground · capacity with luggage`}
+            : `${data.vehicles.length} on the ground · seats with luggage`}
           {assigned > 0 ? ` · ${assigned} on a trip` : ''}
           {unavailable > 0 ? ` · ${unavailable} unavailable` : ''}
         </p>
@@ -208,10 +208,10 @@ export function FleetBoard({ eventId, eventCode }: FleetBoardProps) {
       <BottomSheet
         open={manageOpen}
         onClose={() => setManageOpen(false)}
-        label="Fleet set-up"
+        label="Vehicle set-up"
       >
         <div className="flex flex-col gap-6">
-          <h2 className="text-lg font-semibold text-ink">Fleet set-up</h2>
+          <h2 className="text-lg font-semibold text-ink">Vehicle set-up</h2>
           <DriverRoster eventId={eventId} vehicles={vehicleOptions} />
           <OdometerEntry eventId={eventId} vehicles={vehicleOptions} onSaved={reload} />
           <OdometerRecent eventId={eventId} />
@@ -272,7 +272,7 @@ export function FleetBoard({ eventId, eventCode }: FleetBoardProps) {
               </div>
 
               <dl className="flex flex-col">
-                <SheetRow label="Capacity" value={`${openVehicle.capacity} with luggage`} mono />
+                <SheetRow label="Seats" value={`${openVehicle.capacity} with luggage`} mono />
                 {openVehicle.seatLabel ? (
                   <SheetRow label="Sticker" value={openVehicle.seatLabel} />
                 ) : null}

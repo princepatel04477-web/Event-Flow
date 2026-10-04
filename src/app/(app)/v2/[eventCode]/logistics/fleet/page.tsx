@@ -4,7 +4,7 @@ import { FleetBoard } from './FleetBoard'
 import { requireTravelScreen } from '../_guard'
 
 export const metadata: Metadata = {
-  title: 'Fleet',
+  title: 'Vehicles',
 }
 
 type PageProps = {

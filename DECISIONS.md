@@ -5,6 +5,23 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 4 October 2026 — L5: logistics copy
+
+Vehicles screen: title "Vehicles" (was "Fleet"), "Vehicle set-up", "seats with
+luggage", the vehicle row label "Seats" (was "Capacity"). Pickup & Drop screen:
+title "Pickup & Drop" (was "Trips"). Driver sheets: the sheet and the copied
+WhatsApp line say "Driver sheet" / "Vehicle" (was "Trip sheet" / "Trip"). No
+route segment, action or query changed.
+
+**Left alone, with reasons:** the vehicle TYPE names — "Sedan", "SUV", "Tempo
+Traveller", "Bus" and their capacities — are `vehicle_types` rows (data), not
+UI copy; changing them is a migration, which this series forbids. The travel
+row status words in `_travel.ts` ("Met", "Expected", "Gone", "To go") were left
+— they are plain trade words and the list does not name them. `traceFetch`
+labels like `'fleet :: readFleet'` are perf spans, not screen text.
+
+---
+
 ## 4 October 2026 — L4: hospitality copy (rooms, check-in, setup, hampers)
 
 Hamper strings per `docs/COPY-INDIA.md`: row status "Pending" / "Room not

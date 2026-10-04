@@ -177,7 +177,7 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
       <BottomSheet
         open={openTrip !== null}
         onClose={() => setOpenTripId(null)}
-        label={openTrip ? (openTrip.vehicleLabel ?? 'Trip sheet') : 'Trip sheet'}
+        label={openTrip ? (openTrip.vehicleLabel ?? 'Driver sheet') : 'Driver sheet'}
       >
         {openTrip ? (
           <div className="flex flex-col gap-5">
@@ -290,7 +290,7 @@ function tripMeta(trip: DriverSheetTrip): string {
  */
 function formatWhatsApp(trip: DriverSheetTrip): string {
   const lines = [
-    `🚗 *${trip.vehicleLabel ?? 'Trip'}*`,
+    `🚗 *${trip.vehicleLabel ?? 'Vehicle'}*`,
     '',
     `Driver: ${trip.driverName ?? 'Not assigned'}`,
     `Contact: ${trip.driverMobile ?? 'N/A'}`,

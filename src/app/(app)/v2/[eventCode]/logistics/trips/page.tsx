@@ -5,7 +5,7 @@ import { LogisticsClient } from '@/app/(staff)/[eventCode]/logistics/LogisticsCl
 import { requireTravelScreen } from '../_guard'
 
 export const metadata: Metadata = {
-  title: 'Trips',
+  title: 'Pickup & Drop',
 }
 
 type PageProps = {
