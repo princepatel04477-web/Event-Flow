@@ -115,8 +115,8 @@ export function FleetBoard({ eventId, eventCode }: FleetBoardProps) {
   if (error || !data) {
     return (
       <ErrorState
-        title="Could not load the fleet"
-        description={error instanceof Error ? error.message : 'Could not load fleet data.'}
+        title="Could not load the vehicles"
+        description={error instanceof Error ? error.message : 'Could not load the vehicles.'}
         onRetry={reload}
       />
     )
@@ -168,8 +168,8 @@ export function FleetBoard({ eventId, eventCode }: FleetBoardProps) {
       {data.vehicles.length === 0 ? (
         <EmptyState
           icon={<CarIcon className="h-7 w-7" />}
-          title="No vehicles in the fleet"
-          description="Add them here, then trip planning can put families in them."
+          title="No vehicles yet"
+          description="Add them here, then Pickup & Drop can put families in them."
           action={
             <Button variant="secondary" fullWidth onClick={() => setAddOpen(true)}>
               Add vehicles

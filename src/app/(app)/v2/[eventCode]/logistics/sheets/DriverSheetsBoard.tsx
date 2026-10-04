@@ -121,11 +121,11 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
     return (
       <EmptyState
         icon={<FileTextIcon className="h-7 w-7" />}
-        title="No planned trips"
-        description="Sheets are written when a plan is committed in the trip planner."
+        title="No driver sheets yet"
+        description="Sheets are written when a plan is committed in Pickup & Drop."
         action={
           <LinkButton href={`/${eventCode}/logistics/trips`} variant="secondary" fullWidth>
-            Open the trip planner
+            Open Pickup & Drop
           </LinkButton>
         }
       />

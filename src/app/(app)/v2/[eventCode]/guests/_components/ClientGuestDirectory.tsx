@@ -151,7 +151,7 @@ export function ClientGuestDirectory({ eventId }: ClientGuestDirectoryProps) {
       {matches.length === 0 ? (
         <EmptyState
           icon={<SearchIcon className="h-7 w-7" />}
-          title="Nothing matches"
+          title="No match"
           description="Try a different spelling, or part of the family head's name."
         />
       ) : (

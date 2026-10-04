@@ -5,6 +5,24 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 4 October 2026 — L6: errors, empty states and toasts
+
+App-wide sweep of the v2 error/empty copy to V9 (say what happened, what to
+do) and V10 (say why it is empty, what to do). "Search needs a signal" →
+"No internet"; "Search did not answer" → "Could not search"; "Nothing matches"
+→ "No match"; "Could not load the fleet" → "Could not load the vehicles";
+"No vehicles in the fleet" → "No vehicles yet"; "No planned trips" → "No
+driver sheets yet" with "…committed in Pickup & Drop"; "Open the trip planner"
+→ "Open Pickup & Drop"; the By-room error no longer says "Reload the page" —
+it says try again and ask your event admin.
+
+**Left alone, with reasons:** v2's other error states already carry an action
+(`ErrorState onRetry`, or an `EmptyState` with a button), so V9/V10 are met
+without rewriting them. The `ErrorState`/`EmptyState` components themselves
+were not touched. Legacy `(staff)` error copy is out of scope.
+
+---
+
 ## 4 October 2026 — L5: logistics copy
 
 Vehicles screen: title "Vehicles" (was "Fleet"), "Vehicle set-up", "seats with

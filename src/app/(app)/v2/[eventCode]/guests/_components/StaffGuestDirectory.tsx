@@ -170,12 +170,12 @@ export function StaffGuestDirectory({
       ) : offline ? (
         <EmptyState
           icon={<UsersIcon className="h-7 w-7" />}
-          title="Search needs a signal"
+          title="No internet"
           description="Nothing can be looked up right now. Whatever you already saved will send itself when the signal comes back."
         />
       ) : searchError ? (
         <ErrorState
-          title="Search did not answer"
+          title="Could not search"
           description={
             rows
               ? 'Showing the last results that came back.'

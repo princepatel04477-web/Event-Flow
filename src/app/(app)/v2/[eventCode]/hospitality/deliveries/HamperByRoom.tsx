@@ -110,7 +110,7 @@ export function HamperByRoom({ eventId, eventCode, detailBase }: HamperByRoomPro
     return (
       <ErrorState
         title="Could not load the rooms"
-        description="The room list did not come back. Reload the page and try again."
+        description="The room list did not come back. Try again, and ask your event admin if it keeps failing."
         onRetry={() => void refetch()}
       />
     )
