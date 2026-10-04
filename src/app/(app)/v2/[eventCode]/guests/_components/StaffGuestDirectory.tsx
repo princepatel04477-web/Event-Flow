@@ -171,7 +171,7 @@ export function StaffGuestDirectory({
         <EmptyState
           icon={<UsersIcon className="h-7 w-7" />}
           title="No internet"
-          description="Nothing can be looked up right now. Whatever you already saved will send itself when the signal comes back."
+          description="Nothing can be looked up while offline. Whatever you already saved will send itself when the signal comes back."
         />
       ) : searchError ? (
         <ErrorState

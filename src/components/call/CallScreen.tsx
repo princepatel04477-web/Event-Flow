@@ -537,7 +537,7 @@ export function CallScreen({
                     <ClockIcon className="h-8 w-8 text-warning" />
                     <p className="text-base font-semibold text-fg">Saved on this phone</p>
                     <p className="max-w-xs text-sm text-muted">
-                      No signal right now — this outcome will sync automatically the moment you are
+                      No signal — this outcome will sync automatically the moment you are
                       back online. It is not lost.
                     </p>
                   </>

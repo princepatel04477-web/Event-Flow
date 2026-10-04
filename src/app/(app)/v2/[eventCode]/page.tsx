@@ -165,7 +165,7 @@ export default async function AppHomePage({ params }: PageProps) {
           actionHref={job.href}
         />
         <p className="text-sm leading-snug text-muted">
-          The counters are not loading on this phone right now. Every screen still works.
+          The counters are not loading on this phone. Every screen still works.
         </p>
         <HelpLink eventCode={event.code} />
       </div>

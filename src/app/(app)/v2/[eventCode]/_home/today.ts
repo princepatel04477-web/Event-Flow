@@ -153,15 +153,15 @@ const CALM_JOBS: Record<StaffFocus, Omit<TodayJob, 'href'> & { path: string }> =
   logistics: {
     id: 'default',
     headline: 'Check today’s arrivals',
-    context: 'Nothing is missing a vehicle right now.',
+    context: 'Nothing is missing a vehicle.',
     actionLabel: 'Open arrivals',
     path: 'logistics/arrivals',
     status: '',
   },
   hospitality: {
     id: 'default',
-    headline: 'Every guest has a bed',
-    context: 'Nobody is waiting for a room right now.',
+    headline: 'Every family has a room',
+    context: 'Nobody is waiting for a room.',
     actionLabel: 'Open rooms',
     path: 'hospitality/rooms',
     status: '',
@@ -169,7 +169,7 @@ const CALM_JOBS: Record<StaffFocus, Omit<TodayJob, 'href'> & { path: string }> =
   hamper: {
     id: 'default',
     headline: 'Every hamper is delivered',
-    context: 'Nothing is waiting on a photo right now.',
+    context: 'Nothing is waiting on a photo.',
     actionLabel: 'Open hampers',
     path: 'hospitality/deliveries',
     status: '',

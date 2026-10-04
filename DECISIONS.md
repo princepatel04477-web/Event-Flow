@@ -5,6 +5,26 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 4 October 2026 — L9: the copy guard (series complete)
+
+`tests/copy.test.ts` scans the v2 tree and `src/components` for the phrases
+`docs/COPY-INDIA.md` §2 bans. It skips comment lines and lets a line opt out
+with `// copy-ok: <reason>`. `npm run test:copy` runs it on its own.
+`docs/COPY-REVIEW.md` is the record of what each L-prompt changed and what was
+left.
+
+The guard immediately earned its keep: it caught eight live "right now"
+strings the V5 rule bans — the offline guest search, the help screen's two
+"Today"/"Home" lines, the Home degraded line, three Home calm contexts, and
+`CallScreen`'s "No signal" note. All eight were rewritten. It also exposed a
+stray "Every guest has a bed" calm headline in `today.ts`, now "Every family
+has a room".
+
+**The L-series is complete (L0–L9).** See `docs/COPY-REVIEW.md` for the
+per-prompt table and the deliberately-untouched list.
+
+---
+
 ## 4 October 2026 — L8: the en-IN / Asia/Kolkata formatters
 
 New `src/lib/format/india.ts` — `formatDate` ("20 Dec (Sat)"), `formatTime`
