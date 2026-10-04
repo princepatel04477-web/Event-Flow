@@ -68,32 +68,32 @@ const JOBS: Record<
   }
 > = {
   confirmedNoRoom: {
-    headline: (n) => `${n} ${n === 1 ? 'guest has' : 'guests have'} no room`,
-    context: 'Confirmed, and nowhere to sleep yet.',
-    actionLabel: 'Place families',
+    headline: (n) => `${n} ${n === 1 ? 'family' : 'families'} — room not allotted`,
+    context: 'Confirmed, room not allotted yet.',
+    actionLabel: 'Allot rooms',
     path: 'hospitality/rooms',
     status: 'No room',
   },
   arrivalsNoVehicle: {
-    headline: (n) => `${n} ${n === 1 ? 'arrival has' : 'arrivals have'} no car`,
-    context: 'Arriving today with nobody meeting them.',
-    actionLabel: 'Assign cars',
+    headline: (n) => `${n} ${n === 1 ? 'arrival' : 'arrivals'} today — vehicle not assigned`,
+    context: 'Arriving today, vehicle not assigned.',
+    actionLabel: 'Assign vehicles',
     path: 'logistics/fleet',
-    status: 'No car',
+    status: 'No vehicle',
   },
   noDeparture: {
-    headline: (n) => `${n} ${n === 1 ? 'guest has' : 'guests have'} no departure`,
-    context: 'Checked in, with no leaving time recorded.',
-    actionLabel: 'Log departures',
+    headline: (n) => `${n} ${n === 1 ? 'family' : 'families'} — departure details missing`,
+    context: 'Checked in, departure details missing.',
+    actionLabel: 'Add departure details',
     path: 'logistics/departures',
     status: 'No date',
   },
   hampersPending: {
-    headline: (n) => `${n} ${n === 1 ? 'hamper' : 'hampers'} to deliver`,
-    context: 'Every delivery needs a photo as proof.',
-    actionLabel: 'Deliver hampers',
+    headline: (n) => `${n} ${n === 1 ? 'hamper' : 'hampers'} pending delivery`,
+    context: 'Click a photo at every delivery.',
+    actionLabel: 'Start hamper delivery',
     path: 'hospitality/deliveries',
-    status: 'To deliver',
+    status: 'Pending',
   },
 }
 
@@ -145,7 +145,7 @@ const CALM_JOBS: Record<StaffFocus, Omit<TodayJob, 'href'> & { path: string }> =
   management: {
     id: 'default',
     headline: 'Call the next family',
-    context: 'Nothing else needs you right now.',
+    context: 'No pending work. All on track.',
     actionLabel: 'Start calling',
     path: 'rsvp/queue',
     status: '',
@@ -241,8 +241,8 @@ export function progressBars(n: TodayNumbers, focus: StaffFocus): TodayBar[] {
   const called = Math.max(0, n.totalGroups - n.rsvpPending)
   const hampersTotal = n.hampersDelivered + n.hampersPending
 
-  const calls: TodayBar = { label: 'Families called', done: called, total: n.totalGroups, tone: 'green' }
-  const rooms: TodayBar = { label: 'Guests with a bed', done: n.guestsRoomed, total: n.totalPax, tone: 'brand' }
+  const calls: TodayBar = { label: 'Calls done', done: called, total: n.totalGroups, tone: 'green' }
+  const rooms: TodayBar = { label: 'Rooms allotted', done: n.guestsRoomed, total: n.totalPax, tone: 'brand' }
   const hampers: TodayBar = {
     label: 'Hampers delivered',
     done: n.hampersDelivered,
@@ -270,9 +270,9 @@ export function progressBars(n: TodayNumbers, focus: StaffFocus): TodayBar[] {
  */
 export function moreNumbers(n: TodayNumbers): Array<{ label: string; value: number }> {
   return [
-    { label: 'Guests expected', value: n.totalPax },
+    { label: 'Total PAX', value: n.totalPax },
     { label: 'Families', value: n.totalGroups },
     { label: 'Confirmed', value: n.rsvpConfirmed },
-    { label: 'Still to call', value: n.rsvpPending },
+    { label: 'Calls pending', value: n.rsvpPending },
   ]
 }

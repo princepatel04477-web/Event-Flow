@@ -68,7 +68,7 @@ describe('attentionJobs', () => {
       numbers({ confirmedNoRoom: 1, arrivalsNoVehicle: 0, noDeparture: 0, hampersPending: 0 }),
       'SHARMA26',
     )
-    expect(job.headline).toBe('1 guest has no room')
+    expect(job.headline).toBe('1 family — room not allotted')
   })
 
   it('renders every href against the event code it was given', () => {
@@ -145,8 +145,8 @@ describe('progressBars', () => {
     // 0/0 is not "finished" — it is "nothing imported", and the bar must not
     // exist rather than sit empty at the top of the screen.
     const bars = progressBars(numbers({ totalPax: 0, guestsRoomed: 0 }), 'hospitality')
-    expect(bars.map((b) => b.label)).not.toContain('Guests with a bed')
-    expect(bars.map((b) => b.label)).toEqual(['Families called'])
+    expect(bars.map((b) => b.label)).not.toContain('Rooms allotted')
+    expect(bars.map((b) => b.label)).toEqual(['Calls done'])
   })
 
   it('shows at most three and puts the department’s own bar first', () => {
@@ -183,11 +183,11 @@ describe('moreNumbers', () => {
   it('is the admin disclosure, and is only the counters that are not actions', () => {
     const rows = moreNumbers(numbers())
     expect(rows.map((r) => r.label)).toEqual([
-      'Guests expected',
+      'Total PAX',
       'Families',
 
       'Confirmed',
-      'Still to call',
+      'Calls pending',
     ])
   })
 })

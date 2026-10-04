@@ -128,7 +128,7 @@ export function AppHeader({ event, viewer, showHelp, showGuests }: AppHeaderProp
               href={`/${event.code}/help`}
               className="tap flex min-h-11 items-center rounded-xl px-1 text-sm font-medium text-ink hover:bg-surface-2 active:bg-surface-2"
             >
-              How this app works
+              How to use
             </Link>
           ) : null}
 

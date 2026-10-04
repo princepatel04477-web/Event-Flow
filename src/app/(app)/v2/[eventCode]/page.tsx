@@ -32,7 +32,7 @@ import {
 import { readVisibleNumbers } from './_home/visibleNumbers'
 
 export const metadata: Metadata = {
-  title: 'Today',
+  title: "Today's Status",
 }
 
 type PageProps = {
@@ -158,7 +158,7 @@ export default async function AppHomePage({ params }: PageProps) {
     return (
       <div className="flex flex-col gap-5">
         <NowCard
-          eyebrow="Right now"
+          eyebrow="Pending Work"
           headline={job.headline}
           context={job.context}
           actionLabel={job.actionLabel}
@@ -191,20 +191,20 @@ export default async function AppHomePage({ params }: PageProps) {
             href={`/${event.code}/guests`}
             className="tap block rounded-2xl bg-now p-5 text-now-fg transition-transform duration-press ease-ledger active:scale-[0.99]"
           >
-            <p className="eyebrow text-highlight">Guests expected</p>
+            <p className="eyebrow text-highlight">Total PAX</p>
             <p className="mt-2 font-display text-[4rem] leading-none">
               <span className="tabular-nums">{numbers.totalPax}</span>{' '}
-              <span className="text-3xl italic text-now-muted">guests</span>
+              <span className="text-3xl italic text-now-muted">PAX</span>
             </p>
             <p className="mt-2 text-base text-now-muted">
-              from {numbers.totalGroups} {numbers.totalGroups === 1 ? 'family' : 'families'}
-              {numbers.rsvpPending > 0 ? ` · ${numbers.rsvpPending} still to call` : ' · everyone called'}
+              {numbers.totalGroups} {numbers.totalGroups === 1 ? 'family' : 'families'}
+              {numbers.rsvpPending > 0 ? ` · ${numbers.rsvpPending} calls pending` : ' · all calls done'}
             </p>
           </Link>
         ) : null}
 
         <NowCard
-          eyebrow="Right now"
+          eyebrow="Pending Work"
           headline={now.headline}
           context={now.context}
           actionLabel={now.actionLabel}
@@ -297,7 +297,7 @@ function HelpLink({ eventCode }: { eventCode: string }) {
       href={`/${eventCode}/help`}
       className="tap -mt-1 self-start py-2 text-sm font-medium text-muted underline underline-offset-4 hover:text-ink"
     >
-      How this app works
+      How to use
     </Link>
   )
 }

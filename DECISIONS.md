@@ -5,6 +5,23 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — L1: the Home screen reads like an Indian event team
+
+Home (v2 Today) copy per `docs/COPY-INDIA.md`. `today.ts`: attention headlines
+became "<n> <thing> pending <action>" with inline pluralisation ("12 families —
+room not allotted", "6 hampers pending delivery"), card buttons became "Allot
+rooms / Assign vehicles / Add departure details / Start hamper delivery", the
+hamper context is "Click a photo at every delivery.", and the progress bars are
+"Calls done" / "Rooms allotted" (hampers unchanged). `page.tsx`: metadata title
+"Today's Status", hero "Total PAX … PAX", "… calls pending / all calls done",
+Now card eyebrow "Pending Work", help link "How to use". The same "How this app
+works" in `AppHeader` and the help page's metadata became "How to use".
+
+`tests/v3-today.test.ts` updated to the new strings. Legacy (staff) screens that
+still say "still to call" were left and are listed here: `(staff)/[eventCode]/page.tsx`.
+
+---
+
 ## 3 October 2026 — L0: the India copy guide (`docs/COPY-INDIA.md`)
 
 The "Speak Like an Indian Event Team" series. Created `docs/COPY-INDIA.md`: who

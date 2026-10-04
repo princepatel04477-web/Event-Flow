@@ -9,7 +9,7 @@ import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import { HelpScreen } from './HelpScreen'
 
 export const metadata: Metadata = {
-  title: 'How this app works',
+  title: 'How to use',
 }
 
 type PageProps = {
