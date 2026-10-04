@@ -91,7 +91,7 @@ export function ClientGuestDirectory({ eventId }: ClientGuestDirectoryProps) {
       <EmptyState
         icon={<UsersIcon className="h-7 w-7" />}
         title="Could not load the guest list"
-        description={loadError}
+        description="Try again in a moment. If it keeps failing, ask your event team."
         action={<Button onClick={() => void reload()}>Try again</Button>}
       />
     )
@@ -145,7 +145,7 @@ export function ClientGuestDirectory({ eventId }: ClientGuestDirectoryProps) {
           ? matches.length === 0
             ? 'No guest matches that name'
             : `${matches.length} ${matches.length === 1 ? 'guest' : 'guests'}`
-          : `${rows?.length ?? 0} guests · read-only`}
+          : `${rows?.length ?? 0} guests · for viewing only`}
       </p>
 
       {matches.length === 0 ? (

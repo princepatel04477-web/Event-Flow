@@ -5,6 +5,21 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 4 October 2026 — L7: the client (family) view
+
+The client view already said "guests" everywhere and showed no error codes —
+`ClientGuestDirectory` (also used by `FindClient`) reads
+`client_guest_profiles` and has no "PAX". Two copy fixes: the load error now
+gives a plain description ("Try again in a moment. If it keeps failing, ask
+your event team.") instead of printing `loadError` raw — a raw Supabase
+message can carry an error code, which L7 forbids on this screen — and the
+count line says "for viewing only", not "read-only".
+
+**Checked, unchanged:** no "PAX" appears in any client-facing v2 file (grepped
+the tree); `families/[groupId]` already says "N guests".
+
+---
+
 ## 4 October 2026 — L6: errors, empty states and toasts
 
 App-wide sweep of the v2 error/empty copy to V9 (say what happened, what to
