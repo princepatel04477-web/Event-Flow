@@ -125,14 +125,14 @@ export function AllocateReview({
           tone="brand"
         />
         <p className="text-sm leading-snug text-muted">
-          {plan.summary.guests} {plan.summary.guests === 1 ? 'guest' : 'guests'} would get a bed ·{' '}
+          {plan.summary.guests} {plan.summary.guests === 1 ? 'guest' : 'guests'} would get a room ·{' '}
           {plan.summary.bedsSpare} still free. Nothing is saved yet.
         </p>
       </section>
 
       {plan.proposals.length === 0 ? (
         <p className="rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-sm text-muted">
-          The plan could not place anybody. Each family that needs a bed is listed below with the
+          The plan could not place anybody. Each family that needs a room is listed below with the
           reason.
         </p>
       ) : (
@@ -231,7 +231,7 @@ export function AllocateReview({
 
             {alternatives.length === 0 ? (
               <p className="rounded-xl border border-rule-strong bg-surface px-3.5 py-3 text-sm text-muted">
-                No other room has {changing.pax} free beds. Skip this family and place them across
+                No other room has space for {changing.pax} PAX. Skip this family and place them across
                 rooms from the Waiting list.
               </p>
             ) : (
@@ -272,7 +272,7 @@ export function AllocateReview({
           the app. While the commit is in flight both controls are disabled and
           the primary says so, rather than swapping the bar for a spinner. */}
       <BottomBar
-        summary={`${acceptedGuests} ${acceptedGuests === 1 ? 'guest' : 'guests'} now have a bed`}
+        summary={`${acceptedGuests} ${acceptedGuests === 1 ? 'guest' : 'guests'} now have a room`}
         secondary={{ label: 'Cancel', onPress: onCancel, disabled: committing }}
         primary={{
           label: committing ? 'Saving…' : `Confirm ${accepted.length}`,

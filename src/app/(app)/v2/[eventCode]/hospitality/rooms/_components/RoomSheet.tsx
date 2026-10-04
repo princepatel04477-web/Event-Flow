@@ -225,7 +225,7 @@ export function RoomSheet({
                   fullWidth
                   onClick={() => setMode({ kind: 'move', occupant: pickedOccupant })}
                 >
-                  Move {firstName(pickedOccupant.guestName)}
+                  Move to another room
                 </Button>
                 <Button
                   variant="secondary"
@@ -280,7 +280,7 @@ export function RoomSheet({
         {mode.kind === 'move' ? (
           <>
             <p className="text-sm leading-snug text-muted">
-              Move {mode.occupant.guestName} to which room?
+              Move to which room?
             </p>
             <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
               {moveTargets.map((target) => (
@@ -382,11 +382,6 @@ export function RoomSheet({
       </div>
     </BottomSheet>
   )
-}
-
-/** The first word of a name — "Move Ravi", not "Move Ravi Kumar Patel". */
-function firstName(name: string): string {
-  return name.trim().split(/\s+/)[0] || name
 }
 
 function sideWord(side: string | null): string {

@@ -28,11 +28,11 @@ export interface BoardTotals {
  */
 export function boardSummary(totals: BoardTotals): string {
   const parts: string[] = [
-    `${totals.guestsWithBed} of ${totals.confirmedGuests} ${
-      totals.confirmedGuests === 1 ? 'guest has' : 'guests have'
-    } a bed`,
+    `${totals.guestsWithBed} of ${totals.confirmedGuests} PAX ${
+      totals.confirmedGuests === 1 ? 'has' : 'have'
+    } a room`,
   ]
-  parts.push(`${totals.bedsFree} ${totals.bedsFree === 1 ? 'bed' : 'beds'} free`)
+  parts.push(`${totals.bedsFree} PAX free`)
   if (totals.familiesWaiting > 0) {
     parts.push(
       `${totals.familiesWaiting} ${totals.familiesWaiting === 1 ? 'family' : 'families'} waiting`,
@@ -138,9 +138,9 @@ function floorLabel(floor: string): string {
   return /^\d+$/.test(floor) ? `Floor ${floor}` : floor
 }
 
-/** "2 of 3 beds" — the line under a room number on the Rooms tab. */
+/** "2/3 PAX" — the line under a room number on the Rooms tab. */
 export function bedsLabel(occupied: number, capacity: number): string {
-  return `${occupied} of ${capacity} ${capacity === 1 ? 'bed' : 'beds'}`
+  return `${occupied}/${capacity} PAX`
 }
 
 /** A room as the bed maths needs it: its capacity and who is in it. */
@@ -194,19 +194,18 @@ export function notPlacedYet(confirmedGuests: number, occupied: number): number 
 }
 
 /**
- * "3 / 2 beds · 1 extra" (over), "2 / 2 beds" (full), "1 / 2 beds" (space).
+ * "Room full (2/2 PAX)" (full or over), "1/2 PAX" (space).
  *
  * The overflow past capacity is spelled out — a coordinator repeating the line
- * back needs to know the room is over, not just "full". Named `roomBedLine`,
- * not `bedLine`: RoomsBoard already has a local `bedLine(bedsFree, waiting)`
- * for the bottom bar, and the two must not be confused.
+ * back needs to know the room is over. Named `roomBedLine`, not `bedLine`:
+ * RoomsBoard already has a local `bedLine(bedsFree, waiting)` for the bottom
+ * bar, and the two must not be confused.
  */
 export function roomBedLine(occupied: number, capacity: number): string {
-  const unit = capacity === 1 ? 'bed' : 'beds'
   const extra = Math.max(0, occupied - capacity)
-  return extra > 0
-    ? `${occupied} / ${capacity} ${unit} · ${extra} extra`
-    : `${occupied} / ${capacity} ${unit}`
+  const base =
+    occupied >= capacity ? `Room full (${occupied}/${capacity} PAX)` : `${occupied}/${capacity} PAX`
+  return extra > 0 ? `${base} · ${extra} extra bed` : base
 }
 
 /** "6 guests · no room yet" / "6 guests · 2 placed, 4 to go". */

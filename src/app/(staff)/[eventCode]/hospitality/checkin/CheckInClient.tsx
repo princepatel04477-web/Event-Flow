@@ -487,7 +487,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
                 onClick={() => handleCheckOut(openRow)}
                 disabled={Boolean(openRow.occupiedByOther) || rowBusy(openRow.assignment.id)}
               >
-                Check out
+                Mark checked out
               </Button>
             ) : (
               <Button
@@ -496,7 +496,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
                 onClick={() => handleCheckIn(openRow)}
                 disabled={rowBusy(openRow.assignment.id)}
               >
-                Checked in
+                Mark checked in
               </Button>
             )}
           </div>

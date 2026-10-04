@@ -360,7 +360,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
         ok: false,
         message:
           result.code === 'capacity'
-            ? `Room ${v.roomNumber} has no bed left. Move somebody out first, or pick another room.`
+            ? `Room ${v.roomNumber} is full. Shift its guests out first, or pick another room.`
             : result.error,
       }
     },
@@ -524,7 +524,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
       <section className="flex flex-col gap-3 rounded-2xl border border-rule-strong bg-surface p-4 shadow-e1">
         {isPending ? (
           <p role="status" className="text-base text-muted">
-            Counting beds…
+            Counting rooms…
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-2">
@@ -537,7 +537,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
               className="tap min-h-14 rounded-xl border border-rule-strong px-3 py-2 text-left transition-colors duration-press ease-ledger active:bg-surface-2"
             >
               <span className="figure block text-xl font-semibold text-ink">{beds.occupied}</span>
-              <span className="block text-xs text-muted">Occupied guests</span>
+              <span className="block text-xs text-muted">Occupied</span>
             </button>
             <button
               type="button"
@@ -548,7 +548,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
               className="tap min-h-14 rounded-xl border border-rule-strong px-3 py-2 text-left transition-colors duration-press ease-ledger active:bg-surface-2"
             >
               <span className="figure block text-xl font-semibold text-ink">{beds.withBed}</span>
-              <span className="block text-xs text-muted">With bed</span>
+              <span className="block text-xs text-muted">Allotted</span>
             </button>
             <button
               type="button"
@@ -567,7 +567,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
               className="tap min-h-14 rounded-xl border border-rule-strong px-3 py-2 text-left transition-colors duration-press ease-ledger active:bg-surface-2"
             >
               <span className="figure block text-xl font-semibold text-ink">{notPlaced}</span>
-              <span className="block text-xs text-muted">Not placed yet</span>
+              <span className="block text-xs text-muted">Room not allotted</span>
             </button>
           </div>
         )}
@@ -624,7 +624,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
         onChange={setTab}
         options={[
           { value: 'rooms', label: 'By room', count: grid.rooms.length },
-          { value: 'waiting', label: 'Waiting', count: waiting.length },
+          { value: 'waiting', label: 'Unallotted families', count: waiting.length },
         ]}
       />
 
@@ -742,7 +742,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
       <BottomBar
         summary={
           isPending
-            ? 'Counting beds…'
+            ? 'Counting rooms…'
             : canAutoFill
               ? // NOT the same numbers as the card above. The card already
                 // says "5 beds free · 2 families waiting" and repeating it
@@ -776,11 +776,11 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
 /** "38 beds free · 14 waiting" — the one line of state, with zeroes dropped. */
 function bedLine(bedsFree: number, waiting: number): string {
   const parts: string[] = []
-  parts.push(`${bedsFree} ${bedsFree === 1 ? 'bed' : 'beds'} free`)
+  parts.push(`${bedsFree} PAX free`)
   if (waiting > 0) {
     parts.push(`${waiting} ${waiting === 1 ? 'family' : 'families'} waiting`)
   } else {
-    parts.push('every family has a bed')
+    parts.push('every family has a room')
   }
   return parts.join(' · ')
 }
@@ -820,7 +820,7 @@ function WaitingList({
   if (total === 0) {
     return (
       <EmptyState
-        title="Every family has a bed"
+        title="Every family has a room"
         description="This fills in as the calling team confirms families."
         action={
           canOpenCallList ? (
@@ -929,7 +929,7 @@ function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) =
       type="button"
       onClick={() => onOpen(room.roomId)}
       aria-label={`Room ${room.roomNumber}${typeLabel ? ` ${typeLabel}` : ''}, ${
-        occupied === 0 ? 'empty' : `${OCCUPANCY_LABELS[status]}, ${occupied} of ${room.capacity} beds`
+        occupied === 0 ? 'empty' : `${OCCUPANCY_LABELS[status]}, ${occupied}/${room.capacity} PAX`
       }${names.length === 0 ? '' : `, ${names.join(', ')}`}`}
       className={cn(
         'tap flex h-full min-h-[6.5rem] w-full flex-col gap-2 rounded-2xl border bg-surface p-3 text-left',
@@ -981,7 +981,7 @@ function RoomCard({ room, onOpen }: { room: GridRoom; onOpen: (roomId: string) =
         {room.isBlocked ? (
           <span className="block text-sm text-muted">Out of service</span>
         ) : names.length === 0 ? (
-          <span className="block text-sm text-muted">{room.capacity} beds free</span>
+          <span className="block text-sm text-muted">{room.capacity} PAX free</span>
         ) : (
           <>
             <span className="block truncate text-sm leading-snug text-ink">
@@ -1019,7 +1019,7 @@ function CommitSummary({
       <p className="text-base font-medium text-ink">
         {result.families === 0
           ? 'Nothing was saved.'
-          : `${result.families} ${result.families === 1 ? 'family' : 'families'} placed · ${result.guests} ${result.guests === 1 ? 'guest' : 'guests'} now have a bed.`}
+          : `${result.families} ${result.families === 1 ? 'family' : 'families'} placed · ${result.guests} ${result.guests === 1 ? 'guest' : 'guests'} now have a room.`}
       </p>
       {failures.length > 0 ? (
         <ul className="flex flex-col gap-2" aria-label="Families that could not be placed">

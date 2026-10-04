@@ -203,7 +203,7 @@ export function RoomCreateForm({ eventId, hotelId, eventCode, hotelName, backHre
           </select>
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="eyebrow">Capacity <span className="text-ledger-red">*</span></span>
+          <span className="eyebrow">Capacity (PAX) <span className="text-ledger-red">*</span></span>
           <Input value={capacity} onChange={(e) => setCapacity(e.target.value)} type="number" min="1" required />
         </label>
       </div>
@@ -229,7 +229,7 @@ export function RoomCreateForm({ eventId, hotelId, eventCode, hotelName, backHre
         </div>
       ) : (
         <label className="flex flex-col gap-1.5">
-          <span className="eyebrow">Room number <span className="text-ledger-red">*</span></span>
+          <span className="eyebrow">Room no. <span className="text-ledger-red">*</span></span>
           <Input value={roomNumber} onChange={(e) => setRoomNumber(e.target.value)} placeholder="e.g. 304" required />
         </label>
       )}

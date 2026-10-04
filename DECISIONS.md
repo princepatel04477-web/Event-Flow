@@ -5,7 +5,7 @@ is made, so the next session does not re-litigate it.
 
 ---
 
-## 4 October 2026 — L4 (partial): hamper copy
+## 4 October 2026 — L4: hospitality copy (rooms, check-in, setup, hampers)
 
 Hamper strings per `docs/COPY-INDIA.md`: row status "Pending" / "Room not
 allotted" (was "To go" / "No room"), the Next-door action "Click delivery
@@ -15,15 +15,22 @@ with the button "Save delivery" (was "Confirm delivery"). The fixed BottomBar
 primary stays "Photo" — "Click delivery photo" does not fit a fixed bar at
 360px, so the word-list short form is used there and listed here.
 
-**L4 is NOT complete.** Still owed: the Rooms/check-in/Hotel & Room Setup
-wording (Room Allotment "Allot room" / "Move to another room" / "Remove from
-room", "Room full (2/2 PAX)", "Twin sharing" / "Triple sharing", "Room not
-allotted", the swap message and the "Add extra bed and allot anyway" override;
-Check-in "Mark checked in/out"; Setup "Add hotel"/"Add rooms"/"Room no."/
-"Floor"/"Capacity (PAX)"), and the sweep that removes every visible "bed"
-except "Extra bed" from the Rooms screens. That sweep touches `RoomsBoard`,
-`RoomSheet`, `PlaceFamilySheet`, `AllocateReview` and the rooms tests, and it
-overlaps the F7 bed wording — it needs its own session, not a rushed pass.
+Rooms wording: `src/lib/rooms/board.ts` now says "X of Y PAX have a room ·
+N PAX free", `bedsLabel` is "2/3 PAX", `roomBedLine` is "Room full (2/2 PAX)"
+/ "1/2 PAX" / "Room full (3/2 PAX) · 1 extra bed". `RoomsBoard` tiles Occupied /
+Allotted / Extra bed / Room not allotted, the waiting tab is "Unallotted
+families", the full-room message is "Room N is full. Shift its guests out
+first…". `AllocateReview` "would get a room" / "needs a room" / "space for N
+PAX" / "now have a room". `RoomSheet` "Move to another room". Check-in buttons
+"Mark checked in" / "Mark checked out". Setup `RoomCreateForm` "Room no." /
+"Capacity (PAX)"; `ROOM_TYPE_LABELS` became "Twin sharing" / "Triple sharing" /
+"King bed" / "Queen bed" (display only — the stored values are unchanged).
+
+**Left alone, with reasons:** every remaining "bed" in the Rooms screens is in
+a comment (kept per the series). `PlaceFamilySheet`'s "Add a guest" primary and
+its "How many go in one room?" were left — no "bed" in them, and the list does
+not name them. `test` width note: the fixed BottomBar primary stays "Photo".
+`RoomingRoomSheet`, the rooming-list, was out of L4's scope.
 
 ---
 

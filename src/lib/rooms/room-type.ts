@@ -16,11 +16,11 @@ export const ROOM_TYPES = ['suite', 'standard', 'deluxe', 'king', 'queen'] as co
 export type RoomType = (typeof ROOM_TYPES)[number]
 
 export const ROOM_TYPE_LABELS: Record<RoomType, string> = {
-  suite: 'Suite',
-  standard: 'Standard',
-  deluxe: 'Deluxe',
-  king: 'King',
-  queen: 'Queen',
+  suite: 'Triple sharing',
+  standard: 'Twin sharing',
+  deluxe: 'Twin sharing',
+  king: 'King bed',
+  queen: 'Queen bed',
 }
 
 /**

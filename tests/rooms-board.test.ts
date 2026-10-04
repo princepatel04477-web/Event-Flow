@@ -29,19 +29,19 @@ describe('boardSummary', () => {
         bedsFree: 41,
         familiesWaiting: 14,
       }),
-    ).toBe('312 of 465 guests have a bed · 41 beds free · 14 families waiting')
+    ).toBe('312 of 465 PAX have a room · 41 PAX free · 14 families waiting')
   })
 
   it('says everyone is placed rather than "0 families waiting"', () => {
     expect(
       boardSummary({ confirmedGuests: 6, guestsWithBed: 6, bedsFree: 2, familiesWaiting: 0 }),
-    ).toBe('6 of 6 guests have a bed · 2 beds free · everyone is placed')
+    ).toBe('6 of 6 PAX have a room · 2 PAX free · everyone is placed')
   })
 
   it('reads correctly for one of everything', () => {
     expect(
       boardSummary({ confirmedGuests: 1, guestsWithBed: 0, bedsFree: 1, familiesWaiting: 1 }),
-    ).toBe('0 of 1 guest has a bed · 1 bed free · 1 family waiting')
+    ).toBe('0 of 1 PAX has a room · 1 PAX free · 1 family waiting')
   })
 })
 
@@ -109,8 +109,8 @@ describe('groupRoomsByHotelFloor', () => {
 
 describe('row labels', () => {
   it('counts beds', () => {
-    expect(bedsLabel(2, 3)).toBe('2 of 3 beds')
-    expect(bedsLabel(0, 1)).toBe('0 of 1 bed')
+    expect(bedsLabel(2, 3)).toBe('2/3 PAX')
+    expect(bedsLabel(0, 1)).toBe('0/1 PAX')
   })
 
   it('says what a waiting family still needs', () => {
@@ -146,9 +146,9 @@ describe('bed summary', () => {
   })
 
   it('spells out the overflow on the room line', () => {
-    expect(roomBedLine(3, 2)).toBe('3 / 2 beds · 1 extra')
-    expect(roomBedLine(2, 2)).toBe('2 / 2 beds')
-    expect(roomBedLine(1, 2)).toBe('1 / 2 beds')
-    expect(roomBedLine(0, 1)).toBe('0 / 1 bed')
+    expect(roomBedLine(3, 2)).toBe('Room full (3/2 PAX) · 1 extra bed')
+    expect(roomBedLine(2, 2)).toBe('Room full (2/2 PAX)')
+    expect(roomBedLine(1, 2)).toBe('1/2 PAX')
+    expect(roomBedLine(0, 1)).toBe('0/1 PAX')
   })
 })
