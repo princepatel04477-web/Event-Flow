@@ -5,6 +5,24 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 3 October 2026 — L0: the India copy guide (`docs/COPY-INDIA.md`)
+
+The "Speak Like an Indian Event Team" series. Created `docs/COPY-INDIA.md`: who
+reads the app, twelve voice rules, `en-IN` formats, the word list, and the RSVP
+outcome wording. **PAX comes back to staff screens** — an Indian hotel desk,
+transporter and wedding planner all say PAX; only the client (family) view says
+"guests". `docs/GLOSSARY.md` is marked superseded and its "What to show a user"
+column now matches the word list. Section 4 gains a "(proposed — check)" table of
+strings found in the v2 tree that the list did not cover (each with its file).
+
+**Run on `main`, not the `brain/showcase` worktree.** The series says to work off
+`brain/showcase`, but that branch has none of the F-series/UI4 work and the
+deliverable target is `main` (push + redeploy), so the copy work is done on
+`main`. The `C:\dev\ef-copy` worktree (branch `brain/copy-india`, off
+`be9ddf5`) was created and left in place, unused.
+
+---
+
 ## 3 October 2026 — F8b: applied the migrations, built the By-room hamper view
 
 ### Migrations applied to the linked project (EventFlow, xktxnkuz…)

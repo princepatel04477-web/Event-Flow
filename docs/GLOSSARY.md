@@ -1,26 +1,33 @@
 ﻿# EventFlow Plain Language Glossary
 
-This glossary defines the authoritative user-facing vocabulary for EventFlow. Every noun and status shown to an end user must use the plain terms listed below.
+> **Superseded for wording by `docs/COPY-INDIA.md`.** That file is the authority
+> for every string a person reads. **Staff screens use PAX.** Where the two
+> disagree, `docs/COPY-INDIA.md` wins.
 
-Trade terms and engineering jargon are banned from UI copy; they may remain only in database identifiers, TypeScript code, and specific Excel export headers where legacy client spreadsheets require them.
+This glossary defines the user-facing vocabulary for EventFlow. Every noun and
+status shown to an end user must use the terms listed below.
+
+Trade terms and engineering jargon are banned from UI copy; they may remain only
+in database identifiers, TypeScript code, and specific Excel export headers where
+legacy client spreadsheets require them.
 
 | Term in code | What to show a user | Where the code word may stay | Real file(s) where term appears |
 |---|---|---|---|
-| `pax` / `PAX` | "guests" (or "number of guests") | Keep "PAX" ONLY as an Excel column header in `src/lib/export/sheets.ts` for spreadsheet parity. Internal variables, DB columns (`expected_pax`, `confirmed_pax`). | `src/app/(staff)/[eventCode]/dashboard/page.tsx`<br>`src/app/(staff)/[eventCode]/guests/list/_components/GuestCard.tsx`<br>`src/app/(staff)/[eventCode]/rsvp/review/[extractionId]/page.tsx`<br>`src/app/(staff)/[eventCode]/logistics/departures/DeparturesClient.tsx` |
-| `adults` / `children` | "adults" / "children" | Columns `guest_groups.expected_adults`/`expected_children` (invited split, migration 20261003090000) and `adults_confirmed`/`children_confirmed` (split recorded on the call). **Guests = everyone. A child is anyone under 12; children count in the headline "guests" number** (client answer, 3 Oct 2026). | `supabase/migrations/20261003090000_guest_groups_expected_split.sql`<br>`src/lib/export/definitions.ts` |
-| `group` / `guest_group` | "family" | Database tables `guest_groups`, column `group_id`, functions in `src/lib/actions/rsvp.ts`. | `src/app/(staff)/[eventCode]/dashboard/page.tsx`<br>`src/app/(staff)/[eventCode]/guests/list/GuestsClient.tsx`<br>`src/lib/actions/rsvp.ts` |
-| `deliverable` | "hamper" or "return gift" (use the specific item, never umbrella term) | Tables `deliverables`, `delivery_proofs`, API functions in `src/lib/actions/deliveries.ts`. | `src/app/(staff)/[eventCode]/hospitality/deliveries/page.tsx`<br>`src/app/(staff)/[eventCode]/hospitality/deliveries/DeliveriesClient.tsx`<br>`src/app/(staff)/[eventCode]/hospitality/deliveries/[deliverableId]/DeliveryDetail.tsx` |
-| `extraction` | "call notes" | Table `rsvp_extractions`, RPC `apply_rsvp_extraction`, internal processing in `src/lib/extraction/`. | `src/app/(staff)/[eventCode]/rsvp/review/page.tsx`<br>`src/app/(staff)/[eventCode]/rsvp/review/[extractionId]/page.tsx`<br>`src/app/(staff)/[eventCode]/rsvp/review/[extractionId]/loading.tsx` |
-| `unmatched` | "unknown numbers" | Status enums, IndexedDB ledger status in `src/lib/harvest-ledger.ts` (`status: 'unmatched'`), route segments. | `src/lib/sections/config.tsx`<br>`src/app/(staff)/[eventCode]/rsvp/unmatched/page.tsx`<br>`src/app/(staff)/[eventCode]/rsvp/unmatched/UnmatchedTrayClient.tsx` |
-| `harvest` | "imported recordings" | Native plugin wrappers (`CallRecordingHarvestPlugin`), `src/lib/harvest.ts`, `src/lib/harvest-ledger.ts`. | `src/app/(admin)/AdminSidebar.tsx`<br>`src/app/(admin)/admin/harvest-debug/HarvestDebugClient.tsx`<br>`src/lib/harvest.ts` |
-| `travel leg` | "arrival" or "departure" | Table `travel_legs`, view `v_travel_ledger`, TypeScript database types. | `src/app/(staff)/[eventCode]/guests/list/_components/format.ts`<br>`src/app/(staff)/[eventCode]/guests/_components/format.ts`<br>`src/app/(staff)/[eventCode]/dashboard/page.tsx` |
-| `roomed` | "has a room" | View columns `guests_roomed`, TS query return values in `dashboard.ts`. | `src/app/(staff)/[eventCode]/dashboard/page.tsx`<br>`src/app/(staff)/[eventCode]/guests/list/_components/ClientGuestList.tsx` |
-| `Board` (tab label) | "Home" | Internal section id `'dashboard'`, function names `readBoard()`. | `src/lib/sections/config.tsx`<br>`src/app/(staff)/[eventCode]/dashboard/page.tsx` |
-| `rsvp` (section name) | "RSVP" | Internal section id `rsvp`, route segment `/rsvp`, table `call_attempts`, filter/queue modules. The section was called "Calls" in the UI until 3 Oct 2026; only the words a person reads changed. | `src/lib/sections/v3.ts`<br>`src/lib/sections/config.tsx`<br>`src/lib/departments.ts`<br>`src/lib/section-locks.ts` |
-| `Stay` (tab label) | "Rooms" | Internal child segment `rooms`, section `hospitality`. | `src/lib/sections/config.tsx`<br>`src/components/nav/BottomTabs.tsx` |
-| `Prep` (tab label) | "Setup" | Internal feature flag `production`, section `production`. | `src/lib/sections/config.tsx` |
-| `access code` | "your code" | Table `access_codes`, cookie name `nuvent_code_auth` (frozen per CLAUDE.md §12). | `src/app/(auth)/login/page.tsx`<br>`src/app/(auth)/login/CodeLoginForm.tsx` |
-| `event_team` / `client` | "team" / "family view" | Database enum `app_role`, JWT claims, server guard parameters. | `src/lib/sections/config.tsx`<br>`src/app/(staff)/[eventCode]/layout.tsx`<br>`CLAUDE.md` §7 |
-| `ledger` | "travel overview" | View `v_travel_ledger`, CSS easing `ease-ledger`, admin route segments. | `src/app/(admin)/admin/events/[eventCode]/ledger/LedgerClient.tsx`<br>`src/components/ui/EmptyState.tsx` |
-| `fleet` | "Vehicles" | Table `vehicles`, internal route `/logistics/fleet`. | `src/lib/sections/config.tsx`<br>`src/app/(staff)/[eventCode]/logistics/fleet/FleetClient.tsx` |
-| `checkin` / `checkout` | "Check-in / out" | Child segment `checkin`, internal timestamp columns in `room_assignments`. | `src/lib/sections/config.tsx`<br>`src/app/(staff)/[eventCode]/dashboard/page.tsx` |
+| `pax` / `PAX` | "PAX" on staff screens; "guests" on the client (family) view | Excel column headers and DB columns (`expected_pax`, `confirmed_pax`). | `src/lib/export/sheets.ts`<br>`src/lib/sections/config.tsx` |
+| `adults` / `children` | "adults" / "children" | Columns `guest_groups.expected_adults`/`expected_children` (invited split) and `adults_confirmed`/`children_confirmed` (split recorded on the call). Guests = everyone; a child is under 12. | `supabase/migrations/20261003090000_guest_groups_expected_split.sql`<br>`src/lib/export/definitions.ts` |
+| `group` / `guest_group` | "Family" | Tables `guest_groups`, column `group_id`, functions in `src/lib/actions/rsvp.ts`. | `src/lib/actions/rsvp.ts` |
+| `deliverable` | "Hamper" or "Return gift" (the specific item, never the umbrella term) | Tables `deliverables`, `delivery_proofs`, API functions in `src/lib/actions/deliveries.ts`. | `src/lib/actions/deliveries.ts` |
+| `extraction` | "Call Records" | Table `rsvp_extractions`, RPC `apply_rsvp_extraction`, processing in `src/lib/extraction/`. | `src/lib/extraction/` |
+| `unmatched` | "Unknown Numbers" | Status enums, IndexedDB ledger status in `src/lib/harvest-ledger.ts` (`status: 'unmatched'`), route segments. | `src/lib/sections/config.tsx` |
+| `harvest` | "imported recordings" | Native plugin wrappers (`CallRecordingHarvestPlugin`), `src/lib/harvest.ts`, `src/lib/harvest-ledger.ts`. | `src/lib/harvest.ts` |
+| `travel leg` | "Pickup & Drop" | Table `travel_legs`, view `v_travel_ledger`, TypeScript database types. | `src/lib/sections/config.tsx` |
+| `roomed` | "Rooms allotted" | View columns `guests_roomed`, TS query return values in `dashboard.ts`. | `src/lib/actions/dashboard.ts` |
+| `Board` (menu label) | "Dashboard" (the Home screen's own title is "Today's Status") | Internal section id `'dashboard'`, function names `readBoard()`. | `src/lib/sections/config.tsx` |
+| `rsvp` (section name) | "RSVP" | Internal section id `rsvp`, route segment `/rsvp`, table `call_attempts`, filter/queue modules. Named "Calls" in the UI until 3 Oct 2026. | `src/lib/sections/v3.ts`<br>`src/lib/sections/config.tsx` |
+| `Stay` (tab label) | "Room Allotment" | Internal child segment `rooms`, section `hospitality`. | `src/lib/sections/config.tsx` |
+| `Prep` (tab label) | "Hotel & Room Setup" | Internal feature flag `production`, section `production`. | `src/lib/sections/config.tsx` |
+| `access code` | "Login code" | Table `access_codes`, cookie name `nuvent_code_auth` (frozen per CLAUDE.md §12). | `src/app/(auth)/login/CodeLoginForm.tsx` |
+| `event_team` / `client` | "team" / "family view" | Database enum `app_role`, JWT claims, server guard parameters. | `src/lib/sections/config.tsx`<br>CLAUDE.md §7 |
+| `ledger` | "travel overview" | View `v_travel_ledger`, CSS easing `ease-ledger`, admin route segments. | `src/lib/sections/config.tsx` |
+| `fleet` | "Vehicles" | Table `vehicles`, internal route `/logistics/fleet`. | `src/lib/sections/config.tsx` |
+| `checkin` / `checkout` | "Check-in / Check-out" | Child segment `checkin`, internal timestamp columns in `room_assignments`. | `src/lib/sections/config.tsx` |
