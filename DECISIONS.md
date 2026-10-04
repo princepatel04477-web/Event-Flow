@@ -5,6 +5,28 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 4 October 2026 — L4 (partial): hamper copy
+
+Hamper strings per `docs/COPY-INDIA.md`: row status "Pending" / "Room not
+allotted" (was "To go" / "No room"), the Next-door action "Click delivery
+photo", the By-room chip "Pending" (was "No hamper"), and the sealed proof
+confirmation "Once saved, this delivery cannot be changed. Save delivery?"
+with the button "Save delivery" (was "Confirm delivery"). The fixed BottomBar
+primary stays "Photo" — "Click delivery photo" does not fit a fixed bar at
+360px, so the word-list short form is used there and listed here.
+
+**L4 is NOT complete.** Still owed: the Rooms/check-in/Hotel & Room Setup
+wording (Room Allotment "Allot room" / "Move to another room" / "Remove from
+room", "Room full (2/2 PAX)", "Twin sharing" / "Triple sharing", "Room not
+allotted", the swap message and the "Add extra bed and allot anyway" override;
+Check-in "Mark checked in/out"; Setup "Add hotel"/"Add rooms"/"Room no."/
+"Floor"/"Capacity (PAX)"), and the sweep that removes every visible "bed"
+except "Extra bed" from the Rooms screens. That sweep touches `RoomsBoard`,
+`RoomSheet`, `PlaceFamilySheet`, `AllocateReview` and the rooms tests, and it
+overlaps the F7 bed wording — it needs its own session, not a rushed pass.
+
+---
+
 ## 3 October 2026 — L3: RSVP outcomes in the callers' words
 
 Outcome display text per section 5 of `docs/COPY-INDIA.md`. In

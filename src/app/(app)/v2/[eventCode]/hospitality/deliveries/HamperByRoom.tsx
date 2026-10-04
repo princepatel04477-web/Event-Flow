@@ -190,7 +190,7 @@ export function HamperByRoom({ eventId, eventCode, detailBase }: HamperByRoomPro
                             ? `Delivered ×${assigned.quantity}`
                             : assigned
                               ? `Assigned ×${assigned.quantity}`
-                              : 'No hamper'}
+                              : 'Pending'}
                         </StatusPill>
                       </button>
 

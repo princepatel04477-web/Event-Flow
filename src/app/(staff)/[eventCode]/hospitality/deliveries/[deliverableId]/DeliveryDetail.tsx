@@ -381,14 +381,14 @@ export function DeliveryDetail({
                 runner tapping Confirm had nothing on screen telling them it was
                 the last chance. */}
             <p className="rounded-lg bg-tint-warning px-3 py-2 text-xs font-medium text-warning">
-              Once confirmed, this proof cannot be changed or deleted — not even by an admin.
+              Once saved, this delivery cannot be changed. Save delivery?
             </p>
             <div className="flex gap-2">
               <Button variant="secondary" fullWidth disabled={phase.name === 'uploading'} onClick={() => setPhase({ name: 'ready' })}>
                 Retake
               </Button>
               <Button fullWidth loading={phase.name === 'uploading'} onClick={() => void handleConfirm()}>
-                Confirm delivery
+                Save delivery
               </Button>
             </div>
           </CardBody>

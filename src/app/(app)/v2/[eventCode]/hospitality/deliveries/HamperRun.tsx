@@ -394,7 +394,7 @@ export function HamperRun({
               eyebrow="Next door"
               headline={roomHeadline(next)}
               context={nextContext(next)}
-              actionLabel="Take photo"
+              actionLabel="Click delivery photo"
               actionHref={detailHref(next)}
             />
           ) : null}
@@ -619,7 +619,7 @@ function rowMeta(row: DeliveryRunRow): string {
  */
 function rowStatus(row: DeliveryRunRow, skipped: readonly string[]): string {
   if (skipped.includes(row.id)) return 'Skipped'
-  return row.room_number ? 'To go' : 'No room'
+  return row.room_number ? 'Pending' : 'Room not allotted'
 }
 
 export default HamperRun
