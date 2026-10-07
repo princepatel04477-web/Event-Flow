@@ -16,18 +16,20 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
  * phone on venue Wi-Fi. Measured 2026-09-24: the two chunks carrying it
  * (`3jae-i7lmr_ke.js` and this component's own chunk) are on all seven.
  *
- * For what? The card below. The card is the job. Reporting was already dead
- * cargo: `initSentry()` was only ever called from a `if (typeof window !==
- * 'undefined')` block in `src/app/layout.tsx`, which is a SERVER component, so
- * that branch is false on the server and the module is not shipped to the client
- * at all — confirmed by reading it, and the reason `captureDiagnostic()`'s own
- * `if (!initialized || !DSN) return` guard has always returned early.
+ * For what? The card below. The card is the job. Reporting was reached only from
+ * a `if (typeof window !== 'undefined')` block in `src/app/layout.tsx`, which is
+ * a SERVER component, so that branch was false on the server and the module was
+ * never shipped to the client — `initSentry()` never ran, and `captureDiagnostic()`'s
+ * own `if (!DSN) return` guard returned early regardless. The browser-only wiring
+ * now lives in the client `NativeBridge`, so `initSentry()` actually runs; with
+ * no `NEXT_PUBLIC_SENTRY_DSN` configured it still imports nothing, and the SDK
+ * only ever loads on a real report.
  *
- * So the boundary is now React's own, which is the entire API a boundary needs,
+ * So the boundary is React's own, which is the entire API a boundary needs,
  * and the SDK is imported on the ERROR path instead of on the happy one. The
  * fallback UI, the props and `resetError` are unchanged; an error is still
  * offered to Sentry, from `src/lib/sentry.ts`, and a deployment with no DSN
- * still does nothing — exactly as before.
+ * still does nothing.
  */
 export function SentryErrorBoundary({ children }: { children: React.ReactNode }) {
   return <Boundary>{children}</Boundary>
@@ -78,7 +80,7 @@ class Boundary extends Component<Props, State> {
             Something went wrong
           </h1>
           <p style={{ margin: '0 0 20px', color: '#4a5568' }}>
-            The event team has been notified. Tap to reload and carry on.
+            Tap Reload to carry on. If it keeps happening, tell your coordinator.
           </p>
           <button
             onClick={this.resetError}

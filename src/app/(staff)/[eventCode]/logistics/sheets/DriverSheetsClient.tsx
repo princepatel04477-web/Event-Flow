@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import * as XLSX from 'xlsx'
 
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -13,6 +12,7 @@ import {
   readDriverSheets,
   type DriverSheetTrip,
 } from '@/lib/actions/departures'
+import { downloadJsonSheet } from '@/lib/export/download'
 import { copyText } from '@/lib/ui/copyText'
 
 interface Props {
@@ -91,7 +91,7 @@ export function DriverSheetsClient({ eventId }: Props) {
     else setCopyError(result.message)
   }
 
-  const handleExportAll = () => {
+  const handleExportAll = async () => {
     if (phase.stage !== 'ready') return
     const rows = phase.trips.flatMap((t) =>
       t.families.map((f) => ({
@@ -107,10 +107,7 @@ export function DriverSheetsClient({ eventId }: Props) {
         Contact: f.contactNumber ?? '',
       })),
     )
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Driver Sheets')
-    XLSX.writeFile(wb, 'driver_sheets.xlsx')
+    await downloadJsonSheet(rows, 'Driver Sheets', 'driver_sheets.xlsx')
   }
 
   if (phase.stage === 'loading') {
@@ -148,7 +145,7 @@ export function DriverSheetsClient({ eventId }: Props) {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-fg">Driver sheets</h2>
-        <Button variant="secondary" size="md" onClick={handleExportAll}>
+        <Button variant="secondary" size="md" onClick={() => void handleExportAll()}>
           Export all
         </Button>
       </div>

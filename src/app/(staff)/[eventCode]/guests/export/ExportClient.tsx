@@ -1,13 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import * as XLSX from 'xlsx'
 
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card'
 import { DownloadIcon } from '@/components/icons'
 import { readExportData } from '@/lib/actions/export'
-import { buildWorkbook } from '@/lib/export/workbook'
+import { downloadWorkbook } from '@/lib/export/download'
 import { buildSheetDefinitions } from '@/lib/export/definitions'
 
 export interface ExportClientProps {
@@ -30,11 +29,10 @@ export function ExportClient({ eventId }: ExportClientProps) {
       }
 
       const sheets = buildSheetDefinitions(result.data)
-      const wb = buildWorkbook(sheets)
 
       const eventPart = result.eventName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')
       const filename = `EventFlow_${eventPart || 'Event'}_${stamp()}.xlsx`
-      XLSX.writeFile(wb, filename)
+      await downloadWorkbook(sheets, filename)
     } catch {
       setError('Could not build the workbook. Try again in a moment.')
     } finally {

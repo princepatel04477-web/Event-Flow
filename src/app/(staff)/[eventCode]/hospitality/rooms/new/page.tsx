@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase/server'
 import { resolveEventByCode, requireStaff } from '@/lib/supabase/queries'
+import { friendlyDbError } from '@/lib/errors'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Row } from '@/components/ui/Row'
 import { BuildingIcon, ChevronRightIcon } from '@/components/icons'
@@ -43,7 +44,7 @@ export default async function StaffRoomCreatePickerPage({ params }: PageProps) {
       <EmptyState
         icon={<BuildingIcon className="h-7 w-7" />}
         title="Could not load hotels"
-        description={error.message}
+        description={friendlyDbError(error)}
       />
     )
   }

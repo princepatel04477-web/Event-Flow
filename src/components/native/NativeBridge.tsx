@@ -5,7 +5,9 @@ import { useEffect, useRef } from 'react'
 
 import { dropLastVisit, getLanding, previousVisit, resolveBack } from '@/lib/nav/back'
 import { closeTopSheet, openSheetCount } from '@/lib/nav/sheet-stack'
+import { wireExternalLinkInterception } from '@/lib/native/navigation'
 import { isNativePlatform } from '@/lib/native/platform'
+import { initSentry } from '@/lib/sentry'
 
 /**
  * A two-second note at the foot of the screen, in plain DOM. The back button
@@ -49,6 +51,20 @@ export function NativeBridge() {
   }, [router])
   const lastExitPrompt = useRef<number | null>(null)
 
+  // Browser bootstrap that must run on EVERY platform, and only in a browser.
+  //
+  // `initSentry()` and `wireExternalLinkInterception()` live here now. They used
+  // to sit in src/app/layout.tsx inside `if (typeof window !== 'undefined')` —
+  // but that file is a SERVER component, so `window` was always undefined there
+  // and neither call ever reached the browser. Without the interceptor a tap on
+  // any raw `tel:` anchor could navigate the WebView (the Tier-0 call bug)
+  // instead of handing the dial to the OS, which is the whole reason the
+  // interceptor exists.
+  useEffect(() => {
+    initSentry()
+    wireExternalLinkInterception()
+  }, [])
+
   useEffect(() => {
     if (!isNativePlatform()) return
 
@@ -61,8 +77,23 @@ export function NativeBridge() {
       ])
 
       const stateHandle = await App.addListener('appStateChange', ({ isActive }) => {
-        if (isActive) {
-          void supabase.auth.refreshSession()
+        if (!isActive) return
+        // A no-op for a code-auth (team/client) session — it has no GoTrue
+        // refresh token — but correct for an admin.
+        void supabase.auth.refreshSession()
+        // Drain the offline queues on the NATIVE resume event. This is the
+        // reliable trigger on Android; the queues' own `visibilitychange` drain
+        // is not guaranteed to fire on every WebView resume, so queued writes and
+        // proofs could otherwise sit until the next hard network flip. Skipped
+        // while offline so a doomed attempt does not count a retry against every
+        // queued row.
+        if (typeof navigator === 'undefined' || navigator.onLine) {
+          void import('@/lib/mutate/write-queue')
+            .then((m) => m.flushWriteQueue())
+            .catch(() => {})
+          void import('@/lib/proof-queue')
+            .then((m) => m.flushProofQueue())
+            .catch(() => {})
         }
       })
 

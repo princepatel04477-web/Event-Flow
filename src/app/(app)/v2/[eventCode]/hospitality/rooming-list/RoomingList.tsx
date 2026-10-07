@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import * as XLSX from 'xlsx'
 
 import { DownloadIcon, SearchIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
@@ -13,7 +12,7 @@ import { LoadingRows } from '@/components/ui/LoadingRows'
 import { Progress } from '@/components/ui/Progress'
 import { readRoomingList } from '@/lib/actions/rooming-list'
 import { roomingListFileName, roomingListSheet } from '@/lib/export/rooming-list'
-import { buildWorkbook } from '@/lib/export/workbook'
+import { downloadWorkbook } from '@/lib/export/download'
 import { queryKeys } from '@/lib/query/keys'
 import {
   DEFAULT_ROOMING_SORT,
@@ -32,6 +31,7 @@ import {
   type RoomingSort,
   type RoomingTile,
 } from '@/lib/rooms/rooming-list'
+import { useCappedRows } from '@/lib/useCappedRows'
 import { cn } from '@/lib/utils'
 
 import { RoomingRoomSheet } from './_components/RoomingRoomSheet'
@@ -89,6 +89,11 @@ export function RoomingList({ eventId, eventCode, eventName }: RoomingListProps)
     [rows, term, tile, sort],
   )
 
+  // The FULL filtered/sorted list stays `shown` — the count line and the export
+  // both read it — so only the rows RENDERED are capped. A 168-room sheet with a
+  // family per room otherwise mounts every row in one commit.
+  const { visible: shownRows, remaining: shownRemaining, showMore: showMoreRows } = useCappedRows(shown)
+
   const tiles = useMemo(() => roomingTiles(rows), [rows])
 
   const openRoomRows = useMemo(
@@ -106,14 +111,13 @@ export function RoomingList({ eventId, eventCode, eventName }: RoomingListProps)
    * re-reads the event would hand them a different sheet from the one they were
    * reading. See `roomingListSheet`.
    */
-  function handleExport() {
+  async function handleExport() {
     if (exporting || shown.length === 0) return
     setExportError(null)
     setExportNote(null)
     setExporting(true)
     try {
-      const wb = buildWorkbook([roomingListSheet(shown)])
-      XLSX.writeFile(wb, roomingListFileName(eventName))
+      await downloadWorkbook([roomingListSheet(shown)], roomingListFileName(eventName))
       setExportNote(
         `${shown.length} ${shown.length === 1 ? 'row' : 'rows'} exported to Excel.`,
       )
@@ -239,7 +243,7 @@ export function RoomingList({ eventId, eventCode, eventName }: RoomingListProps)
               </tr>
             </thead>
             <tbody className="divide-y divide-rule">
-              {shown.map((row) => (
+              {shownRows.map((row) => (
                 <RoomingTr
                   key={row.key}
                   row={row}
@@ -252,6 +256,16 @@ export function RoomingList({ eventId, eventCode, eventName }: RoomingListProps)
         </div>
       )}
 
+      {shownRemaining > 0 ? (
+        <button
+          type="button"
+          onClick={showMoreRows}
+          className="tap min-h-11 w-full rounded-xl border border-rule-strong bg-surface text-center text-sm font-medium text-brand"
+        >
+          Show {Math.min(50, shownRemaining)} more rooms ({shownRemaining} left)
+        </button>
+      ) : null}
+
       <div className="flex flex-col gap-2">
         <Button
           variant="secondary"
@@ -259,7 +273,7 @@ export function RoomingList({ eventId, eventCode, eventName }: RoomingListProps)
           fullWidth
           loading={exporting}
           leadingIcon={<DownloadIcon className="h-5 w-5" />}
-          onClick={handleExport}
+          onClick={() => void handleExport()}
           disabled={shown.length === 0}
         >
           {exporting ? 'Building the sheet…' : 'Export to Excel'}

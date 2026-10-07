@@ -24,6 +24,7 @@
 
 import { supabase } from '@/lib/supabase/client'
 import { registerVoiceNote } from '@/lib/actions/voice-note'
+import { friendlyDbError } from '@/lib/errors'
 
 import {
   markVoiceNoteAttempt,
@@ -71,7 +72,10 @@ export async function commitVoiceNote(
     return {
       ok: false,
       queued: true,
-      error: `Could not upload the recording: ${uploadError.message}`,
+      // The raw Storage/Postgres text (bucket name, SQLSTATE) is a diagnostic,
+      // not a message for a runner in a corridor. It still lands on the queued
+      // row via markVoiceNoteAttempt above; the UI gets the house sentence.
+      error: friendlyDbError(uploadError),
     }
   }
 

@@ -1,12 +1,11 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import * as XLSX from 'xlsx'
 
 import { UploadIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
-import { buildExportTemplateWorkbook } from '@/lib/export/template'
+import { downloadTemplate } from '@/lib/export/download'
 import { parseImportFile, type ImportOutcome } from '@/lib/import/knownSheet'
 
 export interface UploadStepProps {
@@ -38,8 +37,8 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
    * importer reads, and the only way to guarantee it is to make it the
    * exporter's own output rather than a second header list to keep in sync.
    */
-  function handleTemplate() {
-    XLSX.writeFile(buildExportTemplateWorkbook(), 'EventFlow_guest_export_template.xlsx')
+  async function handleTemplate() {
+    await downloadTemplate('EventFlow_guest_export_template.xlsx')
   }
 
   async function handleFiles(files: FileList | null) {
@@ -98,7 +97,7 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
         <Button type="button" size="lg" loading={busy} onClick={() => inputRef.current?.click()}>
           {busy ? 'Reading file…' : 'Choose file'}
         </Button>
-        <Button type="button" variant="secondary" size="lg" onClick={handleTemplate}>
+        <Button type="button" variant="secondary" size="lg" onClick={() => void handleTemplate()}>
           Download template
         </Button>
         <p className="-mt-2 text-xs leading-relaxed text-subtle">

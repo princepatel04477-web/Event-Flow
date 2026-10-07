@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import * as XLSX from 'xlsx'
 
 import { FileTextIcon, PhoneIcon } from '@/components/icons'
 import { BottomSheet } from '@/components/ui/BottomSheet'
@@ -13,6 +12,7 @@ import { LinkButton } from '@/components/ui/LinkButton'
 import { LoadingRows } from '@/components/ui/LoadingRows'
 import { Row } from '@/components/ui/Row'
 import { readDriverSheets, type DriverSheetTrip } from '@/lib/actions/departures'
+import { downloadJsonSheet } from '@/lib/export/download'
 import { formatDateTime } from '@/lib/format/india'
 import { copyText } from '@/lib/ui/copyText'
 
@@ -86,7 +86,7 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
     else setCopyError(result.message)
   }
 
-  function handleExport(tripsToWrite: readonly DriverSheetTrip[]) {
+  async function handleExport(tripsToWrite: readonly DriverSheetTrip[]) {
     const rows = tripsToWrite.flatMap((t) =>
       t.families.map((f) => ({
         Vehicle: t.vehicleLabel ?? 'Unnamed',
@@ -101,10 +101,7 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
         Contact: f.contactNumber ?? '',
       })),
     )
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Driver Sheets')
-    XLSX.writeFile(wb, 'driver_sheets.xlsx')
+    await downloadJsonSheet(rows, 'Driver Sheets', 'driver_sheets.xlsx')
   }
 
   if (error) {
@@ -146,7 +143,7 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
           variant="ghost"
           size="sm"
           className="shrink-0 border border-rule-strong"
-          onClick={() => handleExport(trips)}
+          onClick={() => void handleExport(trips)}
         >
           Export all
         </Button>
@@ -243,7 +240,7 @@ export function DriverSheetsBoard({ eventId, eventCode }: DriverSheetsBoardProps
             <Button
               variant="ghost"
               fullWidth
-              onClick={() => handleExport([openTrip])}
+              onClick={() => void handleExport([openTrip])}
             >
               Export this sheet
             </Button>

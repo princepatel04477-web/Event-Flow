@@ -73,19 +73,36 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
   // cannot see the pathname and sniffing headers() to fake it would opt this
   // whole subtree out of static rendering.
   const access = await getEventAccess(event.id)
-  const staffCtx = access === 'admin' || access === 'event_team'
-    ? await getStaffViewerContext(event.id)
-    : null
-  const department = staffCtx?.department ?? null
 
   // Belt and braces: getEventByCode already returned null for a non-member,
   // so this cannot fire. It documents the invariant rather than assuming it.
   if (access === 'none') notFound()
 
-  // The arrival banner's two server inputs: the admin's switch, and today's
-  // date (resolved here so the server and client agree on the day).
-  const arrivalsNotify = access !== 'client' && (await isArrivalsNotifyEnabled(event.id))
-  const today = new Date().toISOString().slice(0, 10)
+  // The three reads below each depend only on `access`/`event.id`, so they run
+  // as ONE batch rather than three more serial awaits on every tab tap. They
+  // used to be `await getStaffViewerContext` → `await isArrivalsNotifyEnabled`
+  // → `await hasGuestList`, three extra round trips to Seoul in the shell
+  // BEFORE the page's own fetch even started — a direct violation of T5 ("one
+  // tap is one round trip, at most"). `getStaffViewerContext` is per-request
+  // memoised; the other two were not.
+  const [staffCtx, arrivalsNotifyRaw, hasGuestsRaw] = await Promise.all([
+    access === 'admin' || access === 'event_team'
+      ? getStaffViewerContext(event.id)
+      : Promise.resolve(null),
+    access !== 'client' ? isArrivalsNotifyEnabled(event.id) : Promise.resolve(false),
+    access !== 'client' ? hasGuestList(event.id) : Promise.resolve(true),
+  ])
+  const department = staffCtx?.department ?? null
+  const arrivalsNotify = access !== 'client' && arrivalsNotifyRaw
+  const hasGuests = access !== 'client' ? hasGuestsRaw : true
+
+  // The arrival banner's date is TODAY IN IST, not the server's UTC calendar
+  // date. `new Date().toISOString().slice(0, 10)` returns the UTC day, and IST
+  // is UTC+5:30 — so between midnight and 05:30 the banner described
+  // *yesterday's* arrivals, which is exactly the event-morning window a runner
+  // reads it in. `en-CA` formats as YYYY-MM-DD and matches the IST-of-today the
+  // family record already uses (families/[groupId]/page.tsx).
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
 
   // The v3 bar: Today · Calls · Hospitality · Hampers · Logistics, per-department
   // filtering intact. This is deliberately NOT `bottomTabsFor`, which still
@@ -121,7 +138,6 @@ export default async function AppEventLayout({ children, params }: LayoutProps) 
    * stays: there is nothing fixed to clear.
    */
   const contentBottom = showTabs ? 'pb-nav' : 'pb-8'
-  const hasGuests = access !== 'client' ? await hasGuestList(event.id) : true
 
   return (
     // The skin is a property of WHO IS LOOKING, not of an OS setting.

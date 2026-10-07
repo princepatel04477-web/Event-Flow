@@ -19,10 +19,11 @@
  * has already been tuned for a 543-guest event. So this is its own read, and it
  * is read-only: nothing in this module writes.
  *
- * Sequential requests, not `Promise.all`, for the same reason
- * `readRoomsGrid` is: the grid was flaky at full scale when five requests fired
- * concurrently at the Seoul region, and sequential keeps each one individually
- * short and deterministic.
+ * ONE batch, not six serial awaits, for the same reason `readRoomsGrid` now
+ * batches: the six reads are independent `eq('event_id', …)` queries against a
+ * per-call client, so sequential execution bought nothing but five extra round
+ * trips to Seoul on a screen reached by a tab tap (T5, "one tap is one round
+ * trip, at most").
  */
 
 import { getEventAccess } from '@/lib/supabase/queries'
@@ -46,48 +47,43 @@ export async function readRoomingList(eventId: string): Promise<RoomingListResul
 
   const supabase = await createClient()
 
-  const roomsRes = await supabase
-    .from('rooms')
-    .select('id, hotel_id, room_number, room_type, floor, is_blocked')
-    .eq('event_id', eventId)
+  const [roomsRes, hotelsRes, assignmentsRes, groupsRes, guestsRes, hampersRes] = await Promise.all([
+    supabase
+      .from('rooms')
+      .select('id, hotel_id, room_number, room_type, floor, is_blocked')
+      .eq('event_id', eventId),
+    supabase.from('hotels').select('id, name').eq('event_id', eventId),
+    // Active stays only. A released assignment is history: the room it named is
+    // free, and putting it on the sheet would show the hotel a guest who has
+    // been moved elsewhere.
+    supabase
+      .from('room_assignments')
+      .select('id, room_id, guest_id, group_id, checked_in_at, checked_out_at')
+      .eq('event_id', eventId)
+      .is('released_at', null),
+    supabase.from('guest_groups').select('id, head_name').eq('event_id', eventId),
+    supabase
+      .from('guests')
+      .select('id, group_id, full_name, is_head')
+      .eq('event_id', eventId),
+    // Group-level hampers: `kind = hamper`, `guest_id is null` — the house model
+    // is one hamper per family, and the partial unique index
+    // `deliverables_one_per_group_kind` only constrains that shape (CLAUDE.md
+    // §10). The id comes back because it is what the proof screen is keyed on.
+    supabase
+      .from('deliverables')
+      .select('id, group_id, status')
+      .eq('event_id', eventId)
+      .eq('kind', 'hamper')
+      .is('guest_id', null),
+  ])
+
   if (roomsRes.error) {
     return { ok: false, error: 'Could not read the rooms. Check your connection.', rows: [] }
   }
-
-  const hotelsRes = await supabase.from('hotels').select('id, name').eq('event_id', eventId)
-
-  // Active stays only. A released assignment is history: the room it named is
-  // free, and putting it on the sheet would show the hotel a guest who has
-  // been moved elsewhere.
-  const assignmentsRes = await supabase
-    .from('room_assignments')
-    .select('id, room_id, guest_id, group_id, checked_in_at, checked_out_at')
-    .eq('event_id', eventId)
-    .is('released_at', null)
   if (assignmentsRes.error) {
     return { ok: false, error: 'Could not read who is in which room.', rows: [] }
   }
-
-  const groupsRes = await supabase
-    .from('guest_groups')
-    .select('id, head_name')
-    .eq('event_id', eventId)
-
-  const guestsRes = await supabase
-    .from('guests')
-    .select('id, group_id, full_name, is_head')
-    .eq('event_id', eventId)
-
-  // Group-level hampers: `kind = hamper`, `guest_id is null` — the house model
-  // is one hamper per family, and the partial unique index
-  // `deliverables_one_per_group_kind` only constrains that shape (CLAUDE.md
-  // §10). The id comes back because it is what the proof screen is keyed on.
-  const hampersRes = await supabase
-    .from('deliverables')
-    .select('id, group_id, status')
-    .eq('event_id', eventId)
-    .eq('kind', 'hamper')
-    .is('guest_id', null)
 
   const hotelNames = new Map((hotelsRes.data ?? []).map((h) => [h.id, h.name]))
   const headNames = new Map((groupsRes.data ?? []).map((g) => [g.id, g.head_name]))

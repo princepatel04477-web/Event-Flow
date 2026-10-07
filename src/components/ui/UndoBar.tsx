@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from 'react'
 
 import { Button } from '@/components/ui/Button'
+import { StuckWritesNotice } from '@/components/ui/StuckWritesNotice'
 import {
   clearFailedWrite,
   commitPendingUndo,
@@ -123,7 +124,13 @@ export function UndoBar() {
             </Button>
           </div>
         </div>
-      ) : null}
+      ) : (
+        // Nothing transient to show — surface any write that has failed past the
+        // retry ceiling (`STUCK_AFTER_RETRIES`). It rides this same persistent
+        // live region, so it is announced and can never overlap the undo or
+        // failed-write branches above.
+        <StuckWritesNotice />
+      )}
     </div>
   )
 }

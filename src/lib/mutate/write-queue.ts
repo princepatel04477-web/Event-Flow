@@ -33,6 +33,11 @@ export interface QueuedWrite {
   /** Shown in the SyncChip vocabulary, e.g. "call outcomes". */
   what: string
   createdAt: number
+  /**
+   * When the last replay was ATTEMPTED. Backoff is measured from here, not from
+   * `createdAt` — see `flushWriteQueue`. Null until the first failure.
+   */
+  lastAttemptAt: number | null
   retries: number
   lastError: string | null
 }
@@ -56,14 +61,21 @@ export async function queueWrite(input: {
   kind: string
   payload: unknown
   what: string
+  /**
+   * Idempotency key. Callers that already minted one (e.g. so a retry of a write
+   * whose response was lost reuses the same key) pass it here; otherwise a fresh
+   * UUID is minted.
+   */
+  localId?: string
 }): Promise<QueuedWrite> {
   const entry: QueuedWrite = {
-    localId: crypto.randomUUID(),
+    localId: input.localId ?? crypto.randomUUID(),
     eventId: input.eventId,
     kind: input.kind,
     payload: JSON.stringify(input.payload),
     what: input.what,
     createdAt: Date.now(),
+    lastAttemptAt: null,
     retries: 0,
     lastError: null,
   }
@@ -85,7 +97,12 @@ export async function queuedWriteCount(): Promise<number> {
 export async function markWriteFailed(localId: string, message: string): Promise<void> {
   const row = await db.writes.get(localId)
   if (!row) return
-  await db.writes.put({ ...row, retries: row.retries + 1, lastError: message })
+  await db.writes.put({
+    ...row,
+    retries: row.retries + 1,
+    lastAttemptAt: Date.now(),
+    lastError: message,
+  })
 }
 
 /** Drop a row once the server has accepted it. */
@@ -98,8 +115,15 @@ export function backoffMs(retries: number): number {
   return Math.min(60_000, Math.pow(2, retries) * 2_000)
 }
 
-/** How many attempts before a write is surfaced as needing attention. */
-export const STUCK_AFTER_RETRIES = 5
+/**
+ * How many attempts before a write is surfaced as needing attention.
+ *
+ * Three, not five. The product rule is "surface after 3 failures with a manual
+ * Retry" — by the time a room change or an RSVP outcome has failed five times
+ * the runner has long since assumed it saved, and the queue has been invisible
+ * the whole time (`stuckWrites()` had no caller at all).
+ */
+export const STUCK_AFTER_RETRIES = 3
 
 /**
  * How to replay a queued write, by `kind`.
@@ -151,6 +175,9 @@ export function __clearWriteReplaysForTests(): void {
   replays.clear()
 }
 
+/** The in-flight drain, so concurrent callers share one pass. See flushWriteQueue. */
+let inflightFlush: Promise<number> | null = null
+
 /**
  * Attempt every queued write, oldest first, once each.
  *
@@ -160,6 +187,26 @@ export function __clearWriteReplaysForTests(): void {
  * user's write happened.
  */
 export async function flushWriteQueue(): Promise<number> {
+  // ONE drain at a time, module-wide.
+  //
+  // Every mounted `useOptimisticAction` installs its OWN drain, and on an
+  // offline→online transition (or a foreground) they all fire in the same
+  // commit. Without this guard each hook reads the SAME rows from IndexedDB
+  // before any is deleted and replays them — so one queued `assign-guests-room`
+  // was sent once per mounted hook, and each replay placed the NEXT unplaced
+  // guests of that family, into rooms the coordinator never chose. A module-level
+  // in-flight promise makes later callers await the running pass instead.
+  if (inflightFlush) return inflightFlush
+  const run = drainWriteQueue()
+  inflightFlush = run
+  try {
+    return await run
+  } finally {
+    if (inflightFlush === run) inflightFlush = null
+  }
+}
+
+async function drainWriteQueue(): Promise<number> {
   const entries = await db.writes.orderBy('createdAt').toArray()
   let sent = 0
 
@@ -167,11 +214,14 @@ export async function flushWriteQueue(): Promise<number> {
     const replay = replays.get(entry.kind)
     if (!replay) continue
 
-    // Respect the backoff: without this, every reconnect event re-attempts every
-    // row at once against a link that has just proved it cannot carry them.
+    // Respect the backoff, measured from the LAST ATTEMPT — not from creation.
+    // Measuring from `createdAt` meant that once a row was a minute old every
+    // subsequent failure's due time was already in the past, so it was
+    // re-attempted on every drain event with no spacing at all: the exact
+    // opposite of the "spread retries" this was meant to do.
     if (entry.retries > 0) {
-      const dueAt = entry.createdAt + backoffMs(entry.retries - 1)
-      if (Date.now() < dueAt) continue
+      const from = entry.lastAttemptAt ?? entry.createdAt
+      if (Date.now() < from + backoffMs(entry.retries - 1)) continue
     }
 
     try {

@@ -18,6 +18,7 @@ import { traceFetch } from '@/lib/perf'
 import { queryKeys } from '@/lib/query/keys'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
 import { initials } from '@/lib/ui/metrics'
+import { useCappedRows } from '@/lib/useCappedRows'
 import { formatDateTime } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -269,6 +270,11 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
     )
   }, [rows, search, view])
 
+  // Cap the ROWS RENDERED; `listRows` stays whole for the counts and segment
+  // totals above. This is the list most likely to be hundreds long (one row per
+  // family with a room), and mounting it all at once is the measured 26 s cost.
+  const { visible: listVisible, remaining: listRemaining, showMore: showMoreRows } = useCappedRows(listRows)
+
   /** The family whose sheet is open, if any. */
   const openRow = (rows ?? []).find((r) => r.assignment.id === openRowId) ?? null
 
@@ -409,7 +415,7 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
             </p>
           ) : (
             <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
-              {listRows.map((row) => {
+              {listVisible.map((row) => {
                 const isIn =
                   row.assignment.checked_in_at !== null && row.assignment.checked_out_at === null
                 const isOut = row.assignment.checked_out_at !== null
@@ -435,6 +441,16 @@ export function CheckInClient({ eventId, eventCode }: CheckInClientProps) {
           )}
         </>
       )}
+
+      {listRemaining > 0 ? (
+        <button
+          type="button"
+          onClick={showMoreRows}
+          className="tap min-h-11 w-full rounded-xl border border-rule-strong bg-surface text-center text-sm font-medium text-brand"
+        >
+          Show {Math.min(50, listRemaining)} more ({listRemaining} left)
+        </button>
+      ) : null}
 
       {/* Every action for one family, in a sheet: who they are, the room, the
           two things that block a check-in, and the ONE commit. */}

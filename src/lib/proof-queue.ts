@@ -33,6 +33,8 @@ export interface QueuedProof {
   deliverableId: string
   dataUrl: string
   createdAt: number
+  /** When the last sync was ATTEMPTED. Backoff is measured from here. */
+  lastAttemptAt: number | null
   retries: number
   lastError: string | null
 }
@@ -55,13 +57,21 @@ export async function queueProof(input: {
   eventId: string
   deliverableId: string
   dataUrl: string
+  /**
+   * Idempotency key. The delivery screen mints one BEFORE its first attempt so a
+   * response lost after the upload + insert already committed reuses the SAME
+   * key on the queued retry — the storage_path unique index then recognises the
+   * already-synced proof instead of admitting a second one.
+   */
+  localId?: string
 }): Promise<QueuedProof> {
   const entry: QueuedProof = {
-    localId: crypto.randomUUID(),
+    localId: input.localId ?? crypto.randomUUID(),
     eventId: input.eventId,
     deliverableId: input.deliverableId,
     dataUrl: input.dataUrl,
     createdAt: Date.now(),
+    lastAttemptAt: null,
     retries: 0,
     lastError: null,
   }
@@ -82,6 +92,9 @@ export function backoffMs(retries: number): number {
 /** How many attempts before a proof is surfaced as "needs attention". */
 export const STUCK_AFTER_RETRIES = 5
 
+/** The in-flight drain, so concurrent callers share one pass. See flushProofQueue. */
+let inflightFlush: Promise<number> | null = null
+
 /**
  * Flush all queued proofs, oldest first. Each entry is attempted once,
  * independently — one failure never blocks the rest. Returns how many
@@ -89,9 +102,33 @@ export const STUCK_AFTER_RETRIES = 5
  * the per-entry backoff spreads retries rather than hammering.
  */
 export async function flushProofQueue(): Promise<number> {
+  // ONE drain at a time, module-wide — same guard as flushWriteQueue. Two
+  // callers firing in the same commit (the banner, a screen) would otherwise
+  // both read the same rows and sync the same proof twice. The storage_path
+  // unique index makes the second attempt harmless, but it is still a wasted
+  // round trip per duplicate; the guard removes it.
+  if (inflightFlush) return inflightFlush
+  const run = drainProofQueue()
+  inflightFlush = run
+  try {
+    return await run
+  } finally {
+    if (inflightFlush === run) inflightFlush = null
+  }
+}
+
+async function drainProofQueue(): Promise<number> {
   const entries = await db.proofs.orderBy('createdAt').toArray()
   let synced = 0
   for (const entry of entries) {
+    // Honour the per-entry backoff `backoffMs` documents but this loop never
+    // applied: it re-attempted every row on every flush regardless of `retries`,
+    // so a dead link was hammered on every reconnect/foreground event. Measured
+    // from the last ATTEMPT, not from creation.
+    if (entry.retries > 0) {
+      const from = entry.lastAttemptAt ?? entry.createdAt
+      if (Date.now() < from + backoffMs(entry.retries - 1)) continue
+    }
     try {
       await submitProof({
         eventId: entry.eventId,
@@ -105,6 +142,7 @@ export async function flushProofQueue(): Promise<number> {
       const next: QueuedProof = {
         ...entry,
         retries: entry.retries + 1,
+        lastAttemptAt: Date.now(),
         lastError: err instanceof Error ? err.message : String(err),
       }
       await db.proofs.put(next)

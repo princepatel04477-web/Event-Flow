@@ -85,7 +85,7 @@ export interface AllocationGuest {
 export async function readAllocationData(eventId: string): Promise<AllocationData> {
   const supabase = await createClient()
 
-  const [groupsRes, roomsRes, guestsRes] = await Promise.all([
+  const [groupsRes, roomsRes, guestsRes, assignmentsRes] = await Promise.all([
     supabase
       .from('guest_groups')
       .select('id, head_name, group_type, side, expected_pax, confirmed_pax, priority')
@@ -102,31 +102,44 @@ export async function readAllocationData(eventId: string): Promise<AllocationDat
       .from('guests')
       .select('id, group_id, age_band, is_head')
       .eq('event_id', eventId),
+    // Active assignments feed the occupancy count below. Independent of the
+    // three reads beside it, so it belongs in the SAME batch rather than two
+    // serial round trips after it (T5).
+    supabase
+      .from('room_assignments')
+      .select('room_id, group_id, guest_id')
+      .eq('event_id', eventId)
+      .is('released_at', null),
   ])
+
+  // A failed read must NOT read as "this event has no rooms/families". These
+  // four results used to fall straight through to `?? []`, so a dropped query
+  // rendered the allocation screen as an empty event. Throw instead: callers are
+  // server components/actions and React Query `queryFn`s, so a throw becomes an
+  // honest error rather than a confident lie.
+  for (const res of [groupsRes, roomsRes, guestsRes, assignmentsRes]) {
+    if (res.error) throw new Error(friendlyDbError(res.error))
+  }
 
   const groups = (groupsRes.data ?? []) as unknown as GroupRow[]
   const roomsRaw = (roomsRes.data ?? []) as unknown as RoomRow[]
   const guestsAll = (guestsRes.data ?? []) as unknown as GuestRow[]
+  const assignments = (assignmentsRes.data ?? []) as unknown as AssignmentRow[]
 
-  // Fetch hotels separately (need names)
+  // Fetch hotels separately (need names) — genuinely dependent on the rooms read
+  // above for the set of hotel ids, so it cannot join the first batch.
   const hotelIds = [...new Set(roomsRaw.map((r) => r.hotel_id))]
   const hotels = new Map<string, string>()
   if (hotelIds.length > 0) {
-    const { data: hotelRows } = await supabase
+    const { data: hotelRows, error: hotelsError } = await supabase
       .from('hotels')
       .select('id, name')
       .in('id', hotelIds)
+    if (hotelsError) throw new Error(friendlyDbError(hotelsError))
     for (const h of ((hotelRows ?? []) as unknown as HotelRow[])) {
       hotels.set(h.id, h.name)
     }
   }
-
-  // Count existing active assignments per room
-  const { data: assignments } = await supabase
-    .from('room_assignments')
-    .select('room_id, group_id, guest_id')
-    .eq('event_id', eventId)
-    .is('released_at', null)
 
   const occupancy = new Map<string, number>()
   const groupRoomMap = new Map<string, string[]>()
@@ -425,43 +438,58 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
   const supabase = await createClient()
   timing.mark('client-create')
 
-  // Sequential reads — deliberately NOT a Promise.all batch. The rooms grid
-  // was flaky at 543-guest scale when five requests fired concurrently to
-  // the Supabase region; sequential keeps each request individually short
-  // and deterministic. The group read was merged (was: groups + confirmed
-  // groups = 6 requests; now: 5) by selecting rsvp_status once.
-  const roomsRes = await supabase
-    .from('rooms')
-    .select('id, hotel_id, room_number, room_type, capacity, max_capacity, floor, is_blocked')
-    .eq('event_id', eventId)
-    .order('room_number', { ascending: true })
-  const assignmentsRes = await supabase
-    .from('room_assignments')
-    .select('id, room_id, guest_id, group_id, is_override')
-    .eq('event_id', eventId)
-    .is('released_at', null)
-  const hotelsRes = await supabase
-    .from('hotels')
-    .select('id, name')
-    .eq('event_id', eventId)
-  const guestsRes = await supabase
-    .from('guests')
-    .select('id, group_id, age_band, is_head')
-    .eq('event_id', eventId)
-  const groupsRes = await supabase
-    .from('guest_groups')
-    .select('id, head_name, primary_mobile, rsvp_status, expected_pax, confirmed_pax, group_type, side')
-    .eq('event_id', eventId)
-  // Hamper delivered state per group, for the room-tap panel (§5.3) and the
-  // per-room hamper coding (§5.4). Group-level hamper: kind=hamper, guest_id
-  // null (the house model — one hamper per family, not per room).
-  const hampersRes = await supabase
-    .from('deliverables')
-    .select('group_id, status')
-    .eq('event_id', eventId)
-    .eq('kind', 'hamper')
-    .is('guest_id', null)
+  // ONE batch, not six serial awaits.
+  //
+  // These were sequential (a header comment said the grid was "flaky at
+  // 543-guest scale when five requests fired concurrently"). That diagnosis does
+  // not hold: `createClient()` returns a FRESH client per call specifically so no
+  // request can share another's session (see src/lib/supabase/server.ts), so
+  // there is no shared-client race to be flaky about. Six independent
+  // `eq('event_id', …)` reads against one client are ordinary concurrent use.
+  //
+  // What the serial form actually cost: six round trips to Seoul (~215–538 ms
+  // each) per mount, which is why Rooms was the slowest route ever measured
+  // (6.3 s on venue-wifi). It also breaks the house rule these screens exist to
+  // satisfy — T5, "one tap is one round trip, at most" (docs/INTERACTION-CONTRACT.md).
+  // `Promise.all` collapses it to one RTT and is the fix T5 names.
+  const [roomsRes, assignmentsRes, hotelsRes, guestsRes, groupsRes, hampersRes] = await Promise.all([
+    supabase
+      .from('rooms')
+      .select('id, hotel_id, room_number, room_type, capacity, max_capacity, floor, is_blocked')
+      .eq('event_id', eventId)
+      .order('room_number', { ascending: true }),
+    supabase
+      .from('room_assignments')
+      .select('id, room_id, guest_id, group_id, is_override')
+      .eq('event_id', eventId)
+      .is('released_at', null),
+    supabase.from('hotels').select('id, name').eq('event_id', eventId),
+    supabase
+      .from('guests')
+      .select('id, group_id, age_band, is_head')
+      .eq('event_id', eventId),
+    supabase
+      .from('guest_groups')
+      .select('id, head_name, primary_mobile, rsvp_status, expected_pax, confirmed_pax, group_type, side')
+      .eq('event_id', eventId),
+    // Hamper delivered state per group, for the room-tap panel (§5.3) and the
+    // per-room hamper coding (§5.4). Group-level hamper: kind=hamper, guest_id
+    // null (the house model — one hamper per family, not per room).
+    supabase
+      .from('deliverables')
+      .select('group_id, status')
+      .eq('event_id', eventId)
+      .eq('kind', 'hamper')
+      .is('guest_id', null),
+  ])
   timing.mark('reads')
+
+  // Same rule as `readAllocationData` above: a dropped read must not render as
+  // an empty board. Any of the six failing turns into an honest error, which
+  // the React Query caller shows as its ErrorState.
+  for (const res of [roomsRes, assignmentsRes, hotelsRes, guestsRes, groupsRes, hampersRes]) {
+    if (res.error) throw new Error(friendlyDbError(res.error))
+  }
 
   const roomsRaw = roomsRes.data ?? []
   const assignments = assignmentsRes.data ?? []

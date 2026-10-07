@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import * as XLSX from 'xlsx'
 
 import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { Button } from '@/components/ui/Button'
@@ -18,6 +17,7 @@ import {
   type RecipientFilter,
   type GeneratedMessage,
 } from '@/lib/actions/messages'
+import { downloadJsonSheet } from '@/lib/export/download'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -100,18 +100,19 @@ export function ManualSendClient({ eventId, eventCode }: Props) {
     }, 2000)
   }
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (phase.stage !== 'preview') return
     const rows = phase.messages.map((m) => ({
       Mobile: m.mobileNumber,
       Family: m.headName,
       Message: m.body,
     }))
-    const ws = XLSX.utils.json_to_sheet(rows)
-    ws['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 60 }]
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Messages')
-    XLSX.writeFile(wb, `${eventCode}_${phase.template.key}_messages.xlsx`)
+    await downloadJsonSheet(
+      rows,
+      'Messages',
+      `${eventCode}_${phase.template.key}_messages.xlsx`,
+      [16, 20, 60],
+    )
   }
 
   // Loading
@@ -228,7 +229,7 @@ export function ManualSendClient({ eventId, eventCode }: Props) {
             fullWidth
             variant="secondary"
             leadingIcon={<DownloadIcon className="h-4 w-4" />}
-            onClick={handleExport}
+            onClick={() => void handleExport()}
           >
             Export Excel
           </Button>

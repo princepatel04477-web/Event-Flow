@@ -125,7 +125,6 @@ export function DeliveryDetail({
   const [detail, setDetail] = useState<DeliveryDetailData | null>(null)
   const [phase, setPhase] = useState<Phase>({ name: 'loading' })
   const [previewDataUrl, setPreviewDataUrl] = useState('')
-  const [receivedBy, setReceivedBy] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [queuedCount, setQueuedCount] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -271,24 +270,37 @@ export function DeliveryDetail({
   async function handleConfirm() {
     if (!detail) return
     const dataUrl = previewDataUrl
+    // ONE idempotency key for this attempt, minted BEFORE the first try and
+    // reused by the queued retry.
+    //
+    // Without this, a response lost AFTER the upload + insert already committed
+    // fell into the catch below, called queueProof(), and got a BRAND-NEW key —
+    // so the replay uploaded to a DIFFERENT storage path and inserted a second
+    // proof row. The `delivery_proofs.storage_path` unique index (the intended
+    // dedupe) never fired, because the path differed. delivery_proofs is
+    // insert-only and cannot be corrected or deleted by anyone, so one lost
+    // response meant a permanent duplicate for one hamper.
+    const idempotencyKey = crypto.randomUUID()
     setPhase({ name: 'uploading' })
     setError(null)
     try {
       // Offline: queue immediately — the banner + reconnect flush handle sync.
       if (!online) {
-        const entry = await queueProof({ eventId, deliverableId, dataUrl })
+        const entry = await queueProof({ eventId, deliverableId, dataUrl, localId: idempotencyKey })
         setPhase({ name: 'queued', entry })
         setQueuedCount((n) => n + 1)
         return
       }
-      const row = await submitProof({ eventId, deliverableId, dataUrl })
+      const row = await submitProof({ eventId, deliverableId, dataUrl, idempotencyKey })
       if (row) {
         setPhase({ name: 'done', proof: row })
       }
     } catch {
       // Failed while online — queue for retry rather than lose the photo.
+      // SAME key, so if the failure was a lost response after commit the replay
+      // hits the unique index and is recognised as already-synced, not a dup.
       try {
-        const entry = await queueProof({ eventId, deliverableId, dataUrl })
+        const entry = await queueProof({ eventId, deliverableId, dataUrl, localId: idempotencyKey })
         setPhase({ name: 'queued', entry })
         setQueuedCount((n) => n + 1)
       } catch (qe) {
@@ -365,13 +377,11 @@ export function DeliveryDetail({
               {detail.headName ?? 'This family'} · {detail.roomNumber ? `Room ${detail.roomNumber}` : 'No room'} ·{' '}
               {detail.kind === 'hamper' ? 'Hamper' : 'Return gift'}
             </p>
-            <input
-              type="text"
-              value={receivedBy}
-              onChange={(e) => setReceivedBy(e.target.value)}
-              placeholder="Received by (name) — optional"
-              className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-base"
-            />
+            {/* REMOVED: a "Received by (name)" text input used to sit here. It
+                collected a name and then silently discarded it — `submitProof`
+                has no such field, and delivery_proofs is insert-only, so the
+                value could never be added later either. A field that drops what
+                a runner types is worse than no field. */}
             {/* The one place in the app where a confirmation is right rather
                 than a nuisance, so it has to say WHY. `delivery_proofs` has no
                 update policy and no delete policy, and two unconditional

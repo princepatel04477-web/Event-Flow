@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
-import * as XLSX from 'xlsx'
 
 import { AdminPageTitle } from '@/app/(admin)/AdminPageTitle'
 import { Button } from '@/components/ui/Button'
@@ -14,6 +13,7 @@ import { Row, type RowTone } from '@/components/ui/Row'
 import { Spinner } from '@/components/ui/Spinner'
 import { ShieldAlertIcon, DownloadIcon } from '@/components/icons'
 import { readLedger, type LedgerRow, type LedgerFilter } from '@/lib/actions/departures'
+import { downloadJsonSheet } from '@/lib/export/download'
 
 interface Props {
   eventId: string
@@ -60,20 +60,16 @@ export function LedgerClient({ eventId, eventCode, eventName }: Props) {
     load(f)
   }
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (phase.stage !== 'ready') return
-    const ws = XLSX.utils.json_to_sheet(
-      phase.data.rows.map((r) => ({
-        Family: r.headName,
-        PAX: r.pax,
-        'Arrival legs': r.arrivalLegs,
-        'Departure legs': r.departureLegs,
-        Status: STATE_META[r.state]?.label ?? r.state,
-      })),
-    )
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Logistics Ledger')
-    XLSX.writeFile(wb, `${eventCode}_travel_ledger.xlsx`)
+    const rows = phase.data.rows.map((r) => ({
+      Family: r.headName,
+      PAX: r.pax,
+      'Arrival legs': r.arrivalLegs,
+      'Departure legs': r.departureLegs,
+      Status: STATE_META[r.state]?.label ?? r.state,
+    }))
+    await downloadJsonSheet(rows, 'Logistics Ledger', `${eventCode}_travel_ledger.xlsx`)
   }
 
   if (phase.stage === 'loading') {
@@ -169,7 +165,7 @@ export function LedgerClient({ eventId, eventCode, eventName }: Props) {
           fullWidth
           variant="secondary"
           leadingIcon={<DownloadIcon className="h-5 w-5" />}
-          onClick={handleExport}
+          onClick={() => void handleExport()}
         >
           Export to Excel
         </Button>

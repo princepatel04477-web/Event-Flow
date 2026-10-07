@@ -82,12 +82,17 @@ testsprite_tests\tmp\config.json
 # ---------------------------------------------------------------------
 /backups/
 
+# MiroFish (cloned swarm-simulation tool) — never commit. It carries its own
+# .env with live LLM + Zep Cloud keys.
+/.mirofish/
+
 # Test and tooling output
 /test-results/
 /playwright-report/
 /.playwright-mcp/
 /e2e/perf-*.md
 /e2e/routes-*.json
+/e2e/bundle-size.json
 
 # Scratch files and captured console/error dumps from debugging sessions
 /gradle-final02.log

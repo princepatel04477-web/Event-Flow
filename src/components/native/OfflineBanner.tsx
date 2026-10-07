@@ -3,7 +3,33 @@
 import { useEffect, useState } from 'react'
 
 import { queuedProofCount, flushProofQueue } from '@/lib/proof-queue'
+import { queuedWriteCount, flushWriteQueue } from '@/lib/mutate/write-queue'
+import { listQueuedCompletions } from '@/lib/call/outbox'
+import { listQueuedVoiceNotes } from '@/lib/voice-note/outbox'
 import { useOnline } from '@/lib/useOnline'
+
+/**
+ * Every offline queue this app keeps, summed into the one number the banner
+ * shows.
+ *
+ * It used to count ONLY the proof queue, so a runner with a queued call outcome,
+ * a room change and a voice note read "0 changes queued" while three writes sat
+ * on the phone unsent. Four queues exist; the banner must speak for all of them:
+ *   - proofs        (Dexie, `eventops-proof-queue`)
+ *   - reversible writes (Dexie, `eventops-write-queue`)
+ *   - call completions (idb, `eventflow-call-outbox`)
+ *   - voice notes   (idb, `eventflow-voice-notes`)
+ * The last two expose no count helper, so their lists are counted by length.
+ */
+async function totalQueued(): Promise<number> {
+  const [proofs, writes, calls, notes] = await Promise.all([
+    queuedProofCount(),
+    queuedWriteCount(),
+    listQueuedCompletions(),
+    listQueuedVoiceNotes(),
+  ])
+  return proofs + writes + calls.length + notes.length
+}
 
 /**
  * Persistent, non-dismissible offline banner (M9 Part A).
@@ -48,14 +74,36 @@ export function OfflineBanner({ offlineNote }: OfflineBannerProps = {}) {
   }, [])
 
   useEffect(() => {
-    void queuedProofCount().then(setQueued)
+    void totalQueued().then(setQueued)
   }, [])
 
   useEffect(() => {
     if (!online) return
-    // Reconnected — flush the write queue, then refresh the count.
-    void flushProofQueue().then(() => queuedProofCount().then(setQueued))
+    // Reconnected — send what we can, then re-count EVERY queue. Proofs and
+    // reversible writes drain here (both are self-contained modules); the call
+    // outbox and voice notes are drained by the screens that own their payloads,
+    // and this re-count picks up whatever they managed to send.
+    void Promise.allSettled([flushProofQueue(), flushWriteQueue()])
+      .then(() => totalQueued())
+      .then(setQueued)
   }, [online])
+
+  // Also re-count (and drain) when the app returns to the foreground. Venue
+  // Wi-Fi is routinely associated-but-dead, so `navigator.onLine` can stay true
+  // forever while nothing is actually getting through — the `online` transition
+  // above then never fires, and the count would go stale after a call or a
+  // camera capture.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      const done = navigator.onLine
+        ? Promise.allSettled([flushProofQueue(), flushWriteQueue()])
+        : Promise.resolve()
+      void done.then(() => totalQueued()).then(setQueued)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
 
   if (online && queued === 0) return null
 

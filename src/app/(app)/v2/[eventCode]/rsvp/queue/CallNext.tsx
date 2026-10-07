@@ -64,7 +64,16 @@ async function fetchQueue(
 ): Promise<QueueRow[]> {
   const query = supabase
     .from('v_rsvp_queue')
-    .select('*')
+    // Only the columns the calling screen actually paints. `select('*')` pulled
+    // the whole view row for every family on every mount; `priority` still
+    // drives the ORDER BY below but need not travel, and `last_outcome` and
+    // `remarks` are never read from this view (the family's own `remarks` comes
+    // from `fetchFamily`'s `guest_groups` select).
+    .select(
+      'group_id, head_name, primary_mobile, rsvp_status, expected_pax, confirmed_pax, ' +
+        'attempt_count, next_callback_at, is_locked, locked_until, locked_by_staff, ' +
+        'group_type, side',
+    )
     .eq('event_id', eventId)
     .order('attempt_count', { ascending: true })
     .order('last_attempt_at', { ascending: true })
@@ -154,18 +163,24 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn }: CallNextProps
 
   const totalCount = allRows.length
   // A family is "called" once an outcome is logged or an attempt exists.
-  const calledRows = allRows.filter(
-    (r) =>
-      (r.rsvp_status && r.rsvp_status !== 'not_started') ||
-      (r.attempt_count !== null && r.attempt_count > 0),
+  // Memoised: this is a whole-array pass that ran on EVERY render (a keystroke,
+  // a chip tap, an optimistic write) even when `allRows` had not changed.
+  const calledRows = useMemo(
+    () =>
+      allRows.filter(
+        (r) =>
+          (r.rsvp_status && r.rsvp_status !== 'not_started') ||
+          (r.attempt_count !== null && r.attempt_count > 0),
+      ),
+    [allRows],
   )
   const doneCount = calledRows.length
   // Guests called = the headcount of every called family, using the same
   // `confirmed_pax ?? expected_pax` the rest of the app uses. No new read:
   // `v_rsvp_queue` already returns both columns on every row.
-  const guestsCalled = calledRows.reduce(
-    (sum, r) => sum + (r.confirmed_pax ?? r.expected_pax ?? 0),
-    0,
+  const guestsCalled = useMemo(
+    () => calledRows.reduce((sum, r) => sum + (r.confirmed_pax ?? r.expected_pax ?? 0), 0),
+    [calledRows],
   )
 
   // The chip -> row mapping lives in `@/lib/rsvp-queue` so this screen, the

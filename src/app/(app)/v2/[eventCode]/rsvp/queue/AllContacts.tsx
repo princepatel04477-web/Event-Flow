@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 
+import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import type { QueueRow } from './types'
 
 const STATUS: Record<string, { label: string; dot: string }> = {
@@ -30,8 +31,13 @@ export function AllContacts({ rows, currentGroupId, onSelectFamily }: AllContact
   const [term, setTerm] = useState('')
   const [shown, setShown] = useState(PAGE)
 
+  // The raw `term` still drives the input, so typing stays instant; the settled
+  // value drives the filter + sort. Without this the whole queue was copied and
+  // re-sorted on every keystroke.
+  const debouncedTerm = useDebouncedValue(term, 250)
+
   const list = useMemo(() => {
-    const q = term.trim().toLowerCase()
+    const q = debouncedTerm.trim().toLowerCase()
     const digits = q.replace(/\D/g, '')
     const withId = rows.filter((r) => r.group_id !== null)
     const matched = q
@@ -42,7 +48,7 @@ export function AllContacts({ rows, currentGroupId, onSelectFamily }: AllContact
         )
       : withId
     return [...matched].sort((a, b) => (a.head_name ?? '').localeCompare(b.head_name ?? ''))
-  }, [rows, term])
+  }, [rows, debouncedTerm])
 
   return (
     <section className="flex flex-col gap-2" aria-label="All contacts">

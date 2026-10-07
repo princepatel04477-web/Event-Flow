@@ -57,6 +57,11 @@ export async function readFleet(eventId: string): Promise<FleetData> {
       .order('sort_order', { ascending: true }),
   ])
 
+  // A failed read must not read as an empty fleet. Throw so the React Query
+  // caller shows its error state instead of "No vehicles / No types".
+  if (vehiclesRes.error) throw new Error(friendlyDbError(vehiclesRes.error))
+  if (typesRes.error) throw new Error(friendlyDbError(typesRes.error))
+
   const vehicles = (vehiclesRes.data ?? []).map((v: Record<string, unknown>) => {
     const typeId = v.vehicle_type_id as string | null
     const typeRow = typeId
@@ -526,6 +531,11 @@ export async function readKmDashboard(eventId: string): Promise<KmDashboardData>
       .eq('event_id', eventId),
   ])
 
+  // Same rule: a dropped read must not show as "no KM logged / no vehicles".
+  if (logsRes.error) throw new Error(friendlyDbError(logsRes.error))
+  if (tripsRes.error) throw new Error(friendlyDbError(tripsRes.error))
+  if (vehiclesRes.error) throw new Error(friendlyDbError(vehiclesRes.error))
+
   const kmByVehicle = new Map<string, number>()
   for (const log of logsRes.data ?? []) {
     const km = (log.end_km ?? 0) - (log.start_km ?? 0)
@@ -603,6 +613,11 @@ export async function readVehicleAvailability(eventId: string): Promise<VehicleA
       .not('scheduled_at', 'is', null)
       .order('scheduled_at', { ascending: true }),
   ])
+
+  // A dropped read here would report every vehicle as "free" — the one answer
+  // that must never be wrong. Throw instead.
+  if (vehiclesRes.error) throw new Error(friendlyDbError(vehiclesRes.error))
+  if (tripsRes.error) throw new Error(friendlyDbError(tripsRes.error))
 
   const nextByVehicle = new Map<string, { pickup: string; free: string }>()
   for (const t of tripsRes.data ?? []) {

@@ -16,6 +16,7 @@ import { suggestVehiclesForArrival, type PaxSuggestionResult } from '@/lib/actio
 import { traceFetch } from '@/lib/perf'
 import { queryKeys } from '@/lib/query/keys'
 import { useOptimisticAction } from '@/lib/mutate/useOptimisticAction'
+import { useCappedRows } from '@/lib/useCappedRows'
 import { cn, formatDate } from '@/lib/utils'
 import { formatMobile } from '@/lib/phone'
 import type { Database } from '@/lib/supabase/database.types'
@@ -431,11 +432,16 @@ function DayBlock({
   eventId: string
   onArrive: (row: ArrivalRow) => void
 }) {
+  // Cap the ROWS RENDERED for this day block; the header count stays
+  // `rows.length`. An arrivals card is heavy (a clock, up to four body lines, a
+  // button) and grows further when its suggestion panel opens, so mounting a
+  // whole day at once is the stutter.
+  const { visible, remaining, showMore } = useCappedRows(rows)
   return (
     <section className="flex flex-col gap-2.5">
       <SectionHead eyebrow={title} right={`${rows.length}`} inline />
       <ul className="flex flex-col gap-2.5">
-        {rows.map((row, i) => (
+        {visible.map((row, i) => (
           <ArrivalRowCard
             key={row.leg.id}
             row={row}
@@ -445,6 +451,15 @@ function DayBlock({
           />
         ))}
       </ul>
+      {remaining > 0 ? (
+        <button
+          type="button"
+          onClick={showMore}
+          className="tap min-h-11 w-full rounded-xl border border-rule-strong bg-surface text-center text-sm font-medium text-brand"
+        >
+          Show {Math.min(50, remaining)} more ({remaining} left)
+        </button>
+      ) : null}
     </section>
   )
 }

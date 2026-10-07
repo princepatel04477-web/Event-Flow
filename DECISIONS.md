@@ -3892,3 +3892,117 @@ Access codes, and a family page. No page errors. What that found and fixed:
 
 Still not verified: anything on a handset (Android back, drag, the WebView), the call flow with a
 real dial, and the frame budget under CPU throttling.
+
+## 7 October 2026 — Bug sweep + latency pass (serial reads → one batch)
+
+A multi-agent sweep of `src/` for bugs and latency, with **every finding verified against source
+before it was touched**. Full detail in `BUGS-AND-LATENCY-REPORT.md`. 32 findings; 11 fixed
+(all 4 Blockers); `tsc` clean, **857/857 tests pass**, eslint clean on changed files.
+
+**Latency — the serial round trips are gone.** Four read paths violated the house T5 rule ("one
+tap is one round trip, at most") with sequential awaited Supabase calls to Seoul:
+
+- `readRoomsGrid` (`src/lib/actions/rooms.ts`): **6 serial reads → one `Promise.all`** (−5 RTT).
+  This is almost certainly why Rooms was the worst route ever measured (6.3 s, FEEL-BASELINE).
+- `readRoomingList` (`src/lib/actions/rooming-list.ts`): **6 → 1** (−5 RTT).
+- v2 shell (`src/app/(app)/v2/[eventCode]/layout.tsx`): `staffCtx`/`arrivalsNotify`/`hasGuestList`
+  were three more serial awaits in the shell on **every** navigation → one batch (−2 RTT/nav).
+- `readAllocationData`: assignments folded into the first batch (−1 RTT).
+
+**The old "flaky when concurrent" note was a wrong diagnosis and is retired.** Both serial readers
+blamed "the grid flaky at 543-guest scale when five requests fired concurrently". `createClient()`
+returns a **fresh client per call by design** (`src/lib/supabase/server.ts` — a shared client leaks
+one request's session into another's), so there is no shared-client race to be flaky about.
+Concurrent independent reads against a per-call client are ordinary use. Comment rewritten.
+
+**Blockers fixed**
+
+- **SessionBridge** — the resume listener killed itself on the first navigation (effect deps
+  `[router, pathname]` + `hydratedRef` guard + a one-shot `sessionStorage` marker). After one tab
+  tap there was no `appStateChange` listener for the rest of the session, so a WebView that lost
+  its cookie on the *second* remount bounced to /login mid-shift. Listener now in its own effect;
+  marker deleted (restore is idempotent).
+- **External-link interceptor** — `wireExternalLinkInterception()` sat in a **server** component
+  behind `typeof window !== 'undefined'`, so it never ran in the browser (a server module is never
+  shipped to the client). Every `tel:` anchor risked navigating the WebView — the Tier-0 call bug.
+  Moved to the client `NativeBridge` (Sentry init too; its SDK is dynamically imported, so no
+  bundle regression — the ~66 KB stays off the happy path).
+- **Proof duplication** — a response lost *after* a proof committed fell into the catch and queued
+  a retry with a **new** idempotency key, writing a second path the `storage_path` unique index
+  never caught. `delivery_proofs` is insert-only; the row is permanent. One key is now minted
+  before the attempt and reused by both `submitProof` and `queueProof`.
+- **Concurrent queue flush** — `flushWriteQueue` had no in-flight guard, and every mounted
+  `useOptimisticAction` drains on reconnect, so one queued write replayed once per hook. Now a
+  module-level in-flight promise.
+
+**Also fixed:** write-queue backoff measured from `lastAttemptAt` not `createdAt`; proof queue now
+honours its backoff; `/login`-morning arrival date in IST not UTC; native resume drains the queues;
+the error card no longer claims "the event team has been notified" (nothing is reported without a
+DSN); the "Received by (name)" field removed (it collected a value `submitProof` cannot store).
+
+**Not verified:** no browser/handset/DB in this environment, so the latency gains are
+**round-trip counts from the code**, not milliseconds — `npm run latency` still needs to be run on
+a device. Recommended next: virtualize rooming/arrivals/check-in (proven 26 s mount risk), lazy
+`xlsx` (must also fix `lib/export/workbook.ts` or the chunk won't move), and give the write queue a
+visible "needs attention" surface.
+
+## 7 October 2026 — "Fix all the flaws": correctness, offline honesty, latency
+
+Worked the open findings from `BUGS-AND-LATENCY-REPORT.md` + `MIROFISH-USER-SIMULATION-REPORT.md`
+against the approved plan (`~/.commandcode/plans/eventflow-flaws-fix-plan.md`). Every item was
+re-verified against the tree first — which corrected three of my earlier claims (Chip/SyncChip
+already meet 44px; `?denied=section` is already handled by `DeniedNote`; `DeliveryDetail` already
+routes through `friendlyDbError`). `tsc` clean, **857/857 tests pass**, eslint clean on every
+changed file, `next build` green. 30 files, +624/−240.
+
+**P1 — correctness**
+- **A failed read no longer reads as an empty event.** `readRoomsGrid`/`readAllocationData`
+  (`rooms.ts`) and `readFleet`/`readKmDashboard`/`readVehicleAvailability` (`fleet.ts`) silently
+  did `.data ?? []`, so a dropped query rendered "No rooms / No vehicles / Nothing to call". They
+  now `throw new Error(friendlyDbError(err))`; every caller is a React Query `queryFn` (or a
+  try/catch'd await) so it surfaces as an honest ErrorState. `logistics.ts` and `CallNext` already
+  did this right.
+- **Raw Postgres/storage text removed from staff screens** — `voice-note/upload.ts` and
+  `rooms/new/page.tsx` now pass errors through `friendlyDbError`; the raw string stays on the
+  queued row for diagnostics.
+- **Cookie lifetime matched to the token:** `COOKIE_MAX_AGE` 30 days → **7** (the JWT's own
+  lifetime). The cookie used to outlive the token by 23 days, bouncing users at day 8 with an
+  apparently-valid cookie.
+
+**P2 — offline honesty (the simulation's #1/#2 complaints)**
+- **`OfflineBanner` now counts all four queues** (proofs, reversible writes, call completions,
+  voice notes). It counted only proofs, so a runner with queued outcomes read "0 changes queued".
+  It also drains proofs + writes on reconnect AND on foreground (venue Wi-Fi is often
+  associated-but-dead, so `online` never flips).
+- **A stuck write is finally surfaced.** `stuckWrites()` had **zero callers**; the threshold was 5.
+  Now 3, and a `StuckWritesNotice` ("N changes could not be sent" + Retry) renders inside
+  `UndoBar`'s persistent live region — so it is announced and cannot overlap the undo bar, and it
+  rides both event shells without a new mount point.
+
+**P3 — latency (measured)**
+- **Per-keystroke work removed:** new `useDebouncedValue`, applied to `AllContacts` (was copying +
+  sorting the whole queue per keystroke) and `RoomsBoard` (was re-scanning every room's occupants
+  per keystroke).
+- **Calls board:** `select('*')` → the 13 columns it paints; `calledRows`/`guestsCalled` memoised
+  (they ran on every render).
+- **`xlsx` off the tap path.** Seven client screens imported it statically; it is now loaded only
+  when someone taps Export, via `src/lib/export/download.ts` which owns both the `xlsx` and
+  `./workbook` dynamic imports (a per-screen dynamic import alone would not have moved the chunk,
+  because `workbook.ts` imports xlsx too). Measured with `bundle-size`: the export routes
+  (rooming-list, sheets, ledger, messages, guests/export) all dropped off the top-10 (rooming-list
+  was 1.61 MB raw → under 1.18 MB), shell unchanged at 556.7 KB. The genuine import routes
+  (`guests/import`, `import-hotels`) keep xlsx — they must parse spreadsheets.
+- **Long lists no longer mount whole.** `useCappedRows` bounds rows rendered (50, +50 per "Show
+  more") on the rooming list, check-in and arrivals — the 543-row/26 s mount cost is the stutter.
+  Deliberately a CAP, not a scroll window: these rows have variable height, and `GuestsClient`'s
+  hand-rolled window is structurally broken (its scroller is never bounded, so `onScroll` never
+  fires and the list would freeze after the first screenful). A wrong window shows a blank list.
+  Flagged: full scroll virtualisation for these screens needs device verification.
+
+**Not done (flagged, not guessed):** import idempotency (duplicate families on re-import),
+access-code role mapping / client-view scoping, and the fonts/ArrivalBanner-poll trims — these are
+Phase 4 and need the live DB, per the plan.
+
+Still not verified: anything on a handset. The capped rows and the lazy-export path were checked by
+typecheck, the full suite and the production build only — a real scroll/first-export pass on a
+device is still owed.

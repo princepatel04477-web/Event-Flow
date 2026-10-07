@@ -7,7 +7,13 @@ import { redirect } from 'next/navigation'
 import { safeRedirectPath } from '@/lib/utils'
 import { CODE_AUTH_COOKIE, STAFF_MEMBER_COOKIE } from '@/lib/auth/cookies'
 
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30 // 30 days — staff log in once per event.
+// 7 days — the code-auth JWT's own lifetime (verify-access-code's
+// SESSION_EXPIRY_SEC). It used to be 30, which meant the cookie outlived the
+// token by 23 days: from day 8 the cookie was still present but
+// getSessionClaims rejected the expired token and bounced the user to /login
+// with a cookie they could not explain. The cookie should never outlive what
+// it carries. See CLAUDE.md §12 ("Session lifetime is 7 days, not 30").
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 
 /**
  * Store a verified code-auth token in the session cookie. Called by the

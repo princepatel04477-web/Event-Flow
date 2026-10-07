@@ -36,7 +36,14 @@ const NO_RESTORE_PATHS = ['/admin/login', '/pick-staff']
 export function SessionBridge() {
   const router = useRouter()
   const pathname = usePathname()
-  const hydratedRef = useRef(false)
+
+  // `pathname` is read inside rehydrate() but must NOT be an effect dependency.
+  // This effect owns a native listener whose lifetime has nothing to do with
+  // navigation — see the note below.
+  const pathnameRef = useRef(pathname)
+  useEffect(() => {
+    pathnameRef.current = pathname
+  })
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -47,15 +54,20 @@ export function SessionBridge() {
     async function rehydrate() {
       const stored = await readStoredClaims()
       if (!stored?.token) return
-      if (NO_RESTORE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return
-      // A sessionStorage marker set right after a fresh code login tells us
-      // the cookie was just written by the normal flow — do not double-restore.
-      // (httpOnly cookies are not visible to document.cookie, so that check
-      // cannot be used for idempotency.)
-      if (sessionStorage.getItem('nuvent_session_restored') === '1') return
+      const path = pathnameRef.current
+      if (NO_RESTORE_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) return
       try {
+        // Idempotent by construction: restoreCodeAuthSession re-writes the SAME
+        // cookie with the same token. So there is no marker to keep and no
+        // "already restored" state to get stuck in.
+        //
+        // There used to be a sessionStorage marker here, set on the first
+        // restore and never cleared. It made rehydration one-shot for the whole
+        // JS session: a WebView that lost its cookie on the SECOND remount (the
+        // normal case — every call, camera capture, memory reclaim) could no
+        // longer be restored and bounced to /login mid-shift. A guard that
+        // prevents the fix from running is worse than no marker.
         await restoreCodeAuthSession(stored.token, stored.staffMemberId)
-        sessionStorage.setItem('nuvent_session_restored', '1')
         router.refresh()
       } catch {
         // Restore failed (network/edge) — the guard will redirect and the
@@ -63,31 +75,33 @@ export function SessionBridge() {
       }
     }
 
-    async function init() {
-      // Cold mount: the WebView just remounted from scratch (app killed and
-      // relaunched, or a navigation unloaded it). Restore before guards run.
-      await rehydrate()
+    // Cold mount: the WebView just remounted from scratch (app killed and
+    // relaunched, or a navigation unloaded it). Restore before guards run.
+    void rehydrate()
 
-      // Resume (native only): the app was backgrounded (dialer, camera, home)
-      // and came back. Refresh the cookie in case the backgrounded WebView
-      // lost it. On the web there is no app lifecycle to listen to.
-      if (isNative) {
-        const { App } = await import('@capacitor/app')
-        appHandle = await App.addListener('appStateChange', ({ isActive }) => {
-          if (isActive) void rehydrate()
-        })
-      }
+    // Resume (native only): the app was backgrounded (dialer, camera, home)
+    // and came back. Refresh the cookie in case the backgrounded WebView lost
+    // it. On the web there is no app lifecycle to listen to.
+    //
+    // REGISTERED IN ITS OWN EFFECT, with `[]` deps — not beside the cold-mount
+    // restore above. The two used to share one effect whose deps were
+    // `[router, pathname]`, so every client-side navigation ran the cleanup and
+    // called `appHandle.remove()`, and the `hydratedRef` guard then refused to
+    // re-add it. After the first navigation the app had NO resume listener for
+    // the rest of the session — the exact remount the bridge exists to survive.
+    async function wireResume() {
+      if (!isNative) return
+      const { App } = await import('@capacitor/app')
+      appHandle = await App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) void rehydrate()
+      })
     }
-
-    if (!hydratedRef.current) {
-      hydratedRef.current = true
-      void init()
-    }
+    void wireResume()
 
     return () => {
       appHandle?.remove()
     }
-  }, [router, pathname])
+  }, [router])
 
   return null
 }

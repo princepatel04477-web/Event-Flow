@@ -16,21 +16,23 @@ import { NativeBridge } from '@/components/native/NativeBridge'
 import { SessionBridge } from '@/components/native/SessionBridge'
 import { OfflineBanner } from '@/components/native/OfflineBanner'
 import { SentryErrorBoundary } from '@/components/native/SentryErrorBoundary'
-import { initSentry } from '@/lib/sentry'
 import { getUiVersion } from '@/lib/ui-version'
 import { V2_OFFLINE_NOTE } from '@/lib/offline-note'
-import { wireExternalLinkInterception } from '@/lib/native/navigation'
 
 import './globals.css'
 
-// Install Sentry global handlers on the client before anything renders.
-if (typeof window !== 'undefined') {
-  initSentry()
-  // tel:/mailto: links belong to the OS, not the WebView — a captured click
-  // on one must go to the system dialer and never navigate the WebView (the
-  // Tier-0 call bug). This wires the document-level interceptor once.
-  wireExternalLinkInterception()
-}
+// Browser-only wiring (Sentry global handlers, the tel:/mailto: link
+// interceptor) lives in <NativeBridge>, which is a CLIENT component.
+//
+// It used to live HERE, inside `if (typeof window !== 'undefined')`. That reads
+// as "run on the client only", but this file is a SERVER component: `window` is
+// always undefined in it, and a server module is never shipped to the browser.
+// So the guard did not gate the calls to the client — it ran on the server and
+// did nothing, and `wireExternalLinkInterception` therefore never installed its
+// document listener. Every raw `tel:` anchor in the app was left to the WebView
+// instead of handing the dial to the OS — the Tier-0 call bug the interceptor
+// exists to prevent. Browser-only wiring belongs in a client component; see
+// NativeBridge.
 
 /**
  * The four faces of the v3 design, self-hosted.

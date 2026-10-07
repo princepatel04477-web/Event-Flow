@@ -54,6 +54,7 @@ import {
 import { ROOM_TYPES, ROOM_TYPE_LABELS, roomTypeLabel, type RoomType } from '@/lib/rooms/room-type'
 import { useStoredVenue } from '@/lib/rooms/venue'
 import { initials } from '@/lib/ui/metrics'
+import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { cn } from '@/lib/utils'
 
 import { AllocateReview } from './_components/AllocateReview'
@@ -107,6 +108,9 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
 
   const [tab, setTab] = useState<'rooms' | 'waiting'>('waiting')
   const [term, setTerm] = useState('')
+  // Settled search term. The input keeps the raw `term`; the two filters below
+  // read this, so a keystroke no longer re-scans every room's occupants.
+  const debouncedTerm = useDebouncedValue(term, 250)
   const [plan, setPlan] = useState<RoomPlan | null>(null)
   const [planning, setPlanning] = useState(false)
   const [planError, setPlanError] = useState<string | null>(null)
@@ -418,8 +422,8 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
   )
 
   const waitingShown = useMemo(
-    () => waiting.filter((f) => matchesTerm(term, f.headName)),
-    [waiting, term],
+    () => waiting.filter((f) => matchesTerm(debouncedTerm, f.headName)),
+    [waiting, debouncedTerm],
   )
 
   const roomsShown = useMemo(
@@ -427,7 +431,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
       grid.rooms.filter(
         (room) =>
           matchesTerm(
-            term,
+            debouncedTerm,
             room.roomNumber,
             room.roomType,
             room.hotelName,
@@ -436,7 +440,7 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
             ...room.occupants.map((o) => o.guestName),
           ) && matchesRoomFilters(roomFacts(room), effectiveFilters),
       ),
-    [grid.rooms, term, effectiveFilters],
+    [grid.rooms, debouncedTerm, effectiveFilters],
   )
 
   const hotels = useMemo(() => groupRoomsByHotelFloor(roomsShown), [roomsShown])
