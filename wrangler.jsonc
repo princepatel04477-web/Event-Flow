@@ -16,14 +16,15 @@
     "binding": "ASSETS"
   },
 
-  // Public by design — the same two values are inlined into the client bundle
-  // at build time. APP_JWT_SECRET is NOT here: it is a `wrangler secret put`.
-  // Never build with a plain `opennextjs-cloudflare build`; use `npm run
-  // cf:build`, which keeps the repo's .env* files out of the Worker.
-  "vars": {
-    "NEXT_PUBLIC_SUPABASE_URL": "https://iqcihrhlopezwkecajan.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxY2locmhsb3BlendrZWNhamFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI4MjE2ODUsImV4cCI6MjEwODM5NzY4NX0.I6fEbaRDRIHTQuRyxHuDbRQQYLASGsW4ajT3LA5ckFg"
-  },
+  // NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are NOT Worker
+  // vars: `next build` inlines every process.env.NEXT_PUBLIC_* reference, in
+  // server code as well as client, so `npm run cf:build` takes them from its
+  // own environment (fetch the key with `npx supabase projects api-keys
+  // --project-ref iqcihrhlopezwkecajan`). The anon key is public by design,
+  // but a JWT committed here trips secret scanners on every PR.
+  // APP_JWT_SECRET is a `wrangler secret put`. Never build with a plain
+  // `opennextjs-cloudflare build`; `npm run cf:build` keeps the repo's .env*
+  // files out of the Worker.
 
   // D1 (SQLite), APAC. Bound but not yet read or written by the app: a cache
   // here only helps if a D1 round trip is cheaper than the Postgres query it
