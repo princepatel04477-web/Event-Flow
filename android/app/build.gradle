@@ -42,9 +42,12 @@ android {
         // Settings included) is now reachable from the phone's More sheet. In
         // remote-shell mode the fix itself ships from nuvent-five.vercel.app;
         // this bump keeps the version check and the installed base in step.
-        // final-10: partner test build. No native change — web UI ships from
-        // nuvent-five.vercel.app at 6415806; this bump keeps the version check
-        // and the installed base in step.
+        // final-10: partner test build, and the first on Cloudflare + Supabase
+        // Mumbai. No native change. Built with
+        //   CAP_SERVER_URL=https://eventflow-app.eventflow-web-app.workers.dev
+        // (the Worker, not nuvent-five.vercel.app, which still serves Seoul).
+        // capacitor.config.ts defaults to localhost, so a release build MUST set
+        // CAP_SERVER_URL; check assets/capacitor.config.json inside the APK.
         versionCode 10
         versionName "final-10"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
