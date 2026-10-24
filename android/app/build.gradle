@@ -42,8 +42,11 @@ android {
         // Settings included) is now reachable from the phone's More sheet. In
         // remote-shell mode the fix itself ships from nuvent-five.vercel.app;
         // this bump keeps the version check and the installed base in step.
-        versionCode 9
-        versionName "final-09"
+        // final-10: partner test build. No native change — web UI ships from
+        // nuvent-five.vercel.app at 6415806; this bump keeps the version check
+        // and the installed base in step.
+        versionCode 10
+        versionName "final-10"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

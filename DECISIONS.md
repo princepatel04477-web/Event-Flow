@@ -5,6 +5,57 @@ is made, so the next session does not re-litigate it.
 
 ---
 
+## 24 October 2026 — Move to Cloudflare Workers + Supabase Mumbai
+
+**Where things are now.** App: Worker `eventflow-app` at
+`https://eventflow-app.eventflow-web-app.workers.dev` (Cloudflare account
+`b3a555…`). Database: Supabase **EventFlow-IN** `iqcihrhlopezwkecajan`,
+`ap-south-1`. APK final-10 (versionCode 10) bakes the Worker URL. The Seoul
+project `xktxnkuzplhzxkevwrcj` and the Vercel deployment are untouched and
+**still live** — switch-over (stop Seoul cron + webhooks, retire Vercel) has
+not happened. Until it does, final-09 handsets write to Seoul.
+
+**Why Mumbai.** Staff and client are in India; Seoul put ~6,000 km under every
+server-side query. Vercel's region was pinned to Seoul only to sit beside it.
+
+**Cloudflare needed Next 16.3.8.** Every `@opennextjs/cloudflare` that accepts
+our Node-runtime `src/proxy.ts` (1.20.3+) requires Next >= 16.3.3. Pinned
+16.3.8 with adapter 1.20.11 — the smallest step. Node middleware is still
+marked "experimental" by OpenNext. The lockfile re-resolved ~1,750 transitive
+versions in the process; typecheck, 857 tests and the Worker build all ran on
+it.
+
+**Never build with a bare `opennextjs-cloudflare build`.** It bakes `.env`,
+`.env.local` and `.env.test` into `.open-next/cloudflare/next-env.mjs` inside
+the Worker — in this repo that is the Seoul service-role key. `npm run
+cf:build` sets them aside, restores them, and fails if anything was baked in.
+`npm run cf:deploy` stamps `GIT_COMMIT_SHA` (with `-dirty`) so `/api/version`
+still answers on Cloudflare.
+
+**D1 is bound but unused.** `eventflow-cache` (APAC) is `EVENTFLOW_CACHE`.
+With the Worker placed beside Supabase in Mumbai (`cf-placement: local-BOM`),
+a D1 round trip is not obviously cheaper than the Postgres query it would
+replace, and D1 has no RLS — any cache key must carry event + role. Measure
+before routing reads through it.
+
+**The workers.dev subdomain is account-wide.** Renaming it to
+`eventflow-web-app` also moved the unrelated `varunya-jewells` Worker (its
+old link broke). Accepted by the owner. A custom domain would decouple both
+and stop future host moves from needing a new APK.
+
+**Edge Functions: repo now matches what was live.** `call-log-excel`,
+`extract-rsvp` and `transcribe-recording` carried a Vault-retry fix
+(2026-10-03) deployed from the dashboard and never committed. Ported into the
+repo (docs kept) before deploying to Mumbai.
+
+**Restore gaps.** `supabase db dump` omits storage-schema policies and the
+`auth.users` trigger; see `20261024074910_restore_storage_policies_and_auth_trigger.sql`.
+Vault secrets were re-created (Seoul's ciphertext does not decrypt in another
+project) with webhook URLs repointed to the Mumbai functions. The migration
+history and the `resume-stuck-transcriptions` cron job were re-created by hand.
+
+---
+
 ## 4 October 2026 — L9: the copy guard (series complete)
 
 `tests/copy.test.ts` scans the v2 tree and `src/components` for the phrases

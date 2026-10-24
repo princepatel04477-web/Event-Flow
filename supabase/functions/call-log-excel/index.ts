@@ -47,11 +47,30 @@ const CONFIG_TTL_MS = 5 * 60_000
 let webhookSecret = ''
 let configLoadedAt = 0
 
+/**
+ * Vault read, with a short retry. On a cold start the first service-role call
+ * can fail with "JWT issued at future" (clock skew between this worker and the
+ * API, ~1s). Falling straight back to the env copy on that error is how a
+ * STALE env secret got used on 2026-10-03: a 401 on a valid webhook and an
+ * "invalid key" from Sarvam. So: retry the Vault read; fall back to env ONLY
+ * when Vault answered and has no value - never because the read errored.
+ */
+async function vaultSecret(fn: string, vaultName: string): Promise<{ value: string | null; failed: boolean }> {
+  let lastError = ''
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const { data, error } = await db.rpc('pipeline_secret', { p_name: vaultName })
+    if (!error) return { value: typeof data === 'string' && data !== '' ? data : null, failed: false }
+    lastError = error.message
+    await new Promise((r) => setTimeout(r, 400 * attempt))
+  }
+  console.error(`${fn}: could not read ${vaultName} from Vault after retries:`, lastError)
+  return { value: null, failed: true }
+}
+
 async function loadConfig(): Promise<boolean> {
   if (webhookSecret && Date.now() - configLoadedAt < CONFIG_TTL_MS) return true
-  const { data, error } = await db.rpc('pipeline_secret', { p_name: 'call_log_webhook_secret' })
-  if (error) console.error('call-log-excel: could not read secret from Vault:', error.message)
-  const value = typeof data === 'string' && data !== '' ? data : Deno.env.get('CALL_LOG_WEBHOOK_SECRET') ?? ''
+  const vault = await vaultSecret('call-log-excel', 'call_log_webhook_secret')
+  const value = vault.value ?? (vault.failed ? '' : Deno.env.get('CALL_LOG_WEBHOOK_SECRET') ?? '')
   if (!value) return false
   webhookSecret = value
   configLoadedAt = Date.now()

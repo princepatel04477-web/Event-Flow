@@ -80,13 +80,30 @@ let sarvamApiKey = ''
 let webhookSecret = ''
 let configLoadedAt = 0
 
-async function readSecret(envName: string, vaultName: string): Promise<string | null> {
-  const { data, error } = await db.rpc('pipeline_secret', { p_name: vaultName })
-  if (error) {
-    console.error(`transcribe-recording: could not read ${vaultName} from Vault:`, error.message)
-  } else if (typeof data === 'string' && data !== '') {
-    return data
+/**
+ * Vault read, with a short retry. On a cold start the first service-role call
+ * can fail with "JWT issued at future" (clock skew between this worker and the
+ * API, ~1s). Falling straight back to the env copy on that error is how a
+ * STALE env secret got used on 2026-10-03: a 401 on a valid webhook and an
+ * "invalid key" from Sarvam. So: retry the Vault read; fall back to env ONLY
+ * when Vault answered and has no value - never because the read errored.
+ */
+async function vaultSecret(fn: string, vaultName: string): Promise<{ value: string | null; failed: boolean }> {
+  let lastError = ''
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const { data, error } = await db.rpc('pipeline_secret', { p_name: vaultName })
+    if (!error) return { value: typeof data === 'string' && data !== '' ? data : null, failed: false }
+    lastError = error.message
+    await new Promise((r) => setTimeout(r, 400 * attempt))
   }
+  console.error(`${fn}: could not read ${vaultName} from Vault after retries:`, lastError)
+  return { value: null, failed: true }
+}
+
+async function readSecret(envName: string, vaultName: string): Promise<string | null> {
+  const vault = await vaultSecret('transcribe-recording', vaultName)
+  if (vault.value) return vault.value
+  if (vault.failed) return null
   return Deno.env.get(envName) || null
 }
 

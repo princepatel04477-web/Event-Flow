@@ -1,6 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "nuvent",
+  // The Worker name is the first label of the workers.dev URL that gets baked
+  // into the APK (remote-shell mode). Renaming it moves the app to a new URL
+  // and strands every installed handset on the old one until it gets a new APK.
+  "name": "eventflow-app",
   "main": ".open-next/worker.js",
 
   // nodejs_compat is required: the app imports node:crypto (createHash, in
@@ -13,16 +16,35 @@
     "binding": "ASSETS"
   },
 
+  // Public by design — the same two values are inlined into the client bundle
+  // at build time. APP_JWT_SECRET is NOT here: it is a `wrangler secret put`.
+  // Never build with a plain `opennextjs-cloudflare build`; use `npm run
+  // cf:build`, which keeps the repo's .env* files out of the Worker.
+  "vars": {
+    "NEXT_PUBLIC_SUPABASE_URL": "https://iqcihrhlopezwkecajan.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxY2locmhsb3BlendrZWNhamFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI4MjE2ODUsImV4cCI6MjEwODM5NzY4NX0.I6fEbaRDRIHTQuRyxHuDbRQQYLASGsW4ajT3LA5ckFg"
+  },
+
+  // D1 (SQLite), APAC. Bound but not yet read or written by the app: a cache
+  // here only helps if a D1 round trip is cheaper than the Postgres query it
+  // replaces. With the Worker placed beside Supabase in Mumbai that is not a
+  // given — measure before routing reads through it.
+  "d1_databases": [
+    {
+      "binding": "EVENTFLOW_CACHE",
+      "database_name": "eventflow-cache",
+      "database_id": "18f21027-7570-4cc8-80ce-592e810da013"
+    }
+  ],
+
   // SMART PLACEMENT.
   //
-  // Supabase is in ap-northeast-2 (Seoul). Staff and the client are in India,
-  // so a request lands in a Mumbai/Chennai colo and every server-side DB call
-  // crosses ~6,000km. The admin dashboard makes roughly ten of them per load,
-  // and they are sequential enough that the round trips dominate the page.
+  // Supabase is in ap-south-1 (Mumbai) since 2026-10-24, moved from Seoul.
+  // Staff and the client are in India, so the admin dashboard's ~10 sequential
+  // DB calls should now be short wherever the Worker runs in India.
   //
   // Smart Placement lets Cloudflare relocate the Worker to a colo nearer the
-  // origin it talks to, so those ten trips become short and only the single
-  // user->Worker leg is long. It is a HINT, not a guarantee: Cloudflare only
+  // origin it talks to. It is a HINT, not a guarantee: Cloudflare only
   // relocates once it has observed enough traffic and decided it helps, and a
   // freshly deployed Worker always starts unplaced. Verify with the
   // cf-placement response header rather than assuming.

@@ -29,7 +29,9 @@
     "test:all-feel": "npx playwright test --project=feel --project=phone",
     "tap-budget": "node scripts/tap-budget.mjs",
     "latency": "node scripts/latency.mjs",
-    "bundle-size": "node scripts/bundle-size.mjs"
+    "bundle-size": "node scripts/bundle-size.mjs",
+    "cf:build": "node scripts/cf-build.mjs",
+    "cf:deploy": "node scripts/cf-deploy.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
@@ -55,7 +57,7 @@
     "idb": "^8.0.3",
     "jose": "^6.2.8",
     "motion": "13.1.0",
-    "next": "16.2.12",
+    "next": "16.3.8",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1",
@@ -63,17 +65,17 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.20.2",
+    "@opennextjs/cloudflare": "^1.20.11",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^20.19.43",
     "@types/react": "19.2.18",
     "@types/react-dom": "^19.2.4",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^16.2.12",
+    "eslint-config-next": "^16.3.8",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10",
-    "wrangler": "^4.120.0"
+    "wrangler": "^4.152.0"
   }
 }

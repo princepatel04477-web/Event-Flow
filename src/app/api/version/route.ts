@@ -34,10 +34,13 @@ export const dynamic = 'force-dynamic'
 export function GET() {
   return NextResponse.json(
     {
-      // Vercel injects this at build time. Locally it is undefined, which is
-      // the honest answer for `next dev` — the smoke suite treats a missing
-      // SHA as "not a real deployment" rather than as a match.
-      commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+      // Vercel injects VERCEL_GIT_COMMIT_SHA at build time; on Cloudflare the
+      // deploy passes GIT_COMMIT_SHA as a Worker var (`wrangler deploy --var`),
+      // suffixed `-dirty` when the tree had uncommitted changes. Locally both
+      // are undefined, which is the honest answer for `next dev` — the smoke
+      // suite treats a missing SHA as "not a real deployment" rather than as
+      // a match.
+      commit: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA ?? null,
       // Evaluated when the serverless function cold-starts, not at build.
       // Close enough to "when did this instance come up" to be worth having.
       servedAt: new Date().toISOString(),
