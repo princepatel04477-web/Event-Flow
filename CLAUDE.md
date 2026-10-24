@@ -4,6 +4,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## 0. Current infrastructure — read this first (since 24 October 2026)
+
+**Where the facts below conflict with this section, this section wins.** Much
+of §3, §11c and §12 still describes Vercel + Supabase Seoul; that is history.
+
+| | Now | Retired |
+|---|---|---|
+| App | Cloudflare Worker `eventflow-app` — `https://eventflow-app.eventflow-web-app.workers.dev` | Vercel `nuvent` (`nuvent-five.vercel.app`) |
+| Database | Supabase **EventFlow-IN** `iqcihrhlopezwkecajan`, `ap-south-1` Mumbai | `xktxnkuzplhzxkevwrcj` Seoul — kept as an archive |
+| APK | final-10, versionCode 10, `C:\android-builds\nuvent\eventflow-final-10.apk`, sha256 `df4aae71…` | final-09 and older load Vercel → Seoul |
+
+- **Build / deploy:** `npm run cf:build` then `npm run cf:deploy`, with
+  `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the
+  environment (`npx supabase projects api-keys --project-ref iqcihrhlopezwkecajan`).
+  **Never** a bare `opennextjs-cloudflare build` — it bakes `.env*`, including
+  the Seoul service-role key in `.env.test`, into the Worker.
+- **APK release:** `CAP_SERVER_URL=https://eventflow-app.eventflow-web-app.workers.dev`
+  is mandatory; the config defaults to localhost.
+- **Secrets:** `APP_JWT_SECRET` is a Worker secret (`wrangler secret put`) and an
+  Edge Function secret, and equals EventFlow-IN's legacy JWT secret.
+- **Seoul is switched off**: its 6 `pg_net` webhook triggers are DISABLED (not
+  dropped) and its `resume-stuck-transcriptions` cron job is unscheduled.
+- **`.env.test` still points at Seoul**, and `npm run test:run` writes fixtures
+  to its live test event E12345. Repoint it before trusting tests again.
+- The workers.dev subdomain is **account-wide**; renaming it also moves the
+  unrelated `varunya-jewells` Worker on the same Cloudflare account.
+- Full record: `DECISIONS.md`, 24 October 2026.
+
+---
+
 ## 1. What this project is
 
 A multi-tenant event operations platform for a large Indian wedding, replacing Excel

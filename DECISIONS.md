@@ -7,6 +7,17 @@ is made, so the next session does not re-litigate it.
 
 ## 24 October 2026 — Move to Cloudflare Workers + Supabase Mumbai
 
+**Switch-over (same day, later).** Seoul's six `pg_net` webhook triggers
+(`call_recordings_enqueue_call_log`, `call_recordings_enqueue_transcription`,
+`rsvp_extractions_enqueue_call_log`, `transcripts_enqueue_call_log`,
+`transcripts_enqueue_extraction_ins`, `transcripts_enqueue_extraction_upd`)
+are **disabled, not dropped**, and its cron job is unscheduled — `alter table
+… enable trigger …` and one `cron.schedule` bring them back. Before that, the
+17 Seoul writes since the dump were checked: all were `npm run test:run`
+fixtures on test event E12345 (three leftovers remain there), none real.
+Vercel was to be **paused, not deleted** (keeps rollback); not done yet — the
+project's Vercel account login had expired.
+
 **Where things are now.** App: Worker `eventflow-app` at
 `https://eventflow-app.eventflow-web-app.workers.dev` (Cloudflare account
 `b3a555…`). Database: Supabase **EventFlow-IN** `iqcihrhlopezwkecajan`,
