@@ -4068,3 +4068,23 @@ Phase 4 and need the live DB, per the plan.
 Still not verified: anything on a handset. The capped rows and the lazy-export path were checked by
 typecheck, the full suite and the production build only — a real scroll/first-export pass on a
 device is still owed.
+
+## 25 October 2026: fixes from the overnight bug hunt (see BUG-HUNT-2026-10-25.md)
+
+- **`NEXT_PUBLIC_UI` is now required by `cf-build` and set as a Worker var.** It was a Vercel-only
+  Production env var, and nothing carried it into the Cloudflare move, so the Worker silently served
+  v1. It is both a build input and a runtime var because the compiled middleware reads `process.env`
+  at request time.
+- **`v_rsvp_queue` gets columns appended, never dropped and recreated.** `20260812000000`'s drop and
+  recreate lost `locked_by_staff`. `20261025090000` uses CREATE OR REPLACE, with the new column last.
+  It was applied with `db query -f` + `migration repair`, because `db push` refuses while remote
+  `20261003105439` has no local file.
+- **The APK's `offline.html` learns `server.url` at `cap copy` time** (`capacitor:copy:after` →
+  `scripts/cap-offline-url.mjs`). Capacitor serves the error page from `https://localhost`, and
+  nothing at runtime exposes server.url to it. The source in `public/` keeps an empty value.
+- **Edge Functions called from the browser put CORS on every response, not just the 200.** Without
+  it, an error status reads as a network failure to the client.
+- **v1 guest rows open the read-only family page.** `(staff)/[eventCode]/families/[groupId]`
+  re-exports v2's page, so browsing no longer takes the RSVP caller lock.
+- APK final-11 (versionCode 11) built and verified on the emulator, **not distributed**. It only
+  changes the offline page.
