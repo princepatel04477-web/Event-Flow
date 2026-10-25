@@ -385,18 +385,35 @@ describe.runIf(enabled)('T1 — adversarial isolation', () => {
     test('a client reads nothing from base tables in their OWN event', async () => {
       const leaked: string[] = []
       for (const table of EVENT_SCOPED_TABLES) {
-        const { data } = await clientA.client
+        let query = clientA.client
           .from(table)
           .select('*')
           .eq('event_id', (env as T1Env).eventA)
-          .limit(1)
+        // The ONE sanctioned exception: room-targeted hampers, for the client's
+        // read-only room-wise hamper status (F8b, policy
+        // deliverables_client_room_sel in 20261003091000). Family and guest
+        // hampers stay staff-only, so those are what this checks for.
+        if (table === 'deliverables') query = query.is('room_id', null)
+        const { data } = await query.limit(1)
         if ((data?.length ?? 0) > 0) leaked.push(table)
       }
       expect(
         leaked,
         `a CLIENT read base-table rows from ${leaked.join(', ')} — clients get the ` +
-          'client_guest_profiles view and nothing else (CLAUDE.md §7)',
+          'client_guest_profiles view and nothing else (CLAUDE.md §7), plus ' +
+          'room-targeted deliverables (F8b)',
       ).toEqual([])
+    })
+
+    test('a client sees ONLY room-targeted deliverables (F8b), never family hampers', async () => {
+      const { data, error } = await clientA.client
+        .from('deliverables')
+        .select('id, room_id')
+        .eq('event_id', (env as T1Env).eventA)
+        .limit(500)
+      expect(error, `client deliverables read errored: ${error?.message}`).toBeNull()
+      const familyLevel = (data ?? []).filter((d) => d.room_id === null)
+      expect(familyLevel, 'a CLIENT read family/guest-targeted hampers').toEqual([])
     })
 
     test('a client cannot write', async () => {

@@ -89,17 +89,43 @@ type UntypedFrom = {
       eq: (column: string, value: string) => { maybeSingle: () => Promise<BoardQueryResult> }
     }
   }
+  rpc: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => { maybeSingle: () => Promise<BoardQueryResult> }
 }
 
-function selectBoardRow(
+/** Set once public.event_board() is known to be absent, to stop re-probing it. */
+let boardRpcMissing = false
+
+/**
+ * The board row, through `public.event_board()` when it exists.
+ *
+ * Reading `v_event_board` directly re-applies RLS (`app.is_staff(event_id)`)
+ * to every row each subquery counts, and that check cannot be inlined: 2.7 s
+ * for an 819-family event, against PostgREST's 8 s statement timeout. A busy
+ * moment tipped it over, the read answered null, and the dashboard said "Some
+ * counters could not be read". The function asks the same question once for
+ * the event (2.6 ms). See 20261025100000_event_board_rpc.sql.
+ *
+ * Falls back to the view if the function has not been deployed (PGRST202 /
+ * 42883), so deploy order stays free.
+ */
+async function selectBoardRow(
   supabase: Awaited<ReturnType<typeof createClient>>,
   eventId: string,
 ): Promise<BoardQueryResult> {
-  return (supabase as unknown as UntypedFrom)
-    .from('v_event_board')
-    .select('*')
-    .eq('event_id', eventId)
-    .maybeSingle()
+  const untyped = supabase as unknown as UntypedFrom
+  if (!boardRpcMissing) {
+    const res = await untyped.rpc('event_board', { p_event_id: eventId }).maybeSingle()
+    const missing =
+      res.error?.code === 'PGRST202' ||
+      res.error?.code === '42883' ||
+      /could not find the function/i.test(res.error?.message ?? '')
+    if (!missing) return res
+    boardRpcMissing = true
+  }
+  return untyped.from('v_event_board').select('*').eq('event_id', eventId).maybeSingle()
 }
 
 type BoardRow = DashboardRow & AttentionRow

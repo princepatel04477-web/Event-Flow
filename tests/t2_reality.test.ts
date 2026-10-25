@@ -438,13 +438,18 @@ describe.runIf(enabled)('T2 — venue reality', () => {
       await sf.from('rooms').delete().eq('id', room!.id)
     })
 
+    // "Overlap" means overlapping stays BEYOND the room's capacity. Since
+    // 20260816130000 (merged room guard) two guests may share a capacity-2 room
+    // on the same nights. That is a shared room, not a double booking, and the
+    // old rule that refused it made every room single-occupancy. So the room
+    // here holds exactly one, and the second overlapping stay is the clash.
     test('a genuine overlap is refused', async () => {
       const e = env as T1Env
       const { data: room } = await sf
         .from('rooms')
         .insert({
           event_id: e.eventA, hotel_id: hotelId,
-          room_number: `${STAMP}-ovl`, capacity: 2, max_capacity: 2,
+          room_number: `${STAMP}-ovl`, capacity: 1, max_capacity: 1,
         })
         .select('id')
         .single()
@@ -470,7 +475,7 @@ describe.runIf(enabled)('T2 — venue reality', () => {
       })
       expect(
         error,
-        'DOUBLE BOOKING: two guests hold the same room over overlapping nights and nothing objected',
+        'DOUBLE BOOKING: two guests hold a ONE-bed room over overlapping nights and nothing objected',
       ).toBeTruthy()
       expect(error?.code, `overlap refusal code was ${error?.code}`).toBe('23514')
 
