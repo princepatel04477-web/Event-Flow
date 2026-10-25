@@ -107,11 +107,21 @@ export function OfflineBanner({ offlineNote }: OfflineBannerProps = {}) {
 
   if (online && queued === 0) return null
 
+  // An OVERLAY, not a sticky block in the flow. Sticky took up ~35px of
+  // layout the instant signal dropped, pushing every control down under a
+  // thumb already on its way to the screen, so taps landed on the wrong
+  // control (BUG-HUNT-2026-10-25 #9). Fixed over the top of the header shifts
+  // nothing, and pointer-events-none lets a tap that lands on the banner
+  // reach whatever it covers instead of being swallowed.
   return (
     <div
       role="status"
-      className="sticky top-0 z-50 w-full bg-warning px-4 py-2 text-center text-sm font-semibold text-warning-fg"
-      style={{ background: '#a35408', color: '#fff9f2' }}
+      className="pointer-events-none fixed inset-x-0 top-0 z-50 w-full bg-warning px-4 pb-2 text-center text-sm font-semibold text-warning-fg"
+      style={{
+        background: '#a35408',
+        color: '#fff9f2',
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)',
+      }}
     >
       {online
         ? `${queued} change${queued === 1 ? '' : 's'} queued — will sync when online`

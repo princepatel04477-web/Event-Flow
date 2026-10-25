@@ -18,10 +18,16 @@
  * came out empty. Configuration reaches the Worker only through wrangler.jsonc
  * `vars` (public values) and `wrangler secret put` (APP_JWT_SECRET).
  *
- * The two NEXT_PUBLIC_* values are inlined into the client bundle by `next
+ * The NEXT_PUBLIC_* values are inlined into the client bundle by `next
  * build`, so they must be in the environment of THIS process:
  *
- *   NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... npm run cf:build
+ *   NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... NEXT_PUBLIC_UI=v2 npm run cf:build
+ *
+ * NEXT_PUBLIC_UI is required, not defaulted. It was a Production-only Vercel
+ * env var, nothing carried it across in the Cloudflare move, and the Worker
+ * silently served the retired v1 UI (BUG-HUNT-2026-10-25 #1). Unset means v1
+ * with no error anywhere, so the build refuses rather than guess. It is ALSO a
+ * wrangler.jsonc var: the compiled middleware reads process.env at runtime.
  */
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -29,10 +35,14 @@ import os from 'node:os'
 import path from 'node:path'
 
 const root = process.cwd()
-const REQUIRED = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']
+const REQUIRED = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_UI']
 const missing = REQUIRED.filter((k) => !process.env[k]?.trim())
 if (missing.length) {
-  console.error(`cf-build: set ${missing.join(' and ')} in the environment first.`)
+  console.error(`cf-build: set ${missing.join(', ')} in the environment first.`)
+  process.exit(1)
+}
+if (!['v1', 'v2'].includes(process.env.NEXT_PUBLIC_UI.trim())) {
+  console.error(`cf-build: NEXT_PUBLIC_UI must be 'v1' or 'v2', got '${process.env.NEXT_PUBLIC_UI}'.`)
   process.exit(1)
 }
 

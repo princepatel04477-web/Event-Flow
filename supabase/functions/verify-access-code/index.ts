@@ -159,15 +159,34 @@ async function mintJwt(opts: {
     .sign(key)
 }
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// CORS goes on EVERY response, not just the 200. The login form calls this
+// from the browser, and a response without Access-Control-Allow-Origin is
+// blocked before the page can read its status: fetch() throws, and the form
+// showed "Could not reach the server" for a mistyped code, while the 429
+// "Too many attempts" message could never appear at all
+// (BUG-HUNT-2026-10-25 #4). The wrapper also covers an uncaught throw, which
+// would otherwise reach the phone as the same misleading network error.
 Deno.serve(async (req) => {
+  let res: Response
+  try {
+    res = await handle(req)
+  } catch (err) {
+    console.error('verify-access-code: unhandled', err)
+    res = Response.json({ error: 'Server error' }, { status: 500 })
+  }
+  for (const [k, v] of Object.entries(CORS_HEADERS)) res.headers.set(k, v)
+  return res
+})
+
+async function handle(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      },
-    })
+    return new Response('ok')
   }
 
   if (req.method !== 'POST') {
@@ -232,6 +251,5 @@ Deno.serve(async (req) => {
       app_role: appRole,
       event_id: eventId,
     },
-    { headers: { 'Access-Control-Allow-Origin': '*' } },
   )
-})
+}

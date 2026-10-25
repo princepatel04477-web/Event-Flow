@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { AdminLink } from '@/components/nav/AdminLink'
 import { BottomTabs } from '@/components/nav/BottomTabs'
+import { NavTracker } from '@/components/nav/NavTracker'
 import { SectionTabs } from '@/components/nav/SectionTabs'
 import { StaffWelcomeBanner } from '@/components/nav/StaffWelcomeBanner'
 import { EventSwitcher } from '@/components/nav/EventSwitcher'
@@ -12,6 +13,7 @@ import { UndoBar } from '@/components/ui/UndoBar'
 import { NoGuestListPopup } from '@/components/guests/NoGuestListPopup'
 import { hasGuestList } from '@/lib/actions/dashboard'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
+import { departmentHomePath } from '@/lib/departments'
 
 import { getSessionClaims } from '@/lib/auth/server'
 import { bottomTabsFor } from '@/lib/sections/config'
@@ -152,6 +154,21 @@ export default async function EventLayout({ children, params }: LayoutProps) {
       </main>
 
       <BottomTabs eventCode={event.code} access={access} department={department} />
+
+      {/* Landing + visit history for the Android back button (lib/nav/back).
+          It was mounted in the v2 and admin shells only, so under v1 both were
+          always null and hardware back from any tab offered "Press back again
+          to close EventFlow" instead of going home (BUG-HUNT-2026-10-25 #6).
+          A runner's landing is their own section; a lead's (management, whose
+          Dashboard tab works since the same date), an admin's and a client's
+          is this event's root. */}
+      <NavTracker
+        landing={
+          access === 'event_team' && department && department !== 'management'
+            ? departmentHomePath(event.code, department)
+            : `/${event.code}`
+        }
+      />
 
       {/* The undo bar lives in the SHELL, not in each screen, and that is the
           whole point of mounting it here. A write's undo window is 7 seconds,

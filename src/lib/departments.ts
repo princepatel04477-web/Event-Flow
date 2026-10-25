@@ -76,11 +76,10 @@ export function departmentHomePath(eventCode: string, department: StaffDepartmen
  *   (`bottomTabsFor`'s `isLead`) already treats this department as an admin
  *   equivalent, so v2's dashboard — the render this department is already
  *   getting — is the right destination, not `rsvp/campaigns`.
- *   `departmentHomePath('management')` cannot become the dashboard path
- *   itself: `(staff)/[eventCode]/page.tsx` (v1) runs the identical
- *   redirect-on-department check against that same route, and pointing the
- *   shared function at it would send v1's dashboard into a redirect loop —
- *   v1 has no other screen at that path for this case to land on.
+ *   (v1's dashboard, `(staff)/[eventCode]/page.tsx`, also exempts
+ *   management from its redirect-on-department check since 2026-10-25, so
+ *   its Dashboard tab no longer bounces. v1's post-login landing for the
+ *   department is still `rsvp/campaigns`, via `departmentHomePath`.)
  * - `hamper` goes to `hospitality/deliveries`, the real v2 build (Job 3,
  *   `HamperRun`). `/{event}/hamper` under the v2 route group is a stale
  *   re-export of the v1 screen (see `(app)/v2/[eventCode]/hamper/page.tsx`)
@@ -110,10 +109,9 @@ export function v2DepartmentHome(
  * shell it is rendering.
  *
  * Under v1 the version argument selects the shared `departmentHomePath` and
- * nothing else — including `management → rsvp/campaigns`. That answer is
- * deliberately unchanged: v1's dashboard at `/{event}` redirects any
- * department away from itself through that same shared function, so
- * changing this side alone would trade a wrong landing for a redirect loop.
+ * nothing else — including `management → rsvp/campaigns`. v1's dashboard
+ * at `/{event}` redirects every department except management away from
+ * itself through that same shared function.
  *
  * v2 uses the shell's own answer. For `management` that is the dashboard
  * (`/{event}`), not Auto-call — see `v2DepartmentHome`, which returns `null`

@@ -100,7 +100,13 @@ export function CodeLoginForm({ next }: { next: string }) {
       const body = await res.json().catch(() => null)
 
       if (res.status !== 200 || !body?.access_token) {
-        setError(body?.error === 'Too many attempts. Try again later.' ? body.error : 'Invalid code')
+        setError(
+          res.status === 429
+            ? 'Too many attempts. Try again later.'
+            : res.status >= 500
+              ? 'The server had a problem signing you in. Try again in a minute.'
+              : 'Invalid code',
+        )
         setPending(false)
         return
       }

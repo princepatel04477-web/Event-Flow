@@ -3753,6 +3753,7 @@ export type Database = {
           last_opened_by_staff: string | null
           last_outcome: Database["app"]["Enums"]["call_outcome"] | null
           locked_by: string | null
+          locked_by_staff: string | null
           locked_until: string | null
           next_callback_at: string | null
           primary_mobile: string | null

@@ -26,6 +26,13 @@
   // `opennextjs-cloudflare build`; `npm run cf:build` keeps the repo's .env*
   // files out of the Worker.
 
+  // NEXT_PUBLIC_UI is BOTH a build-time env (cf-build requires it) and a
+  // Worker var: src/proxy.ts reads it through getUiVersion(), and the compiled
+  // middleware resolves process.env at RUNTIME, not from the build inline.
+  // Missing here = the Worker serves the retired v1 UI with no error
+  // (BUG-HUNT-2026-10-25 #1). Keep the two values the same.
+  "vars": { "NEXT_PUBLIC_UI": "v2" },
+
   // D1 (SQLite), APAC. Bound but not yet read or written by the app: a cache
   // here only helps if a D1 round trip is cheaper than the Postgres query it
   // replaces. With the Worker placed beside Supabase in Mumbai that is not a

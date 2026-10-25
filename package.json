@@ -20,6 +20,7 @@
     "mobile:launch": "adb shell am start -n com.nuvent.app/.MainActivity",
     "mobile:local": "next build && npx cap sync android",
     "mobile:prod": "npx cap sync android",
+    "capacitor:copy:after": "node scripts/cap-offline-url.mjs",
     "smoke": "node scripts/smoke.mjs",
     "test:t1": "vitest run --config vitest.integration.config.ts tests/t1_isolation.test.ts",
     "test:t2": "vitest run --config vitest.integration.config.ts tests/t2_reality.test.ts",

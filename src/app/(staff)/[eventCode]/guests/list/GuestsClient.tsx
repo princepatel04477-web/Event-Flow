@@ -158,6 +158,19 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
     [searchActive, activeSearchRows, rows],
   )
   const total = rows?.length ?? 0
+  // The header counts PEOPLE and FAMILIES, not rows. A family with no guest
+  // row yet still comes back as one row (guest_id null) so it stays findable,
+  // and counting rows called those families "guests" — the staff list said
+  // 820 guests for an event with 769 (BUG-HUNT-2026-10-25 #10).
+  const { guestCount, familyCount } = useMemo(() => {
+    const families = new Set<string>()
+    let guests = 0
+    for (const r of rows ?? []) {
+      if (r.guest_id) guests += 1
+      if (r.group_id) families.add(r.group_id)
+    }
+    return { guestCount: guests, familyCount: families.size }
+  }, [rows])
   const shownTotal = activeSearchRows ? activeSearchRows.length : total
 
   const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
@@ -187,7 +200,8 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
       <div>
         <h2 className="text-xl font-semibold text-fg">Guest list</h2>
         <p className="mt-0.5 text-sm text-muted">
-          {total} {total === 1 ? 'guest' : 'guests'} · read-only. Tap a guest to open their
+          {guestCount} {guestCount === 1 ? 'guest' : 'guests'} in {familyCount}{' '}
+          {familyCount === 1 ? 'family' : 'families'} · read-only. Tap a guest to open their
           family&apos;s record.
         </p>
         {listStale ? (
@@ -332,9 +346,14 @@ export function GuestsClient({ eventId, eventCode }: GuestsClientProps) {
 }
 
 /**
- * One compact, fixed-height row. Links to the family's RSVP record — the
- * operational "profile" for a guest (call history, travel, RSVP outcome).
+ * One compact, fixed-height row. Links to the family's read-only page
+ * (`families/[groupId]`) — answer, travel, stay, hamper and call history.
  * The link is the whole row, so the 44px tap target is the entire card.
+ *
+ * NOT `rsvp/status/[groupId]`, which it used to be: that page takes the
+ * 15-minute caller lock on render, so browsing the list locked families
+ * against the callers (BUG-HUNT-2026-10-25 #7). Logging an answer is one tap
+ * further, from the family page's "Log an answer" link.
  */
 function GuestListRow({ row, eventCode }: { row: GuestSearchRow; eventCode: string }) {
   const groupId = row.group_id ?? null
@@ -348,7 +367,7 @@ function GuestListRow({ row, eventCode }: { row: GuestSearchRow; eventCode: stri
     typeof row.pax === 'number' ? `Family of ${row.pax}` : null,
   ].filter(Boolean)
 
-  const href = groupId ? `/${eventCode}/rsvp/status/${groupId}` : null
+  const href = groupId ? `/${eventCode}/families/${groupId}` : null
 
   const inner = (
     <div className="flex h-full items-center gap-3 px-4">
@@ -363,7 +382,11 @@ function GuestListRow({ row, eventCode }: { row: GuestSearchRow; eventCode: stri
         ) : null}
       </div>
       <div className="shrink-0 text-right">
-        {phone ? <p className="text-sm font-medium text-brand">{formatMobile(phone)}</p> : null}
+        {/* Plain ink, not brand colour: it sits inside the row link, so tapping it
+            opens the family, not the dialer, and brand-coloured text read as a
+            tel: link (BUG-HUNT-2026-10-25 #11). A bare tel: here would also skip
+            the call_attempts row the dial flow writes first (CLAUDE.md §12). */}
+        {phone ? <p className="text-sm font-medium tabular-nums text-muted">{formatMobile(phone)}</p> : null}
         <ChevronRightIcon className="ml-auto h-5 w-5 text-muted" />
       </div>
     </div>
@@ -384,8 +407,10 @@ function GuestListRow({ row, eventCode }: { row: GuestSearchRow; eventCode: stri
     // cache and all. A soft navigation fetches only the destination and leaves
     // the shell, the query cache and the undo bar standing.
     //
-    // `prefetch={false}` is NOT a performance oversight, it is a safety
-    // requirement, and it is the reason this row is not armed by
+    // `prefetch={false}` was a safety requirement while this row pointed at
+    // `rsvp/status` (it now opens the read-only family page; kept off because
+    // a list of hundreds of rows prefetching is still waste). It is also the
+    // reason this row is not armed by
     // `useBoundedPrefetch` like the nav tabs are. A full prefetch runs the
     // destination's server render for real, and `rsvp/status/[groupId]` calls
     // `claimGroupForCall` on render — it TAKES THE 15-MINUTE CALLER LOCK. A

@@ -64,7 +64,12 @@ export default async function EventHomePage({ params, searchParams }: PageProps)
   // client would be told "0 families" for a 238-family wedding.
   const access = await requireStaff(event.id, event.code)
   const viewerCtx = await getStaffViewerContext(event.id)
-  if (access === 'event_team' && viewerCtx?.department) {
+  // `management` (Event lead) stays: `bottomTabsFor` gives this department a
+  // Dashboard tab, and redirecting it to rsvp/campaigns made that tab bounce
+  // straight back to Auto Dialer with no feedback (BUG-HUNT-2026-10-25 #5).
+  // Its post-login landing is still campaigns, via departmentHomePath — that
+  // is a separate hop, and leaving this page alone cannot loop.
+  if (access === 'event_team' && viewerCtx?.department && viewerCtx.department !== 'management') {
     redirect(departmentHomePath(event.code, viewerCtx.department))
   }
 
