@@ -4088,3 +4088,24 @@ device is still owed.
   re-exports v2's page, so browsing no longer takes the RSVP caller lock.
 - APK final-11 (versionCode 11) built and verified on the emulator, **not distributed**. It only
   changes the offline page.
+
+## 25 October 2026 (later): loose ends, and why the dashboard board is an RPC now
+
+- **`public.event_board(p_event_id)` replaces the direct `v_event_board` read.** As a team session,
+  the view took 2.7 s for SAMPLE2026 (819 families). Each of its subqueries re-applies
+  `app.is_staff(event_id)` per row, and that is a SECURITY DEFINER function with a pinned
+  search_path, so Postgres cannot inline it (~0.45 ms per row). PostgREST's 8 s timeout made that
+  an intermittent failure, which showed as "Some counters could not be read". The RPC checks
+  `is_staff(p_event_id)` once and runs as the owner: 2.6 ms in the database, ~0.25 s end to end,
+  all 16 columns identical. Verified that a team session on another event, a client and anon all get
+  nothing. **Every other RLS read still pays the per-row cost.** The general fix is policies of
+  the form `event_id in (select app.staff_event_ids())`, with `staff_event_ids()` defined as
+  `select id from events where app.is_staff(id)`, which makes it equivalent by construction. It touches
+  every policy, so it waits until after the event.
+- **T1.4 and T2.7 were stale, not the database.** Clients may read room-level hampers (F8b), and two
+  guests may share a capacity-2 room (merged guard, 16 Aug). The tests now pin the current rules.
+- **T2's cleanup deletes the room hampers that `room_assignments_ensure_hamper` creates.** Before
+  this, every run left a hotel, 3 rooms and 3 hampers. Today's leftovers were removed with a guarded
+  transaction (T2- hotels only, no assignments, no proofs).
+- `.env.test` now targets Mumbai. It carries the public URL/anon pair too, because
+  `tests/setup-env.ts` reads `.env.test` before `.env.local`, and `.env.local` is still Seoul.

@@ -121,8 +121,20 @@ describe.runIf(enabled)('T2 — venue reality', () => {
     // this suite dialled cannot be removed — that is by design, and those rows
     // are recognisable by the T2- prefix.
     if (!env) return
-    await sf.from('room_assignments').delete().eq('room_id', roomId)
-    await sf.from('rooms').delete().eq('id', roomId)
+    // Every room this file made sits in its own hotel (the T2.7 rooms too).
+    // Each room assignment fires room_assignments_ensure_hamper, which creates
+    // a ROOM-level hamper, and that hamper's FK keeps the room, and so the
+    // hotel, from being deleted. Without the deliverables step every run left
+    // a T2- hotel, three rooms and three hampers on the test event, and the
+    // per-test room deletes failed the same way. None of these hampers has a
+    // proof (proofs are insert-only and could not be removed).
+    const { data: testRooms } = await sf.from('rooms').select('id').eq('hotel_id', hotelId)
+    const roomIds = (testRooms ?? []).map((r) => r.id as string)
+    if (roomIds.length) {
+      await sf.from('room_assignments').delete().in('room_id', roomIds)
+      await sf.from('deliverables').delete().in('room_id', roomIds)
+      await sf.from('rooms').delete().in('id', roomIds)
+    }
     await sf.from('hotels').delete().eq('id', hotelId)
     if (guestIds.length) await sf.from('guests').delete().in('id', guestIds)
     const { data: attempts } = await sf.from('call_attempts').select('id').eq('group_id', groupId)

@@ -16,18 +16,27 @@ of §3, §11c and §12 still describes Vercel + Supabase Seoul; that is history.
 | APK | final-10, versionCode 10, `C:\android-builds\nuvent\eventflow-final-10.apk`, sha256 `df4aae71…` | final-09 and older load Vercel → Seoul |
 
 - **Build / deploy:** `npm run cf:build` then `npm run cf:deploy`, with
-  `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the
-  environment (`npx supabase projects api-keys --project-ref iqcihrhlopezwkecajan`).
+  `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and
+  `NEXT_PUBLIC_UI=v2` in the environment (`npx supabase projects api-keys
+  --project-ref iqcihrhlopezwkecajan`). cf-build refuses without all three.
   **Never** a bare `opennextjs-cloudflare build` — it bakes `.env*`, including
-  the Seoul service-role key in `.env.test`, into the Worker.
+  the service-role key in `.env.test`, into the Worker.
 - **APK release:** `CAP_SERVER_URL=https://eventflow-app.eventflow-web-app.workers.dev`
   is mandatory; the config defaults to localhost.
 - **Secrets:** `APP_JWT_SECRET` is a Worker secret (`wrangler secret put`) and an
   Edge Function secret, and equals EventFlow-IN's legacy JWT secret.
 - **Seoul is switched off**: its 6 `pg_net` webhook triggers are DISABLED (not
   dropped) and its `resume-stuck-transcriptions` cron job is unscheduled.
-- **`.env.test` still points at Seoul**, and `npm run test:run` writes fixtures
-  to its live test event E12345. Repoint it before trusting tests again.
+- **`.env.test` points at EventFlow-IN (Mumbai) since 25 October 2026**
+  (backup of the Seoul version: `.env.test.seoul.bak`). `npm run test:run`
+  writes and removes fixtures on test event E12345; `test:t1` / `test:t2` use
+  SAMPLE2026 + E00000. **Each T2 run leaves one `T2-…-family` on SAMPLE2026
+  forever**, because it dials it and call_attempts cannot be deleted (§5.4).
+  Run T2 deliberately, not in a loop. `.env.local` still points at Seoul, so
+  `npm run dev` talks to the archive until it is repointed. That needs the
+  Mumbai `APP_JWT_SECRET`, which only the owner has.
+- **Migrations:** `db push` works again. Remote history and
+  `supabase/migrations/` match (`20261003105439` was recovered from Seoul).
 - The workers.dev subdomain is **account-wide**; renaming it also moves the
   unrelated `varunya-jewells` Worker on the same Cloudflare account.
 - Full record: `DECISIONS.md`, 24 October 2026.
