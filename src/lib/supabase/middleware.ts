@@ -15,12 +15,23 @@ const PUBLIC_PATHS = ['/login', '/admin/login', '/auth', '/pick-staff']
  * session can exist, or it cannot tell you what is deployed when login itself
  * is the thing that is broken.
  *
- * It is kept OUT of PUBLIC_PATHS deliberately: that list also matches
- * `${p}/`, which would open every future `/api/version/*` route to anonymous
- * callers as a side effect. Exact-only means exposing a sub-route later has to
- * be a deliberate act rather than an inherited default.
+ * `/api/media/internal` is how `transcribe-recording` reads audio out of R2.
+ * It runs on Supabase with no session and no cookie, so the bounce to /login
+ * would hand it a redirect where it expects bytes — and the symptom would be
+ * "transcription silently stopped working for every new recording", with a
+ * 307 nobody thinks to look at. It is NOT unauthenticated: the route itself
+ * requires MEDIA_FETCH_SECRET and 404s without it. What is exempted here is
+ * the session wall, not the auth.
+ *
+ * (`public/install.html` and the import template `.xlsx` were the same class
+ * of bug, fixed in the proxy's matcher — see the note on `config` there.)
+ *
+ * Both are kept OUT of PUBLIC_PATHS deliberately: that list also matches
+ * `${p}/`, which would open every future sub-route to anonymous callers as a
+ * side effect. Exact-only means exposing a sub-route later has to be a
+ * deliberate act rather than an inherited default.
  */
-const PUBLIC_PATHS_EXACT = ['/api/version']
+const PUBLIC_PATHS_EXACT = ['/api/version', '/api/media/internal']
 
 /**
  * Refreshes the auth session on every request and bounces anonymous users to
