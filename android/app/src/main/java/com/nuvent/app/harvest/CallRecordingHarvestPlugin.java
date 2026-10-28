@@ -44,16 +44,131 @@ public class CallRecordingHarvestPlugin extends Plugin {
 
     private static final String TAG = "HarvestPlugin";
 
-    // H1 — known paths across common OEM dialers.
+    // H1 — known paths across common OEM dialers. The exact-hit fast path;
+    // anything not listed here is found by scanForRecordingFolders() below.
+    //
+    // NOTE ON Android/data: the Google Dialer writes to
+    // /storage/emulated/0/Android/data/com.google.android.dialer/files/CallRecordings
+    // and that path USED to be in this list. It was removed, not forgotten.
+    // Since Android 11 no app can read another app Android/data directory —
+    // MANAGE_EXTERNAL_STORAGE does not lift that one — so the entry could
+    // never match and only made the probe look thorough. Android/media is a
+    // different case and IS readable, which is why the Samsung entry below
+    // uses it.
     private static final String[] KNOWN_PATHS = {
+        // Xiaomi / Redmi / POCO (MIUI, HyperOS)
         "/storage/emulated/0/MIUI/sound_recorder/call_rec",
+        // Stock-ish Android, OnePlus, Nothing, Motorola
         "/storage/emulated/0/Recordings/Call",
-        "/storage/emulated/0/Record/PhoneRecord",
+        "/storage/emulated/0/Recordings/Call Recordings",
+        // Samsung One UI
         "/storage/emulated/0/Sounds/CallRecord",
+        "/storage/emulated/0/Sounds/Call Recordings",
+        "/storage/emulated/0/Android/media/com.samsung.android.app.telephonyui/CallRecording",
+        // Oppo / Realme / OnePlus (ColorOS, realme UI)
+        "/storage/emulated/0/Record/PhoneRecord",
+        "/storage/emulated/0/Record/Call",
+        "/storage/emulated/0/ColorOS/Record/Call",
+        "/storage/emulated/0/Music/Record/Call",
+        // Vivo / iQOO (Funtouch, OriginOS)
+        "/storage/emulated/0/Record/CallRecord",
+        // Huawei / Honor (EMUI, MagicOS)
+        "/storage/emulated/0/Recorder/call",
+        // Generic / third-party recorders
         "/storage/emulated/0/PhoneRecord",
+        "/storage/emulated/0/CallRecordings",
+        "/storage/emulated/0/CallRecorder",
+        "/storage/emulated/0/Call",
         "/storage/emulated/0/Music/Recordings",
-        "/storage/emulated/0/Android/data/com.google.android.dialer/files/CallRecordings",
     };
+
+    /**
+     * Roots the scan walks when the list above misses. Kept shallow and few:
+     * a full walk of external storage on a phone with 20k photos takes long
+     * enough that staff would believe the screen had hung.
+     */
+    private static final String[] SCAN_ROOTS = {
+        "/storage/emulated/0",
+        "/storage/emulated/0/Recordings",
+        "/storage/emulated/0/Sounds",
+        "/storage/emulated/0/Record",
+        "/storage/emulated/0/Music",
+        "/storage/emulated/0/Android/media",
+    };
+
+    /** Directories never worth descending — large, and never a dialer output. */
+    private static final String[] SCAN_SKIP = {
+        "Android/data", "Android/obb", "DCIM", "Pictures", "Movies", "Download",
+        "WhatsApp", "Telegram", ".thumbnails", "tencent", "MIUI/Gallery",
+    };
+
+    private static final int SCAN_MAX_DEPTH = 3;
+    private static final int SCAN_MAX_HITS = 12;
+
+    /**
+     * Find call-recording folders this build has never heard of.
+     *
+     * A hardcoded list only ever covers the handsets someone thought of, and
+     * this app ships to whatever ten cheap Androids the client hands out. So
+     * after the known paths, walk a few shallow roots looking for a directory
+     * whose NAME says what it holds — "call_rec", "PhoneRecord",
+     * "Call Recordings" and so on — and that actually contains audio.
+     *
+     * Requiring audio inside is what stops it matching an empty "Calls" folder
+     * left by a messaging app. The depth, root and hit caps are what stop it
+     * becoming a full-disk crawl on a phone full of photos.
+     */
+    private static void scanForRecordingFolders(File dir, int depth, List<String> out) {
+        if (out.size() >= SCAN_MAX_HITS || depth > SCAN_MAX_DEPTH) return;
+        if (dir == null || !dir.isDirectory() || !dir.canRead()) return;
+
+        String abs = dir.getAbsolutePath();
+        for (String skip : SCAN_SKIP) {
+            if (abs.contains("/" + skip)) return;
+        }
+
+        File[] children = dir.listFiles();
+        if (children == null) return;
+
+        for (File child : children) {
+            if (out.size() >= SCAN_MAX_HITS) return;
+            if (!child.isDirectory() || !child.canRead()) continue;
+            if (looksLikeCallRecordingDir(child.getName()) && containsAudio(child)) {
+                String path = child.getAbsolutePath();
+                if (!out.contains(path)) {
+                    out.add(path);
+                    Log.i(TAG, "Discovered by scan: " + path);
+                }
+                // Found it; its children are takes, not more folders.
+                continue;
+            }
+            scanForRecordingFolders(child, depth + 1, out);
+        }
+    }
+
+    /** "call_rec", "PhoneRecord", "Call Recordings" — same intent, many spellings. */
+    private static boolean looksLikeCallRecordingDir(String name) {
+        String n = name.toLowerCase().replace("_", "").replace("-", "").replace(" ", "");
+        boolean mentionsCall = n.contains("call") || n.contains("phone");
+        boolean mentionsRecording = n.contains("rec");
+        return mentionsCall && mentionsRecording;
+    }
+
+    /** At least one audio file, so an empty lookalike folder is not reported. */
+    private static boolean containsAudio(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) return false;
+        for (File f : files) {
+            if (!f.isFile()) continue;
+            String n = f.getName().toLowerCase();
+            if (n.endsWith(".m4a") || n.endsWith(".mp3") || n.endsWith(".amr")
+                || n.endsWith(".aac") || n.endsWith(".wav") || n.endsWith(".ogg")
+                || n.endsWith(".3gp") || n.endsWith(".3gpp") || n.endsWith(".mp4")) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     // H2 — FileObservers, held as strong references so GC does not reclaim them.
     private final List<FileObserver> observers = new ArrayList<>();
@@ -138,12 +253,25 @@ public class CallRecordingHarvestPlugin extends Plugin {
             }
         }
 
-        // Probe known OEM paths.
+        // Probe known OEM paths first — exact hits, no walking.
         for (String path : KNOWN_PATHS) {
             File dir = new File(path);
             if (dir.exists() && dir.isDirectory() && dir.canRead()) {
-                found.add(dir.getAbsolutePath());
+                String abs = dir.getAbsolutePath();
+                if (!found.contains(abs)) found.add(abs);
             }
+        }
+
+        // Then look for folders this build has never heard of. Runs even when
+        // the known paths hit: a phone can have both a stock recorder folder
+        // and a third-party one, and harvesting only the first would silently
+        // miss every call made through the other.
+        List<String> scanned = new ArrayList<>();
+        for (String root : SCAN_ROOTS) {
+            scanForRecordingFolders(new File(root), 0, scanned);
+        }
+        for (String path : scanned) {
+            if (!found.contains(path)) found.add(path);
         }
 
         JSArray arr = new JSArray();
