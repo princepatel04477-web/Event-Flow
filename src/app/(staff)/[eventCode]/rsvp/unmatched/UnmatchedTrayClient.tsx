@@ -96,7 +96,14 @@ export function UnmatchedTrayClient({
       })
 
       if (result.kind === 'matched') {
-        await markMatched(filePath, result.callAttemptId)
+        // A match no longer implies an in-app call attempt: a recording tied to
+        // a family by the number in its filename has none, because the call was
+        // dialled outside the app. Label it by group in that case, the same way
+        // `handleManualAttach` below labels a hand-attached file.
+        await markMatched(
+          filePath,
+          result.callAttemptId ?? `group:${result.groupId}`,
+        )
         setOpenPath(null)
         await load()
         return

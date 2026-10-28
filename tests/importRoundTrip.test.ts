@@ -86,6 +86,8 @@ function makeData(): ExportData {
     hotels: [],
     callAttempts: [],
     extractions: [],
+    recordings: [],
+    transcripts: [],
     profileNames: {},
     staffNames: {},
   }

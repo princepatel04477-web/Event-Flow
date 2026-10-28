@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 import { requireSection } from '@/lib/auth/section-guard'
 import { getViewer, resolveEventByCode } from '@/lib/supabase/queries'
 
+import { AutoCapture } from '@/components/harvest/AutoCapture'
+
 import { CallNext } from './CallNext'
 
 export const metadata: Metadata = {
@@ -46,12 +48,19 @@ export default async function CallNextPage({ params }: PageProps) {
   await requireSection(event.id, event.code, 'rsvp')
 
   return (
-    <CallNext
-      eventId={event.id}
-      eventCode={event.code}
-      startsOn={event.starts_on}
-      endsOn={event.ends_on}
-      isAdmin={viewer?.isAdmin ?? false}
-    />
+    <>
+      {/* Mounted HERE, on the screen staff keep open, because capture only runs
+          while its component is mounted — a WebView cannot watch the filesystem
+          in the background. On anything that is not the APK it renders nothing,
+          so the web app and the dev browser are unaffected. */}
+      <AutoCapture eventId={event.id} eventCode={event.code} />
+      <CallNext
+        eventId={event.id}
+        eventCode={event.code}
+        startsOn={event.starts_on}
+        endsOn={event.ends_on}
+        isAdmin={viewer?.isAdmin ?? false}
+      />
+    </>
   )
 }

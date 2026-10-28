@@ -157,6 +157,8 @@ function fixture(): ExportData {
     hotels: [],
     callAttempts: [],
     extractions: [],
+    recordings: [],
+    transcripts: [],
     profileNames: {},
     staffNames: {},
   }

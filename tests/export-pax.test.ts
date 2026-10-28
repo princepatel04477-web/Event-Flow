@@ -159,6 +159,8 @@ function makeData(): ExportData {
     staffNames: {},
     callAttempts: [],
     extractions: [],
+    recordings: [],
+    transcripts: [],
   }
 }
 

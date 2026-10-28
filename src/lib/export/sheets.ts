@@ -23,6 +23,7 @@ export type RoomRow = Database['public']['Tables']['rooms']['Row']
 export type HotelRow = Database['public']['Tables']['hotels']['Row']
 export type CallAttemptRow = Database['public']['Tables']['call_attempts']['Row']
 export type RsvpExtractionRow = Database['public']['Tables']['rsvp_extractions']['Row']
+export type CallRecordingRow = Database['public']['Tables']['call_recordings']['Row']
 
 // ---------------------------------------------------------------------------
 // Sheet row shapes
@@ -143,6 +144,26 @@ export interface DepartureManifestRow {
   rsvpStatus: string
 }
 
+export interface RecordingExportRow {
+  recordingIndex: number
+  headName: string
+  phone: string
+  recordedAt: string
+  durationSec: number | null
+  source: string
+  transcriptStatus: string
+  language: string
+  transcriptText: string
+  extractionStatus: string
+  audioFile: string
+  /**
+   * Drives the amber row. A boolean rather than re-reading the formatted
+   * `transcriptStatus` string, so relabelling the status copy cannot silently
+   * stop the highlighting.
+   */
+  transcriptComplete: boolean
+}
+
 // ---------------------------------------------------------------------------
 // Fetching
 // ---------------------------------------------------------------------------
@@ -158,10 +179,29 @@ export interface ExportData {
   hotels: HotelRow[]
   callAttempts: CallAttemptRow[]
   extractions: RsvpExtractionRow[]
+  recordings: CallRecordingRow[]
+  transcripts: TranscriptExportRow[]
   /** profiles keyed by user id -> display name, for "delivered by". */
   profileNames: Record<string, string>
   /** staff members keyed by id -> name, for code-auth proof attribution. */
   staffNames: Record<string, string>
+}
+
+/**
+ * Minimal transcript shape the export needs. NOT the full table row: the
+ * query leaves out `raw_response`, which keeps the entire untrimmed Sarvam
+ * payload so STT never has to be paid for twice, and is megabytes per call
+ * that no cell ever shows.
+ */
+export interface TranscriptExportRow {
+  id: string
+  recording_id: string
+  status: string
+  error_text: string | null
+  language: string | null
+  full_text: string | null
+  text: string
+  created_at: string
 }
 
 /** Minimal guest shape the export needs (member names per bed). */
@@ -649,6 +689,127 @@ export function buildDepartureManifestRows(data: ExportData): DepartureManifestR
     .map(({ dateValue: _, ...rest }) => rest)
 
   return rows
+}
+
+// ---------------------------------------------------------------------------
+// Sheet 10 — Recordings (one row per captured note, with how far it got)
+// ---------------------------------------------------------------------------
+
+const RECORDING_SOURCE_LABELS: Record<string, string> = {
+  voice_note: 'Voice note',
+  harvested: 'Harvested',
+}
+
+const TRANSCRIPT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Queued',
+  processing: 'Transcribing',
+  complete: 'Complete',
+  failed: 'Failed',
+}
+
+const EXTRACTION_STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  pending: 'Awaiting review',
+  in_review: 'In review',
+  accepted: 'Accepted',
+  committed: 'Applied',
+  rejected: 'Rejected',
+  superseded: 'Superseded',
+}
+
+/** Excel rejects a cell over 32,767 characters. A long transcript can reach it. */
+const CELL_TEXT_LIMIT = 32000
+
+/**
+ * The audio trail. Every other sheet shows what the data BECAME; this one
+ * shows where each recording stopped — uploaded, transcribed, extracted, or
+ * still waiting on a human. A family whose answers are sitting in an
+ * un-transcribed file looks identical to one nobody called, on every sheet
+ * but this one.
+ *
+ * It deliberately does NOT re-state the RSVP outcome: a recording is evidence,
+ * and only a reviewed extraction becomes data (§5.8). Reading an answer off
+ * this sheet instead of the review screen would be reading the evidence as if
+ * it were the record.
+ */
+export function buildRecordingRows(data: ExportData): RecordingExportRow[] {
+  const groupById = new Map(data.groups.map((g) => [g.id, g]))
+  const attemptById = new Map(data.callAttempts.map((a) => [a.id, a]))
+
+  // A recording can carry several transcripts — the webhook retries 5xx three
+  // times and each attempt inserts a row. The newest describes the recording's
+  // current state; the earlier ones are history, not contradictions.
+  const transcriptByRecording = new Map<string, TranscriptExportRow>()
+  for (const t of data.transcripts) {
+    const held = transcriptByRecording.get(t.recording_id)
+    if (!held || new Date(t.created_at) > new Date(held.created_at)) {
+      transcriptByRecording.set(t.recording_id, t)
+    }
+  }
+
+  // Same for extractions. Re-running extraction over one transcript is cheap
+  // (~Rs 0.03) and supersedes rather than replaces, so take the newest.
+  const extractionByTranscript = new Map<string, RsvpExtractionRow>()
+  for (const e of data.extractions) {
+    if (!e.transcript_id) continue
+    const held = extractionByTranscript.get(e.transcript_id)
+    if (!held || new Date(e.created_at) > new Date(held.created_at)) {
+      extractionByTranscript.set(e.transcript_id, e)
+    }
+  }
+
+  return data.recordings
+    .slice()
+    .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
+    .map((r, i) => {
+      const group = r.group_id ? groupById.get(r.group_id) : undefined
+      const attempt = r.call_attempt_id ? attemptById.get(r.call_attempt_id) : undefined
+      const transcript = transcriptByRecording.get(r.id)
+      const extraction = transcript ? extractionByTranscript.get(transcript.id) : undefined
+
+      // A bare "Failed" sends someone hunting for a bug. `too_short` is the
+      // deliberate under-10s skip and needs no investigation at all, so the
+      // reason travels with the status rather than living in a column nobody
+      // widens.
+      let transcriptStatus: string
+      if (!transcript) {
+        transcriptStatus = 'Not transcribed'
+      } else {
+        const label = TRANSCRIPT_STATUS_LABELS[transcript.status] ?? transcript.status
+        transcriptStatus =
+          transcript.status === 'failed' && transcript.error_text
+            ? `${label} - ${transcript.error_text}`
+            : label
+      }
+
+      // `full_text` is the real transcript; `text` is the NOT NULL legacy
+      // column that holds '' until Sarvam completes. Prefer the former and
+      // fall back, rather than printing an empty cell for a finished call.
+      const text = transcript?.full_text || transcript?.text || ''
+
+      return {
+        recordingIndex: i + 1,
+        headName: group?.head_name ?? 'Unknown',
+        // The dialled number is what this recording is OF. The family's listed
+        // mobile is only a fallback for a recording with no attempt behind it
+        // (a harvested file, or a row filed before the attempt existed).
+        phone: attempt?.dialed_number ?? group?.primary_mobile ?? '',
+        recordedAt: r.recorded_at,
+        durationSec: r.duration_sec,
+        source: RECORDING_SOURCE_LABELS[r.source] ?? r.source,
+        transcriptStatus,
+        language: transcript?.language ?? '',
+        transcriptText:
+          text.length > CELL_TEXT_LIMIT
+            ? `${text.slice(0, CELL_TEXT_LIMIT)} [truncated - read the full transcript in the app]`
+            : text,
+        extractionStatus: extraction
+          ? (EXTRACTION_STATUS_LABELS[extraction.status] ?? extraction.status)
+          : '-',
+        audioFile: r.storage_path,
+        transcriptComplete: transcript?.status === 'complete',
+      }
+    })
 }
 
 // ---------------------------------------------------------------------------

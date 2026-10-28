@@ -15,6 +15,13 @@ export interface HarvestLedgerEntry {
   callRecordingId?: string
   firstSeenAt: number
   lastError?: string
+  /**
+   * The Storage path a previous attempt already claimed for this file. Reused
+   * on every retry so a half-finished upload resumes onto the same object
+   * instead of scattering orphans through a bucket that has no delete policy.
+   * Not indexed, so it needs no Dexie version bump.
+   */
+  storagePath?: string
 }
 
 /**
@@ -73,6 +80,15 @@ export async function markMatched(path: string, callRecordingId: string): Promis
       status: 'matched',
       callRecordingId,
     })
+  } catch {
+    // Row may have been removed.
+  }
+}
+
+/** Claim a Storage path for this file before the upload starts. */
+export async function rememberStoragePath(path: string, storagePath: string): Promise<void> {
+  try {
+    await db.harvest_seen.update(path, { storagePath })
   } catch {
     // Row may have been removed.
   }

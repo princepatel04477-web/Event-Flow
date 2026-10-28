@@ -46,6 +46,15 @@ export async function readExportData(eventId: string): Promise<ExportDataResult>
     // Call log + extraction audit (N6 export sheets 6-8)
     supabase.from('call_attempts').select('*').eq('event_id', eventId),
     supabase.from('rsvp_extractions').select('*').eq('event_id', eventId),
+    // The audio trail (Recordings sheet). `transcripts` is fetched without
+    // `raw_response` on purpose: it keeps the ENTIRE Sarvam payload untrimmed
+    // (so STT never has to be re-run), which is megabytes per call and none of
+    // it reaches a cell.
+    supabase.from('call_recordings').select('*').eq('event_id', eventId),
+    supabase
+      .from('transcripts')
+      .select('id, recording_id, event_id, status, error_text, language, full_text, text, created_at')
+      .eq('event_id', eventId),
   ])
 
   const failure = rest.find((r) => r.error)
@@ -53,7 +62,7 @@ export async function readExportData(eventId: string): Promise<ExportDataResult>
     return { ok: false, message: `Could not read export data: ${failure.error.message}` }
   }
 
-  const [groups, guests, legs, deliverables, proofs, assignments, rooms, hotels, profiles, staffMembers, callAttempts, extractions] = rest
+  const [groups, guests, legs, deliverables, proofs, assignments, rooms, hotels, profiles, staffMembers, callAttempts, extractions, recordings, transcripts] = rest
 
   const profileNames: Record<string, string> = {}
   for (const p of profiles.data ?? []) {
@@ -81,6 +90,8 @@ export async function readExportData(eventId: string): Promise<ExportDataResult>
       hotels: hotels.data ?? [],
       callAttempts: callAttempts.data ?? [],
       extractions: extractions.data ?? [],
+      recordings: recordings.data ?? [],
+      transcripts: transcripts.data ?? [],
       profileNames,
       staffNames,
     },

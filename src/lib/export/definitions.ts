@@ -14,6 +14,7 @@ import {
   buildRoomAllocationRows,
   buildArrivalManifestRows,
   buildDepartureManifestRows,
+  buildRecordingRows,
   type CallLogRow,
   type DeliverableRowExport,
   type ExceptionRow,
@@ -23,6 +24,7 @@ import {
   type HamperRoomExportRow,
   type ArrivalManifestRow,
   type DepartureManifestRow,
+  type RecordingExportRow,
   type RoomAllocationRow,
 } from './sheets'
 
@@ -46,6 +48,7 @@ export function buildSheetDefinitions(data: ExportData): ExportSheetDefinition[]
   const callLogRows = buildCallLogRows(data)
   const arrivalRows = buildArrivalManifestRows(data)
   const departureRows = buildDepartureManifestRows(data)
+  const recordingRows = buildRecordingRows(data)
 
   return [
     guestMasterSheet(guestMasterRows),
@@ -57,6 +60,7 @@ export function buildSheetDefinitions(data: ExportData): ExportSheetDefinition[]
     callLogSheet(callLogRows),
     arrivalManifestSheet(arrivalRows),
     departureManifestSheet(departureRows),
+    recordingsSheet(recordingRows),
   ]
 }
 
@@ -275,5 +279,40 @@ function departureManifestSheet(rows: DepartureManifestRow[]): AnySheetDefinitio
       { key: 'rsvpStatus', header: 'RSVP', type: 'string', width: 14 },
     ],
     headerNote: 'All times IST · Sorted by departure',
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sheet 10 — Recordings
+//
+// Appended rather than slotted in beside the Call Log: the import template is
+// generated from this same list, and people navigate the workbook by tab
+// position. A new last tab is additive; reordering moves every tab after it.
+// ---------------------------------------------------------------------------
+
+function recordingsSheet(rows: RecordingExportRow[]): AnySheetDefinition {
+  return {
+    name: 'Recordings',
+    rows,
+    columns: [
+      { key: 'recordingIndex', header: '#', type: 'number', width: 5 },
+      { key: 'headName', header: 'Family head', type: 'string', width: 28 },
+      { key: 'phone', header: 'Phone', type: 'string', width: 16 },
+      { key: 'recordedAt', header: 'Recorded', type: 'string', width: 18 },
+      { key: 'durationSec', header: 'Duration (s)', type: 'number', width: 12 },
+      { key: 'source', header: 'Source', type: 'string', width: 12 },
+      { key: 'transcriptStatus', header: 'Transcript', type: 'string', width: 24 },
+      { key: 'language', header: 'Lang', type: 'string', width: 6 },
+      { key: 'extractionStatus', header: 'Extraction', type: 'string', width: 16 },
+      { key: 'transcriptText', header: 'Transcript text', type: 'text', width: 60 },
+      { key: 'audioFile', header: 'Audio file', type: 'text', width: 44 },
+    ],
+    // Audio with no finished transcript is the actionable row: the family's
+    // answers exist and nobody has read them. See `rooming-list.ts` for why
+    // the parameter is `unknown` and narrowed.
+    isException: (row: unknown) => !(row as RecordingExportRow).transcriptComplete,
+    headerNote:
+      'All times IST · Audio file is the path inside the private call-recordings bucket · ' +
+      'Amber = no finished transcript',
   }
 }

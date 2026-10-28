@@ -32,6 +32,8 @@ export function emptyExportData(): ExportData {
     hotels: [],
     callAttempts: [],
     extractions: [],
+    recordings: [],
+    transcripts: [],
     profileNames: {},
     staffNames: {},
   }

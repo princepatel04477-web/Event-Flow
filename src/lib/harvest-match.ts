@@ -14,7 +14,19 @@ export type MatchInput = {
 }
 
 export type MatchResult =
-  | { kind: 'matched'; callAttemptId: string; groupId: string; eventId: string }
+  | {
+      kind: 'matched'
+      /**
+       * Null when the call was dialled outside the app. `call_recordings`
+       * allows it, and the alternative — refusing the audio because no row
+       * exists — throws away the only record of the call.
+       */
+      callAttemptId: string | null
+      groupId: string
+      eventId: string
+      /** How the file was tied to a family, for the staff-facing status line. */
+      via: 'call-window' | 'filename-phone'
+    }
   | { kind: 'unmatched'; reason: string }
   | { kind: 'error'; message: string }
 
@@ -36,6 +48,25 @@ export type MatchResult =
  * The caller must also provide the event_id to scope the search.
  */
 export async function matchRecording(
+  input: MatchInput & { eventId: string }
+): Promise<MatchResult> {
+  const windowed = await matchByCallWindow(input)
+  if (windowed.kind !== 'unmatched') return windowed
+
+  // Nothing in the call log lines up with this file. That is the NORMAL case
+  // for a call placed from the phone's own dialer: the app never ran, so no
+  // `call_attempts` row was ever written. Falling back to the number in the
+  // filename is what makes the dialer workflow possible at all — without it,
+  // every such recording lands in the unmatched tray forever.
+  const phoneMatch = await matchByFilenamePhone(input)
+  if (phoneMatch.kind !== 'unmatched') return phoneMatch
+
+  // Report the window reason, not the phone reason: the window is the precise
+  // test and its message names the timestamp that failed.
+  return windowed
+}
+
+async function matchByCallWindow(
   input: MatchInput & { eventId: string }
 ): Promise<MatchResult> {
   const supabase = await createClient()
@@ -77,6 +108,7 @@ export async function matchRecording(
       callAttemptId: c.id,
       groupId: c.group_id,
       eventId: input.eventId,
+      via: 'call-window',
     }
   }
 
@@ -138,6 +170,69 @@ export async function matchRecording(
     callAttemptId: matchedCall.id,
     groupId: matchedCall.group_id,
     eventId: input.eventId,
+    via: 'call-window',
+  }
+}
+
+/**
+ * Tie a file to a family by the number in its filename.
+ *
+ * Only ever reached when the call log has nothing in the window, so it cannot
+ * steal a file from a real in-app attempt. It matches against BOTH numbers on
+ * the group: staff dial the alternate number often enough that primary-only
+ * matching would push those recordings into the tray for no reason.
+ *
+ * Ambiguity is refused rather than guessed. Two families sharing a mobile is
+ * rare but real (a father and son on one number), and filing a recording
+ * against the wrong family puts one family's answers in another's record,
+ * where the review screen will read them as that family's own.
+ */
+async function matchByFilenamePhone(
+  input: MatchInput & { eventId: string }
+): Promise<MatchResult> {
+  const raw = extractPhoneFromFilename(input.filePath)
+  const phone = normalisePhone(raw)
+  if (!phone) {
+    return {
+      kind: 'unmatched',
+      reason: 'No call in the time window, and the filename carries no phone number.',
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: groups, error } = await supabase
+    .from('guest_groups')
+    .select('id, primary_mobile, alt_mobile')
+    .eq('event_id', input.eventId)
+
+  if (error) {
+    return { kind: 'error', message: `Could not read the guest list: ${error.message}` }
+  }
+
+  const hits = (groups ?? []).filter(
+    (g) =>
+      normalisePhone(g.primary_mobile) === phone || normalisePhone(g.alt_mobile) === phone,
+  )
+
+  if (hits.length === 0) {
+    return {
+      kind: 'unmatched',
+      reason: `No call in the time window, and ${phone} is not a number on this event's guest list.`,
+    }
+  }
+  if (hits.length > 1) {
+    return {
+      kind: 'unmatched',
+      reason: `${phone} belongs to ${hits.length} families, so this recording was not filed against a guess.`,
+    }
+  }
+
+  return {
+    kind: 'matched',
+    callAttemptId: null,
+    groupId: hits[0].id,
+    eventId: input.eventId,
+    via: 'filename-phone',
   }
 }
 
