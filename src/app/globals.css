@@ -46,9 +46,10 @@
    The names are unchanged, deliberately: every screen reads these token
    names, which is the same property that lets the whole re-skin land here
    rather than across 76 routes. Values moved from paper/maroon to
-   bone/indigo/haldi; the display face moved from Bricolage Grotesque to
-   Instrument Serif, the body from Figtree to Geist, figures from IBM Plex
-   Mono to Geist Mono; radii grew (cards 20→24, sheets 32); motion moved to
+   bone/indigo/haldi; the body moved from Figtree to Geist and figures from
+   IBM Plex Mono to Geist Mono; the separate display face (Bricolage
+   Grotesque, then Instrument Serif) was dropped and `--font-display` now
+   points at Geist too; radii grew (cards 20→24, sheets 32); motion moved to
    90/160/240ms on an out-expo curve. REVERT: restore this file, `layout.tsx`
    and `src/lib/motion/tokens.ts` from the commit before this re-skin.
 
@@ -155,8 +156,8 @@
   --ef-text-xl: 1.5rem;     /* 24px — display */
   --ef-text-2xl: 1.75rem;   /* 28px — the one thing on the screen */
 
-  /* The screen title: 32px Instrument Serif. Its own token because "the
-     title of the screen" is a decision, not a step on the body scale. */
+  /* The screen title: 32px. Its own token because "the title of the screen"
+     is a decision, not a step on the body scale. */
   --ef-text-title: 2rem;
 
   /* Eyebrow tracking. v3 keeps the small tracked label for the marigold
@@ -299,10 +300,11 @@
 
   /* Type roles (UI4 "Haldi & Ink").
      - sans: Geist. Body, rows, buttons, every label.
-     - display: Instrument Serif. Screen titles, the one hero number, the
-       Now-card headline, empty-state titles. One weight (400) — the serif
-       carries the emphasis, so a `font-semibold` beside `font-display` must
-       not be faked (see `font-synthesis` on `.font-display` below).
+     - display: Geist, the same family as the body. Screen titles, the one
+       hero number, the Now-card headline, empty-state titles. The serif that
+       used to sit here was dropped on request; size, weight and tracking
+       carry the hierarchy instead, which is why `font-display` is still a
+       separate token and not a find-and-replace across 43 files.
      - The Devanagari and Gujarati cuts stay immediately after the Latin
        face. Family names come off the Excel sheet in Hindi and Gujarati
        ("शर्मा परिवार", "રમેશભાઈ શાહ") inline with Latin on the same row, and
@@ -312,8 +314,9 @@
   --font-sans: var(--font-geist), var(--font-plex-devanagari), var(--font-noto-gujarati),
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Noto Sans", "Noto Sans Devanagari", sans-serif;
-  --font-display: var(--font-instrument-serif), var(--font-plex-devanagari),
-    var(--font-noto-gujarati), ui-serif, Georgia, "Times New Roman", serif;
+  --font-display: var(--font-geist), var(--font-plex-devanagari),
+    var(--font-noto-gujarati), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Noto Sans", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono",
     SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
@@ -397,13 +400,19 @@
     outline-offset: 2px;
   }
 
-  /* Instrument Serif ships ONE weight. Screens written for the old display
-     face pair `font-display` with `font-semibold`/`font-bold`; without this
-     the WebView fakes a bold by smearing the outline, which on a serif reads
-     as a printing fault. The serif carries the emphasis on its own. */
+  /* `font-synthesis: none` stays, for a different reason than it was added.
+     It guarded a single-weight serif from having a bold smeared onto it by
+     the WebView; Geist ships 400-700, so every weight these screens ask for
+     is now a real one and nothing needs faking. Keeping the rule means a
+     future weight that ISN'T loaded fails visibly rather than quietly
+     rendering a synthetic one.
+
+     Oblique is explicitly off: the display face must never slant, including
+     where a parent sets `italic`. */
   .font-display {
     font-synthesis: none;
-    letter-spacing: -0.01em;
+    font-style: normal;
+    letter-spacing: -0.015em;
   }
 }
 

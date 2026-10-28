@@ -76,7 +76,7 @@ class Boundary extends Component<Props, State> {
         }}
       >
         <div style={{ maxWidth: 360, textAlign: 'center' }}>
-          <h1 style={{ fontFamily: 'Caprasimo, Georgia, serif', fontSize: 24, margin: '0 0 8px' }}>
+          <h1 style={{ fontFamily: 'Geist, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', fontSize: 24, margin: '0 0 8px' }}>
             Something went wrong
           </h1>
           <p style={{ margin: '0 0 20px', color: '#4a5568' }}>

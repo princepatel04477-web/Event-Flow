@@ -95,7 +95,7 @@ export function WarningsList({ warnings }: WarningsListProps) {
                   {w.rawValue ? (
                     <p className="mt-0.5 truncate font-mono text-sm text-fg">“{w.rawValue}”</p>
                   ) : (
-                    <p className="mt-0.5 text-sm italic text-subtle">(cell was empty)</p>
+                    <p className="mt-0.5 text-sm text-subtle">(cell was empty)</p>
                   )}
                   <p className="mt-0.5 text-sm leading-snug text-muted">{w.action}</p>
                 </li>

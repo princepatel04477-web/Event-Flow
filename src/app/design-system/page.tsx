@@ -392,7 +392,7 @@ function Ui4Shell() {
       <div className="rounded-2xl bg-now p-5 text-now-fg shadow-e2">
         <p className="eyebrow text-highlight">Today</p>
         <p className="mt-2 font-display text-[4.5rem] leading-none">
-          412 <span className="text-3xl italic text-now-muted">guests</span>
+          412 <span className="text-3xl text-now-muted">guests</span>
         </p>
         <p className="mt-2 text-base text-now-muted">from 238 families · 62 still to call</p>
       </div>

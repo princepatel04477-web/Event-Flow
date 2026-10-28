@@ -194,7 +194,7 @@ export default async function AppHomePage({ params }: PageProps) {
             <p className="eyebrow text-highlight">Total PAX</p>
             <p className="mt-2 font-display text-[4rem] leading-none">
               <span className="tabular-nums">{numbers.totalPax}</span>{' '}
-              <span className="text-3xl italic text-now-muted">PAX</span>
+              <span className="text-3xl text-now-muted">PAX</span>
             </p>
             <p className="mt-2 text-base text-now-muted">
               {numbers.totalGroups} {numbers.totalGroups === 1 ? 'family' : 'families'}

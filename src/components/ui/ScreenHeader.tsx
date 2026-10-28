@@ -106,7 +106,7 @@ export function ScreenHeader({
       )}
     >
       {/* ~68px of content: a 28px event pill (or 20px context line) over a
-          35px serif title, on 4px padding. Deliberately not taller — at 360px
+          35px title, on 4px padding. Deliberately not taller — at 360px
           every pixel here is a pixel the list below does not get. */}
       <div className="mx-auto flex w-full max-w-[480px] items-center gap-2 px-4 py-2">
         {backHref ? (

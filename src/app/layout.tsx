@@ -3,7 +3,6 @@ import {
   Geist,
   Geist_Mono,
   IBM_Plex_Sans_Devanagari,
-  Instrument_Serif,
   Noto_Sans_Gujarati,
 } from 'next/font/google'
 import type { ReactNode } from 'react'
@@ -49,24 +48,17 @@ import './globals.css'
  */
 
 /**
- * Display (UI4 "Haldi & Ink") — screen titles, the one hero number, the
- * Now-card headline, empty-state titles. Instrument Serif has a single
- * weight; the italic is loaded for the hero number's unit word ("412
- * *guests*") and nothing else. See `.font-display` in globals.css for why a
- * bold is never synthesised.
- */
-const instrumentSerif = Instrument_Serif({
-  subsets: ['latin'],
-  weight: '400',
-  style: ['normal', 'italic'],
-  variable: '--font-instrument-serif',
-  display: 'swap',
-})
-
-/**
- * Body — every row, label, button and paragraph. 400 for body, 500/600 for
- * emphasis and labels, 700 for the rare bold. Nothing else is loaded: each
- * extra weight is another file over venue Wi-Fi.
+ * Body AND display — every row, label, button and paragraph, and since the
+ * display serif was dropped, the screen titles and hero numbers too.
+ *
+ * Instrument Serif used to be loaded here for `--font-display`, in a normal
+ * and an italic cut. Both are gone: the serif was not wanted, and the italic
+ * only ever carried the hero number's unit word ("15 *PAX*"). Dropping them
+ * takes two font files off the critical path on venue Wi-Fi, which is the one
+ * place this app can least afford them.
+ *
+ * 400 for body, 500/600 for emphasis and labels, 700 for the rare bold.
+ * Nothing else is loaded: each extra weight is another file over venue Wi-Fi.
  */
 const geist = Geist({
   subsets: ['latin'],
@@ -109,12 +101,11 @@ const geistMono = Geist_Mono({
 })
 
 /**
- * UI4 replaced Bricolage Grotesque + Figtree + IBM Plex Mono with Instrument
- * Serif + Geist + Geist Mono. Three Latin families, as before; the two Indic
- * cuts are load-bearing (see the token comments in globals.css).
+ * Two Latin families now — Geist for everything that reads as text, Geist Mono
+ * for every figure. The two Indic cuts are load-bearing (see the token
+ * comments in globals.css).
  */
 const fontVariables = [
-  instrumentSerif.variable,
   geist.variable,
   plexDevanagari.variable,
   notoGujarati.variable,
