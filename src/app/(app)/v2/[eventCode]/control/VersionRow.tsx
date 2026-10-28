@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
 /**
@@ -11,9 +11,18 @@ import { useEffect, useRef, useState } from 'react'
  * non-technical organiser tapped into it. It now takes a deliberate 700ms press
  * on this line (pointer events, no library), which a developer knows to do and
  * an organiser never does by accident.
+ *
+ * The press now opens the CAPTURE TEST rather than `/admin/harvest-debug`.
+ * Both are developer tools, but only one of them a staff member can open: the
+ * harvest debug screen is under `(admin)`, so a code-auth team session — every
+ * phone on the calling floor — gets nothing at all (CLAUDE.md §12). Since the
+ * question the tool answers is "does capture work on THIS handset", a door
+ * only the developer's own login can open tests the one phone nobody doubted.
+ * An admin can still reach harvest debug by URL.
  */
 export function VersionRow() {
   const router = useRouter()
+  const params = useParams<{ eventCode: string }>()
   const [commit, setCommit] = useState<string | null>(null)
   const timer = useRef<number | null>(null)
 
@@ -39,7 +48,10 @@ export function VersionRow() {
     <p
       onPointerDown={() => {
         cancel()
-        timer.current = window.setTimeout(() => router.push('/admin/harvest-debug'), 700)
+        timer.current = window.setTimeout(
+          () => router.push(`/${params.eventCode}/control/capture-test`),
+          700,
+        )
       }}
       onPointerUp={cancel}
       onPointerLeave={cancel}

@@ -85,6 +85,12 @@ const REPLACED_BY_V7 = {
  */
 const NEW_IN_V8 = new Set([
   'find', // one box that finds anyone — no legacy screen does this
+  // Per-handset check for automatic call capture. There is no legacy
+  // counterpart because the legacy equivalent, `/admin/harvest-debug`, is in
+  // the ADMIN tree rather than the event tree — and being admin-only is
+  // precisely why it could not answer the question this screen exists for
+  // ("does capture work on the phone the caller is holding?").
+  'control/capture-test',
 ])
 
 /**
