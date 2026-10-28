@@ -1,6 +1,8 @@
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 
 import { supabase } from '@/lib/supabase/client'
+import { uploadMedia } from '@/lib/media/client'
+import { r2BucketValue } from '@/lib/media/names'
 import { readStoredClaims } from '@/lib/native/session-keeper'
 
 /**
@@ -250,17 +252,23 @@ export async function submitProof({ eventId, deliverableId, dataUrl, idempotency
   const path = `${eventId}/${deliverableId}/${key}.jpg`
 
   const bytes = dataUrlToBlob(dataUrl)
-  const { error: uploadError } = await supabase.storage
-    .from('delivery-proofs')
-    .upload(path, bytes, { contentType: 'image/jpeg', upsert: false })
-  if (uploadError) throw uploadError
+  // The idempotency key is in the object key, so a re-flush of the same proof
+  // overwrites identical bytes rather than creating a second object. The row
+  // insert below is what actually deduplicates, on its unique storage_path.
+  const uploaded = await uploadMedia({
+    bucket: 'eventflow-delivery-proofs',
+    key: path,
+    blob: bytes,
+    contentType: 'image/jpeg',
+  })
+  if (!uploaded.ok) throw new Error(uploaded.error)
 
   const { data: row, error: insertError } = await supabase
     .from('delivery_proofs')
     .insert({
       event_id: eventId,
       deliverable_id: deliverableId,
-      storage_bucket: 'delivery-proofs',
+      storage_bucket: r2BucketValue('eventflow-delivery-proofs'),
       storage_path: path,
       // Code session: attribute to the selected staff member. Admin: the
       // real auth uid. The column default is app.current_identity(), but we

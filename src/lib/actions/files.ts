@@ -130,12 +130,25 @@ export async function listExports(eventId: string): Promise<ExportFileRow[]> {
 }
 
 /**
- * A fresh one-hour URL for a stored file.
+ * A URL for a stored file.
  *
- * No ownership check in TypeScript on purpose: `createSignedUrl` only succeeds
- * when the caller's storage policies allow reading the object, and those fence
- * by the event id in the path — so an outsider cannot sign another event's file
- * by guessing the path.
+ * Still no ownership check here, but the reason CHANGED when exports moved to
+ * R2 and this comment has to change with it. It used to be true that
+ * `createSignedUrl` only succeeded when Supabase's storage policies allowed
+ * the read, so the fence was in the database and this function could not
+ * widen it.
+ *
+ * R2 has no such policies. What comes back now is a route, not a signed URL,
+ * and `/api/media` re-derives the event id from the key and checks staff
+ * access on EVERY request — so an outsider still cannot read another event's
+ * file by guessing the path, but the check now lives in
+ * `src/app/api/media/route.ts` rather than in Postgres. If that route's
+ * `assertStaffOnKey` is ever weakened, this function is one of the things it
+ * stops protecting.
+ *
+ * One way it is stricter than before: a signed URL stayed valid for its full
+ * hour even after the staff member's access code was revoked. A route does
+ * not.
  */
 export async function signExport(path: string): Promise<string | null> {
   return storageAdapter().signedUrl(path, SIGNED_URL_TTL_SECONDS)

@@ -1,5 +1,6 @@
 import path from 'node:path'
 
+import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare'
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
@@ -80,5 +81,16 @@ const nextConfig: NextConfig = {
     '172.16.0.0/12',
   ],
 }
+
+/**
+ * Makes the Worker's bindings (R2, D1) reachable from `next dev`.
+ *
+ * Without it `getCloudflareContext()` throws in development, so every media
+ * upload and read would work when deployed and fail on the laptop — the worst
+ * split there is, because it is the deployed half nobody can step through.
+ * Wrangler simulates the bindings locally; R2 objects written in dev land in
+ * `.wrangler/state`, not in the real bucket.
+ */
+initOpenNextCloudflareForDev()
 
 export default nextConfig

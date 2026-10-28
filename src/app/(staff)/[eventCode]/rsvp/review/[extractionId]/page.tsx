@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 
 import { ChevronLeftIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
+import { mediaReadUrl } from '@/lib/media/read'
 import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import {
   RSVP_STATUS_LABELS,
@@ -280,15 +281,12 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       if (t.recording_id) {
         const { data: rec } = await supabase
           .from('call_recordings')
-          .select('storage_path')
+          .select('storage_path, storage_bucket')
           .eq('id', t.recording_id)
           .eq('event_id', event.id)
           .maybeSingle()
         if (rec?.storage_path) {
-          const { data: signed } = await supabase.storage
-            .from('call-recordings')
-            .createSignedUrl(rec.storage_path, 3600)
-          audioUrl = signed?.signedUrl ?? null
+          audioUrl = await mediaReadUrl(rec.storage_bucket, rec.storage_path)
         }
       }
     }

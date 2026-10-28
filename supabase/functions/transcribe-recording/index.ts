@@ -818,20 +818,49 @@ async function runTranscription(rec: RecordingRow, transcriptId: string, resumeJ
   let jobId = resumeJobId
 
   if (!jobId) {
-    // 5a. Signed URL → download server-side. Audio never streams through the
-    //     client; the bucket is private and stays private.
-    const { data: signed, error: signErr } = await db.storage
-      .from(rec.storage_bucket)
-      .createSignedUrl(rec.storage_path, SIGNED_URL_TTL_SEC)
+    // 5a. Fetch the audio server-side. It never streams through the client;
+    //     the store is private either way.
+    //
+    //     TWO STORES, PERMANENTLY. Rows written before the R2 cutover name a
+    //     Supabase bucket and are signed here as they always were. Rows
+    //     written after name `r2:<bucket>`, which this function cannot reach
+    //     directly — R2 is a Worker binding, not a public API — so the Worker
+    //     lends it the bytes over MEDIA_FETCH_SECRET. `call_recordings` has
+    //     `no_update`, so no row can ever be moved from one branch to the
+    //     other; both have to keep working.
+    let audioUrl: string
+    let audioHeaders: Record<string, string> = {}
 
-    if (signErr || !signed?.signedUrl) {
-      await markFailed(transcriptId, `Could not sign storage URL: ${signErr?.message ?? 'unknown'}`)
-      return
+    if (rec.storage_bucket.startsWith('r2:')) {
+      const base = Deno.env.get('MEDIA_FETCH_BASE')
+      const secret = Deno.env.get('MEDIA_FETCH_SECRET')
+      if (!base || !secret) {
+        await markFailed(
+          transcriptId,
+          'MEDIA_FETCH_BASE / MEDIA_FETCH_SECRET are not set, so R2 audio cannot be read.',
+        )
+        return
+      }
+      audioUrl =
+        `${base.replace(/\/$/, '')}/api/media/internal` +
+        `?bucket=${encodeURIComponent(rec.storage_bucket)}` +
+        `&key=${encodeURIComponent(rec.storage_path)}`
+      audioHeaders = { 'x-media-secret': secret }
+    } else {
+      const { data: signed, error: signErr } = await db.storage
+        .from(rec.storage_bucket)
+        .createSignedUrl(rec.storage_path, SIGNED_URL_TTL_SEC)
+
+      if (signErr || !signed?.signedUrl) {
+        await markFailed(transcriptId, `Could not sign storage URL: ${signErr?.message ?? 'unknown'}`)
+        return
+      }
+      audioUrl = signed.signedUrl
     }
 
     let audio: Blob
     try {
-      const audioRes = await fetch(signed.signedUrl)
+      const audioRes = await fetch(audioUrl, { headers: audioHeaders })
       if (!audioRes.ok) throw new Error(`storage returned ${audioRes.status}`)
       audio = await audioRes.blob()
     } catch (err) {

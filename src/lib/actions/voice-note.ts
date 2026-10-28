@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 
 import { createClient } from '@/lib/supabase/server'
 import { getSessionClaims } from '@/lib/auth/server'
+import { r2BucketValue } from '@/lib/media/names'
 
 export type RegisterVoiceNoteResult =
   | { ok: true; recordingId: string }
@@ -71,7 +72,7 @@ export async function registerVoiceNote(input: {
       event_id: input.eventId,
       group_id: input.groupId,
       call_attempt_id: input.callAttemptId,
-      storage_bucket: 'call-recordings',
+      storage_bucket: r2BucketValue('eventflow-call-recordings'),
       storage_path: input.storagePath,
       duration_sec: input.durationSec,
       mime_type: input.mimeType,

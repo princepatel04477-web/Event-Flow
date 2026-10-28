@@ -22,9 +22,8 @@
  * is not already there.
  */
 
-import { supabase } from '@/lib/supabase/client'
 import { registerVoiceNote } from '@/lib/actions/voice-note'
-import { friendlyDbError } from '@/lib/errors'
+import { uploadMedia } from '@/lib/media/client'
 
 import {
   markVoiceNoteAttempt,
@@ -54,29 +53,21 @@ export function buildStoragePath(eventId: string, groupId: string, extension: st
  */
 export async function commitVoiceNote(
   note: PendingVoiceNote,
-  { isRetry = false }: { isRetry?: boolean } = {},
 ): Promise<VoiceNoteUploadResult> {
-  const { error: uploadError } = await supabase.storage
-    .from('call-recordings')
-    .upload(note.storagePath, note.blob, {
-      contentType: note.mimeType,
-      // A retry re-uploads onto the path this note already owns. Without
-      // upsert the second attempt fails with "already exists" for a note whose
-      // audio landed but whose row insert did not — the exact case retry is for.
-      upsert: isRetry,
-    })
+  // R2 overwrites by key, so a retry resumes onto the path this note already
+  // owns rather than failing with "already exists" — the exact case retry is
+  // for. `isRetry` is therefore no longer passed; the behaviour is the default.
+  const uploaded = await uploadMedia({
+    bucket: 'eventflow-call-recordings',
+    key: note.storagePath,
+    blob: note.blob,
+    contentType: note.mimeType,
+  })
 
-  if (uploadError) {
+  if (!uploaded.ok) {
     await queueVoiceNote(note)
-    await markVoiceNoteAttempt(note.callAttemptId, uploadError.message)
-    return {
-      ok: false,
-      queued: true,
-      // The raw Storage/Postgres text (bucket name, SQLSTATE) is a diagnostic,
-      // not a message for a runner in a corridor. It still lands on the queued
-      // row via markVoiceNoteAttempt above; the UI gets the house sentence.
-      error: friendlyDbError(uploadError),
-    }
+    await markVoiceNoteAttempt(note.callAttemptId, uploaded.error)
+    return { ok: false, queued: true, error: uploaded.error }
   }
 
   const result = await registerVoiceNote({
@@ -111,7 +102,7 @@ export async function drainVoiceNotes(): Promise<{ synced: number; stillQueued: 
 
   for (const item of items) {
     try {
-      const result = await commitVoiceNote(item, { isRetry: true })
+      const result = await commitVoiceNote(item)
       if (result.ok) synced += 1
       else stillQueued += 1
     } catch (err) {

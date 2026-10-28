@@ -28,8 +28,7 @@
 import { Filesystem } from '@capacitor/filesystem'
 
 import { registerHarvestedRecording } from '@/lib/actions/harvest'
-import { supabase } from '@/lib/supabase/client'
-import { friendlyDbError } from '@/lib/errors'
+import { uploadMedia } from '@/lib/media/client'
 
 export type HarvestCommitResult =
   | { ok: true; recordingId: string }
@@ -118,7 +117,6 @@ export async function commitHarvestedRecording(input: {
     }
   }
 
-  const isRetry = Boolean(input.storagePath)
   const storagePath =
     input.storagePath ??
     buildHarvestStoragePath(input.eventId, input.groupId, extensionOf(input.fileName))
@@ -140,12 +138,15 @@ export async function commitHarvestedRecording(input: {
     return { ok: false, error: 'The recording file is empty, so nothing was uploaded.' }
   }
 
-  const { error: uploadError } = await supabase.storage
-    .from('call-recordings')
-    .upload(storagePath, blob, { contentType, upsert: isRetry })
+  const uploaded = await uploadMedia({
+    bucket: 'eventflow-call-recordings',
+    key: storagePath,
+    blob,
+    contentType,
+  })
 
-  if (uploadError) {
-    return { ok: false, error: friendlyDbError(uploadError) }
+  if (!uploaded.ok) {
+    return { ok: false, error: uploaded.error }
   }
 
   const result = await registerHarvestedRecording({

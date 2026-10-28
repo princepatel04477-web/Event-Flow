@@ -45,6 +45,31 @@
     }
   ],
 
+  // R2 — the private media store, replacing the three private Supabase
+  // buckets. Bindings, not credentials: the Worker reaches these directly, so
+  // nothing here is a secret and nothing has to be rotated.
+  //
+  // The Supabase buckets are NOT deleted and NOT emptied. `call_recordings`
+  // and `delivery_proofs` carry `no_update`/`no_delete` triggers, so a row
+  // already written can never be repointed at a new bucket — this is a
+  // forward-only cutover and the old rows must keep resolving. `storage_bucket`
+  // is the switch: an `r2:` prefix means these buckets, anything else means
+  // Supabase. See `src/lib/media/r2.ts`.
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_RECORDINGS",
+      "bucket_name": "eventflow-call-recordings"
+    },
+    {
+      "binding": "MEDIA_PROOFS",
+      "bucket_name": "eventflow-delivery-proofs"
+    },
+    {
+      "binding": "MEDIA_EXPORTS",
+      "bucket_name": "eventflow-exports"
+    }
+  ],
+
   // SMART PLACEMENT.
   //
   // Supabase is in ap-south-1 (Mumbai) since 2026-10-24, moved from Seoul.

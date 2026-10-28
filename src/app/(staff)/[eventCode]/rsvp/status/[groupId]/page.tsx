@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ChevronLeftIcon, ShieldAlertIcon, ClockIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase/server'
+import { mediaReadUrl } from '@/lib/media/read'
 import { getSessionClaims } from '@/lib/auth/server'
 import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import { claimGroupForCall } from '@/lib/actions/call'
@@ -161,10 +162,7 @@ export default async function RsvpLogPage({ params, searchParams }: PageProps) {
       .maybeSingle()
 
     if (rec?.storage_path) {
-      const { data: signed } = await supabase.storage
-        .from(rec.storage_bucket ?? 'call-recordings')
-        .createSignedUrl(rec.storage_path, 3600)
-      manualAudioUrl = signed?.signedUrl ?? null
+      manualAudioUrl = await mediaReadUrl(rec.storage_bucket, rec.storage_path)
     }
   }
 

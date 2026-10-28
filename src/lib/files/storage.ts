@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { formatMeta, type ExportKind } from '@/lib/files/kinds'
+import { mediaBucket } from '@/lib/media/r2'
 
 /**
  * Where generated exports are stored, behind an interface (A11).
@@ -28,27 +28,47 @@ export interface StorageAdapter {
   signedUrl(path: string, expiresInSeconds: number): Promise<string | null>
 }
 
-class SupabaseStorageAdapter implements StorageAdapter {
+/**
+ * The Supabase adapter that used to live here is gone, not commented out.
+ * Exports are regenerated on demand and the two files that older
+ * `export_files` rows point at were copied into R2, so there is no path left
+ * that needs to read the old bucket — and a dead adapter kept "just in case"
+ * is how two stores quietly become permanent.
+ *
+ * Recordings and proofs are the opposite case and DO keep both branches
+ * forever: their rows carry `storage_bucket` and cannot be updated. See
+ * `src/lib/media/names.ts`.
+ */
+
+/**
+ * R2, through the same interface. The comment above the Supabase adapter
+ * predicted this would touch "this file and nothing else", and it did.
+ *
+ * `signedUrl` returns a route, not a signed URL — R2 has no signing without
+ * S3 credentials, and the route re-authorises against the live session on
+ * every request. `expiresInSeconds` is therefore ignored, which is stricter
+ * than the thing it replaces rather than looser: a Supabase signed URL stayed
+ * valid for its full hour even after the staff member's code was revoked.
+ */
+class R2StorageAdapter implements StorageAdapter {
   async put(path: string, bytes: Uint8Array, contentType: string): Promise<StorageResult> {
-    const supabase = await createClient()
-    const { error } = await supabase.storage
-      .from(EXPORTS_BUCKET)
-      .upload(path, bytes, { contentType, upsert: true })
-    return error ? { ok: false, error: error.message } : { ok: true }
+    try {
+      const store = await mediaBucket('eventflow-exports')
+      await store.put(path, bytes, { httpMetadata: { contentType } })
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Could not store the file.' }
+    }
   }
 
-  async signedUrl(path: string, expiresInSeconds: number): Promise<string | null> {
-    const supabase = await createClient()
-    const { data } = await supabase.storage
-      .from(EXPORTS_BUCKET)
-      .createSignedUrl(path, expiresInSeconds)
-    return data?.signedUrl ?? null
+  async signedUrl(path: string): Promise<string | null> {
+    return `/api/media?bucket=eventflow-exports&key=${encodeURIComponent(path)}`
   }
 }
 
-/** The adapter the app uses. One line to change when R2 arrives. */
+/** The adapter the app uses. */
 export function storageAdapter(): StorageAdapter {
-  return new SupabaseStorageAdapter()
+  return new R2StorageAdapter()
 }
 
 /**

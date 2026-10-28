@@ -743,32 +743,44 @@ export function RoomsBoard({ eventId, eventCode, canOpenCallList }: RoomsBoardPr
         }}
       />
 
-      <BottomBar
-        summary={
-          isPending
-            ? 'Counting rooms…'
-            : canAutoFill
-              ? // NOT the same numbers as the card above. The card already
-                // says "5 beds free · 2 families waiting" and repeating it
-                // here is two lines saying one thing; this line says what the
-                // button does, which is the one thing the card cannot.
-                'Nothing is saved until you confirm'
-              : bedLine(grid.totals.bedsFree, waiting.length)
-        }
-        primary={
-          !hasRooms
-            ? { label: 'Add rooms', href: `/${eventCode}/hospitality/rooms/new` }
-            : canAutoFill
-              ? {
+      {/* The bar appears only when there is something to press.
+          It used to render a disabled "Nothing to fill" button whenever every
+          family already had a room — a permanently dead control occupying the
+          one spot reserved for the screen's primary action, which
+          docs/INTERACTION-CONTRACT.md T3 calls a bug outright. BottomBar's own
+          contract agrees: "a bar with no action is a footer", which is why
+          `primary` is required and why the fix is to not render the bar rather
+          than to pass it nothing.
+
+          The summary line goes with it. The card above already reads
+          "2 PAX free · every family has a room", so on a settled screen the bar
+          was repeating the one fact it had, under a button that did nothing. */}
+      {!hasRooms || canAutoFill ? (
+        <BottomBar
+          summary={
+            isPending
+              ? 'Counting rooms…'
+              : canAutoFill
+                ? // NOT the same numbers as the card above. The card already
+                  // says "5 beds free · 2 families waiting" and repeating it
+                  // here is two lines saying one thing; this line says what the
+                  // button does, which is the one thing the card cannot.
+                  'Nothing is saved until you confirm'
+                : bedLine(grid.totals.bedsFree, waiting.length)
+          }
+          primary={
+            !hasRooms
+              ? { label: 'Add rooms', href: `/${eventCode}/hospitality/rooms/new` }
+              : {
                   label: planning
                     ? 'Working out rooms…'
                     : `Auto-fill ${waiting.length} ${waiting.length === 1 ? 'family' : 'families'}`,
                   onPress: () => void startPlanning(),
                   disabled: planning,
                 }
-              : { label: 'Nothing to fill', onPress: () => {}, disabled: true }
-        }
-      />
+          }
+        />
+      ) : null}
     </div>
   )
 }
