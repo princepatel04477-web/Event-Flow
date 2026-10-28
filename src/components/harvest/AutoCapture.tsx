@@ -85,6 +85,23 @@ function writeConsent(eventId: string, at: number): void {
   }
 }
 
+/**
+ * Local midnight — the floor for "include today's earlier calls".
+ *
+ * The reason the floor exists at all is the phone's back catalogue: a handset
+ * in service for weeks holds calls made before anyone agreed to hand them
+ * over, and `call_recordings` cannot be updated or deleted, so an upload
+ * cannot be taken back. Today is a deliberate, bounded exception — staff who
+ * turn capture on at lunchtime would otherwise lose the morning's calls with
+ * no way to recover them, and they know what they did this morning. Anything
+ * before today still needs the unmatched tray and a human.
+ */
+function startOfToday(): number {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
 function describe(outcome: SweepOutcome | null, total: number): string {
   if (total > 0) {
     return `${total} recording${total === 1 ? '' : 's'} sent for transcription.`
@@ -215,8 +232,8 @@ export function AutoCapture({ eventId, eventCode }: AutoCaptureProps) {
     }
   }
 
-  function handleConsent() {
-    const at = Date.now()
+  function handleConsent(includeToday: boolean) {
+    const at = includeToday ? startOfToday() : Date.now()
     writeConsent(eventId, at)
     enabledAtRef.current = at
     setPhase('watching')
@@ -259,12 +276,21 @@ export function AutoCapture({ eventId, eventCode }: AutoCaptureProps) {
           <>
             <p className="text-sm text-muted">
               Every recording sent from here is transcribed and read by the office. Confirm that
-              families are told the call is being recorded. Only calls made from now on are
-              captured — nothing already on this phone is sent.
+              families are told the call is being recorded.
             </p>
-            <Button variant="primary" onClick={handleConsent}>
-              Families are told — start capturing
+            <Button variant="primary" onClick={() => handleConsent(false)}>
+              Families are told — capture from now on
             </Button>
+            {/* Deliberately a second, plainer control rather than a checkbox on
+                the first one: it sends calls that were already recorded, so it
+                should be chosen, not left ticked by whoever used the phone
+                last. Older than today still needs the unmatched tray. */}
+            <Button variant="secondary" onClick={() => handleConsent(true)}>
+              Capture today&apos;s earlier calls too
+            </Button>
+            <p className="text-sm text-muted">
+              Nothing recorded before today is ever sent.
+            </p>
           </>
         ) : null}
 
