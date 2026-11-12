@@ -797,7 +797,7 @@ export function sectionHeading(cells: unknown[]): { text: string; side: Normalis
   // Not parseSideAndSubSide: it reads "Father Side" as side 'other' and then
   // drops the father branch. A heading names a side only when it says
   // bride/groom/both; the branch is read on its own.
-  const side = /(bride|groom|both)/i.test(text) ? normaliseSide(text) : null
+  const side = /\b(bride|groom|both)\b/i.test(text) ? normaliseSide(text) : null
   const subSide = side === 'both' ? null : parseSubSide(text)
   if (!side && !subSide) return null
   return { text, side, subSide }

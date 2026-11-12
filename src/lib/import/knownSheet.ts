@@ -119,7 +119,7 @@ export async function parseKnownWorkbook(
  * optional phone / pax / city / remarks / group columns).
  */
 function withTabSideDefaults(sheetName: string, options: ParseFamiliesOptions): ParseFamiliesOptions {
-  // "Groom_Invitation_List": `_` is a word character, so groom never
+  // "Groom_Invitation_List": `_` is a word character, so \bgroom\b never
   // matched it. Treat _ - . as spaces before looking for the side.
   const lower = sheetName.toLowerCase().replace(/[_\-.]+/g, ' ')
   const hasBride = /\bbride\b/.test(lower)

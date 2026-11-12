@@ -4109,3 +4109,29 @@ device is still owed.
   transaction (T2- hotels only, no assignments, no proofs).
 - `.env.test` now targets Mumbai. It carries the public URL/anon pair too, because
   `tests/setup-env.ts` reads `.env.test` before `.env.local`, and `.env.local` is still Seoul.
+
+## 12 November 2026: first client list (Ujjain, 11–12 Feb), and two pipeline breaks found before calling
+
+- **Recording uploads were broken in production from the R2 move (28 Oct) until today.** `PUT /api/media`
+  passed `req.body` straight to `R2Bucket.put()`, and R2 refuses a stream of unknown length
+  ("Provided readable stream must have a known length"). Every recording, delivery proof and export
+  upload returned 502. Nothing showed it, because no real recording had been made since the move.
+  The route now buffers the body (60 MB cap). A call recording is a few MB.
+- **`extract-rsvp` now uses `sarvam-105b-conversations`, not `sarvam-105b`.** The reasoning model
+  started ignoring `reasoning_effort: low`. It spent all 12,000 tokens thinking and was cut off
+  (`finish_reason: length`, 97–154 s). The retry pushed the worker past the 150 s wall clock, so it
+  was killed (546) before it could write even a failure draft. The recording transcribed, and then no
+  review item ever appeared. The conversations model returns the full v2 JSON in about 3 s. `sarvam-m`
+  is retired. Each LLM attempt is now sized to a 125 s job budget measured from request arrival, so a
+  failure draft always lands. Verified live: upload, transcript after 10 s, pending extraction after 21 s.
+- **The model takes the year from the event's dates.** A February call on an August event came back
+  with blank dates at 0.4 confidence, which is the null-over-guess rule working. The Ujjain event must
+  carry its real dates (2027-02-11 to 2027-02-12).
+- **The contacts import path reads the client's calling-list shape.** "Calling Number" outranks
+  "Whatsapp Number" (WhatsApp became the alternate number, and the fallback when Calling is blank).
+  "9414075324, 9214078324" splits into a primary and an alternate. Adult + Kids sum into pax, while an
+  explicit Total column still wins. A lone "Father Side" / "Mother Side" row is a section heading that
+  sets the sub-side of the rows below it. Subtotal and grand-total rows are skipped. Relation, the
+  Remarks cell and Excel cell notes ("Call Both", "Call Via Botim") go into `remarks`. The commit
+  action now sends `remarks` and `altMobile`; the SQL always read them, and the app never sent them.
+- Two pipeline-test recordings now sit permanently on SAMPLE2026 (call_recordings cannot be deleted).

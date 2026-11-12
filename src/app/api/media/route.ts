@@ -76,6 +76,9 @@ async function assertStaffOnKey(req: NextRequest): Promise<Allowed | Denied> {
   return { ok: true, bucket, key }
 }
 
+/** 60 MB: a long call as WAV, with room to spare; far below Worker memory. */
+const MAX_UPLOAD_BYTES = 60 * 1024 * 1024
+
 /** Upload. The body is the object; the key says where it goes. */
 export async function PUT(req: NextRequest) {
   const resolved = await assertStaffOnKey(req)
@@ -87,9 +90,29 @@ export async function PUT(req: NextRequest) {
   // `upsert` is the caller's business: a retry of a half-finished upload wants
   // the same key overwritten, a new capture never collides because its key
   // carries a uuid. R2 overwrites by default, which is the retry behaviour.
+  // Buffer, do not stream. R2's put() refuses a ReadableStream whose length it
+  // cannot see ("Provided readable stream must have a known length"), and the
+  // body OpenNext hands this route is exactly that — every upload 502'd in
+  // production until 12 Nov 2026 with the stream passed straight through.
+  // A four-minute call is ~8 MB, far inside the Worker's memory.
+  const declared = Number(req.headers.get('content-length') ?? '')
+  if (Number.isFinite(declared) && declared > MAX_UPLOAD_BYTES) {
+    return NextResponse.json({ error: 'File too large.' }, { status: 413 })
+  }
+  let bytes: ArrayBuffer
+  try {
+    bytes = await req.arrayBuffer()
+  } catch {
+    return NextResponse.json({ error: 'Could not read the upload.' }, { status: 400 })
+  }
+  if (bytes.byteLength === 0) return NextResponse.json({ error: 'Empty body.' }, { status: 400 })
+  if (bytes.byteLength > MAX_UPLOAD_BYTES) {
+    return NextResponse.json({ error: 'File too large.' }, { status: 413 })
+  }
+
   try {
     const store = await mediaBucket(resolved.bucket)
-    const object = await store.put(resolved.key, req.body, {
+    const object = await store.put(resolved.key, bytes, {
       httpMetadata: { contentType },
     })
     return NextResponse.json({ ok: true, key: resolved.key, size: object?.size ?? null })

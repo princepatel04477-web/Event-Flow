@@ -156,7 +156,46 @@ export interface WorkbookGrids {
   /** Every tab name, in workbook order. */
   sheetNames: string[]
   /** Each tab's raw grid, in the same order. */
-  sheets: { sheetName: string; grid: unknown[][] }[]
+  sheets: { sheetName: string; grid: unknown[][]; comments?: RowComments }[]
+}
+
+/**
+ * Excel cell notes ("comments"), keyed by the 0-based GRID row they sit on.
+ * Real guest lists put caller instructions there — "Call Both", "Call Via
+ * Botim" — and `sheet_to_json` drops them, so they are read separately.
+ */
+export type RowComments = Record<number, { col: number; text: string }[]>
+
+const HTML_ENTITIES: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&apos;': "'",
+}
+
+function readRowComments(worksheet: XLSX.WorkSheet | undefined): RowComments {
+  const out: RowComments = {}
+  if (!worksheet || !worksheet['!ref']) return out
+  // Grid row 0 is the first row of the used range, not necessarily sheet row 1.
+  const origin = XLSX.utils.decode_range(worksheet['!ref']).s.r
+  for (const key of Object.keys(worksheet)) {
+    if (key.startsWith('!')) continue
+    const cell = worksheet[key] as XLSX.CellObject | undefined
+    if (!cell?.c?.length) continue
+    const at = XLSX.utils.decode_cell(key)
+    const row = at.r - origin
+    const col = at.c - XLSX.utils.decode_range(worksheet['!ref']).s.c
+    for (const c of cell.c) {
+      const text = String(c.t ?? '')
+        .replace(/&(amp|lt|gt|quot|#39|apos);/g, (m) => HTML_ENTITIES[m] ?? m)
+        .replace(/\s+/g, ' ')
+        .trim()
+      if (text) (out[row] ??= []).push({ col, text })
+    }
+  }
+  return out
 }
 
 /**
@@ -178,6 +217,7 @@ export async function readAllSheetGrids(file: File): Promise<WorkbookGrids> {
     sheets: sheetNames.map((sheetName) => ({
       sheetName,
       grid: readGrid(workbook.Sheets[sheetName]),
+      comments: readRowComments(workbook.Sheets[sheetName]),
     })),
   }
 }

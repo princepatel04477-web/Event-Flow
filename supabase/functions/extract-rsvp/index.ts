@@ -101,23 +101,42 @@ async function loadConfig(): Promise<boolean> {
 // deprecations page); claude-sonnet-4-6 is its named replacement. Used only
 // when an anthropic_api_key is in Vault.
 const CLAUDE_MODEL = 'claude-sonnet-4-6'
-/** Default extraction model: Sarvam's own LLM, same key as transcription. */
-const SARVAM_MODEL = 'sarvam-105b'
-const SARVAM_CHAT_URL = 'https://api.sarvam.ai/v1/chat/completions'
-const LLM_TIMEOUT_MS = 120_000
 /**
- * sarvam-105b is a reasoning model: it thinks in `reasoning_content` before it
- * answers, and the thinking counts against max_tokens. With 4096 tokens and the
- * default effort it spent the whole budget thinking and returned content: null
- * (seen live 2026-09-26). Low effort + a larger budget leaves room to answer.
+ * Default extraction model: Sarvam's own LLM, same key as transcription.
+ *
+ * sarvam-105b-conversations, NOT sarvam-105b. Measured live 2026-11-12 on the
+ * same transcript and the same v2 prompt:
+ *   sarvam-105b, effort low   -> 12,000 tokens of reasoning, answer cut off
+ *                                (finish_reason length), 97-114 s
+ *   sarvam-105b, no effort    -> same, 154 s
+ *   sarvam-105b-conversations -> complete, correct JSON in 3 s
+ * The reasoning model now ignores `reasoning_effort: low`, so every call ran
+ * past the Edge Function's 150 s wall clock and the worker was killed
+ * (546 WORKER_RESOURCE_LIMIT) before it could write even a failure draft:
+ * recordings transcribed and then silently never reached the review screen.
+ * sarvam-m, the old fast model, is retired (HTTP 400).
  */
+const SARVAM_MODEL = 'sarvam-105b-conversations'
+const SARVAM_CHAT_URL = 'https://api.sarvam.ai/v1/chat/completions'
+/** Only these Sarvam models take `reasoning_effort`. */
+const SARVAM_REASONING_MODELS = new Set(['sarvam-105b'])
+const LLM_TIMEOUT_MS = 60_000
+/**
+ * Whole-job budget for one extraction, measured from when the request arrived.
+ * Supabase kills the worker at 150 s wall clock, background task included, and
+ * a killed worker writes nothing. Every LLM attempt is sized to what is left of
+ * this budget, so the failure draft always has time to land.
+ */
+const JOB_BUDGET_MS = 125_000
+/** Below this much remaining budget, do not start another LLM attempt. */
+const MIN_ATTEMPT_MS = 15_000
 type SarvamOptions = { reasoningEffort: 'low' | 'high' | 'max'; maxTokens: number; useTools: boolean }
 /**
- * useTools false = plain JSON reply. Measured live 2026-09-26 on the same test
- * call: JSON 93 s, forced function call 137 s, identical output. The slower one
- * risks the Edge Function background-task wall clock, so JSON is the default.
+ * useTools false = plain JSON reply (response_format json_object), measured
+ * faster than a forced function call. maxTokens stays under the conversations
+ * model's 8,192 output cap; a full v2 extraction is ~1,600 tokens.
  */
-const SARVAM_DEFAULTS: SarvamOptions = { reasoningEffort: 'low', maxTokens: 12_000, useTools: false }
+const SARVAM_DEFAULTS: SarvamOptions = { reasoningEffort: 'low', maxTokens: 6_000, useTools: false }
 const PROMPT_VERSION = 'v2'
 const MAX_RETRIES = 1 // one retry on validation failure
 
@@ -498,9 +517,9 @@ evidence_start_ms / evidence_end_ms.
 ${context}`
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = LLM_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     return await fetch(url, { ...init, signal: controller.signal })
   } finally {
@@ -537,6 +556,7 @@ async function callSarvam(
   transcript: string,
   context: string,
   opts: SarvamOptions = SARVAM_DEFAULTS,
+  deadline: number = Date.now() + JOB_BUDGET_MS,
 ): Promise<{ result: ExtractionOutput } | { error: string }> {
   let lastError = ''
   const jsonInstruction =
@@ -544,6 +564,11 @@ async function callSarvam(
     'each value being {value, confidence, evidence, evidence_start_ms, evidence_end_ms, reasoning}:\n' +
     JSON.stringify(EXTRACTION_TOOL.input_schema)
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const remaining = deadline - Date.now()
+    if (remaining < MIN_ATTEMPT_MS) {
+      lastError = `${lastError ? `${lastError}; ` : ''}stopped: out of time for another attempt`
+      break
+    }
     let res: Response
     try {
       res = await fetchWithTimeout(SARVAM_CHAT_URL, {
@@ -553,7 +578,7 @@ async function callSarvam(
           model: SARVAM_MODEL,
           temperature: 0.1,
           max_tokens: opts.maxTokens,
-          reasoning_effort: opts.reasoningEffort,
+          ...(SARVAM_REASONING_MODELS.has(SARVAM_MODEL) ? { reasoning_effort: opts.reasoningEffort } : {}),
           messages: [
             { role: 'system', content: systemPromptFor(context) },
             {
@@ -579,7 +604,7 @@ async function callSarvam(
               }
             : { response_format: { type: 'json_object' } }),
         }),
-      })
+      }, Math.min(LLM_TIMEOUT_MS, remaining - 5_000))
     } catch (err) {
       lastError = `Sarvam request failed: ${err instanceof Error ? err.message : String(err)}`
       continue
@@ -621,10 +646,12 @@ async function callSarvam(
     if (!input && typeof message.content === 'string') input = parseJsonObject(message.content)
 
     if (!input) {
-      const reasoningChars = typeof message.reasoning_content === 'string' ? message.reasoning_content.length : 0
+      // Sarvam moved the thinking from `reasoning_content` to `reasoning`.
+      const thought = message.reasoning_content ?? message.reasoning
+      const reasoningChars = typeof thought === 'string' ? thought.length : 0
       lastError =
         `Sarvam returned no parseable extraction (finish_reason ${finishReason}, ${reasoningChars} chars of reasoning): ` +
-        JSON.stringify({ ...message, reasoning_content: undefined }).slice(0, 300)
+        JSON.stringify({ ...message, reasoning_content: undefined, reasoning: undefined }).slice(0, 300)
       continue
     }
     const missing = missingRequired(input)
@@ -641,12 +668,13 @@ async function callLlm(
   transcript: string,
   context: string,
   sarvamOpts: SarvamOptions = SARVAM_DEFAULTS,
+  deadline: number = Date.now() + JOB_BUDGET_MS,
 ): Promise<{ result: ExtractionOutput; model: string } | { error: string; model: string }> {
   if (anthropicApiKey) {
     const r = await callClaude(transcript, context)
     return 'error' in r ? { error: r.error, model: CLAUDE_MODEL } : { result: r.result, model: CLAUDE_MODEL }
   }
-  const r = await callSarvam(transcript, context, sarvamOpts)
+  const r = await callSarvam(transcript, context, sarvamOpts, deadline)
   return 'error' in r ? { error: r.error, model: SARVAM_MODEL } : { result: r.result, model: SARVAM_MODEL }
 }
 
@@ -846,7 +874,7 @@ function formatTranscript(segmentsJson: unknown, fallback: string): string {
 // far longer than the 5 s pg_net enqueue timeout.
 // ---------------------------------------------------------------------------
 
-async function extractTranscript(transcriptId: string): Promise<void> {
+async function extractTranscript(transcriptId: string, deadline: number): Promise<void> {
   const { data: transcript, error: txErr } = await db
     .from('transcripts')
     .select('id, event_id, recording_id, full_text, text, segments, status')
@@ -887,7 +915,7 @@ async function extractTranscript(transcriptId: string): Promise<void> {
     return
   }
 
-  const llm = await callLlm(transcriptText, grounding.contextText)
+  const llm = await callLlm(transcriptText, grounding.contextText, SARVAM_DEFAULTS, deadline)
   if ('error' in llm) {
     // Still write a draft row so this appears in the review queue as "extraction failed".
     const { error: insErr } = await db.from('rsvp_extractions').insert({
@@ -937,6 +965,9 @@ async function extractTranscript(transcriptId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 Deno.serve(async (req) => {
+  // The wall clock that kills this worker starts here, not when the
+  // background task does, so the job budget is measured from here too.
+  const requestStartedAt = Date.now()
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: {
@@ -998,7 +1029,7 @@ Deno.serve(async (req) => {
   }
 
   EdgeRuntime.waitUntil(
-    extractTranscript(transcriptId).catch((err) => {
+    extractTranscript(transcriptId, requestStartedAt + JOB_BUDGET_MS).catch((err) => {
       console.error('extract-rsvp: background task crashed:', err instanceof Error ? err.message : String(err))
     }),
   )
