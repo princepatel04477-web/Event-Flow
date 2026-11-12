@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { notFound, redirect } from 'next/navigation'
 
 import { ArchiveEventCard } from '@/app/(admin)/admin/events/[eventCode]/ArchiveEventCard'
+import { DeleteEventCard } from '@/app/(admin)/admin/events/[eventCode]/DeleteEventCard'
 import {
   BuildingIcon,
   DownloadIcon,
@@ -139,12 +140,18 @@ export default async function ControlPage({ params }: PageProps) {
       {/* Last, alone, after a gap: nothing routine lives below it, so the
           archive control is never something a thumb passes over on the way
           to a task. Same component the admin dashboard used. */}
-      <div className="mt-6">
+      <div className="mt-6 flex flex-col gap-4">
         <ArchiveEventCard
           eventId={event.id}
           eventName={event.name}
           eventCode={event.code}
           archivedAt={event.archived_at ?? null}
+        />
+
+        <DeleteEventCard
+          eventId={event.id}
+          eventName={event.name}
+          eventCode={event.code}
         />
       </div>
 

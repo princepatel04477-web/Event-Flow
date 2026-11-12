@@ -26,6 +26,7 @@ export type Database = {
         Args: { p_table: unknown }
         Returns: undefined
       }
+      can_delete_event_row: { Args: { p_event_id: string }; Returns: boolean }
       code_is_live: { Args: never; Returns: boolean }
       current_auth_uid: { Args: never; Returns: string }
       current_identity: { Args: never; Returns: string }
@@ -4114,6 +4115,7 @@ export type Database = {
         }
         Returns: Json
       }
+      delete_event: { Args: { p_event_id: string }; Returns: Json }
       event_board: {
         Args: { p_event_id: string }
         Returns: {

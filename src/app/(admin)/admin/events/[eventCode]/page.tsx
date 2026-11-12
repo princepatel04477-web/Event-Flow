@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveEventByCode } from '@/lib/supabase/queries'
 import { DashboardClient } from './DashboardClient'
 import { ArchiveEventCard } from './ArchiveEventCard'
+import { DeleteEventCard } from './DeleteEventCard'
 import { readHotelImportContext } from '@/lib/actions/import-hotels'
 import { BuildingIcon, ChevronRightIcon, UsersIcon } from '@/components/icons'
 import { Card } from '@/components/ui/Card'
@@ -118,6 +119,12 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
         eventName={event.name}
         eventCode={event.code}
         archivedAt={event.archived_at}
+      />
+
+      <DeleteEventCard
+        eventId={event.id}
+        eventName={event.name}
+        eventCode={event.code}
       />
     </div>
   )

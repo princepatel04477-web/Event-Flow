@@ -391,3 +391,138 @@ export async function unarchiveEvent(eventId: string): Promise<ArchiveEventResul
   revalidatePath('/', 'layout')
   return { ok: true }
 }
+
+// ---------------------------------------------------------------------------
+// Permanent delete — admin-only hard delete via `public.delete_event(uuid)`
+// ---------------------------------------------------------------------------
+
+export type DeleteEventResult = { ok: true } | { ok: false; error: string }
+
+interface StoredMediaRef {
+  bucket: string
+  key: string
+}
+
+async function collectEventMediaRefs(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  eventId: string,
+): Promise<StoredMediaRef[]> {
+  try {
+    const [proofsRes, recordingsRes, exportsRes] = await Promise.all([
+      supabase
+        .from('delivery_proofs')
+        .select('storage_bucket, storage_path')
+        .eq('event_id', eventId),
+      supabase
+        .from('call_recordings')
+        .select('storage_bucket, storage_path')
+        .eq('event_id', eventId),
+      supabase
+        .from('export_files')
+        .select('path')
+        .eq('event_id', eventId),
+    ])
+
+    const refs: StoredMediaRef[] = []
+    for (const row of proofsRes.data ?? []) {
+      if (row.storage_bucket && row.storage_path) {
+        refs.push({ bucket: row.storage_bucket, key: row.storage_path })
+      }
+    }
+    for (const row of recordingsRes.data ?? []) {
+      if (row.storage_bucket && row.storage_path) {
+        refs.push({ bucket: row.storage_bucket, key: row.storage_path })
+      }
+    }
+    for (const row of exportsRes.data ?? []) {
+      if (row.path) {
+        refs.push({ bucket: 'r2:eventflow-exports', key: row.path })
+      }
+    }
+    return refs
+  } catch {
+    return []
+  }
+}
+
+async function deleteR2MediaBestEffort(refs: StoredMediaRef[]): Promise<void> {
+  if (refs.length === 0) return
+  try {
+    const { mediaBucket, resolveBucket } = await import('@/lib/media/r2')
+    const byBucket = new Map<string, string[]>()
+    for (const ref of refs) {
+      const target = resolveBucket(ref.bucket)
+      if (target.kind !== 'r2') continue
+      const keys = byBucket.get(target.bucket) ?? []
+      keys.push(ref.key)
+      byBucket.set(target.bucket, keys)
+    }
+
+    await Promise.allSettled(
+      Array.from(byBucket.entries()).map(async ([bucketName, keys]) => {
+        const store = await mediaBucket(bucketName as Parameters<typeof mediaBucket>[0])
+        await Promise.allSettled(keys.map((key) => store.delete(key)))
+      }),
+    )
+  } catch {
+    // Best-effort outside Workers runtime (e.g. local Node/tests); DB rows are already gone.
+  }
+}
+
+/**
+ * Permanently delete an event and all of its operational data.
+ *
+ * Admin-only: `public.delete_event(uuid)` enforces `app.is_admin()` in Postgres,
+ * sets a transaction-local guard for that `event_id` so append-only triggers
+ * allow whole-event cleanup while keeping individual row deletes blocked, and
+ * removes child rows cleanly before deleting the `events` row itself.
+ */
+export async function deleteEvent(
+  eventId: string,
+  typedName: string,
+): Promise<DeleteEventResult> {
+  const supabase = await createClient()
+
+  const { data: event, error: readErr } = await supabase
+    .from('events')
+    .select('id, name')
+    .eq('id', eventId)
+    .maybeSingle()
+
+  if (readErr) {
+    if (readErr.code === RLS_DENIED) {
+      return { ok: false, error: 'Only an admin can delete an event.' }
+    }
+    return { ok: false, error: `Could not read the event: ${friendlyDbError(readErr)}` }
+  }
+  if (!event) return { ok: false, error: 'That event no longer exists.' }
+
+  if (!nameMatches(typedName, event.name)) {
+    return {
+      ok: false,
+      error: `That does not match. Type the event name exactly: ${event.name}`,
+    }
+  }
+
+  const mediaRefs = await collectEventMediaRefs(supabase, eventId)
+
+  const { data, error } = await (supabase as unknown as UntypedRpc).rpc('delete_event', {
+    p_event_id: eventId,
+  })
+
+  if (error) {
+    if (error.code === RLS_DENIED) {
+      return { ok: false, error: 'Only an admin can delete an event.' }
+    }
+    return { ok: false, error: friendlyDbError(error) }
+  }
+
+  const payload = (data ?? {}) as { deleted?: boolean; reason?: string }
+  if (payload.deleted === false && payload.reason === 'not_found') {
+    return { ok: false, error: 'That event no longer exists.' }
+  }
+
+  await deleteR2MediaBestEffort(mediaRefs)
+  revalidatePath('/', 'layout')
+  return { ok: true }
+}

@@ -59,6 +59,11 @@ const WRITE_SITES = [
     clearInFinally: true,
   },
   {
+    file: `${EVENTS}/DeleteEventCard.tsx`,
+    anchor: 'await deleteEvent(',
+    clearInFinally: true,
+  },
+  {
     file: `${EVENTS}/messages/SendClient.tsx`,
     anchor: 'await sendMessages(',
     // The phase machine leaves 'sending' on both paths, so there is no
