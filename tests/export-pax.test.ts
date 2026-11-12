@@ -35,6 +35,7 @@ function group(spec: GroupSpec) {
     primary_mobile: '9000000000',
     alt_mobile: null,
     side: 'bride' as const,
+    sub_side: null,
     group_type: 'family' as const,
     city: 'Ahmedabad',
     expected_pax: spec.pax,

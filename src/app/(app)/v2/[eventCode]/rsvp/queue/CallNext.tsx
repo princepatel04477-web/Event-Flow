@@ -72,7 +72,7 @@ async function fetchQueue(
     .select(
       'group_id, head_name, primary_mobile, rsvp_status, expected_pax, confirmed_pax, ' +
         'attempt_count, next_callback_at, is_locked, locked_until, locked_by_staff, ' +
-        'group_type, side',
+        'group_type, side, sub_side',
     )
     .eq('event_id', eventId)
     .order('attempt_count', { ascending: true })

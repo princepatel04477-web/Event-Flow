@@ -52,9 +52,18 @@ import {
   type RowExtras,
 } from './families'
 import { rowHash } from './hash'
-import { normaliseMobile, normaliseText, parsePax } from './normalize'
+import {
+  normaliseMobile,
+  normaliseText,
+  normaliseSide,
+  parsePax,
+  parseSubSide,
+  resolveImportedSide,
+  type NormalisedSide,
+  type SubSide,
+} from './normalize'
 import type { LayoutNote } from './layout'
-import { KNOWN_SHEET_NAME, readSheetGrid, type RawSheetRow } from './parse'
+import { KNOWN_SHEET_NAME, readSheetGrid, type RawSheetRow, type RowComments } from './parse'
 
 /** Header spellings accepted for the contact / mobile column. */
 export const CONTACT_ALIASES = [
@@ -121,6 +130,11 @@ export const CONTACT_ALIASES = [
 
 /** Priority order when multiple contact columns match in a sheet. */
 export const CONTACT_PRIORITY = [
+  // "Calling Number" is the column a client fills in FOR the callers; when a
+  // sheet also has "Whatsapp Number", that one is the fallback, not the dial.
+  'calling no',
+  'calling number',
+  'calling mobile',
   'primary mobile',
   'primary phone',
   'primary contact',
@@ -130,17 +144,15 @@ export const CONTACT_PRIORITY = [
   'phone',
   'phone no',
   'phone number',
-  'whatsapp',
-  'whatsapp no',
-  'whatsapp number',
   'contact',
   'contact no',
   'contact number',
-  'calling no',
-  'calling number',
   'cell',
   'cell no',
   'telephone',
+  'whatsapp',
+  'whatsapp no',
+  'whatsapp number',
 ]
 
 /**
@@ -219,8 +231,42 @@ export const PAX_ALIASES = [
   'count',
   'size',
   'group size',
-  'adults',
   'seats',
+  'total',
+  'total guests',
+  'total guest',
+  'total persons',
+  'persons',
+  'no of persons',
+  'family members',
+]
+
+/**
+ * Split headcount. When a sheet has Adult + Kids (and no total column), pax
+ * is their sum — taking the Adult cell alone undercounts every family with
+ * children, and that number is what rooms and vehicles are planned against.
+ */
+export const ADULT_ALIASES = ['adult', 'adults', 'no of adults', 'adult pax', 'adults pax']
+export const KIDS_ALIASES = [
+  'kid',
+  'kids',
+  'child',
+  'children',
+  'childs',
+  'no of kids',
+  'no of children',
+  'kids pax',
+  'child pax',
+]
+
+/** "Relation" (Brother, Bhatiji, Family Friend…) — the caller's context. */
+export const RELATION_ALIASES = [
+  'relation',
+  'relations',
+  'relationship',
+  'relation with',
+  'relation to',
+  'rel',
 ]
 
 export const CITY_ALIASES = [
@@ -244,6 +290,11 @@ export const REMARKS_ALIASES = [
   'comments',
   'status remark',
   'rsvp remarks',
+  'remarks notes',
+  'remark notes',
+  'remark note',
+  'notes remarks',
+  'special notes',
 ]
 
 export const GROUP_CODE_ALIASES = [
@@ -273,6 +324,27 @@ export const ROOM_ALIASES = [
   'room no',
   'room number',
   'room#',
+]
+
+export const SIDE_ALIASES = [
+  'side',
+  'family side',
+  'guest side',
+  'wedding side',
+  'bride groom',
+  'bride or groom',
+  'party',
+]
+
+export const SUB_SIDE_ALIASES = [
+  'sub side',
+  'subside',
+  'branch',
+  'family branch',
+  'parent side',
+  'father mother',
+  'lineage',
+  'relation side',
 ]
 
 /** How a header cell is normalised before alias matching. */
@@ -369,6 +441,19 @@ export interface ContactsSheet {
   remarksIndex?: number | null
   /** 0-based column index of a Room column, or null. */
   roomIndex?: number | null
+  /** 0-based column index of a Side (Groom / Bride) column, or null. */
+  sideIndex?: number | null
+  /** 0-based column index of a Sub-side (Father / Mother) column, or null. */
+  subSideIndex?: number | null
+  /** A second phone column (WhatsApp, when Calling is the primary), or null. */
+  altContactIndex?: number | null
+  /** Adult / Kids split headcount columns — summed into pax when no total. */
+  adultsIndex?: number | null
+  kidsIndex?: number | null
+  /** "Relation" column, folded into the remarks the caller sees. */
+  relationIndex?: number | null
+  /** Excel cell notes by 0-based grid row — see `RowComments`. */
+  rowComments?: RowComments
   /** Raw data rows, with true 1-based sheet row numbers. */
   rows: RawSheetRow[]
 }
@@ -376,7 +461,20 @@ export interface ContactsSheet {
 /** The header columns of a contacts sheet, before the workbook context is attached. */
 export type ContactsColumns = Pick<
   ContactsSheet,
-  'headers' | 'nameIndex' | 'contactIndex' | 'cityIndex' | 'paxIndex' | 'groupCodeIndex' | 'remarksIndex' | 'roomIndex'
+  | 'headers'
+  | 'nameIndex'
+  | 'contactIndex'
+  | 'cityIndex'
+  | 'paxIndex'
+  | 'groupCodeIndex'
+  | 'remarksIndex'
+  | 'roomIndex'
+  | 'sideIndex'
+  | 'subSideIndex'
+  | 'altContactIndex'
+  | 'adultsIndex'
+  | 'kidsIndex'
+  | 'relationIndex'
 >
 
 export interface ContactsSheetFailure {
@@ -423,25 +521,16 @@ export function resolveContactsSheet(
     }
   }
 
-  let contactIndex: number | null = null
-  if (contactHits.length === 1) {
-    contactIndex = contactHits[0]
-  } else if (contactHits.length > 1) {
-    // Multiple contact columns match (e.g. Mobile + WhatsApp or Calling + Alt)
-    // Select the highest priority column based on CONTACT_PRIORITY
-    let bestPriority = 9999
-    let bestIdx = contactHits[0]
-    for (const idx of contactHits) {
-      const h = norm[idx]
-      const prio = CONTACT_PRIORITY.indexOf(h)
-      const p = prio >= 0 ? prio : 1000
-      if (p < bestPriority) {
-        bestPriority = p
-        bestIdx = idx
-      }
-    }
-    contactIndex = bestIdx
-  }
+  // Several phone columns (Calling + WhatsApp, Mobile + Alt): rank them by
+  // CONTACT_PRIORITY — stable, so equal ranks keep sheet order. The winner is
+  // dialled; the runner-up becomes the alternate number.
+  const rankedContacts = [...contactHits].sort((a, b) => {
+    const pa = CONTACT_PRIORITY.indexOf(norm[a])
+    const pb = CONTACT_PRIORITY.indexOf(norm[b])
+    return (pa >= 0 ? pa : 1000) - (pb >= 0 ? pb : 1000)
+  })
+  const contactIndex: number | null = rankedContacts[0] ?? null
+  const altContactIndex: number | null = rankedContacts[1] ?? null
 
   const requireContact = options?.requireContact ?? true
   if (requireContact && contactIndex === null) {
@@ -454,6 +543,7 @@ export function resolveContactsSheet(
   const nameIndex = nameHits[0]
   const claimed = new Set<number>([nameIndex])
   if (contactIndex !== null) claimed.add(contactIndex)
+  if (altContactIndex !== null) claimed.add(altContactIndex)
 
   const cityIdx = norm.findIndex((h, i) => !claimed.has(i) && h && CITY_ALIASES.includes(h))
   const cityIndex = cityIdx >= 0 ? cityIdx : null
@@ -473,6 +563,25 @@ export function resolveContactsSheet(
 
   const roomIdx = norm.findIndex((h, i) => !claimed.has(i) && h && ROOM_ALIASES.includes(h))
   const roomIndex = roomIdx >= 0 ? roomIdx : null
+  if (roomIndex !== null) claimed.add(roomIndex)
+
+  const sideIdx = norm.findIndex((h, i) => !claimed.has(i) && h && SIDE_ALIASES.includes(h))
+  const sideIndex = sideIdx >= 0 ? sideIdx : null
+  if (sideIndex !== null) claimed.add(sideIndex)
+
+  const subSideIdx = norm.findIndex((h, i) => !claimed.has(i) && h && SUB_SIDE_ALIASES.includes(h))
+  const subSideIndex = subSideIdx >= 0 ? subSideIdx : null
+  if (subSideIndex !== null) claimed.add(subSideIndex)
+
+  const pick = (aliases: string[]): number | null => {
+    const idx = norm.findIndex((h, i) => !claimed.has(i) && h && aliases.includes(h))
+    if (idx < 0) return null
+    claimed.add(idx)
+    return idx
+  }
+  const adultsIndex = pick(ADULT_ALIASES)
+  const kidsIndex = pick(KIDS_ALIASES)
+  const relationIndex = pick(RELATION_ALIASES)
 
   return {
     ok: true,
@@ -485,6 +594,12 @@ export function resolveContactsSheet(
       groupCodeIndex,
       remarksIndex,
       roomIndex,
+      sideIndex,
+      subSideIndex,
+      altContactIndex,
+      adultsIndex,
+      kidsIndex,
+      relationIndex,
     },
   }
 }
@@ -497,7 +612,7 @@ export function resolveContactsGrid(
   grid: unknown[][],
   sheetName: string,
   maxScanRows = 15,
-  options?: { requireContact?: boolean },
+  options?: { requireContact?: boolean; comments?: RowComments },
 ): ContactsSheetResult {
   const limit = Math.min(grid.length, maxScanRows)
   const requireContactFirst = options?.requireContact ?? true
@@ -578,6 +693,7 @@ export function resolveContactsGrid(
       sheetName,
       headerRowIndex: r,
       ...best.resolved,
+      rowComments: options?.comments,
       rows,
     }
     return { ok: true, sheet }
@@ -643,6 +759,56 @@ export async function parseContactsWorkbook(
   return parseContactsSheet(sheet.sheet, options)
 }
 
+/**
+ * Every dialable number in one phone cell. Real sheets put two numbers in a
+ * cell — "9414075324, 9214078324" with a "Call Both" note — and the strict
+ * normaliser rightly refuses a 20-digit string. Split on the separators
+ * people actually type, keep each piece that is a real 10-digit number, and
+ * report the cell as unreadable only when NOTHING in it was usable.
+ */
+export function splitMobiles(cell: unknown): { numbers: string[]; reason: string | null } {
+  if (isBlankCell(cell)) return { numbers: [], reason: null }
+  const whole = normaliseMobile(cell)
+  if (whole.value) return { numbers: [whole.value], reason: null }
+  if (typeof cell !== 'string') return { numbers: [], reason: whole.reason }
+
+  const pieces = cell.split(/[,;/|&\n]+|\s+or\s+|\s{2,}/i).filter((p) => p.trim() !== '')
+  if (pieces.length < 2) return { numbers: [], reason: whole.reason }
+  const numbers: string[] = []
+  for (const piece of pieces) {
+    const one = normaliseMobile(piece)
+    if (one.value && !numbers.includes(one.value)) numbers.push(one.value)
+  }
+  return numbers.length > 0 ? { numbers, reason: null } : { numbers: [], reason: whole.reason }
+}
+
+/**
+ * A section heading inside the list — "Father Side", "MOTHER SIDE",
+ * "Bride Side" — sitting alone on its row (often merged across the columns).
+ * It is not a guest: it labels the rows under it. Returns the side it names,
+ * or null for an ordinary row. The lone-cell + "side" word requirement is what
+ * keeps a guest called "Mama" or "Papa Ji" from being mistaken for one.
+ */
+export function sectionHeading(cells: unknown[]): { text: string; side: NormalisedSide | null; subSide: SubSide | null } | null {
+  const filled = cells.filter((c) => !isBlankCell(c))
+  if (filled.length !== 1 || typeof filled[0] !== 'string') return null
+  const text = filled[0].replace(/\s+/g, ' ').trim()
+  if (text.length > 40 || !/\b(side|paksh|paksha)\b/i.test(text)) return null
+  // Not parseSideAndSubSide: it reads "Father Side" as side 'other' and then
+  // drops the father branch. A heading names a side only when it says
+  // bride/groom/both; the branch is read on its own.
+  const side = /(bride|groom|both)/i.test(text) ? normaliseSide(text) : null
+  const subSide = side === 'both' ? null : parseSubSide(text)
+  if (!side && !subSide) return null
+  return { text, side, subSide }
+}
+
+/** "Mother Side Subtotal", "GRAND TOTAL (ALL GUESTS)", "Total" — a sum, not a family. */
+export function isTotalsRow(nameText: string | null): boolean {
+  if (!nameText) return false
+  return /\b(sub\s*-?\s*total|grand\s*total)\b/i.test(nameText) || /^\s*total\b/i.test(nameText)
+}
+
 /** A blank travel leg — contacts sheets carry no arrival or departure info. */
 const EMPTY_LEG = (): ParsedTravelLeg => ({
   direction: 'arrival',
@@ -664,7 +830,24 @@ export function parseContactsSheet(
   sheet: ContactsSheet,
   options: ParseFamiliesOptions,
 ): ContactsParseOutcome {
-  const { headers, nameIndex, contactIndex, cityIndex, paxIndex, groupCodeIndex, remarksIndex, roomIndex, rows } = sheet
+  const {
+    headers,
+    nameIndex,
+    contactIndex,
+    cityIndex,
+    paxIndex,
+    groupCodeIndex,
+    remarksIndex,
+    roomIndex,
+    sideIndex,
+    subSideIndex,
+    altContactIndex = null,
+    adultsIndex = null,
+    kidsIndex = null,
+    relationIndex = null,
+    rowComments,
+    rows,
+  } = sheet
 
   if (rows.length === 0) {
     return { ok: false, reason: 'That sheet has headers but no rows under them.' }
@@ -677,29 +860,69 @@ export function parseContactsSheet(
   const warnings: ImportWarning[] = []
   const notes: LayoutNote[] = []
 
+  const hasHeadcount = paxIndex != null || adultsIndex != null || kidsIndex != null
+
   if (contactIndex === null) {
     notes.push({
       column: 'contact',
       label: 'Phone number',
       detail: 'not in this sheet — guests will be imported with no phone number.',
     })
+  } else if (altContactIndex !== null) {
+    notes.push({
+      column: 'contact',
+      label: 'Phone number',
+      detail: `dialled from "${headers[contactIndex] ?? ''}". "${headers[altContactIndex] ?? ''}" is kept as the alternate number, and used when the first is blank.`,
+    })
   }
 
-  if (paxIndex === null || paxIndex === undefined) {
+  if (!hasHeadcount) {
     notes.push({
       column: 'pax',
       label: 'Pax (headcount)',
       detail: 'not in this sheet — defaulted to 1 pax per family.',
     })
+  } else if (paxIndex == null && adultsIndex != null) {
+    notes.push({
+      column: 'pax',
+      label: 'Pax (headcount)',
+      detail:
+        kidsIndex != null
+          ? `"${headers[adultsIndex] ?? ''}" + "${headers[kidsIndex] ?? ''}" added together.`
+          : `taken from "${headers[adultsIndex] ?? ''}".`,
+    })
   }
 
-  rows.forEach((row, i) => {
+  // A section heading ("Father Side") sets the side for the rows under it,
+  // until the next heading. A Side column on the row itself still wins.
+  let section: { side: NormalisedSide | null; subSide: SubSide | null } | null = null
+  const sectionsSeen: string[] = []
+  const totalsSkipped: number[] = []
+  let familyCount = 0
+
+  const cellText = (cells: unknown[], idx: number | null | undefined): string | null =>
+    idx == null ? null : normaliseText(cells[idx] ?? null)
+
+  rows.forEach((row) => {
     const cells = row.cells
+
+    const heading = sectionHeading(cells)
+    if (heading) {
+      section = { side: heading.side, subSide: heading.subSide }
+      sectionsSeen.push(`"${heading.text}" (row ${row.sheetRowNumber})`)
+      return
+    }
+    if (isTotalsRow(rawCellText(cells[nameIndex] ?? null))) {
+      totalsSkipped.push(row.sheetRowNumber)
+      return
+    }
+
+    familyCount += 1
     const groupCodeRaw = groupCodeIndex != null ? cells[groupCodeIndex] : null
     const familyNumber =
       groupCodeRaw !== null && groupCodeRaw !== undefined && String(groupCodeRaw).trim() !== ''
         ? String(groupCodeRaw).trim()
-        : String(i + 1)
+        : String(familyCount)
 
     const familyWarnings: ImportWarning[] = []
     const raw = rawRecord(headers, cells)
@@ -718,27 +941,38 @@ export function parseContactsSheet(
       })
     }
 
+    // Phones: the dial column first, then the alternate column. The first
+    // usable number is dialled, the next distinct one is the alternate.
     const contactCell = contactIndex !== null ? cells[contactIndex] ?? null : null
-    const mobile = normaliseMobile(contactCell)
-    const contactRaw = rawCellText(contactCell)
+    const altCell = altContactIndex !== null ? cells[altContactIndex] ?? null : null
+    const fromContact = splitMobiles(contactCell)
+    const fromAlt = splitMobiles(altCell)
+    const allNumbers = [...fromContact.numbers, ...fromAlt.numbers].filter(
+      (n, idx, arr) => arr.indexOf(n) === idx,
+    )
+    const primaryMobile = allNumbers[0] ?? null
+    const altMobile = allNumbers[1] ?? null
+    const contactRaw = rawCellText(contactCell) ?? rawCellText(altCell)
+
     if (contactIndex !== null) {
-      if (mobile.reason) {
+      const unreadable = fromContact.reason ?? fromAlt.reason
+      if (primaryMobile === null && unreadable) {
         familyWarnings.push({
           code: 'mobile_unreadable',
           severity: 'warning',
           familyNumber,
           sheetRowNumber: row.sheetRowNumber,
-          field: 'Contact',
+          field: headers[contactIndex] ?? 'Contact',
           rawValue: contactRaw,
-          action: `Left blank rather than guessed — the number ${mobile.reason}. This guest cannot be dialled until it is fixed.`,
+          action: `Left blank rather than guessed — the number ${unreadable}. This guest cannot be dialled until it is fixed.`,
         })
-      } else if (mobile.value === null) {
+      } else if (primaryMobile === null) {
         familyWarnings.push({
           code: 'mobile_missing',
           severity: 'warning',
           familyNumber,
           sheetRowNumber: row.sheetRowNumber,
-          field: 'Contact',
+          field: headers[contactIndex] ?? 'Contact',
           rawValue: null,
           action: 'Imported with no phone number — this guest cannot be dialled.',
         })
@@ -747,19 +981,58 @@ export function parseContactsSheet(
 
     const cityRaw = cityIndex === null ? null : cells[cityIndex] ?? null
     const place = normaliseText(cityRaw)
-    const primaryMobile = mobile.value
     const headName = name.value
 
+    // Headcount: an explicit total wins; otherwise Adult + Kids.
     const paxRaw = paxIndex != null ? cells[paxIndex] : null
-    const paxParsed = paxRaw !== null && paxRaw !== undefined ? parsePax(paxRaw) : null
-    const expectedPax = paxParsed ?? 1
+    let expectedPax: number | null = isBlankCell(paxRaw) ? null : parsePax(paxRaw)
+    if (expectedPax === null && (adultsIndex != null || kidsIndex != null)) {
+      const adults = adultsIndex != null && !isBlankCell(cells[adultsIndex]) ? parsePax(cells[adultsIndex]) : null
+      const kids = kidsIndex != null && !isBlankCell(cells[kidsIndex]) ? parsePax(cells[kidsIndex]) : null
+      if (adults !== null || kids !== null) expectedPax = (adults ?? 0) + (kids ?? 0)
+    }
+    if (expectedPax === null) {
+      if (hasHeadcount && headName !== null) {
+        familyWarnings.push({
+          code: 'pax_missing',
+          severity: 'warning',
+          familyNumber,
+          sheetRowNumber: row.sheetRowNumber,
+          field: 'Pax',
+          rawValue: null,
+          action: 'Headcount left blank in the sheet — set to 1. Confirm it on the call.',
+        })
+      }
+      expectedPax = 1
+    }
 
-    const remarkRaw = remarksIndex != null ? cells[remarksIndex] : null
-    const remark = normaliseText(remarkRaw)
+    // Remarks the caller sees: relation, the Remarks cell, and Excel cell
+    // notes ("Call Both", "Call Via Botim"). A note on a phone cell names
+    // whose number it is, so it keeps that column's header as a label.
+    const remarkParts: string[] = []
+    const relation = cellText(cells, relationIndex)
+    if (relation) remarkParts.push(`Relation: ${relation}`)
+    const remarkCell = cellText(cells, remarksIndex)
+    if (remarkCell) remarkParts.push(remarkCell)
+    for (const note of rowComments?.[row.sheetRowNumber - 1] ?? []) {
+      const label = note.col === nameIndex ? null : normaliseText(headers[note.col] ?? null)
+      const text = label ? `${label}: ${note.text}` : note.text
+      const seen = remarkParts.some((p) => p.toLowerCase().includes(note.text.toLowerCase()))
+      if (!seen) remarkParts.push(text)
+    }
+    const remark = remarkParts.length > 0 ? remarkParts.join(' · ') : null
 
     const roomRaw = roomIndex != null ? cells[roomIndex] : null
     const room = normaliseText(roomRaw)
     const extras: RowExtras = { id: null, room, bed: null }
+
+    const sectionNow = section as { side: NormalisedSide | null; subSide: SubSide | null } | null
+    const resolvedSide = resolveImportedSide(
+      sideIndex != null ? cells[sideIndex] : null,
+      subSideIndex != null ? cells[subSideIndex] : null,
+      sectionNow?.side ?? options.defaultSide,
+      sectionNow?.subSide ?? options.defaultSubSide,
+    )
 
     const members: ParsedMember[] = []
     if (headName !== null) {
@@ -776,15 +1049,18 @@ export function parseContactsSheet(
 
     const family: ParsedFamily = {
       familyNumber,
-      familyIndex: i + 1,
+      familyIndex: familyCount,
       sourceRowIndex: row.sheetRowNumber,
       sheetRowNumbers: [row.sheetRowNumber],
       hash: rowHash({ headName: headName ?? '', groupCode: familyNumber, primaryMobile }),
       headName,
       headNameRaw,
       place,
+      side: resolvedSide.side,
+      subSide: resolvedSide.subSide,
       primaryMobile,
       primaryMobileRaw: contactRaw,
+      altMobile,
       expectedPax,
       memberCount: members.length,
       remark,
@@ -804,6 +1080,21 @@ export function parseContactsSheet(
     warnings.push(...familyWarnings)
   })
 
+  if (sectionsSeen.length > 0) {
+    notes.push({
+      column: 'subSide',
+      label: 'Sections',
+      detail: `${sectionsSeen.join(', ')} read as headings, not guests — each sets the side of the rows under it.`,
+    })
+  }
+  if (totalsSkipped.length > 0) {
+    notes.push({
+      column: 'pax',
+      label: 'Totals rows',
+      detail: `row${totalsSkipped.length === 1 ? '' : 's'} ${totalsSkipped.join(', ')} skipped — they are sums, not families.`,
+    })
+  }
+
   return {
     ok: true,
     sheetName: sheet.sheetName,
@@ -816,7 +1107,7 @@ export function parseContactsSheet(
       warnings,
       dateWindow: window,
       counts: {
-        sheetRows: rows.length,
+        sheetRows: rows.length - sectionsSeen.length - totalsSkipped.length,
         blankRowsSkipped: 0,
         families: families.length,
         members: families.reduce((n, f) => n + f.members.length, 0),
@@ -844,6 +1135,8 @@ export function parseCustomMapping(
     groupCodeIndex?: number | null
     remarksIndex?: number | null
     roomIndex?: number | null
+    sideIndex?: number | null
+    subSideIndex?: number | null
   },
   options: ParseFamiliesOptions,
 ): ContactsParseOutcome {
@@ -868,6 +1161,8 @@ export function parseCustomMapping(
     groupCodeIndex: mapping.groupCodeIndex ?? null,
     remarksIndex: mapping.remarksIndex ?? null,
     roomIndex: mapping.roomIndex ?? null,
+    sideIndex: mapping.sideIndex ?? null,
+    subSideIndex: mapping.subSideIndex ?? null,
     rows,
   }
 

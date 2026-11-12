@@ -21,6 +21,14 @@ interface Summary {
   blankRowsSkipped: number
   orphans: number
   blockedFamilies: number
+  groomFather: number
+  groomMother: number
+  groomGeneral: number
+  brideFather: number
+  brideMother: number
+  brideGeneral: number
+  bothOrOther: number
+  unassignedSide: number
 }
 
 function summarise(result: ParsedFamilySheet): Summary {
@@ -37,6 +45,14 @@ function summarise(result: ParsedFamilySheet): Summary {
     blankRowsSkipped: counts.blankRowsSkipped,
     orphans: counts.orphans,
     blockedFamilies: counts.blockedFamilies,
+    groomFather: families.filter((f) => f.side === 'groom' && f.subSide === 'father').length,
+    groomMother: families.filter((f) => f.side === 'groom' && f.subSide === 'mother').length,
+    groomGeneral: families.filter((f) => f.side === 'groom' && f.subSide === null).length,
+    brideFather: families.filter((f) => f.side === 'bride' && f.subSide === 'father').length,
+    brideMother: families.filter((f) => f.side === 'bride' && f.subSide === 'mother').length,
+    brideGeneral: families.filter((f) => f.side === 'bride' && f.subSide === null).length,
+    bothOrOther: families.filter((f) => f.side === 'both' || f.side === 'other').length,
+    unassignedSide: families.filter((f) => f.side === null).length,
   }
 }
 
@@ -108,6 +124,38 @@ export function SummaryBar({ result }: SummaryBarProps) {
         <div className="grid grid-cols-2 gap-2">
           <Stat label="No arrival date" value={s.missingArrivalDate} tone="neutral" />
           <Stat label="Blank rows skipped" value={s.blankRowsSkipped} tone="neutral" />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {s.groomFather > 0 ? (
+            <Stat label="Groom's Father Side" value={s.groomFather} tone="info" />
+          ) : null}
+          {s.groomMother > 0 ? (
+            <Stat label="Groom's Mother Side" value={s.groomMother} tone="info" />
+          ) : null}
+          {s.groomGeneral > 0 ? (
+            <Stat label="Groom Side (unsplit)" value={s.groomGeneral} tone="info" />
+          ) : null}
+          {s.brideFather > 0 ? (
+            <Stat label="Bride's Father Side" value={s.brideFather} tone="info" />
+          ) : null}
+          {s.brideMother > 0 ? (
+            <Stat label="Bride's Mother Side" value={s.brideMother} tone="info" />
+          ) : null}
+          {s.brideGeneral > 0 ? (
+            <Stat label="Bride Side (unsplit)" value={s.brideGeneral} tone="info" />
+          ) : null}
+          {s.bothOrOther > 0 ? (
+            <Stat label="Both / Other side" value={s.bothOrOther} tone="neutral" />
+          ) : null}
+          {s.unassignedSide > 0 ? (
+            <Stat
+              label="Side not assigned"
+              value={s.unassignedSide}
+              tone="warning"
+              note="Pick Groom / Bride side above before confirming."
+              emphasis
+            />
+          ) : null}
         </div>
         {/* Nothing in this sheet can produce `confirmed`. Said out loud because
             a reader who sees "Not started: 231" will otherwise go looking for

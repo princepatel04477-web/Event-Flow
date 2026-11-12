@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { StatusPill } from '@/components/ui/StatusPill'
 import type { LockNote } from '@/lib/lock'
 import { dialTarget } from '@/lib/native-call'
-import { SIDE_LABELS } from '@/lib/review/payload'
+import { formatSideLabel } from '@/lib/side'
 import { rsvpStatusLabel } from '@/lib/rsvp'
 import { statusTone } from '@/lib/status'
 import { cn, formatDateTime } from '@/lib/utils'
@@ -47,7 +47,7 @@ export function CurrentFamilyCard({
   const callback = row.next_callback_at
   const canDial = dialTarget(row.primary_mobile) !== null
   const relation = relationLabel(row.group_type)
-  const sideLabel = row.side ? (SIDE_LABELS[row.side as Side] ?? row.side) : null
+  const sideLabel = formatSideLabel((row.side as Side) ?? null, row.sub_side) ?? row.side
 
   const metaLine = [
     relation,

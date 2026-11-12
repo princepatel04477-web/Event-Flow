@@ -15,6 +15,7 @@
 
 import { isBlankCell } from './cells'
 import { parseFamilies, type ParsedFamilySheet, type ParseFamiliesOptions } from './families'
+import { parseSubSide } from './normalize'
 import {
   locateKnownLayout,
   type KnownLayout,
@@ -117,6 +118,26 @@ export async function parseKnownWorkbook(
  * remarks) — and then against the flexible contacts shape (a Name column and
  * optional phone / pax / city / remarks / group columns).
  */
+function withTabSideDefaults(sheetName: string, options: ParseFamiliesOptions): ParseFamiliesOptions {
+  // "Groom_Invitation_List": `_` is a word character, so groom never
+  // matched it. Treat _ - . as spaces before looking for the side.
+  const lower = sheetName.toLowerCase().replace(/[_\-.]+/g, ' ')
+  const hasBride = /\bbride\b/.test(lower)
+  const hasGroom = /\bgroom\b/.test(lower)
+  const inferredSide =
+    hasBride && hasGroom ? 'both' : hasBride ? 'bride' : hasGroom ? 'groom' : null
+  const side = options.defaultSide ?? inferredSide
+  const inferredSubSide =
+    side && (side === 'bride' || side === 'groom') && (options.defaultSide == null || inferredSide === side)
+      ? parseSubSide(lower)
+      : null
+  return {
+    ...options,
+    defaultSide: side ?? null,
+    defaultSubSide: options.defaultSubSide ?? inferredSubSide,
+  }
+}
+
 export async function parseImportFile(
   file: File,
   options: ParseFamiliesOptions,
@@ -150,7 +171,7 @@ export async function parseImportFile(
         headers,
         layout: located.layout,
         notes: located.notes,
-        result: parseFamilies({ headers, rows, blankRowsSkipped }, located.layout, options),
+        result: parseFamilies({ headers, rows, blankRowsSkipped }, located.layout, withTabSideDefaults(name, options)),
         workbookGrids,
       }
     }
@@ -167,13 +188,13 @@ export async function parseImportFile(
 
   // Pass 2 — the flexible contacts/guest shape (searches candidate rows for Name and optional columns).
   let contactsReason: string | null = null
-  for (const { sheetName: name, grid } of ordered) {
-    const contacts = resolveContactsGrid(grid, name)
+  for (const { sheetName: name, grid, comments } of ordered) {
+    const contacts = resolveContactsGrid(grid, name, undefined, { comments })
     if (!contacts.ok) {
       if (contactsReason === null) contactsReason = contacts.reason
       continue
     }
-    const parsed = parseContactsSheet(contacts.sheet, options)
+    const parsed = parseContactsSheet(contacts.sheet, withTabSideDefaults(name, options))
     if (parsed.ok) {
       return {
         ...parsed,

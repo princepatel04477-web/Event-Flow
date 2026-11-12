@@ -91,6 +91,8 @@ function guestMasterSheet(rows: GuestMasterRow[]): AnySheetDefinition {
       { key: 'departureMode', header: 'Mode', type: 'string', width: 12 },
       { key: 'departureDetails', header: 'Details', type: 'text', width: 22 },
       { key: 'drop', header: 'Drop', type: 'text', width: 16 },
+      { key: 'side', header: 'Side', type: 'string', width: 12 },
+      { key: 'subSide', header: 'Sub-side', type: 'string', width: 16 },
     ],
   }
 }

@@ -59,12 +59,17 @@ export function groupTypeLabel(value: GroupType | null): string | null {
   return value ? GROUP_TYPE_LABELS[value] : null
 }
 
-export function sideLabel(value: Side | null): string | null {
+export function sideLabel(
+  value: Side | null,
+  subSide?: string | null,
+): string | null {
   if (!value) return null
   // A bare "Both" / "Other" chip next to a name reads as nonsense, but note
   // 'other' is a RECORDED choice — it must not be relabelled "not recorded".
   if (value === 'both') return 'Both sides'
   if (value === 'other') return 'Other side'
+  if (subSide === 'father') return `${SIDE_LABELS[value]}'s Father Side`
+  if (subSide === 'mother') return `${SIDE_LABELS[value]}'s Mother Side`
   return `${SIDE_LABELS[value]}'s side`
 }
 
@@ -182,18 +187,27 @@ export function groupBySide(families: GuestFamily[]): SideSection[] {
   const map: Record<string, GuestFamily[]> = {}
   for (const f of families) {
     const side = f.guests[0]?.side ?? 'other'
-    const key = side
+    const subSide = f.guests[0]?.sub_side ?? null
+    const key =
+      (side === 'groom' || side === 'bride') && (subSide === 'father' || subSide === 'mother')
+        ? `${side}:${subSide}`
+        : side
     if (!map[key]) map[key] = []
     map[key].push(f)
   }
-  const order = ['groom', 'bride', 'both', 'other']
-  const sections: SideSection[] = []
-  for (const key of order) {
+  const order = [
+    ['groom:father', "Groom's Father Side"],
+    ['groom:mother', "Groom's Mother Side"],
+    ['groom', "Groom's side"],
+    ['bride:father', "Bride's Father Side"],
+    ['bride:mother', "Bride's Mother Side"],
+    ['bride', "Bride's side"],
+    ['both', 'Both sides'],
+    ['other', 'Other guests'],
+  ]
+  const sections = []
+  for (const [key, label] of order) {
     if (map[key]?.length) {
-      const label = key === 'groom' ? "Groom's side"
-        : key === 'bride' ? "Bride's side"
-        : key === 'both' ? 'Both sides'
-        : 'Other guests'
       sections.push({ label, families: map[key] })
     }
   }

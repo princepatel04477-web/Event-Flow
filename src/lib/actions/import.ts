@@ -151,8 +151,15 @@ const commitFamilySchema = z.object({
   familyNumber: z.string(),
   headName: z.string().nullable(),
   primaryMobile: z.string().nullable(),
+  // Both optional so an older open preview tab still commits. The SQL has
+  // always read `altMobile` and `remarks`; they were simply never sent, so
+  // "Call Both" / relation notes in a sheet were dropped on the floor.
+  altMobile: z.string().nullable().optional(),
+  remark: z.string().nullable().optional(),
   place: z.string().nullable(),
   expectedPax: z.number().nullable(),
+  side: z.enum(['bride', 'groom', 'both', 'other']).nullable().optional(),
+  subSide: z.enum(['father', 'mother']).nullable().optional(),
   canImport: z.boolean(),
   blockReason: z.string().nullable(),
   arrival: legSchema,
@@ -210,8 +217,12 @@ export async function commitImport(
     headName: f.headName,
     groupCode: f.familyNumber,
     primaryMobile: f.primaryMobile,
+    altMobile: f.altMobile ?? null,
+    remarks: f.remark ?? null,
     expectedPax: f.expectedPax,
     city: f.place,
+    side: f.side ?? null,
+    subSide: f.side === 'groom' || f.side === 'bride' ? (f.subSide ?? null) : null,
     arrival: f.arrival,
     departure: f.departure,
     rowHash: rowHashServer({

@@ -59,7 +59,16 @@ import {
 } from './cells'
 import { rowHash } from './hash'
 import type { KnownLayout } from './layout'
-import { importRsvpStatus, normaliseMobile, normaliseText, parsePax, type ImportRsvpStatus } from './normalize'
+import {
+  importRsvpStatus,
+  normaliseMobile,
+  normaliseText,
+  parsePax,
+  resolveImportedSide,
+  type ImportRsvpStatus,
+  type NormalisedSide,
+  type SubSide,
+} from './normalize'
 import type { RawSheetRow } from './parse'
 
 // ---------------------------------------------------------------------------
@@ -218,9 +227,19 @@ export interface ParsedFamily {
   headNameRaw: string | null
   /** `PLACE` -> `guest_groups.city`. */
   place: string | null
+  /** Primary wedding side (`groom` / `bride` / `both` / `other`), if known. */
+  side: NormalisedSide | null
+  /** Family branch under Groom/Bride (`father` / `mother`), if bifurcated. */
+  subSide: SubSide | null
   /** 10 digits, or null. Never a truncated guess. */
   primaryMobile: string | null
   primaryMobileRaw: string | null
+  /**
+   * A second dialable number -> `guest_groups.alt_mobile`: the second number
+   * in a "9414075324, 9214078324" cell, or a separate WhatsApp column. Only
+   * the contacts path sets it; the known layout has no such column.
+   */
+  altMobile?: string | null
   /** The `Pax` cell. Null means "the sheet did not say" — never assumed. */
   expectedPax: number | null
   /** How many names this family actually lists. */
@@ -297,6 +316,10 @@ export interface ParseFamiliesOptions {
   eventStartsOn: string | null
   /** `events.ends_on`. */
   eventEndsOn: string | null
+  /** Optional import-level primary side (`groom` / `bride`) applied when rows do not specify one. */
+  defaultSide?: NormalisedSide | null
+  /** Optional import-level family branch (`father` / `mother`) applied when rows do not specify one. */
+  defaultSubSide?: SubSide | null
 }
 
 // ---------------------------------------------------------------------------
@@ -571,6 +594,13 @@ export function parseFamilies(
         })
       }
 
+      const resolvedSide = resolveImportedSide(
+        cellAt(cells, layout.side),
+        cellAt(cells, layout.subSide),
+        options.defaultSide,
+        options.defaultSubSide,
+      )
+
       const family: ParsedFamily = {
         familyNumber,
         familyIndex,
@@ -584,6 +614,8 @@ export function parseFamilies(
         headName: name.value,
         headNameRaw,
         place: normaliseText(cellAt(cells, layout.place)),
+        side: resolvedSide.side,
+        subSide: resolvedSide.subSide,
         primaryMobile,
         primaryMobileRaw: contactRaw,
         expectedPax,

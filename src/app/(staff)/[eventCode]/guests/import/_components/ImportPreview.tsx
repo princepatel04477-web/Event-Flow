@@ -10,10 +10,12 @@ import { LinkButton } from '@/components/ui/LinkButton'
 import type { CommitResult, ImportContext } from '@/lib/actions/import'
 import type { ContactsParseSuccess } from '@/lib/import/contactsSheet'
 import type { ImportOutcome, KnownSheetFailure, WorkbookGrids } from '@/lib/import/knownSheet'
+import type { SubSide } from '@/lib/import/normalize'
 
 import { CommitSummary } from './CommitSummary'
 import { MappingStep } from './MappingStep'
 import { PreviewStep } from './PreviewStep'
+import type { ImportPrimarySide } from './SideBifurcationSelector'
 import { UploadStep } from './UploadStep'
 
 export interface ImportPreviewProps {
@@ -65,6 +67,13 @@ export function ImportPreview({
     : null
 
   const [showMapping, setShowMapping] = useState(false)
+  const [defaultSide, setDefaultSide] = useState<ImportPrimarySide | null>(null)
+  const [defaultSubSide, setDefaultSubSide] = useState<SubSide | null>(null)
+
+  function handleSideChange(nextSide: ImportPrimarySide | null, nextSubSide: SubSide | null) {
+    setDefaultSide(nextSide)
+    setDefaultSubSide(nextSubSide)
+  }
 
   function handleResult(name: string, next: ImportOutcome) {
     setFileName(name)
@@ -88,6 +97,8 @@ export function ImportPreview({
     setError(null)
     setSummary(null)
     setShowMapping(false)
+    setDefaultSide(null)
+    setDefaultSubSide(null)
   }
 
   /** A commit landed: drop the preview, KEEP the counts. */
@@ -97,6 +108,8 @@ export function ImportPreview({
     setOutcome(null)
     setShowMapping(false)
     setError(null)
+    setDefaultSide(null)
+    setDefaultSubSide(null)
   }
 
   function handleParsedFromMapping(
@@ -178,6 +191,9 @@ export function ImportPreview({
         <UploadStep
           eventStartsOn={eventStartsOn}
           eventEndsOn={eventEndsOn}
+          defaultSide={defaultSide}
+          defaultSubSide={defaultSubSide}
+          onSideChange={handleSideChange}
           onResult={handleResult}
           onError={setError}
         />
@@ -187,7 +203,7 @@ export function ImportPreview({
           workbookGrids={outcome.workbookGrids}
           initialSheetName={outcome.sheetName}
           initialHeaderRowIndex={'headerRowNumber' in outcome ? outcome.headerRowNumber - 1 : 0}
-          options={{ eventStartsOn, eventEndsOn }}
+          options={{ eventStartsOn, eventEndsOn, defaultSide, defaultSubSide }}
           onParsed={handleParsedFromMapping}
           onCancel={handleStartOver}
         />
@@ -202,6 +218,9 @@ export function ImportPreview({
             // fallback was invisible.
             outcome={{ ...outcome, contactsFallback: !('layout' in outcome) }}
             context={context}
+            defaultSide={defaultSide}
+            defaultSubSide={defaultSubSide}
+            onSideChange={handleSideChange}
             // Hands the counts up before the preview is dropped — see
             // `handleCommitted`. NOT `handleStartOver`, which discards them.
             onCommitted={handleCommitted}

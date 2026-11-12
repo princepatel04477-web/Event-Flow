@@ -99,6 +99,8 @@ export function MappingStep({
         groupCodeIndex: res.sheet.groupCodeIndex ?? null,
         remarksIndex: res.sheet.remarksIndex ?? null,
         roomIndex: res.sheet.roomIndex ?? null,
+        sideIndex: res.sheet.sideIndex ?? null,
+        subSideIndex: res.sheet.subSideIndex ?? null,
       }
     }
     const detectedPhone = detectContactColumnFromData(
@@ -114,6 +116,8 @@ export function MappingStep({
       groupCodeIndex: null,
       remarksIndex: null,
       roomIndex: null,
+      sideIndex: null,
+      subSideIndex: null,
     }
   }, [headers, currentSheet.grid, headerRowIndex])
 
@@ -123,6 +127,8 @@ export function MappingStep({
   const [cityCol, setCityCol] = useState<number | null>(() => autoMapping.cityIndex)
   const [groupCodeCol, setGroupCodeCol] = useState<number | null>(() => autoMapping.groupCodeIndex)
   const [remarksCol, setRemarksCol] = useState<number | null>(() => autoMapping.remarksIndex)
+  const [sideCol, setSideCol] = useState<number | null>(() => autoMapping.sideIndex)
+  const [subSideCol, setSubSideCol] = useState<number | null>(() => autoMapping.subSideIndex)
 
   const [error, setError] = useState<string | null>(null)
 
@@ -149,6 +155,8 @@ export function MappingStep({
       setCityCol(res.sheet.cityIndex ?? null)
       setGroupCodeCol(res.sheet.groupCodeIndex ?? null)
       setRemarksCol(res.sheet.remarksIndex ?? null)
+      setSideCol(res.sheet.sideIndex ?? null)
+      setSubSideCol(res.sheet.subSideIndex ?? null)
     } else {
       const detectedPhone = detectContactColumnFromData(
         currentSheet.grid,
@@ -156,6 +164,8 @@ export function MappingStep({
         new Set([0]),
       )
       setContactCol(detectedPhone)
+      setSideCol(null)
+      setSubSideCol(null)
     }
   }
 
@@ -187,6 +197,8 @@ export function MappingStep({
         setCityCol(res.sheet.cityIndex ?? null)
         setGroupCodeCol(res.sheet.groupCodeIndex ?? null)
         setRemarksCol(res.sheet.remarksIndex ?? null)
+        setSideCol(res.sheet.sideIndex ?? null)
+        setSubSideCol(res.sheet.subSideIndex ?? null)
       } else {
         setNameCol(0)
         const detectedPhone = detectContactColumnFromData(
@@ -199,6 +211,8 @@ export function MappingStep({
         setCityCol(null)
         setGroupCodeCol(null)
         setRemarksCol(null)
+        setSideCol(null)
+        setSubSideCol(null)
       }
     }
   }
@@ -233,6 +247,8 @@ export function MappingStep({
           cityIndex: cityCol,
           groupCodeIndex: groupCodeCol,
           remarksIndex: remarksCol,
+          sideIndex: sideCol,
+          subSideIndex: subSideCol,
         },
         options,
       )
@@ -374,6 +390,28 @@ export function MappingStep({
               }}
               options={optionalColumnOptions}
             />
+
+            <Select
+              label="Side (Groom / Bride)"
+              hint="Optional. Groom, Bride, or combined like Groom's Father Side."
+              value={sideCol !== null ? String(sideCol) : '-1'}
+              onChange={(e) => {
+                const val = Number(e.target.value)
+                setSideCol(val >= 0 ? val : null)
+              }}
+              options={optionalColumnOptions}
+            />
+
+            <Select
+              label="Family Branch (Father / Mother)"
+              hint="Optional. Bifurcates into Father's or Mother's side."
+              value={subSideCol !== null ? String(subSideCol) : '-1'}
+              onChange={(e) => {
+                const val = Number(e.target.value)
+                setSubSideCol(val >= 0 ? val : null)
+              }}
+              options={optionalColumnOptions}
+            />
           </div>
         </div>
 
@@ -390,6 +428,7 @@ export function MappingStep({
                     <th className="px-3 py-2">Phone</th>
                     <th className="px-3 py-2">Pax</th>
                     <th className="px-3 py-2">City</th>
+                    <th className="px-3 py-2">Side</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -398,12 +437,19 @@ export function MappingStep({
                     const phone = contactCol !== null && contactCol >= 0 ? String(row[contactCol] ?? '') : ''
                     const pax = paxCol !== null && paxCol >= 0 ? String(row[paxCol] ?? '1') : '1'
                     const city = cityCol !== null && cityCol >= 0 ? String(row[cityCol] ?? '') : ''
+                    const sideCell = [
+                      sideCol !== null && sideCol >= 0 ? String(row[sideCol] ?? '').trim() : '',
+                      subSideCol !== null && subSideCol >= 0 ? String(row[subSideCol] ?? '').trim() : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
                     return (
                       <tr key={idx} className="hover:bg-tint-neutral/20">
                         <td className="px-3 py-2 font-medium text-fg">{name || '—'}</td>
                         <td className="px-3 py-2 text-muted">{phone || '—'}</td>
                         <td className="px-3 py-2 text-muted">{pax || '1'}</td>
                         <td className="px-3 py-2 text-muted">{city || '—'}</td>
+                        <td className="px-3 py-2 text-muted">{sideCell || '—'}</td>
                       </tr>
                     )
                   })}

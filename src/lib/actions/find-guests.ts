@@ -176,6 +176,7 @@ function asProfileRow(row: GuestSearchRow): GuestProfileRow | null {
     family_head: row.family_head,
     group_type: row.group_type,
     side: row.side,
+    sub_side: row.sub_side,
     pax: row.pax,
     rsvp_status: null,
     hotel_name: row.hotel_name,

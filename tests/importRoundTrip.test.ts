@@ -41,6 +41,7 @@ function group(overrides: Partial<GuestGroupRow> & Pick<GuestGroupRow, 'id' | 'g
     primary_mobile: null,
     alt_mobile: null,
     side: null,
+    sub_side: null,
     group_type: 'family',
     city: null,
     expected_pax: 1,

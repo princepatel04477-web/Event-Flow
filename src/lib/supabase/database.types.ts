@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.18"
   }
   app: {
     Tables: {
@@ -1233,6 +1233,7 @@ export type Database = {
           side: Database["app"]["Enums"]["side"] | null
           source_row_hash: string | null
           special_requirements: string[]
+          sub_side: string | null
           updated_at: string
         }
         Insert: {
@@ -1268,6 +1269,7 @@ export type Database = {
           side?: Database["app"]["Enums"]["side"] | null
           source_row_hash?: string | null
           special_requirements?: string[]
+          sub_side?: string | null
           updated_at?: string
         }
         Update: {
@@ -1303,6 +1305,7 @@ export type Database = {
           side?: Database["app"]["Enums"]["side"] | null
           source_row_hash?: string | null
           special_requirements?: string[]
+          sub_side?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3456,6 +3459,7 @@ export type Database = {
           room_number: string | null
           rsvp_status: Database["app"]["Enums"]["rsvp_status"] | null
           side: Database["app"]["Enums"]["side"] | null
+          sub_side: string | null
         }
         Relationships: [
           {
@@ -3761,6 +3765,7 @@ export type Database = {
           remarks: string | null
           rsvp_status: Database["app"]["Enums"]["rsvp_status"] | null
           side: Database["app"]["Enums"]["side"] | null
+          sub_side: string | null
         }
         Relationships: [
           {
@@ -3794,6 +3799,13 @@ export type Database = {
           {
             foreignKeyName: "guest_groups_last_opened_by_staff_fkey"
             columns: ["last_opened_by_staff"]
+            isOneToOne: false
+            referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_groups_locked_by_staff_fkey"
+            columns: ["locked_by_staff"]
             isOneToOne: false
             referencedRelation: "staff_members"
             referencedColumns: ["id"]
@@ -3948,6 +3960,7 @@ export type Database = {
           side: Database["app"]["Enums"]["side"] | null
           source_row_hash: string | null
           special_requirements: string[]
+          sub_side: string | null
           updated_at: string
         }
         SetofOptions: {
@@ -4054,6 +4067,7 @@ export type Database = {
           side: Database["app"]["Enums"]["side"] | null
           source_row_hash: string | null
           special_requirements: string[]
+          sub_side: string | null
           updated_at: string
         }
         SetofOptions: {
@@ -4099,6 +4113,33 @@ export type Database = {
           p_start_number: number
         }
         Returns: Json
+      }
+      event_board: {
+        Args: { p_event_id: string }
+        Returns: {
+          arrivals_no_vehicle: number | null
+          arrivals_today: number | null
+          confirmed_no_room: number | null
+          departures_today: number | null
+          event_id: string | null
+          guests_roomed: number | null
+          hampers_delivered: number | null
+          hampers_pending: number | null
+          logistics_expense: number | null
+          name: string | null
+          no_departure: number | null
+          return_gifts_delivered: number | null
+          rsvp_confirmed: number | null
+          rsvp_pending: number | null
+          total_groups: number | null
+          total_pax: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "v_event_board"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       issue_access_code: {
         Args: {
@@ -4218,6 +4259,7 @@ export type Database = {
           side: Database["app"]["Enums"]["side"] | null
           source_row_hash: string | null
           special_requirements: string[]
+          sub_side: string | null
           updated_at: string
         }
         SetofOptions: {
@@ -4252,6 +4294,7 @@ export type Database = {
           return_gift_delivered: boolean
           room_number: string
           side: Database["app"]["Enums"]["side"]
+          sub_side: string
         }[]
       }
       session_code_live: { Args: never; Returns: boolean }

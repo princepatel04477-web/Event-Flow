@@ -7,12 +7,24 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { downloadTemplate } from '@/lib/export/download'
 import { parseImportFile, type ImportOutcome } from '@/lib/import/knownSheet'
+import type { SubSide } from '@/lib/import/normalize'
+
+import {
+  SideBifurcationSelector,
+  type ImportPrimarySide,
+} from './SideBifurcationSelector'
 
 export interface UploadStepProps {
   /** `events.starts_on`. Ordinal dates ("4TH") cannot resolve without it. */
   eventStartsOn: string | null
   /** `events.ends_on`. Nullable in the schema; the parser handles its absence. */
   eventEndsOn: string | null
+  /** Selected primary wedding side for the uploaded list, if chosen up front. */
+  defaultSide: ImportPrimarySide | null
+  /** Selected family branch (father / mother) under the primary side. */
+  defaultSubSide: SubSide | null
+  /** Update the selected import side and branch. */
+  onSideChange: (side: ImportPrimarySide | null, subSide: SubSide | null) => void
   /** Called for both a clean parse and a layout mismatch — both are results. */
   onResult: (fileName: string, outcome: ImportOutcome) => void
   /** Called when the file could not be read at all (wrong tab, corrupt file). */
@@ -26,7 +38,15 @@ export interface UploadStepProps {
  * 465 people's names and phone numbers do not need to cross the network for
  * somebody to look at a preview of them, so they do not.
  */
-export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: UploadStepProps) {
+export function UploadStep({
+  eventStartsOn,
+  eventEndsOn,
+  defaultSide,
+  defaultSubSide,
+  onSideChange,
+  onResult,
+  onError,
+}: UploadStepProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
 
@@ -50,6 +70,8 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
       const outcome = await parseImportFile(file, {
         eventStartsOn,
         eventEndsOn,
+        defaultSide,
+        defaultSubSide,
       })
       onResult(file.name, outcome)
     } catch (e) {
@@ -86,6 +108,13 @@ export function UploadStep({ eventStartsOn, eventEndsOn, onResult, onError }: Up
             The file is processed on this device and not uploaded to any external server.
           </p>
         </div>
+
+        <SideBifurcationSelector
+          side={defaultSide}
+          subSide={defaultSubSide}
+          onChange={onSideChange}
+        />
+
         <input
           ref={inputRef}
           type="file"

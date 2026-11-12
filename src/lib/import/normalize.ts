@@ -138,14 +138,157 @@ export function normaliseGroupType(raw: unknown): NormalisedGroupType | null {
 }
 
 export type NormalisedSide = 'bride' | 'groom' | 'both' | 'other'
+export type SubSide = 'father' | 'mother'
+
+export interface ParsedSideInfo {
+  side: NormalisedSide | null
+  subSide: SubSide | null
+}
+
+function parseShorthandSide(token: string): ParsedSideInfo | null {
+  switch (token) {
+    case 'gf':
+    case 'groom father':
+    case "groom's father":
+    case 'grooms father':
+    case 'groom father side':
+    case "groom's father side":
+      return { side: 'groom', subSide: 'father' }
+    case 'gm':
+    case 'groom mother':
+    case "groom's mother":
+    case 'grooms mother':
+    case 'groom mother side':
+    case "groom's mother side":
+      return { side: 'groom', subSide: 'mother' }
+    case 'bf':
+    case 'bride father':
+    case "bride's father":
+    case 'brides father':
+    case 'bride father side':
+    case "bride's father side":
+      return { side: 'bride', subSide: 'father' }
+    case 'bm':
+    case 'bride mother':
+    case "bride's mother":
+    case 'brides mother':
+    case 'bride mother side':
+    case "bride's mother side":
+      return { side: 'bride', subSide: 'mother' }
+    default:
+      return null
+  }
+}
 
 export function normaliseSide(raw: unknown): NormalisedSide | null {
   const s = normaliseText(raw)?.toLowerCase()
   if (!s) return null
+  const shorthand = parseShorthandSide(s)
+  if (shorthand) return shorthand.side
+  const hasBride = /\bbride/.test(s) || s.includes('bride')
+  const hasGroom = /\bgroom/.test(s) || s.includes('groom')
+  if (s.includes('both') || (hasBride && hasGroom)) return 'both'
+  if (hasBride) return 'bride'
+  if (hasGroom) return 'groom'
+  return 'other'
+}
+
+export function parseSubSide(raw: unknown): SubSide | null {
+  const s = normaliseText(raw)?.toLowerCase()
+  if (!s) return null
+  const shorthand = parseShorthandSide(s)
+  if (shorthand) return shorthand.subSide
+  if (
+    /\bfather(?:'?s)?\b/.test(s) ||
+    /\bpaternal\b/.test(s) ||
+    /\bdad\b/.test(s) ||
+    /\bpapa\b/.test(s)
+  ) {
+    return 'father'
+  }
+  if (
+    /\bmother(?:'?s)?\b/.test(s) ||
+    /\bmaternal\b/.test(s) ||
+    /\bmom\b/.test(s) ||
+    /\bmummy\b/.test(s) ||
+    /\bmama\b/.test(s)
+  ) {
+    return 'mother'
+  }
+  return null
+}
+
+/**
+ * Resolve both primary side (`groom` / `bride` / `both` / `other`) and
+ * family branch (`father` / `mother`) from separate or combined cells.
+ *
+ * Accepts either two columns ("Groom" + "Father's Side") or a single
+ * combined string ("Groom's Father Side", "Bride Mother", "GF", etc.).
+ */
+export function parseSideAndSubSide(rawSide: unknown, rawSubSide?: unknown): ParsedSideInfo {
+  const sideText = normaliseText(rawSide)?.toLowerCase() ?? null
+  const subText = normaliseText(rawSubSide)?.toLowerCase() ?? null
+
+  const shorthandFromSide = sideText ? parseShorthandSide(sideText) : null
+  const shorthandFromSub = subText ? parseShorthandSide(subText) : null
+
+  const explicitSide =
+    (sideText ? normaliseSide(sideText) : null) ??
+    shorthandFromSub?.side ??
+    (subText ? inferPrimarySideIfExplicit(subText) : null)
+
+  const explicitSub =
+    (subText ? parseSubSide(subText) : null) ??
+    (sideText ? parseSubSide(sideText) : null) ??
+    shorthandFromSide?.subSide ??
+    null
+
+  if (explicitSide === 'both' || explicitSide === 'other') {
+    return { side: explicitSide, subSide: null }
+  }
+
+  return {
+    side: explicitSide,
+    subSide: explicitSub,
+  }
+}
+
+function inferPrimarySideIfExplicit(s: string): NormalisedSide | null {
   if (s.includes('both')) return 'both'
   if (s.includes('bride')) return 'bride'
   if (s.includes('groom')) return 'groom'
-  return 'other'
+  return null
+}
+
+/**
+ * Merge row-level side / sub-side cells with import-level defaults.
+ *
+ * Row values always win over import-level defaults, and a default sub-side
+ * is only inherited when the resolved primary side matches the default side
+ * (or no default primary side was specified), preventing e.g. Groom's Father
+ * from leaking onto an explicit Bride row.
+ */
+export function resolveImportedSide(
+  rawSide: unknown,
+  rawSubSide: unknown,
+  defaultSide?: NormalisedSide | null,
+  defaultSubSide?: SubSide | null,
+): ParsedSideInfo {
+  const rowParsed = parseSideAndSubSide(rawSide, rawSubSide)
+  const side = rowParsed.side ?? defaultSide ?? null
+  let subSide: SubSide | null = rowParsed.subSide
+  if (
+    subSide === null &&
+    defaultSubSide != null &&
+    (side === 'groom' || side === 'bride') &&
+    (defaultSide == null || side === defaultSide)
+  ) {
+    subSide = defaultSubSide
+  }
+  if (side === 'both' || side === 'other') {
+    subSide = null
+  }
+  return { side, subSide }
 }
 
 /**

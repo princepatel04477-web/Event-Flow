@@ -42,7 +42,7 @@ export function GuestCard({ row, headingLevel, showFamilyHead = false }: GuestCa
   const name = row.guest_name?.trim() || 'Name not recorded'
   const head = row.family_head?.trim() || null
 
-  const side = sideLabel(row.side)
+  const side = sideLabel(row.side, row.sub_side)
   const groupType = groupTypeLabel(row.group_type)
   const pax = typeof row.pax === 'number' ? row.pax : null
 

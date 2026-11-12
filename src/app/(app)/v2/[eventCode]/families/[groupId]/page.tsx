@@ -7,6 +7,7 @@ import { ChevronRightIcon } from '@/components/icons'
 import { getStaffViewerContext } from '@/lib/auth/section-guard'
 import { mayOpenCallRecords, mayOpenHamperRun, sectionAllowedForDepartment } from '@/lib/departments'
 import { familyNextAction, type FamilyAction } from '@/lib/family/next-action'
+import { formatSideLabel } from '@/lib/side'
 import { createClient } from '@/lib/supabase/server'
 import { requireStaff, resolveEventByCode } from '@/lib/supabase/queries'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -92,7 +93,7 @@ export default async function FamilyPage({ params }: PageProps) {
   const [groupRes, guestsRes, legsRes, attemptsRes, staysRes, hamperRes] = await Promise.all([
     supabase
       .from('guest_groups')
-      .select('id, head_name, city, side, rsvp_status, expected_pax, confirmed_pax, callback_at, primary_mobile, remarks, special_requirements, locked_until')
+      .select('id, head_name, city, side, sub_side, rsvp_status, expected_pax, confirmed_pax, callback_at, primary_mobile, remarks, special_requirements, locked_until')
       .eq('id', groupId)
       .eq('event_id', event.id)
       .maybeSingle(),
@@ -172,7 +173,7 @@ export default async function FamilyPage({ params }: PageProps) {
     <div className="flex flex-col gap-5 pb-6">
       <header className="flex flex-col gap-1">
         <p className="text-sm text-muted">
-          {[group.city, group.side ? `${group.side}'s side` : null].filter(Boolean).join(' · ') || 'Family'}
+          {[group.city, formatSideLabel(group.side, group.sub_side)].filter(Boolean).join(' · ') || 'Family'}
         </p>
         <h1 className="font-display text-[2.5rem] leading-[1.05] text-ink">{group.head_name ?? 'Unnamed family'}</h1>
         {group.primary_mobile && can.answer ? (

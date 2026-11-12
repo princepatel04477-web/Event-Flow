@@ -13,6 +13,7 @@
  * source columns — recorded_at, created_at, updated_at — are DB defaults).
  */
 import type { Database } from '@/lib/supabase/database.types'
+import { formatSideLabel } from '@/lib/side'
 
 export type GuestGroupRow = Database['public']['Tables']['guest_groups']['Row']
 export type TravelLegRow = Database['public']['Tables']['travel_legs']['Row']
@@ -48,6 +49,8 @@ export interface GuestMasterRow {
   departureMode: string
   departureDetails: string
   drop: string
+  side: string
+  subSide: string
 }
 
 export interface FamilyHeadRow {
@@ -298,6 +301,13 @@ export function buildGuestMasterRows(data: ExportData): GuestMasterRow[] {
       departureMode: departure?.mode ? TRAVEL_MODE_LABELS[departure.mode] ?? departure.mode : '',
       departureDetails: departure?.reference ?? '',
       drop: departure?.point ?? '',
+      side: g.side ? SIDE_LABELS[g.side] ?? g.side : '',
+      subSide:
+        g.sub_side === 'father'
+          ? "Father's Side"
+          : g.sub_side === 'mother'
+            ? "Mother's Side"
+            : '',
     }
   })
 }
@@ -331,7 +341,11 @@ export function buildFamilyHeadRows(data: ExportData): FamilyHeadRow[] {
       _id: g.id,
       headName: g.head_name,
       groupType: g.group_type,
-      side: g.side ? SIDE_LABELS[g.side] ?? g.side : '',
+      side: g.side
+        ? g.sub_side === 'father' || g.sub_side === 'mother'
+          ? (formatSideLabel(g.side, g.sub_side) ?? g.side)
+          : (SIDE_LABELS[g.side] ?? g.side)
+        : '',
       city: g.city ?? '',
       phone: g.primary_mobile ?? '',
       adults: g.adults_confirmed,

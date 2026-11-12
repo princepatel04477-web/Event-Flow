@@ -16,13 +16,14 @@ import {
   normaliseBoolean,
   normaliseGroupType,
   normaliseMobile,
-  normaliseSide,
   normaliseText,
   parsePax,
+  parseSideAndSubSide,
   rsvpFromRemarks,
   type NormalisedGroupType,
   type NormalisedSide,
   type RemarksRsvpHint,
+  type SubSide,
 } from './normalize'
 
 export interface ImportRowFields {
@@ -32,6 +33,7 @@ export interface ImportRowFields {
   altMobile: string | null
   expectedPax: number | null
   side: NormalisedSide | null
+  subSide: SubSide | null
   groupType: NormalisedGroupType | null
   city: string | null
   remarks: string | null
@@ -93,7 +95,12 @@ export function buildRow(
   }
 
   const groupCode = normaliseText(cellAt(row.cells, mapping, 'group_code'))
-  const side = normaliseSide(cellAt(row.cells, mapping, 'side'))
+  const parsedSide = parseSideAndSubSide(
+    cellAt(row.cells, mapping, 'side'),
+    cellAt(row.cells, mapping, 'sub_side'),
+  )
+  const side = parsedSide.side
+  const subSide = parsedSide.subSide
   const groupType = normaliseGroupType(cellAt(row.cells, mapping, 'group_type'))
   const city = normaliseText(cellAt(row.cells, mapping, 'city'))
   const needsReturnGift = normaliseBoolean(cellAt(row.cells, mapping, 'needs_return_gift'))
@@ -116,6 +123,7 @@ export function buildRow(
     altMobile: altMobileResult.value,
     expectedPax,
     side,
+    subSide,
     groupType,
     city,
     remarks,

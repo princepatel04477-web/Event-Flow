@@ -14,6 +14,7 @@ export type ImportFieldKey =
   | 'alt_mobile'
   | 'expected_pax'
   | 'side'
+  | 'sub_side'
   | 'group_type'
   | 'city'
   | 'remarks'
@@ -38,6 +39,7 @@ export const IMPORT_FIELDS: ImportFieldDef[] = [
   { key: 'alt_mobile', label: 'Alternate mobile', required: false },
   { key: 'expected_pax', label: 'Expected pax', required: false },
   { key: 'side', label: 'Side (bride / groom)', required: false },
+  { key: 'sub_side', label: "Family branch (Father's / Mother's side)", required: false },
   { key: 'group_type', label: 'Group type', required: false },
   { key: 'city', label: 'City', required: false },
   { key: 'remarks', label: 'Remarks', required: false },
@@ -103,7 +105,8 @@ const ALIASES: Record<ImportFieldKey, string[]> = {
     'people',
     'pax',
   ],
-  side: ['bride/groom', 'bride or groom', 'side'],
+  side: ['bride/groom', 'bride or groom', 'family side', 'wedding side', 'guest side', 'side'],
+  sub_side: ['sub side', 'subside', 'father mother', 'family branch', 'branch', 'parent side', 'lineage'],
   group_type: ['group type', 'family type', 'category', 'type'],
   city: ['from city', 'native place', 'location', 'town', 'city'],
   remarks: ['rsvp remarks', 'status remark', 'comments', 'remark', 'remarks', 'notes'],

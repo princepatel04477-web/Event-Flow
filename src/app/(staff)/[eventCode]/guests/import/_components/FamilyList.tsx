@@ -3,12 +3,14 @@
 import { ChevronDownIcon } from '@/components/icons'
 import { Badge, type BadgeTone } from '@/components/ui/Badge'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
-import type { ImportRsvpStatus } from '@/lib/import/normalize'
+import type { ImportRsvpStatus, NormalisedSide, SubSide } from '@/lib/import/normalize'
 import type { ParsedFamily, ParsedTravelLeg } from '@/lib/import/families'
 import { formatIsoForHumans } from '@/lib/import/cells'
+import { formatSideLabel, SIDE_BRANCH_OPTIONS } from '@/lib/side'
 
 export interface FamilyListProps {
   families: ParsedFamily[]
+  onChangeSide?: (familyKey: string, side: NormalisedSide | null, subSide: SubSide | null) => void
 }
 
 const STATUS_META: Record<ImportRsvpStatus, { label: string; tone: BadgeTone }> = {
@@ -27,7 +29,7 @@ const STATUS_META: Record<ImportRsvpStatus, { label: string; tone: BadgeTone }> 
  * difference between a screen that opens instantly and one that thinks about
  * it first.
  */
-export function FamilyList({ families }: FamilyListProps) {
+export function FamilyList({ families, onChangeSide }: FamilyListProps) {
   if (families.length === 0) {
     return (
       <Card>
@@ -53,17 +55,39 @@ export function FamilyList({ families }: FamilyListProps) {
         </div>
       </CardHeader>
       <CardBody className="flex flex-col divide-y divide-border p-0">
-        {families.map((family) => (
-          <FamilyRow key={`${family.familyIndex}-${family.sourceRowIndex}`} family={family} />
-        ))}
+        {families.map((family) => {
+          const familyKey = `${family.familyIndex}-${family.sourceRowIndex}`
+          return (
+            <FamilyRow
+              key={familyKey}
+              family={family}
+              familyKey={familyKey}
+              onChangeSide={onChangeSide}
+            />
+          )
+        })}
       </CardBody>
     </Card>
   )
 }
 
-function FamilyRow({ family }: { family: ParsedFamily }) {
+function FamilyRow({
+  family,
+  familyKey,
+  onChangeSide,
+}: {
+  family: ParsedFamily
+  familyKey: string
+  onChangeSide?: (familyKey: string, side: NormalisedSide | null, subSide: SubSide | null) => void
+}) {
   const status = STATUS_META[family.rsvpStatus]
   const warningCount = family.warnings.filter((w) => w.severity !== 'info').length
+  const sideText = formatSideLabel(family.side, family.subSide)
+  const selectedKey = family.side
+    ? family.subSide
+      ? `${family.side}:${family.subSide}`
+      : family.side
+    : ''
 
   return (
     <details
@@ -107,6 +131,7 @@ function FamilyRow({ family }: { family: ParsedFamily }) {
               <span aria-hidden>!</span>
             </Badge>
           ) : null}
+          {sideText ? <Badge tone="neutral">{sideText}</Badge> : null}
           <Badge tone={status.tone}>{status.label}</Badge>
           <ChevronDownIcon
             className="h-4 w-4 text-subtle transition-transform group-open:rotate-180"
@@ -136,6 +161,40 @@ function FamilyRow({ family }: { family: ParsedFamily }) {
             value={family.primaryMobile ?? family.primaryMobileRaw ?? 'not given'}
             tone={family.primaryMobile ? undefined : 'warning'}
           />
+          {onChangeSide ? (
+            <div className="min-w-0 col-span-2 sm:col-span-1">
+              <dt className="text-xs font-medium text-subtle">Side / Branch</dt>
+              <dd className="mt-0.5">
+                <select
+                  aria-label={`Side for ${family.headName ?? family.familyNumber}`}
+                  value={selectedKey}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (!val) {
+                      onChangeSide(familyKey, null, null)
+                      return
+                    }
+                    const found = SIDE_BRANCH_OPTIONS.find((opt) => opt.key === val)
+                    if (found) onChangeSide(familyKey, found.side, found.subSide)
+                  }}
+                  className="w-full rounded-lg border border-border bg-paper px-2.5 py-1.5 text-xs text-fg focus:border-brand focus:outline-none"
+                >
+                  <option value="">Not assigned</option>
+                  {SIDE_BRANCH_OPTIONS.map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </dd>
+            </div>
+          ) : (
+            <Detail
+              label="Side / Branch"
+              value={sideText ?? 'not assigned'}
+              tone={sideText ? undefined : 'warning'}
+            />
+          )}
           {family.extras.room || family.extras.bed ? (
             <Detail
               label="Room / bed"

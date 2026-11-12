@@ -34,12 +34,17 @@ export function groupTypeLabel(value: GroupType | null): string | null {
   return value ? GROUP_TYPE_LABELS[value] : null
 }
 
-export function sideLabel(value: Side | null): string | null {
+export function sideLabel(
+  value: Side | null,
+  subSide?: string | null,
+): string | null {
   if (!value) return null
   // A bare "Both" / "Other" chip next to a name reads as nonsense, but note
   // 'other' is a RECORDED choice — it must not be relabelled "not recorded".
   if (value === 'both') return 'Both sides'
   if (value === 'other') return 'Other side'
+  if (subSide === 'father') return `${SIDE_LABELS[value]}'s Father Side`
+  if (subSide === 'mother') return `${SIDE_LABELS[value]}'s Mother Side`
   return `${SIDE_LABELS[value]}'s side`
 }
 

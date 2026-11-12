@@ -7,6 +7,7 @@ export type QueueRow = {
   primary_mobile: string | null
   group_type: string | null
   side: string | null
+  sub_side?: string | null
   expected_pax: number | null
   confirmed_pax: number | null
   rsvp_status: string | null

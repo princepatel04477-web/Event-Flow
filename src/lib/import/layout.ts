@@ -53,12 +53,14 @@ export type KnownColumnKey =
   | 'departureMode'
   | 'departureDetails'
   | 'drop'
+  | 'side'
+  | 'subSide'
 
 /**
- * Columns captured for Phase 2 (room allocation) but not required for the
- * Phase 1 calling list. Their absence is a note, not a failure.
+ * Columns captured for Phase 2 (room allocation) or side bifurcation, not
+ * required for the Phase 1 calling list.
  */
-export const OPTIONAL_COLUMNS = ['id', 'room', 'bed'] as const
+export const OPTIONAL_COLUMNS = ['id', 'room', 'bed', 'side', 'subSide'] as const
 export type OptionalColumnKey = (typeof OPTIONAL_COLUMNS)[number]
 export type RequiredColumnKey = Exclude<KnownColumnKey, OptionalColumnKey>
 
@@ -88,6 +90,8 @@ export const COLUMN_LABELS: Record<KnownColumnKey, string> = {
   departureMode: 'Mode (departure — the second one, after Departure Date)',
   departureDetails: 'Details (departure — the second one, after Departure Date)',
   drop: 'Drop',
+  side: 'Side',
+  subSide: 'Sub-side (Father / Mother)',
 }
 
 /**
@@ -120,6 +124,8 @@ const ALIASES: Record<Exclude<KnownColumnKey, 'name'>, string[]> = {
   departureMode: ['mode'],
   departureDetails: ['details', 'detail'],
   drop: ['drop', 'drop point', 'drop off'],
+  side: ['side', 'family side', 'guest side', 'wedding side', 'party', 'team'],
+  subSide: ['sub side', 'subside', 'branch', 'family branch', 'parent side', 'lineage', 'relation side'],
 }
 
 /** Aliases accepted for the name column when its header is NOT blank. */
@@ -140,6 +146,8 @@ const SINGLETON_KEYS = [
   'remark',
   'departureDate',
   'drop',
+  'side',
+  'subSide',
 ] as const
 
 /** Columns whose header text is duplicated and must be resolved by position. */
@@ -220,11 +228,13 @@ export function resolveKnownLayout(headers: (string | null)[]): KnownLayoutResul
 
     if (hits.length === 0) {
       if (optional) {
-        notes.push({
-          column: key,
-          label: COLUMN_LABELS[key],
-          detail: 'not in this sheet — nothing to carry forward for room allocation later.',
-        })
+        if (key !== 'side' && key !== 'subSide') {
+          notes.push({
+            column: key,
+            label: COLUMN_LABELS[key],
+            detail: 'not in this sheet — nothing to carry forward for room allocation later.',
+          })
+        }
       } else {
         missing.push({
           column: key,
@@ -374,6 +384,8 @@ export function resolveKnownLayout(headers: (string | null)[]): KnownLayoutResul
     id: found.id ?? null,
     room: found.room ?? null,
     bed: found.bed ?? null,
+    side: found.side ?? null,
+    subSide: found.subSide ?? null,
   }
 
   return { ok: true, layout, notes }

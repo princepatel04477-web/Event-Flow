@@ -9,10 +9,15 @@ import type { CommitResult } from '@/lib/actions/import'
 import { commitImport } from '@/lib/actions/import'
 import type { ImportContext } from '@/lib/actions/import'
 import { lostResponseMessage } from '@/lib/errors'
-import type { ParsedFamilySheet } from '@/lib/import/families'
+import type { ParsedFamily, ParsedFamilySheet } from '@/lib/import/families'
 import type { LayoutNote } from '@/lib/import/layout'
+import type { NormalisedSide, SubSide } from '@/lib/import/normalize'
 
 import { FamilyList } from './FamilyList'
+import {
+  SideBifurcationSelector,
+  type ImportPrimarySide,
+} from './SideBifurcationSelector'
 import { SummaryBar } from './SummaryBar'
 import { WarningsList } from './WarningsList'
 
@@ -45,6 +50,9 @@ export interface PreviewStepProps {
   fileName: string
   outcome: PreviewOutcome
   context: ImportContext
+  defaultSide: ImportPrimarySide | null
+  defaultSubSide: SubSide | null
+  onSideChange: (side: ImportPrimarySide | null, subSide: SubSide | null) => void
   /**
    * The commit landed. The counts are handed UP rather than rendered here,
    * because a successful import unmounts this component in the same commit —
@@ -61,11 +69,20 @@ export interface PreviewStepProps {
  * "Confirm import" button is pressed. On confirm, the parsed families are sent
  * to `public.commit_guest_import()` — one transaction, one outcome.
  */
+type SideOverride = { side: NormalisedSide | null; subSide: SubSide | null }
+
+function familyRowKey(f: ParsedFamily): string {
+  return `${f.familyIndex}-${f.sourceRowIndex}`
+}
+
 export function PreviewStep({
   eventId,
   fileName,
   outcome,
   context,
+  defaultSide,
+  defaultSubSide,
+  onSideChange,
   onCommitted,
   onAdjustMapping,
 }: PreviewStepProps) {
@@ -74,22 +91,91 @@ export function PreviewStep({
 
   const [busy, setBusy] = useState(false)
   const [commitError, setCommitError] = useState<string | null>(null)
+  const [overrideState, setOverrideState] = useState<{
+    source: ParsedFamilySheet
+    map: Record<string, SideOverride>
+  }>({ source: result, map: {} })
 
-  const blocked = result.families.filter((f) => !f.canImport).length
-  const hasNoPhones = result.families.length > 0 && result.families.every((f) => !f.primaryMobile)
+  const activeOverrides = overrideState.source === result ? overrideState.map : {}
+
+  const effectiveFamilies = result.families.map((f) => {
+    const ov = activeOverrides[familyRowKey(f)]
+    return ov ? { ...f, side: ov.side, subSide: ov.subSide } : f
+  })
+
+  const effectiveResult: ParsedFamilySheet = {
+    ...result,
+    families: effectiveFamilies,
+  }
+
+  // Detect whether the parsed sheet already carries distinct row-level sides
+  // (e.g. a master sheet with both Groom and Bride rows).
+  const distinctRowSides = new Set(
+    result.families.filter((f) => f.side !== null).map((f) => `${f.side}:${f.subSide ?? ''}`),
+  )
+  const hasMixedColumnSides = distinctRowSides.size > 1
+
+  function handleSelectorChange(nextSide: ImportPrimarySide | null, nextSubSide: SubSide | null) {
+    onSideChange(nextSide, nextSubSide)
+    const nextMap: Record<string, SideOverride> = { ...activeOverrides }
+    for (const f of result.families) {
+      if (!hasMixedColumnSides || f.side === null) {
+        nextMap[familyRowKey(f)] = {
+          side: nextSide,
+          subSide: nextSide ? nextSubSide : null,
+        }
+      }
+    }
+    setOverrideState({ source: result, map: nextMap })
+  }
+
+  function handleApplySideToAll() {
+    if (!defaultSide) return
+    const nextMap: Record<string, SideOverride> = {}
+    for (const f of result.families) {
+      nextMap[familyRowKey(f)] = {
+        side: defaultSide,
+        subSide: defaultSubSide,
+      }
+    }
+    setOverrideState({ source: result, map: nextMap })
+  }
+
+  function handleFamilySideChange(
+    key: string,
+    side: NormalisedSide | null,
+    subSide: SubSide | null,
+  ) {
+    setOverrideState({
+      source: result,
+      map: {
+        ...activeOverrides,
+        [key]: { side, subSide },
+      },
+    })
+  }
+
+  const blocked = effectiveFamilies.filter((f) => !f.canImport).length
+  const unassignedSideCount = effectiveFamilies.filter((f) => f.side === null).length
+  const hasNoPhones =
+    effectiveFamilies.length > 0 && effectiveFamilies.every((f) => !f.primaryMobile)
 
   async function handleCommit() {
     setBusy(true)
     setCommitError(null)
     try {
-      const payload = result.families.map((f) => ({
+      const payload = effectiveFamilies.map((f) => ({
         rowNumber: f.sourceRowIndex,
         raw: f.raw,
         familyNumber: f.familyNumber,
         headName: f.headName,
         primaryMobile: f.primaryMobile,
+        altMobile: f.altMobile ?? null,
+        remark: f.remark,
         place: f.place,
         expectedPax: f.expectedPax,
+        side: f.side,
+        subSide: f.subSide,
         canImport: f.canImport,
         blockReason: f.blockReason,
         arrival: f.arrival,
@@ -197,8 +283,8 @@ export function PreviewStep({
 
           {outcome.notes.length > 0 ? (
             <ul className="flex flex-col gap-0.5 text-xs text-subtle">
-              {outcome.notes.map((n) => (
-                <li key={n.column}>
+              {outcome.notes.map((n, i) => (
+                <li key={`${n.column}-${i}`}>
                   <span className="font-medium">{n.label}</span> — {n.detail}
                 </li>
               ))}
@@ -235,11 +321,40 @@ export function PreviewStep({
         </p>
       ) : null}
 
-      <SummaryBar result={result} />
+      <div className="flex flex-col gap-2">
+        <SideBifurcationSelector
+          side={defaultSide}
+          subSide={defaultSubSide}
+          onChange={handleSelectorChange}
+          title="Side & Family Branch Assignment"
+          description={
+            hasMixedColumnSides
+              ? 'Your sheet includes multiple sides from its columns. Selecting here fills any unassigned rows, or you can override all rows.'
+              : unassignedSideCount > 0
+                ? `${unassignedSideCount} famil${unassignedSideCount === 1 ? 'y has' : 'ies have'} no side yet — pick Groom Side or Bride Side and Father’s / Mother’s branch.`
+                : 'Change Groom / Bride side or Father’s / Mother’s bifurcation before confirming.'
+          }
+          compact
+        />
+        {hasMixedColumnSides && defaultSide ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={handleApplySideToAll}
+            >
+              Apply to all {effectiveFamilies.length} families
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      <SummaryBar result={effectiveResult} />
 
       <WarningsList warnings={result.warnings} />
 
-      <FamilyList families={result.families} />
+      <FamilyList families={effectiveFamilies} onChangeSide={handleFamilySideChange} />
 
       {/* No summary branch here: a successful commit unmounts this component,
           so the counts are rendered by `ImportPreview` (see CommitSummary). */}

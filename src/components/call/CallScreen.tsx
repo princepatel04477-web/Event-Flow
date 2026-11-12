@@ -23,6 +23,7 @@ import { rsvpStatusLabel, rsvpStatusTone } from '@/lib/rsvp'
 import { BackRow } from '@/components/ui/BackRow'
 import { startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
 import { dialTarget, formatMobile, type DialTarget } from '@/lib/phone'
+import { formatSideLabel } from '@/lib/side'
 import { placeCall } from '@/lib/native-call'
 import { drainOutbox, listQueuedCompletions, queueCompletion } from '@/lib/call/outbox'
 import { drainVoiceNotes } from '@/lib/voice-note/upload'
@@ -432,7 +433,7 @@ export function CallScreen({
             </Badge>
           </CardHeader>
           <CardBody className="flex flex-col gap-2 text-sm">
-            <Row label="Side" value={group.side ?? '—'} />
+            <Row label="Side" value={formatSideLabel(group.side, group.sub_side) ?? '—'} />
             <Row label="City" value={group.city ?? '—'} />
             <Row label="Primary mobile" value={formatMobile(group.primary_mobile)} />
             {group.alt_mobile ? <Row label="Alt mobile" value={formatMobile(group.alt_mobile)} /> : null}

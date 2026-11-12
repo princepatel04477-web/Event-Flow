@@ -12,6 +12,7 @@ import { rsvpStatusLabel } from '@/lib/rsvp'
 import { formatMobile } from '@/lib/phone'
 import { statusTone, type StatusTone } from '@/lib/status'
 import { cn } from '@/lib/utils'
+import { formatSideLabel } from '@/lib/side'
 import type { Database } from '@/lib/supabase/database.types'
 
 export type QueueGroupRow = Database['public']['Views']['v_rsvp_queue']['Row']
@@ -48,7 +49,7 @@ export function QueueRow({ row, eventCode }: QueueRowProps) {
   const groupId = row.group_id
   const headName = row.head_name?.trim() || 'Unnamed family'
   const mobile = row.primary_mobile?.trim() || null
-  const side = row.side?.trim() || null
+  const side = formatSideLabel(row.side ?? null, row.sub_side) ?? row.side?.trim() ?? null
   const pax = row.confirmed_pax ?? row.expected_pax ?? 0
   const status = row.rsvp_status ?? 'not_started'
   const attemptCount = row.attempt_count ?? 0

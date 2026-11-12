@@ -363,7 +363,7 @@ function GuestListRow({ row, eventCode }: { row: GuestSearchRow; eventCode: stri
   const phone = row.phone ?? null
   const chips = [
     groupTypeLabel(row.group_type),
-    sideLabel(row.side),
+    sideLabel(row.side, row.sub_side),
     typeof row.pax === 'number' ? `Family of ${row.pax}` : null,
   ].filter(Boolean)
 
