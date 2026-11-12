@@ -16,10 +16,8 @@ interface Summary {
   declined: number
   tentative: number
   notStarted: number
-  missingMobile: number
   missingArrivalDate: number
   blankRowsSkipped: number
-  orphans: number
   blockedFamilies: number
   groomFather: number
   groomMother: number
@@ -40,10 +38,8 @@ function summarise(result: ParsedFamilySheet): Summary {
     declined: families.filter((f) => f.rsvpStatus === 'declined').length,
     tentative: families.filter((f) => f.rsvpStatus === 'tentative').length,
     notStarted: families.filter((f) => f.rsvpStatus === 'not_started').length,
-    missingMobile: families.filter((f) => f.primaryMobile === null).length,
     missingArrivalDate: families.filter((f) => f.arrival.travelDate === null).length,
     blankRowsSkipped: counts.blankRowsSkipped,
-    orphans: counts.orphans,
     blockedFamilies: counts.blockedFamilies,
     groomFather: families.filter((f) => f.side === 'groom' && f.subSide === 'father').length,
     groomMother: families.filter((f) => f.side === 'groom' && f.subSide === 'mother').length,
@@ -57,56 +53,20 @@ function summarise(result: ParsedFamilySheet): Summary {
 }
 
 /**
- * What the file amounts to, in the order a human acts on it.
- *
- * The two bands are deliberate. Orphan rows and families with no phone number
- * are the only numbers here anyone can DO anything about — an orphan means the
- * sheet has been re-sorted and somebody is about to be dropped, a missing
- * mobile means a family that cannot be dialled at all. Sitting them in a
- * uniform grid beside "blank rows skipped" is how they get skimmed past, so
- * they get their own band, at the top, with their own colour.
+ * What the parsed file amounts to before committing the import.
  */
 export function SummaryBar({ result }: SummaryBarProps) {
   const s = useMemo(() => summarise(result), [result])
 
   return (
     <div className="flex flex-col gap-3">
-      <section aria-labelledby="import-attention" className="flex flex-col gap-2">
-        <h3 id="import-attention" className="text-sm font-semibold text-fg">
-          Needs a human
-        </h3>
-        <div className="grid grid-cols-2 gap-2">
-          <Stat
-            label="Orphan rows"
-            value={s.orphans}
-            tone={s.orphans > 0 ? 'danger' : 'success'}
-            note={
-              s.orphans > 0
-                ? 'Attached to no family. Listed below — fix the sheet, do not import around them.'
-                : 'Every row belongs to a family.'
-            }
-            emphasis
-          />
-          <Stat
-            label="No phone number"
-            value={s.missingMobile}
-            tone={s.missingMobile > 0 ? 'warning' : 'success'}
-            note={
-              s.missingMobile > 0
-                ? 'These families cannot be dialled until a number is added.'
-                : 'Every family can be dialled.'
-            }
-            emphasis
-          />
-        </div>
-        {s.blockedFamilies > 0 ? (
-          <p className="rounded-xl border border-danger bg-tint-danger px-3 py-2 text-sm font-medium text-danger">
-            {s.blockedFamilies} famil{s.blockedFamilies === 1 ? 'y has' : 'ies have'} no name at all.
-            A family cannot exist without one, so {s.blockedFamilies === 1 ? 'it' : 'they'} would be
-            left out entirely.
-          </p>
-        ) : null}
-      </section>
+      {s.blockedFamilies > 0 ? (
+        <p className="rounded-xl border border-danger bg-tint-danger px-3 py-2 text-sm font-medium text-danger">
+          {s.blockedFamilies} famil{s.blockedFamilies === 1 ? 'y has' : 'ies have'} no name at all.
+          A family cannot exist without one, so {s.blockedFamilies === 1 ? 'it' : 'they'} would be
+          left out entirely.
+        </p>
+      ) : null}
 
       <section aria-labelledby="import-totals" className="flex flex-col gap-2">
         <h3 id="import-totals" className="text-sm font-semibold text-fg">
