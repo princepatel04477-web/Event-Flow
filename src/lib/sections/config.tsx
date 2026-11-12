@@ -82,6 +82,7 @@ const ALL_DEPTS: StaffDepartment[] = [
   'hospitality',
   'hamper',
   'production',
+  'rsvp',
 ]
 
 /**
@@ -125,7 +126,7 @@ export const SECTIONS: Record<SectionId, SectionDef> = {
     id: 'rsvp', label: 'RSVP', tabLabel: 'RSVP',
     icon: <PhoneIcon className="h-6 w-6" />,
     roles: ['admin', 'event_team'],
-    departments: ['management'],
+    departments: ['management', 'rsvp'],
     inTabBar: true,
     children: [
       // UI4 Part S: the call list is the section's front door, for the lead

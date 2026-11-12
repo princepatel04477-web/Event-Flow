@@ -24,7 +24,7 @@ export interface CodeAuthClaims {
   /** The selected staff member, set after the "Who are you?" picker. */
   staffMemberId: string | null
   /** Field team department — set when staff_member_id is bound. */
-  department: 'management' | 'logistics' | 'hospitality' | 'hamper' | 'production' | null
+  department: 'management' | 'logistics' | 'hospitality' | 'hamper' | 'production' | 'rsvp' | null
 }
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? process.env.APP_JWT_SECRET ?? '')
@@ -53,7 +53,7 @@ export async function verifyCodeAuthToken(token: string | undefined | null): Pro
     if (typeof eventId !== 'string' || !eventId) return null
     if (typeof accessCodeId !== 'string' || !accessCodeId) return null
 
-    const departments = ['management', 'logistics', 'hospitality', 'hamper', 'production'] as const
+    const departments = ['management', 'logistics', 'hospitality', 'hamper', 'production', 'rsvp'] as const
     const department: CodeAuthClaims['department'] =
       typeof departmentRaw === 'string' &&
       (departments as readonly string[]).includes(departmentRaw)
