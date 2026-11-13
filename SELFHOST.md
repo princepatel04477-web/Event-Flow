@@ -10,7 +10,8 @@ This guide details the self-hosted deployment of EventFlow on `agentdesk-server`
 - **Operating System:** Windows Server 2016 Standard (Build 14393)
 - **Node.js:** v22.23.5 LTS
 - **Git:** 2.56.0.windows.2
-- **Port Strategy:** IIS is preserved untouched on port 80. EventFlow Next.js server binds to `127.0.0.1:3000`.
+- **Port Strategy:** IIS is preserved untouched on port 80. EventFlow Next.js server binds to `localhost:3000` (on this server that is `[::1]:3000`, loopback only).
+- **Why `localhost`, never `-H 127.0.0.1`:** `src/proxy.ts` rewrites every event screen to `/v2/...`. Next normalises the rewrite URL's host to `localhost` but builds its own origin from `-H`. With `127.0.0.1` the two differ, Next treats the rewrite as external and proxies it to itself, and behind Funnel (`X-Forwarded-Proto: https`) that proxy speaks TLS to a plain-HTTP port: every event page returns 500 with `EPROTO ... wrong version number` in the error log. `/api/version` and `/login` still work, so the failure only shows once you sign in.
 - **Code Directory:** `D:\apps\eventflow`
 - **Tools Directory:** `D:\apps\tools`
 - **Backups Directory:** `D:\backups\eventflow`
@@ -19,8 +20,9 @@ This guide details the self-hosted deployment of EventFlow on `agentdesk-server`
 
 ### Public URLs
 - **Primary (Tailscale Funnel):** `https://agentdesk-server.tailc5ce36.ts.net`
-  - Requires one-time tailnet enablement: [Enable Tailscale Funnel](https://login.tailscale.com/f/funnel?node=nM9FPKgj6c11CNTRL)
-  - Once enabled on the tailnet, run on the server: `tailscale funnel --bg 3000`
+  - Tailnet prerequisites (done 13 Nov 2026): HTTPS Certificates enabled on the DNS page, and the Funnel attribute approved.
+  - Server command (done 13 Nov 2026, persists across restarts): `tailscale funnel --bg http://[::1]:3000`. The target must match where the app listens; see Port Strategy.
+  - Check: `tailscale funnel status`. Turn off: `tailscale funnel --https=443 off`.
 - **Active Public Tunnel (Verified from Laptop):** `https://flags-kingston-aaron-member.trycloudflare.com`
   - `/api/version` returns `{"commit":"9d71a5ed134d439cf656531e5c43e5d00b76846a","servedAt":"..."}`
   - `/login` returns `HTTP 200 OK` (EventFlow login page rendered)
@@ -36,7 +38,7 @@ EventFlow runs as a managed Windows Service using **WinSW v2.12.0** installed in
 - **Executable:** `D:\apps\tools\EventFlowApp.exe`
 - **Configuration XML:** `D:\apps\tools\EventFlowApp.xml`
 - **Working Directory:** `D:\apps\eventflow`
-- **Execution Command:** `C:\Program Files\nodejs\node.exe node_modules\next\dist\bin\next start -p 3000 -H 127.0.0.1`
+- **Execution Command:** `C:\Program Files\nodejs\node.exe node_modules\next\dist\bin\next start -p 3000 -H localhost`
 - **Startup Mode:** Automatic (`<startmode>Automatic</startmode>`)
 - **Auto-restart Policy:** Restarts on failure after 5 seconds (`<onfailure action="restart" delay="5 sec"/>`, reset after 1 hour)
 - **Environment Variables:** `PORT=3000`, `NODE_ENV=production`, `GIT_COMMIT_SHA=9d71a5ed134d439cf656531e5c43e5d00b76846a`
@@ -50,7 +52,7 @@ Tested and confirmed:
 1. Identified child `node.exe` PID under `EventFlowApp.exe`.
 2. Killed the `node.exe` process with `Stop-Process -Force`.
 3. Windows Service Control Manager detected child termination and restarted `EventFlowApp`, which immediately spawned a new `node.exe` process.
-4. `http://127.0.0.1:3000/api/version` returned `HTTP 200` with the deployed commit SHA.
+4. `http://localhost:3000/api/version` returned `HTTP 200` with the deployed commit SHA.
 
 ---
 
@@ -79,7 +81,7 @@ To update the self-hosted deployment:
 
 4. **Verify the update**:
    ```cmd
-   powershell -Command "Invoke-RestMethod -Uri http://127.0.0.1:3000/api/version"
+   powershell -Command "Invoke-RestMethod -Uri http://localhost:3000/api/version"
    ```
 
 ---
