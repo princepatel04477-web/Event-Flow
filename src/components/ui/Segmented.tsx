@@ -66,8 +66,10 @@ export function Segmented<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              'tap min-h-12 min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-center font-semibold',
-              isBase ? 'text-base leading-tight' : 'text-sm leading-none',
+              'tap min-h-12 min-w-0 flex-1 rounded-lg font-semibold',
+              isBase
+                ? 'px-2.5 py-1.5 text-center text-base leading-tight'
+                : 'px-3 text-sm leading-none',
               'transition-colors duration-press ease-ledger',
               selected
                 ? 'bg-surface text-brand shadow-e1'
