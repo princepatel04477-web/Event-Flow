@@ -29,6 +29,7 @@ import {
   getLedgerEntries,
   markFailed,
   markMatched,
+  markSkipped,
   markUnmatched,
   markUploaded,
   rememberStoragePath,
@@ -66,11 +67,13 @@ export interface SweepOutcome {
   /** Files held back this sweep — still being written, or over the per-sweep cap. */
   deferred: number
   failed: number
+  /** Reminder calls that were skipped rather than uploaded. */
+  skipped: number
   /** The most recent human-readable problem, for the status line. */
   lastError?: string
 }
 
-const EMPTY: SweepOutcome = { uploaded: 0, unmatched: 0, deferred: 0, failed: 0 }
+const EMPTY: SweepOutcome = { uploaded: 0, unmatched: 0, deferred: 0, failed: 0, skipped: 0 }
 
 /**
  * A path is worth looking at when the ledger has never resolved it. `seen` is
@@ -162,6 +165,12 @@ export async function sweepHarvest(input: {
       await markUnmatched(file.path)
       outcome.unmatched += 1
       outcome.lastError = match.reason
+      continue
+    }
+
+    if (match.kind === 'matched' && match.callKind === 'reminder') {
+      await markSkipped(file.path, 'Reminder call: not recorded.')
+      outcome.skipped += 1
       continue
     }
 

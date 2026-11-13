@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { friendlyDbError, isFrozenRowError } from '@/lib/errors'
 import type { CallCompletionPayload, CallAttemptRow, GuestGroupRow } from '@/lib/call/types'
+import type { CallKind } from '@/lib/call-kind'
 
 function extractConstraintName(error: { message?: string | null } | null | undefined): string | null {
   if (!error?.message) return null
@@ -152,8 +153,11 @@ export async function startCallAttempt(input: {
   dialedNumber: string
   /** ISO timestamp from the phone. Untrusted by design — the server overrides `started_at`. */
   deviceStartedAt?: string
+  callKind?: CallKind
 }): Promise<StartCallAttemptResult> {
   const supabase = await createClient()
+
+  const validatedCallKind: CallKind = input.callKind === 'reminder' ? 'reminder' : 'first'
 
   const { data, error } = await supabase
     .from('call_attempts')
@@ -161,6 +165,7 @@ export async function startCallAttempt(input: {
       event_id: input.eventId,
       group_id: input.groupId,
       dialed_number: input.dialedNumber,
+      call_kind: validatedCallKind,
       ...(input.deviceStartedAt ? { started_at: input.deviceStartedAt } : {}),
     })
     .select()

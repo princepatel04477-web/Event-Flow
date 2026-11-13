@@ -198,6 +198,7 @@ export type Database = {
       }
       call_attempts: {
         Row: {
+          call_kind: 'first' | 'reminder'
           callback_at: string | null
           caller_id: string | null
           caller_id_staff: string | null
@@ -214,6 +215,7 @@ export type Database = {
           started_at: string
         }
         Insert: {
+          call_kind?: 'first' | 'reminder'
           callback_at?: string | null
           caller_id?: string | null
           caller_id_staff?: string | null
@@ -230,6 +232,7 @@ export type Database = {
           started_at?: string
         }
         Update: {
+          call_kind?: 'first' | 'reminder'
           callback_at?: string | null
           caller_id?: string | null
           caller_id_staff?: string | null

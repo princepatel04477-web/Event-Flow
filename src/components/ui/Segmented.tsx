@@ -15,6 +15,8 @@ export interface SegmentedProps<T extends string> {
   options: readonly SegmentedOption<T>[]
   onChange: (value: T) => void
   className?: string
+  /** Size variant: 'sm' (default, 14px text) or 'base' (16px text). Both clear >=44px tap target. */
+  size?: 'sm' | 'base'
 }
 
 /**
@@ -41,7 +43,10 @@ export function Segmented<T extends string>({
   options,
   onChange,
   className,
+  size = 'sm',
 }: SegmentedProps<T>) {
+  const isBase = size === 'base'
+
   return (
     <div
       role="tablist"
@@ -61,14 +66,15 @@ export function Segmented<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              'tap min-h-12 min-w-0 flex-1 rounded-lg px-3 text-sm font-semibold leading-none',
+              'tap min-h-12 min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-center font-semibold',
+              isBase ? 'text-base leading-tight' : 'text-sm leading-none',
               'transition-colors duration-press ease-ledger',
               selected
                 ? 'bg-surface text-brand shadow-e1'
                 : 'bg-transparent text-muted active:bg-surface',
             )}
           >
-            <span className="truncate">{option.label}</span>
+            <span className={isBase ? 'line-clamp-2' : 'truncate'}>{option.label}</span>
             {option.count === undefined ? null : (
               <span className="figure ml-1.5 font-normal">({option.count})</span>
             )}

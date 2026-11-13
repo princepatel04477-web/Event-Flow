@@ -6,6 +6,7 @@ export type HarvestLedgerStatus =
   | 'uploaded'
   | 'unmatched'
   | 'failed'
+  | 'skipped'
 
 export interface HarvestLedgerEntry {
   path: string       // primary key — absolute file path
@@ -115,6 +116,15 @@ export async function markFailed(path: string, reason: string): Promise<void> {
   } catch {}
 }
 
+export async function markSkipped(path: string, reason: string): Promise<void> {
+  try {
+    await db.harvest_seen.update(path, {
+      status: 'skipped',
+      lastError: reason,
+    })
+  } catch {}
+}
+
 export async function getLedgerEntries(
   filter?: { status?: HarvestLedgerStatus },
 ): Promise<HarvestLedgerEntry[]> {
@@ -128,7 +138,8 @@ export async function getLedgerEntries(
   }
 }
 
-export async function hasMatchForCall(callAttemptId: string): Promise<boolean> {
+export async function hasMatchForCall(_callAttemptId?: string): Promise<boolean> {
+  void _callAttemptId
   try {
     // CallAttemptId is not stored directly — it's matched through
     // call_recordings, which we would need to query. For now, check

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { LoadingRows } from '@/components/ui/LoadingRows'
+import { defaultCallKind, type CallKind } from '@/lib/call-kind'
 import { progressPercent } from '@/lib/ui/metrics'
 import { startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
 import { saveRsvpLog } from '@/lib/actions/rsvp'
@@ -131,6 +132,7 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn }: CallNextProps
 
   const [dialError, setDialError] = useState<string | null>(null)
   const [diallingGroupId, setDiallingGroupId] = useState<string | null>(null)
+  const [callKinds, setCallKinds] = useState<Record<string, CallKind>>({})
 
   const [deferredSubmit, setDeferredSubmit] = useState<(() => void) | null>(null)
   const [deferredCanSave, setDeferredCanSave] = useState(false)
@@ -207,6 +209,17 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn }: CallNextProps
   }, [callable, selectedGroupId, offset])
 
   const currentId = current?.group_id ?? null
+
+  const currentCallKind =
+    (currentId ? callKinds[currentId] : undefined) ?? defaultCallKind(current?.rsvp_status)
+
+  const handleCallKindChange = useCallback(
+    (kind: CallKind) => {
+      if (!currentId) return
+      setCallKinds((prev) => ({ ...prev, [currentId]: kind }))
+    },
+    [currentId],
+  )
 
   const { data: rawFamily, error: familyError } = useQuery({
     queryKey: queryKeys.families.detail(eventId, currentId ?? 'none'),
@@ -319,6 +332,8 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn }: CallNextProps
       return
     }
 
+    const chosenCallKind = (groupId ? callKinds[groupId] : undefined) ?? defaultCallKind(row.rsvp_status)
+
     setDialError(null)
     setDiallingGroupId(groupId)
 
@@ -329,6 +344,7 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn }: CallNextProps
         groupId,
         dialedNumber: target.dialedNumber,
         deviceStartedAt: new Date().toISOString(),
+        callKind: chosenCallKind,
       })
     } catch {
       setDiallingGroupId(null)
@@ -547,6 +563,8 @@ export function CallNext({ eventId, eventCode, startsOn, endsOn }: CallNextProps
             row={current}
             dialling={diallingGroupId === current.group_id}
             lock={currentLock}
+            callKind={currentCallKind}
+            onCallKindChange={handleCallKindChange}
             onCall={() => void handleCall(current)}
           />
 

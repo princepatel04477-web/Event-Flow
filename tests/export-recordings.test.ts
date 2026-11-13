@@ -88,6 +88,7 @@ function attempt(over: Partial<CallAttemptRow> = {}): CallAttemptRow {
     caller_id: null,
     caller_id_staff: null,
     notes: null,
+    call_kind: 'first',
     ...over,
   }
 }

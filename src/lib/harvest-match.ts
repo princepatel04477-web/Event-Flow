@@ -26,6 +26,7 @@ export type MatchResult =
       eventId: string
       /** How the file was tied to a family, for the staff-facing status line. */
       via: 'call-window' | 'filename-phone'
+      callKind: 'first' | 'reminder'
     }
   | { kind: 'unmatched'; reason: string }
   | { kind: 'error'; message: string }
@@ -79,7 +80,7 @@ async function matchByCallWindow(
 
   const { data: candidates, error: queryErr } = await supabase
     .from('call_attempts')
-    .select('id, group_id, dialed_number, started_at, outcome')
+    .select('id, group_id, dialed_number, started_at, outcome, call_kind')
     .eq('event_id', input.eventId)
     .gte('started_at', windowStart)
     .lte('started_at', windowEnd)
@@ -109,6 +110,7 @@ async function matchByCallWindow(
       groupId: c.group_id,
       eventId: input.eventId,
       via: 'call-window',
+      callKind: c.call_kind === 'reminder' ? 'reminder' : 'first',
     }
   }
 
@@ -171,6 +173,7 @@ async function matchByCallWindow(
     groupId: matchedCall.group_id,
     eventId: input.eventId,
     via: 'call-window',
+    callKind: matchedCall.call_kind === 'reminder' ? 'reminder' : 'first',
   }
 }
 
@@ -233,6 +236,7 @@ async function matchByFilenamePhone(
     groupId: hits[0].id,
     eventId: input.eventId,
     via: 'filename-phone',
+    callKind: 'first',
   }
 }
 

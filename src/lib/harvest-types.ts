@@ -24,6 +24,7 @@ export type HarvestLedgerStatus =
   | 'uploaded'
   | 'unmatched'
   | 'failed'
+  | 'skipped'
 
 export interface HarvestLedgerEntry {
   path: string

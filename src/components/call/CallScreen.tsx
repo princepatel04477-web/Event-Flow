@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Input } from '@/components/ui/Input'
+import { Segmented } from '@/components/ui/Segmented'
 import { Textarea } from '@/components/ui/Textarea'
 import {
   ArrowDownCircleIcon,
@@ -22,6 +23,7 @@ import { rsvpStatusLabel, rsvpStatusTone } from '@/lib/rsvp'
 
 import { BackRow } from '@/components/ui/BackRow'
 import { startCallAttempt, submitCallOutcome } from '@/lib/actions/call'
+import { CALL_KIND_OPTIONS, defaultCallKind, type CallKind } from '@/lib/call-kind'
 import { dialTarget, formatMobile, type DialTarget } from '@/lib/phone'
 import { formatSideLabel } from '@/lib/side'
 import { placeCall } from '@/lib/native-call'
@@ -72,6 +74,7 @@ export function CallScreen({
   const [activeAttempt, setActiveAttempt] = useState<StoredCallAttempt | null>(null)
   const [startError, setStartError] = useState<string | null>(null)
   const [starting, setStarting] = useState<'primary' | 'alt' | null>(null)
+  const [callKind, setCallKind] = useState<CallKind>(() => defaultCallKind(group.rsvp_status))
 
   const [outcome, setOutcome] = useState<CallOutcome | null>(null)
   const [notes, setNotes] = useState('')
@@ -204,6 +207,7 @@ export function CallScreen({
         groupId: group.id,
         dialedNumber: target.dialedNumber,
         deviceStartedAt: new Date().toISOString(),
+        callKind,
       })
     } catch {
       // No data connection (a basement, venue Wi-Fi with no uplink) — the
@@ -491,6 +495,8 @@ export function CallScreen({
             alt={altTarget}
             starting={starting}
             error={startError}
+            callKind={callKind}
+            onCallKindChange={setCallKind}
             onCall={handleStartCall}
           />
         ) : null}
@@ -721,12 +727,16 @@ function CallButtons({
   alt,
   starting,
   error,
+  callKind,
+  onCallKindChange,
   onCall,
 }: {
   primary: DialTarget | null
   alt: DialTarget | null
   starting: 'primary' | 'alt' | null
   error: string | null
+  callKind: CallKind
+  onCallKindChange: (kind: CallKind) => void
   onCall: (which: 'primary' | 'alt') => void
 }) {
   if (!primary && !alt) {
@@ -746,6 +756,14 @@ function CallButtons({
   return (
     <Card>
       <CardBody className="flex flex-col gap-3">
+        <Segmented<CallKind>
+          label="Call recording choice"
+          size="base"
+          value={callKind}
+          options={CALL_KIND_OPTIONS}
+          onChange={onCallKindChange}
+        />
+
         {primary ? (
           <Button
             size="lg"

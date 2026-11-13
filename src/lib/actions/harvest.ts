@@ -75,6 +75,21 @@ export async function registerHarvestedRecording(input: {
     return { ok: false, error: 'That recording was stored under the wrong event and was not filed.' }
   }
 
+  // Backstop: reminder calls are not recorded or transcribed. If the call attempt
+  // was flagged as a reminder, refuse registration so it is not sent to Sarvam.
+  if (input.callAttemptId) {
+    const { data: attempt } = await supabase
+      .from('call_attempts')
+      .select('call_kind')
+      .eq('id', input.callAttemptId)
+      .eq('event_id', input.eventId)
+      .maybeSingle()
+
+    if (attempt?.call_kind === 'reminder') {
+      return { ok: false, error: 'Reminder call: not recorded.' }
+    }
+  }
+
   const { data: inserted, error: insertError } = await supabase
     .from('call_recordings')
     .insert({

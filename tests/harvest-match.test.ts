@@ -176,4 +176,49 @@ describe('matchRecording', () => {
     const result = await matchRecording(input({ filePath: '/Recordings/Call/recording.m4a' }))
     expect(result.kind).toBe('unmatched')
   })
+
+  it('sets callKind to reminder when in-app attempt was a reminder call', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      stubClient({
+        call_attempts: [
+          {
+            id: 'a-rem',
+            group_id: 'g-rem',
+            dialed_number: '9000000000',
+            started_at: new Date(MTIME - 30_000).toISOString(),
+            outcome: 'connected',
+            call_kind: 'reminder',
+          },
+        ],
+        guest_groups: [],
+      }) as never,
+    )
+
+    const result = await matchRecording(input())
+    expect(result).toMatchObject({
+      kind: 'matched',
+      callAttemptId: 'a-rem',
+      groupId: 'g-rem',
+      via: 'call-window',
+      callKind: 'reminder',
+    })
+  })
+
+  it('sets callKind to first for filename-phone fallback matches', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      stubClient({
+        call_attempts: [],
+        guest_groups: [{ id: 'g-ph', primary_mobile: '9876543210', alt_mobile: null }],
+      }) as never,
+    )
+
+    const result = await matchRecording(input())
+    expect(result).toMatchObject({
+      kind: 'matched',
+      callAttemptId: null,
+      groupId: 'g-ph',
+      via: 'filename-phone',
+      callKind: 'first',
+    })
+  })
 })

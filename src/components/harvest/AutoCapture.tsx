@@ -102,9 +102,16 @@ function startOfToday(): number {
   return d.getTime()
 }
 
-function describe(outcome: SweepOutcome | null, total: number): string {
+function describe(outcome: SweepOutcome | null, total: number, totalSkipped: number): string {
+  const parts: string[] = []
   if (total > 0) {
-    return `${total} recording${total === 1 ? '' : 's'} sent for transcription.`
+    parts.push(`${total} recording${total === 1 ? '' : 's'} sent for transcription.`)
+  }
+  if (totalSkipped > 0) {
+    parts.push(`${totalSkipped} reminder call${totalSkipped === 1 ? '' : 's'} skipped.`)
+  }
+  if (parts.length > 0) {
+    return parts.join(' ')
   }
   if (outcome?.unmatched) {
     return 'A recording could not be matched to a family — attach it in the unmatched tray.'
@@ -120,6 +127,7 @@ export function AutoCapture({ eventId, eventCode }: AutoCaptureProps) {
   const [busy, setBusy] = useState(false)
   const [outcome, setOutcome] = useState<SweepOutcome | null>(null)
   const [totalUploaded, setTotalUploaded] = useState(0)
+  const [totalSkipped, setTotalSkipped] = useState(0)
   const [problem, setProblem] = useState<string | null>(null)
 
   const enabledAtRef = useRef<number | null>(null)
@@ -143,6 +151,7 @@ export function AutoCapture({ eventId, eventCode }: AutoCaptureProps) {
       setOutcome(result)
       setProblem(result.lastError ?? null)
       if (result.uploaded > 0) setTotalUploaded((n) => n + result.uploaded)
+      if (result.skipped > 0) setTotalSkipped((n) => n + result.skipped)
     } catch (err) {
       setProblem(err instanceof Error ? err.message : 'The last check did not finish.')
     } finally {
@@ -248,7 +257,7 @@ export function AutoCapture({ eventId, eventCode }: AutoCaptureProps) {
     return (
       <p className="text-sm text-muted">
         <span className="font-semibold text-fg">Call capture on.</span>{' '}
-        {problem ?? describe(outcome, totalUploaded)}{' '}
+        {problem ?? describe(outcome, totalUploaded, totalSkipped)}{' '}
         <span className="text-muted">Works while this screen is open.</span>
       </p>
     )

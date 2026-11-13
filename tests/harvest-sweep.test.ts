@@ -24,6 +24,7 @@ vi.mock('@/lib/harvest-match', () => ({
     groupId: 'g1',
     eventId: 'e1',
     via: 'filename-phone',
+    callKind: 'first' as const,
   })),
 }))
 
@@ -46,13 +47,14 @@ vi.mock('@/lib/harvest-ledger', () => ({
   markUploaded: vi.fn(async () => {}),
   markUnmatched: vi.fn(async () => {}),
   markFailed: vi.fn(async () => {}),
+  markSkipped: vi.fn(async () => {}),
   rememberStoragePath: vi.fn(async () => {}),
 }))
 
 import { listFiles } from '@/lib/harvest'
 import { matchRecording } from '@/lib/harvest-match'
 import { commitHarvestedRecording } from '@/lib/harvest-upload'
-import { markUnmatched, rememberStoragePath } from '@/lib/harvest-ledger'
+import { markSkipped, markUnmatched, rememberStoragePath } from '@/lib/harvest-ledger'
 import { sweepHarvest } from '@/lib/harvest-sweep'
 
 const ENABLED_AT = 1_700_000_000_000
@@ -89,6 +91,7 @@ beforeEach(() => {
     groupId: 'g1',
     eventId: 'e1',
     via: 'filename-phone',
+    callKind: 'first',
   })
   vi.mocked(commitHarvestedRecording).mockResolvedValue({ ok: true, recordingId: 'rec-1' })
 })
@@ -215,5 +218,37 @@ describe('harvest sweep', () => {
     expect(result.lastError).toBe('No connection')
     // Left as `seen`, so the next sweep tries again.
     expect(markUnmatched).not.toHaveBeenCalled()
+  })
+
+  it('skips a reminder call match without uploading or committing', async () => {
+    vi.mocked(listFiles).mockResolvedValue([file()])
+    vi.mocked(matchRecording).mockResolvedValue({
+      kind: 'matched',
+      callAttemptId: 'att-1',
+      groupId: 'g1',
+      eventId: 'e1',
+      via: 'call-window',
+      callKind: 'reminder',
+    })
+
+    const result = await sweep()
+
+    expect(result.skipped).toBe(1)
+    expect(result.uploaded).toBe(0)
+    expect(result.failed).toBe(0)
+    expect(markSkipped).toHaveBeenCalledWith(file().path, expect.any(String))
+    expect(commitHarvestedRecording).not.toHaveBeenCalled()
+  })
+
+  it('never picks up a file with skipped ledger status', async () => {
+    const f = file()
+    ledger.entries = [{ path: f.path, status: 'skipped' }]
+    vi.mocked(listFiles).mockResolvedValue([f])
+
+    const result = await sweep()
+    expect(result.uploaded).toBe(0)
+    expect(result.skipped).toBe(0)
+    expect(matchRecording).not.toHaveBeenCalled()
+    expect(commitHarvestedRecording).not.toHaveBeenCalled()
   })
 })

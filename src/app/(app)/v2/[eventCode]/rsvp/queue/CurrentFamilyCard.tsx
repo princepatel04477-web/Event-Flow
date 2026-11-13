@@ -2,7 +2,9 @@
 
 import { PhoneIcon } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
+import { Segmented } from '@/components/ui/Segmented'
 import { StatusPill } from '@/components/ui/StatusPill'
+import { CALL_KIND_OPTIONS, defaultCallKind, type CallKind } from '@/lib/call-kind'
 import type { LockNote } from '@/lib/lock'
 import { dialTarget } from '@/lib/native-call'
 import { formatSideLabel } from '@/lib/side'
@@ -16,6 +18,8 @@ interface CurrentFamilyCardProps {
   row: QueueRow
   dialling: boolean
   lock: LockNote | null
+  callKind?: CallKind
+  onCallKindChange?: (kind: CallKind) => void
   onCall: () => void
 }
 
@@ -39,6 +43,8 @@ export function CurrentFamilyCard({
   row,
   dialling,
   lock,
+  callKind,
+  onCallKindChange,
   onCall,
 }: CurrentFamilyCardProps) {
   const headName = row.head_name?.trim() || 'Unnamed family'
@@ -48,6 +54,7 @@ export function CurrentFamilyCard({
   const canDial = dialTarget(row.primary_mobile) !== null
   const relation = relationLabel(row.group_type)
   const sideLabel = formatSideLabel((row.side as Side) ?? null, row.sub_side) ?? row.side
+  const chosenKind = callKind ?? defaultCallKind(row.rsvp_status)
 
   const metaLine = [
     relation,
@@ -62,43 +69,29 @@ export function CurrentFamilyCard({
       className="flex flex-col gap-3 rounded-2xl border border-rule bg-surface p-4 shadow-e1"
       aria-label={`Current family: ${headName}`}
     >
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="line-clamp-2 text-xl leading-tight font-semibold break-words text-ink font-display">
-            {headName}
-          </h2>
-          {/*
-            The family's calling status, ON the call screen. It was only ever
-            rendered inside the "all families" sheet, so logging an outcome
-            changed nothing the caller could see without opening that sheet -
-            which is how "the status does not update" got reported. The queue
-            row is patched optimistically before the write leaves the phone,
-            so this pill flips on the tap.
-          */}
-          <div className="mt-1.5">
-            <StatusPill tone={statusTone(row.rsvp_status)}>
-              {rsvpStatusLabel(row.rsvp_status)}
-            </StatusPill>
-          </div>
-          <p className="mt-1 text-sm text-muted">{metaLine}</p>
-          {attempts > 0 ? (
-            <p className="mt-0.5 text-xs text-subtle">
-              {attempts} {attempts === 1 ? 'call' : 'calls'} so far
-            </p>
-          ) : null}
+      <div className="min-w-0 flex-1">
+        <h2 className="line-clamp-2 text-xl leading-tight font-semibold break-words text-ink font-display">
+          {headName}
+        </h2>
+        {/*
+          The family's calling status, ON the call screen. It was only ever
+          rendered inside the "all families" sheet, so logging an outcome
+          changed nothing the caller could see without opening that sheet -
+          which is how "the status does not update" got reported. The queue
+          row is patched optimistically before the write leaves the phone,
+          so this pill flips on the tap.
+        */}
+        <div className="mt-1.5">
+          <StatusPill tone={statusTone(row.rsvp_status)}>
+            {rsvpStatusLabel(row.rsvp_status)}
+          </StatusPill>
         </div>
-
-        <Button
-          variant="success"
-          size="sm"
-          disabled={!canDial || dialling}
-          leadingIcon={<PhoneIcon className="h-5 w-5" aria-hidden />}
-          onClick={onCall}
-          className="shrink-0"
-          aria-label={`Call ${headName}`}
-        >
-          {dialling ? 'Calling…' : 'Call now'}
-        </Button>
+        <p className="mt-1 text-sm text-muted">{metaLine}</p>
+        {attempts > 0 ? (
+          <p className="mt-0.5 text-xs text-subtle">
+            {attempts} {attempts === 1 ? 'call' : 'calls'} so far
+          </p>
+        ) : null}
       </div>
 
       {callback ? (
@@ -117,6 +110,28 @@ export function CurrentFamilyCard({
           {lock.sentence}
         </p>
       ) : null}
+
+      <div className="flex flex-col gap-2.5 pt-1">
+        <Segmented<CallKind>
+          label="Call recording choice"
+          size="base"
+          value={chosenKind}
+          options={CALL_KIND_OPTIONS}
+          onChange={onCallKindChange ?? (() => {})}
+        />
+
+        <Button
+          variant="success"
+          size="lg"
+          fullWidth
+          disabled={!canDial || dialling}
+          leadingIcon={<PhoneIcon className="h-5 w-5" aria-hidden />}
+          onClick={onCall}
+          aria-label={`Call ${headName}`}
+        >
+          {dialling ? 'Calling…' : 'Call now'}
+        </Button>
+      </div>
 
       {!canDial ? (
         <p className="text-xs text-muted">No phone number on file for this family.</p>
