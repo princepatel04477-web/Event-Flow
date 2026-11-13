@@ -38,6 +38,8 @@ import { ttlCache } from '@/lib/ttl-cache'
  * old name in the header for 30 seconds.
  */
 const eventCache = ttlCache<unknown>(30_000)
+const viewerCache = ttlCache<Viewer>(30_000)
+const accessCache = ttlCache<EventAccess>(30_000)
 
 /**
  * Measurement switch. `NUVENT_PERF_BASELINE=1` disables the caches added by
@@ -154,7 +156,16 @@ export type Viewer = {
 export async function getViewer(): Promise<Viewer | null> {
   // Memoised per request: the layout calls this for the nav and several pages
   // call it again. A null (no session) is never cached — see request-cache.ts.
-  return perRequest('viewer', getViewerUncached)
+  return perRequest('viewer', async () => {
+    const scope = await sessionScope()
+    if (scope === 'anon') return null
+    const hit = PERF_BASELINE ? undefined : (viewerCache.get(`viewer:${scope}`) as Viewer | undefined)
+    if (hit !== undefined) return hit
+
+    const viewer = await getViewerUncached()
+    if (viewer) viewerCache.set(`viewer:${scope}`, viewer)
+    return viewer
+  })
 }
 
 async function getViewerUncached(): Promise<Viewer | null> {
@@ -337,7 +348,16 @@ export async function getEventAccess(eventId: string): Promise<EventAccess> {
   // then requireStaff/requireAdmin resolves it again inside the page.
   // 'none' is a real answer (not nullish), so it caches — correctly: it cannot
   // change within one request.
-  return perRequest(`access:${eventId}`, () => getEventAccessUncached(eventId))
+  return perRequest(`access:${eventId}`, async () => {
+    const scope = await sessionScope()
+    const key = `access:${eventId}:${scope}`
+    const hit = PERF_BASELINE ? undefined : (accessCache.get(key) as EventAccess | undefined)
+    if (hit !== undefined) return hit
+
+    const access = await getEventAccessUncached(eventId)
+    if (access !== 'none') accessCache.set(key, access)
+    return access
+  })
 }
 
 async function getEventAccessUncached(eventId: string): Promise<EventAccess> {

@@ -20,6 +20,13 @@
 
 import { getEventAccess } from '@/lib/supabase/queries'
 import { createClient } from '@/lib/supabase/server'
+import { ttlCache } from '@/lib/ttl-cache'
+
+const deliveryRunCache = ttlCache<DeliveryRunResult>(15_000)
+
+export function invalidateDeliveryRunCache(eventId: string) {
+  deliveryRunCache.delete(eventId)
+}
 
 /** Per-phase timing for server actions (instrument-first). */
 function phaseTiming(label: string) {
@@ -146,6 +153,7 @@ export async function generateDeliverables(eventId: string): Promise<GenerateRes
     returnGiftsCreated = giftRows.length
   }
 
+  invalidateDeliveryRunCache(eventId)
   return {
     ok: true,
     error: null,
@@ -187,6 +195,9 @@ export interface DeliveryRunResult {
  * the group's head name + mobile — the caller needs to confirm the door.
  */
 export async function readDeliveryRun(eventId: string): Promise<DeliveryRunResult> {
+  const cached = deliveryRunCache.get(eventId)
+  if (cached) return cached
+
   const timing = phaseTiming('deliveries :: readDeliveryRun')
   const access = await getEventAccess(eventId)
   timing.mark('guard')
@@ -230,7 +241,9 @@ export async function readDeliveryRun(eventId: string): Promise<DeliveryRunResul
   timing.mark('parse')
   timing.report()
 
-  return { ok: true, error: null, rows }
+  const result: DeliveryRunResult = { ok: true, error: null, rows }
+  deliveryRunCache.set(eventId, result)
+  return result
 }
 
 // ---------------------------------------------------------------------------

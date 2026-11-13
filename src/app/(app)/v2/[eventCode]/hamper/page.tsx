@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 
 import { HamperRun } from '../hospitality/deliveries/HamperRun'
 import { requireHamperScreen } from '../hospitality/deliveries/_guard'
+import { readDeliveryRun } from '@/lib/actions/deliveries'
 
 export const metadata: Metadata = {
   title: 'Hampers',
@@ -42,6 +43,9 @@ type PageProps = {
 export default async function HamperPage({ params }: PageProps) {
   const { eventCode } = await params
   const { event, canGenerate, canOpenGuestList } = await requireHamperScreen(eventCode)
+
+  // Pre-warm the delivery run cache for instant render on client mount
+  void readDeliveryRun(event.id).catch(() => null)
 
   return (
     <HamperRun

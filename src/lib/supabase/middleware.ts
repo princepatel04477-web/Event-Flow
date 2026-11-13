@@ -70,6 +70,25 @@ export async function updateSession(request: NextRequest) {
 
   if (codeClaims) return response
 
+  // Check if any Supabase auth cookies exist before incurring GoTrue work.
+  // Without any sb-* cookie, we know there cannot be a GoTrue session.
+  const hasSbCookies = request.cookies.getAll().some((c) => c.name.startsWith('sb-'))
+
+  // Fast path for public routes without GoTrue cookies: avoid constructing the client
+  // or hitting the network.
+  if (isPublic && !hasSbCookies) {
+    return response
+  }
+
+  // Fast path for unauthenticated requests on protected routes: redirect immediately
+  // to login instead of waiting for a network round trip to return null.
+  if (!hasSbCookies && !isPublic) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    url.searchParams.set('next', pathname)
+    return NextResponse.redirect(url)
+  }
+
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

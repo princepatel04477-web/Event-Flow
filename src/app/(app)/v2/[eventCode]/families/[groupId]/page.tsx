@@ -77,8 +77,10 @@ export default async function FamilyPage({ params }: PageProps) {
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
 
-  const access = await requireStaff(event.id, event.code)
-  const ctx = await getStaffViewerContext(event.id)
+  const [access, ctx] = await Promise.all([
+    requireStaff(event.id, event.code),
+    getStaffViewerContext(event.id),
+  ])
   const department = ctx?.department ?? null
   const lead = access === 'admin' || department === 'management'
 

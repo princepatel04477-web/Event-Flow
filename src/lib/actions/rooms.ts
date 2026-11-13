@@ -14,6 +14,23 @@ import {
   type RoomForAllocation,
 } from '@/lib/allocate/allocator'
 import { suggestRooms } from '@/lib/allocate/suggest'
+import { ttlCache } from '@/lib/ttl-cache'
+import { invalidateRoomingListCache } from './rooming-list'
+
+const roomsGridCache = ttlCache<RoomsGridData>(30_000)
+const allocationDataCache = ttlCache<AllocationData>(30_000)
+
+export function invalidateRoomsCache(eventId?: string) {
+  if (eventId) {
+    roomsGridCache.clear(eventId)
+    allocationDataCache.clear(eventId)
+    invalidateRoomingListCache(eventId)
+  } else {
+    roomsGridCache.clear()
+    allocationDataCache.clear()
+    invalidateRoomingListCache()
+  }
+}
 
 /** Per-phase timing for server actions (instrument-first). */
 function phaseTiming() {
@@ -83,6 +100,9 @@ export interface AllocationGuest {
 }
 
 export async function readAllocationData(eventId: string): Promise<AllocationData> {
+  const cached = allocationDataCache.get(eventId)
+  if (cached) return cached
+
   const supabase = await createClient()
 
   const [groupsRes, roomsRes, guestsRes, assignmentsRes] = await Promise.all([
@@ -162,7 +182,7 @@ export async function readAllocationData(eventId: string): Promise<AllocationDat
     freeBeds: r.capacity - (occupancy.get(r.id) ?? 0),
   }))
 
-  return {
+  const data: AllocationData = {
     groups: groups.map((g): AllocationGroup => ({
       id: g.id,
       headName: g.head_name,
@@ -182,6 +202,8 @@ export async function readAllocationData(eventId: string): Promise<AllocationDat
       isHead: g.is_head,
     })),
   }
+  allocationDataCache.set(eventId, data)
+  return data
 }
 
 // ---------------------------------------------------------------------------
@@ -434,6 +456,9 @@ export interface RoomsGridData {
 }
 
 export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
+  const cached = roomsGridCache.get(eventId)
+  if (cached) return cached
+
   const timing = phaseTiming()
   const supabase = await createClient()
   timing.mark('client-create')
@@ -633,7 +658,9 @@ export async function readRoomsGrid(eventId: string): Promise<RoomsGridData> {
 
   timing.mark('assemble')
   timing.report()
-  return { rooms, unplaced, underBedded, totals }
+  const result: RoomsGridData = { rooms, unplaced, underBedded, totals }
+  roomsGridCache.set(eventId, result)
+  return result
 }
 
 // ---------------------------------------------------------------------------
@@ -700,6 +727,7 @@ export async function commitAllocations(
     return { ok: false, error: friendlyDbError(error) }
   }
 
+  invalidateRoomsCache(eventId)
   return { ok: true, count: rows.length }
 }
 
@@ -1011,6 +1039,7 @@ export async function moveGuestsToRoom(
     return { ok: false, error: friendlyDbError(error), code: 'other' }
   }
 
+  invalidateRoomsCache(eventId)
   return { ok: true, count: assignmentIds.length }
 }
 
@@ -1040,6 +1069,7 @@ export async function releaseGuestFromRoom(
     return { ok: false, error: friendlyDbError(error) }
   }
 
+  invalidateRoomsCache()
   return { ok: true }
 }
 
@@ -1112,6 +1142,7 @@ export async function assignGuestToRoom(
     return { ok: false, error: friendlyDbError(error), code: 'other' }
   }
 
+  invalidateRoomsCache(eventId)
   return { ok: true }
 }
 
@@ -1207,6 +1238,7 @@ export async function assignGroupToRoom(
     return { ok: false, error: friendlyDbError(error), code: 'other' }
   }
 
+  invalidateRoomsCache(eventId)
   return { ok: true, assigned: ordered.length }
 }
 
@@ -1323,6 +1355,7 @@ export async function assignGuestsToRoom(
     return { ok: false, error: friendlyDbError(error), code: 'other' }
   }
 
+  invalidateRoomsCache(eventId)
   return { ok: true, assigned: take, remaining: unplaced.length - take }
 }
 
@@ -1634,5 +1667,6 @@ export async function commitRoomPlan(
     })
   }
 
+  invalidateRoomsCache(eventId)
   return { families, guests, outcomes }
 }

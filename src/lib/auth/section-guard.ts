@@ -50,8 +50,10 @@ export async function requireSection(
   eventCode: string,
   sectionId: SectionId,
 ): Promise<StaffViewerContext> {
-  const access = await requireStaff(eventId, eventCode)
-  const ctx = await getStaffViewerContext(eventId)
+  const [access, ctx] = await Promise.all([
+    requireStaff(eventId, eventCode),
+    getStaffViewerContext(eventId),
+  ])
   if (!ctx) redirect(`/${eventCode}`)
 
   if (access === 'admin' || ctx.department === 'management') return ctx
@@ -97,8 +99,10 @@ export async function requireAnySection(
   eventCode: string,
   sectionIds: SectionId[],
 ): Promise<StaffViewerContext> {
-  const access = await requireStaff(eventId, eventCode)
-  const ctx = await getStaffViewerContext(eventId)
+  const [access, ctx] = await Promise.all([
+    requireStaff(eventId, eventCode),
+    getStaffViewerContext(eventId),
+  ])
   if (!ctx) redirect(`/${eventCode}`)
 
   if (access === 'admin' || ctx.department === 'management') return ctx

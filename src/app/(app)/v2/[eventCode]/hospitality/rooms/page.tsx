@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { requireSection } from '@/lib/auth/section-guard'
 import { sectionAllowedForDepartment } from '@/lib/departments'
 import { getEventAccess, resolveEventByCode } from '@/lib/supabase/queries'
+import { readRoomsGrid } from '@/lib/actions/rooms'
 
 import { RoomsBoard } from './RoomsBoard'
 
@@ -43,7 +44,10 @@ export default async function RoomsPage({ params }: PageProps) {
   // a hospitality runner lands every time they clear their queue. Found by the
   // R1 review; `getEventAccess` is memoised per request, so re-reading it here
   // costs nothing.
-  const access = await getEventAccess(event.id)
+  const [access] = await Promise.all([
+    getEventAccess(event.id),
+    readRoomsGrid(event.id).catch(() => null),
+  ])
   const canOpenCallList =
     access === 'admin' || sectionAllowedForDepartment('rsvp', ctx.department)
 

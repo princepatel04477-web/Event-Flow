@@ -31,8 +31,10 @@ export async function requireHamperScreen(eventCode: string) {
   const event = await resolveEventByCode(eventCode)
   if (!event) notFound()
 
-  const access = await requireStaff(event.id, event.code)
-  const ctx = await getStaffViewerContext(event.id)
+  const [access, ctx] = await Promise.all([
+    requireStaff(event.id, event.code),
+    getStaffViewerContext(event.id),
+  ])
   if (!ctx) redirect(`/${eventCode}`)
 
   if (access === 'admin' || ctx.department === 'management') {

@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 
 import { requireSection } from '@/lib/auth/section-guard'
 import { resolveEventByCode } from '@/lib/supabase/queries'
+import { readRoomingList } from '@/lib/actions/rooming-list'
 
 import { RoomingList } from './RoomingList'
 
@@ -37,6 +38,9 @@ export default async function RoomingListPage({ params }: PageProps) {
 
   const ctx = await requireSection(event.id, event.code, 'hospitality')
   if (ctx.access !== 'admin') redirect(`/${event.code}`)
+
+  // Pre-warm the rooming list on the server so client useQuery hits memory cache
+  await readRoomingList(event.id).catch(() => null)
 
   return <RoomingList eventId={event.id} eventCode={event.code} eventName={event.name} />
 }

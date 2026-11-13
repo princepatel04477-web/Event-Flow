@@ -5,6 +5,15 @@ import { revalidatePath } from 'next/cache'
 import type { ArrivalLeg } from '@/lib/arrivals/banner'
 import { friendlyDbError } from '@/lib/errors'
 import { createClient } from '@/lib/supabase/server'
+import { ttlCache } from '@/lib/ttl-cache'
+
+const arrivalsNotifyCache = ttlCache<boolean>(30_000)
+const arrivalLegsCache = ttlCache<ArrivalLeg[]>(15_000)
+
+export function invalidateArrivalsCache(eventId: string) {
+  arrivalsNotifyCache.delete(eventId)
+  arrivalLegsCache.clear(eventId)
+}
 
 /**
  * Arrival data and the arrival-notification switch (A9).
@@ -34,6 +43,10 @@ type ArrivalReadClient = {
 }
 
 export async function readArrivalLegs(eventId: string, date: string): Promise<ArrivalLeg[]> {
+  const key = `${eventId}:${date}`
+  const cached = arrivalLegsCache.get(key)
+  if (cached !== undefined) return cached
+
   const supabase = await createClient()
   const db = supabase as unknown as ArrivalReadClient
 
@@ -73,6 +86,7 @@ export async function readArrivalLegs(eventId: string, date: string): Promise<Ar
     })
   }
 
+  arrivalLegsCache.set(key, out)
   return out
 }
 
@@ -95,6 +109,9 @@ type SettingsClient = {
 
 /** True unless an admin has switched it off. An unreadable setting stays on. */
 export async function isArrivalsNotifyEnabled(eventId: string): Promise<boolean> {
+  const cached = arrivalsNotifyCache.get(eventId)
+  if (cached !== undefined) return cached
+
   try {
     const supabase = await createClient()
     const { data } = await (supabase as unknown as SettingsClient)
@@ -103,7 +120,9 @@ export async function isArrivalsNotifyEnabled(eventId: string): Promise<boolean>
       .eq('event_id', eventId)
       .maybeSingle()
     const row = data as { arrivals_enabled?: boolean } | null
-    return row?.arrivals_enabled ?? true
+    const enabled = row?.arrivals_enabled ?? true
+    arrivalsNotifyCache.set(eventId, enabled)
+    return enabled
   } catch {
     return true
   }
@@ -115,6 +134,7 @@ export async function setArrivalsNotify(
   eventId: string,
   enabled: boolean,
 ): Promise<NotifyToggleResult> {
+  arrivalsNotifyCache.delete(eventId)
   const supabase = await createClient()
   const { error } = await (supabase as unknown as SettingsClient)
     .from('event_notification_settings')

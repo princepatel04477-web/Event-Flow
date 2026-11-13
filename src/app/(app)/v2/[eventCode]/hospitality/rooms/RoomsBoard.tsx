@@ -55,6 +55,7 @@ import { ROOM_TYPES, ROOM_TYPE_LABELS, roomTypeLabel, type RoomType } from '@/li
 import { useStoredVenue } from '@/lib/rooms/venue'
 import { initials } from '@/lib/ui/metrics'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
+import { useCappedRows } from '@/lib/useCappedRows'
 import { cn } from '@/lib/utils'
 
 import { AllocateReview } from './_components/AllocateReview'
@@ -819,6 +820,8 @@ function WaitingList({
   canOpenCallList,
   onPick,
 }: WaitingListProps) {
+  const { visible, remaining, showMore } = useCappedRows(families, 40)
+
   if (!hasRooms) {
     return (
       <EmptyState
@@ -854,21 +857,28 @@ function WaitingList({
   }
 
   return (
-    <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
-      {families.map((family) => (
-        <li key={family.groupId}>
-          <Row
-            heading={displayName(family.headName)}
-            meta={waitingLabel(family.headcount, family.placed)}
-            initials={initials(family.headName)}
-            status={family.needsTopUp ? 'Names' : undefined}
-            tone="waiting"
-            onPress={() => onPick(family)}
-            trailing={<ChevronRightIcon className="h-5 w-5" />}
-          />
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-2">
+      <ul className="overflow-hidden rounded-2xl border border-rule-strong bg-surface">
+        {visible.map((family) => (
+          <li key={family.groupId}>
+            <Row
+              heading={displayName(family.headName)}
+              meta={waitingLabel(family.headcount, family.placed)}
+              initials={initials(family.headName)}
+              status={family.needsTopUp ? 'Names' : undefined}
+              tone="waiting"
+              onPress={() => onPick(family)}
+              trailing={<ChevronRightIcon className="h-5 w-5" />}
+            />
+          </li>
+        ))}
+      </ul>
+      {remaining > 0 ? (
+        <Button variant="secondary" fullWidth onClick={showMore}>
+          Show {Math.min(remaining, 40)} more ({remaining} remaining)
+        </Button>
+      ) : null}
+    </div>
   )
 }
 

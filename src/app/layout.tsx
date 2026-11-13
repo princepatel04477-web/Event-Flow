@@ -78,6 +78,7 @@ const plexDevanagari = IBM_Plex_Sans_Devanagari({
   weight: ['400', '500', '600'],
   variable: '--font-plex-devanagari',
   display: 'swap',
+  preload: false,
 })
 
 /**
@@ -90,6 +91,7 @@ const notoGujarati = Noto_Sans_Gujarati({
   weight: ['400', '600'],
   variable: '--font-noto-gujarati',
   display: 'swap',
+  preload: false,
 })
 
 /** Every figure in the app, plus every phone and flight number. */

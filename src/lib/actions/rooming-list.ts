@@ -29,11 +29,22 @@
 import { getEventAccess } from '@/lib/supabase/queries'
 import { createClient } from '@/lib/supabase/server'
 import { type RoomingCheckIn, type RoomingHamper, type RoomingListRow } from '@/lib/rooms/rooming-list'
+import { ttlCache } from '@/lib/ttl-cache'
 
 export interface RoomingListResult {
   ok: boolean
   error: string | null
   rows: RoomingListRow[]
+}
+
+const roomingListCache = ttlCache<RoomingListResult>(30_000)
+
+export function invalidateRoomingListCache(eventId?: string) {
+  if (eventId) {
+    roomingListCache.clear(eventId)
+  } else {
+    roomingListCache.clear()
+  }
 }
 
 export async function readRoomingList(eventId: string): Promise<RoomingListResult> {
@@ -44,6 +55,9 @@ export async function readRoomingList(eventId: string): Promise<RoomingListResul
   if (access !== 'admin' && access !== 'event_team') {
     return { ok: false, error: 'Not permitted.', rows: [] }
   }
+
+  const cached = roomingListCache.get(eventId)
+  if (cached) return cached
 
   const supabase = await createClient()
 
@@ -203,5 +217,7 @@ export async function readRoomingList(eventId: string): Promise<RoomingListResul
     }
   }
 
-  return { ok: true, error: null, rows }
+  const result: RoomingListResult = { ok: true, error: null, rows }
+  roomingListCache.set(eventId, result)
+  return result
 }

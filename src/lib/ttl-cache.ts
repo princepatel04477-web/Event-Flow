@@ -31,6 +31,18 @@ export function ttlCache<T>(ttlMs: number) {
     set(key: string, value: T): void {
       store.set(key, { value, expiresAt: Date.now() + ttlMs })
     },
+    delete(key: string): void {
+      store.delete(key)
+    },
+    clear(keyPrefix?: string): void {
+      if (!keyPrefix) {
+        store.clear()
+        return
+      }
+      for (const k of store.keys()) {
+        if (k.startsWith(keyPrefix)) store.delete(k)
+      }
+    },
   }
 }
 

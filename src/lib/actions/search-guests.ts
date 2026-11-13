@@ -2,7 +2,14 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { friendlyDbError } from '@/lib/errors'
+import { ttlCache } from '@/lib/ttl-cache'
 import type { Database } from '@/lib/supabase/database.types'
+
+const guestsListCache = ttlCache<GuestSearchResult>(30_000)
+
+export async function invalidateGuestsListCache(eventId: string) {
+  guestsListCache.delete(eventId)
+}
 
 /** Per-phase timing for server actions (instrument-first). */
 function phaseTiming(label: string) {
@@ -58,7 +65,13 @@ async function readGuestRows(eventId: string, term: string, limit: number): Prom
  * so the DB returning all 543 rows is fine — the DOM never mounts them all.
  */
 export async function listGuests(eventId: string): Promise<GuestSearchResult> {
-  return readGuestRows(eventId, '', 2000)
+  const cached = guestsListCache.get(eventId)
+  if (cached) return cached
+  const result = await readGuestRows(eventId, '', 2000)
+  if (result.ok) {
+    guestsListCache.set(eventId, result)
+  }
+  return result
 }
 
 /**

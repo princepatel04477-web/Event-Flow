@@ -23,6 +23,7 @@ import { formatMobile } from '@/lib/phone'
 import { queryKeys } from '@/lib/query/keys'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/utils'
+import { useCappedRows } from '@/lib/useCappedRows'
 
 import {
   displayName,
@@ -288,6 +289,8 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
   const next = toGo[0] ?? null
   const active = activeId ? (board.find((row) => row.leg.id === activeId) ?? null) : null
   const afterThat = next ? board.filter((row) => row !== next) : board
+  const { visible: visibleAfterThat, remaining: remainingAfterThat, showMore: showMoreAfterThat } =
+    useCappedRows(afterThat, 40)
 
   function openSheet(row: TravelRow) {
     setActiveId(row.leg.id)
@@ -426,7 +429,7 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
             <section className="flex flex-col gap-2">
               <h2 className="eyebrow">After that</h2>
               <div className="flex flex-col gap-4">
-                {groupBySlot(afterThat).map((slot) => (
+                {groupBySlot(visibleAfterThat).map((slot) => (
                   <div key={slot.key} className="flex flex-col gap-1.5">
                     <p className="text-sm text-muted">
                       {slotHeading(slot.rows[0].leg, todayKey, dayLabel)}
@@ -458,6 +461,11 @@ export function TravelBoard({ eventId, eventCode, direction, otherHref }: Travel
                     </ul>
                   </div>
                 ))}
+                {remainingAfterThat > 0 ? (
+                  <Button variant="secondary" fullWidth onClick={showMoreAfterThat}>
+                    Show {Math.min(remainingAfterThat, 40)} more ({remainingAfterThat} remaining)
+                  </Button>
+                ) : null}
               </div>
             </section>
           ) : null}
