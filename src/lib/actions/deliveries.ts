@@ -24,7 +24,7 @@ import { ttlCache } from '@/lib/ttl-cache'
 
 const deliveryRunCache = ttlCache<DeliveryRunResult>(15_000)
 
-export function invalidateDeliveryRunCache(eventId: string) {
+export async function invalidateDeliveryRunCache(eventId: string) {
   deliveryRunCache.delete(eventId)
 }
 

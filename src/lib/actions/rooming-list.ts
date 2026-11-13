@@ -39,7 +39,7 @@ export interface RoomingListResult {
 
 const roomingListCache = ttlCache<RoomingListResult>(30_000)
 
-export function invalidateRoomingListCache(eventId?: string) {
+export async function invalidateRoomingListCache(eventId?: string) {
   if (eventId) {
     roomingListCache.clear(eventId)
   } else {

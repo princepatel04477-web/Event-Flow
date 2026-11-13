@@ -20,7 +20,7 @@ import { invalidateRoomingListCache } from './rooming-list'
 const roomsGridCache = ttlCache<RoomsGridData>(30_000)
 const allocationDataCache = ttlCache<AllocationData>(30_000)
 
-export function invalidateRoomsCache(eventId?: string) {
+export async function invalidateRoomsCache(eventId?: string) {
   if (eventId) {
     roomsGridCache.clear(eventId)
     allocationDataCache.clear(eventId)

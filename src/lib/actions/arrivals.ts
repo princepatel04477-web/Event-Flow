@@ -10,7 +10,7 @@ import { ttlCache } from '@/lib/ttl-cache'
 const arrivalsNotifyCache = ttlCache<boolean>(30_000)
 const arrivalLegsCache = ttlCache<ArrivalLeg[]>(15_000)
 
-export function invalidateArrivalsCache(eventId: string) {
+export async function invalidateArrivalsCache(eventId: string) {
   arrivalsNotifyCache.delete(eventId)
   arrivalLegsCache.clear(eventId)
 }
