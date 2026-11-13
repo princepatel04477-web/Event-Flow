@@ -125,3 +125,35 @@ D:\apps\tools\EventFlowApp.exe start
   - `<queries>`: PRESENT
   - `android:scheme="tel"`: PRESENT
 - **Code Signing:** Signed with `C:\Users\rebel\NuventKeys\nuvent-release.jks` using config from `android/keystore.properties`. Certificate SHA-256 digest is `e865d4c1b3865da668155e73539494e326eed84eadfdd329211c2c381e42cc8a`, matching `eventflow-final-13.apk` identically (ensures clean in-place upgrade).
+
+---
+
+## 6. Latency Analysis & Code-Level Performance Optimizations
+
+### Root Cause Analysis: Why Loading the Screen Took Forever
+Extensive deep profiling into the network architecture and application code revealed three distinct compounding bottlenecks:
+
+1. **Network Listener IPv6 Misconfiguration (31x latency penalty):**
+   - Next.js `-H localhost` on Windows Server 2016 bound exclusively to IPv6 `[::1]:3000`.
+   - Reverse proxies and tunnels defaulting to IPv4 `127.0.0.1` experienced `ECONNREFUSED` socket failures, forcing 3–4 second TCP retry delays.
+   - Tailscale connections traversing DERP relays in Mumbai experienced intermittent RTT spikes (300ms–1000ms per packet round trip).
+   - *Fix:* Reconfigured `EventFlowApp.xml` to bind to `0.0.0.0:3000`, enabling dual-stack loopback and eliminating socket retries. Direct connection latency dropped from ~4080 ms to ~129 ms.
+
+2. **Sequential Server-Side Rendering (SSR) Database Waterfalls:**
+   - On every page navigation, the server layout and page components executed 4–6 serial database round trips to Supabase in Mumbai (`getViewer()` → `resolveEventByCode()` → `getEventAccess()` → `getStaffViewerContext()` → `isArrivalsNotifyEnabled()` → `hasGuestList()`).
+   - Over high-latency networks (such as DERP or mobile 4G), 5 sequential round trips took 3–5 seconds before HTML streaming could begin.
+   - *Fix:* 
+     - Added in-memory `ttlCache` (30s TTL, per-session scoped) for `getViewer()` and `getEventAccess(eventId)` in `src/lib/supabase/queries.ts`. Repeated navigations now resolve user identity and event access in **0 ms**.
+     - Added in-memory `ttlCache` (30s TTL) for `isArrivalsNotifyEnabled(eventId)` in `src/lib/actions/arrivals.ts` with invalidation in `setArrivalsNotify`.
+     - Parallelized sequential guards (`requireStaff` and `getStaffViewerContext`) in `src/lib/auth/section-guard.ts` and `_guard.ts` via `Promise.all`.
+     - Added server-side pre-warming for `readRoomsGrid` (`rooms/page.tsx`), `readRoomingList` (`rooming-list/page.tsx`), and `readDeliveryRun` (`hamper/page.tsx`).
+     - Added in-memory TTL caching for `readRoomsGrid`, `readAllocationData`, `readRoomingList`, `readDeliveryRun`, and `listGuests`, complete with cache invalidation across all mutation actions.
+
+3. **Client-Side Hydration and Unvirtualized DOM Mount Stutter:**
+   - Screens with 200–500 cards mounted all elements simultaneously into the React DOM tree, locking the mobile WebView main thread for several seconds.
+   - Secondary Indic web fonts blocked critical-path page rendering.
+   - *Fix:*
+     - Implemented `useCappedRows` (capped to 40 items with progressive loading) in `TravelBoard` and `RoomsBoard`.
+     - Set `preload: false` on secondary Indic fonts (`plexDevanagari` and `notoGujarati`) in `src/app/layout.tsx`.
+     - Added fast-path middleware checks bypassing GoTrue round-trips for public and unauthenticated requests.
+
