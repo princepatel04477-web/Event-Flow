@@ -28,7 +28,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
  * The default port is 3000 to match `next dev`; it used to be 8000, so any
  * `cap sync` without CAP_SERVER_URL set baked in a dead URL.
  */
-const serverUrl = (process.env.CAP_SERVER_URL ?? 'http://localhost:3000').trim()
+const serverUrl = (process.env.CAP_SERVER_URL ?? 'https://eventflow-app.eventflow-web-app.workers.dev').trim()
 
 /**
  * Refuse to bake an IMMUTABLE Vercel deployment URL into the APK.
@@ -112,7 +112,29 @@ const config: CapacitorConfig = {
     // they documented the mechanism backwards. System schemes are handed off
     // explicitly by lib/native/navigation.ts via AppLauncher, and the dialer
     // intents are declared in AndroidManifest.xml's <queries> block.
-    allowNavigation: ['192.168.*', '10.*', '172.16.*', '172.17.*', '172.18.*', '172.19.*', '172.20.*', '172.21.*', '172.22.*', '172.23.*', '172.24.*', '172.25.*', '172.26.*', '172.27.*', '172.28.*', '172.29.*', '172.30.*', '172.31.*', 'localhost'],
+    allowNavigation: [
+      '192.168.*',
+      '10.*',
+      '172.16.*',
+      '172.17.*',
+      '172.18.*',
+      '172.19.*',
+      '172.20.*',
+      '172.21.*',
+      '172.22.*',
+      '172.23.*',
+      '172.24.*',
+      '172.25.*',
+      '172.26.*',
+      '172.27.*',
+      '172.28.*',
+      '172.29.*',
+      '172.30.*',
+      '172.31.*',
+      'localhost',
+      'agentdesk-server.tailc5ce36.ts.net',
+      '*.workers.dev',
+    ],
   },
 
   android: {
