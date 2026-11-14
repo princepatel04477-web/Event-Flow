@@ -142,6 +142,14 @@ export function groupBySlot(rows: readonly TravelRow[]): { key: string; rows: Tr
  */
 export function paxCount(row: TravelRow): number {
   const confirmed = (row.group.adults_confirmed ?? 0) + (row.group.children_confirmed ?? 0)
+  if (
+    confirmed > 0 &&
+    typeof row.leg.pax_on_leg === 'number' &&
+    row.leg.pax_on_leg > 0 &&
+    row.leg.pax_on_leg < confirmed
+  ) {
+    return row.leg.pax_on_leg
+  }
   if (confirmed > 0) return confirmed
   if ((row.group.expected_pax ?? 0) > 0) return row.group.expected_pax ?? 0
   return row.leg.pax_on_leg ?? 0

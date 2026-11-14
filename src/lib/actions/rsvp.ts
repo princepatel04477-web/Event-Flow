@@ -109,8 +109,78 @@ export async function saveRsvpLog(input: {
     }
   }
 
+  // Handle split arrival legs & pax_on_leg
+  if (v.arrival.paxOnLeg !== undefined || v.splitArrival) {
+    const { data: existingArrivalLegs } = await supabase
+      .from('travel_legs')
+      .select('id, direction, mode')
+      .eq('group_id', input.groupId)
+      .eq('direction', 'arrival')
+      .order('created_at', { ascending: true })
+
+    const primaryLeg = existingArrivalLegs?.[0]
+    if (primaryLeg && v.arrival.paxOnLeg !== undefined) {
+      const pax =
+        typeof v.arrival.paxOnLeg === 'number'
+          ? v.arrival.paxOnLeg
+          : nonNegativeIntOrNull(String(v.arrival.paxOnLeg ?? ''))
+      if (pax !== null) {
+        await supabase
+          .from('travel_legs')
+          .update({ pax_on_leg: pax })
+          .eq('id', primaryLeg.id)
+      }
+    }
+
+    if (v.splitArrival && v.splitArrival.mode) {
+      const splitMode = v.splitArrival.mode as Database['app']['Enums']['travel_mode']
+      const splitPax =
+        typeof v.splitArrival.paxOnLeg === 'number'
+          ? v.splitArrival.paxOnLeg
+          : nonNegativeIntOrNull(String(v.splitArrival.paxOnLeg ?? ''))
+
+      const secondaryLeg = existingArrivalLegs?.[1]
+      if (secondaryLeg) {
+        await supabase
+          .from('travel_legs')
+          .update({
+            mode: splitMode,
+            travel_date: v.splitArrival.date || v.arrival.date || null,
+            travel_time: v.splitArrival.time || null,
+            reference: v.splitArrival.flightTrainNo?.trim() || null,
+            point: v.splitArrival.location?.trim() || null,
+            pax_on_leg: splitPax,
+            needs_transport: v.needsPickup,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', secondaryLeg.id)
+      } else {
+        await supabase
+          .from('travel_legs')
+          .insert({
+            event_id: input.eventId,
+            group_id: input.groupId,
+            direction: 'arrival',
+            mode: splitMode,
+            travel_date: v.splitArrival.date || v.arrival.date || null,
+            travel_time: v.splitArrival.time || null,
+            reference: v.splitArrival.flightTrainNo?.trim() || null,
+            point: v.splitArrival.location?.trim() || null,
+            pax_on_leg: splitPax,
+            needs_transport: v.needsPickup,
+            source: 'rsvp_call',
+          })
+      }
+    } else if (existingArrivalLegs && existingArrivalLegs.length > 1 && !v.splitArrival) {
+      const extraIds = existingArrivalLegs.slice(1).map((l) => l.id)
+      await supabase.from('travel_legs').delete().in('id', extraIds)
+    }
+  }
+
   revalidatePath(`/${input.eventCode}/rsvp/queue`)
   revalidatePath(`/${input.eventCode}/rsvp/status/${input.groupId}`)
+  revalidatePath(`/${input.eventCode}/families/${input.groupId}`)
+  revalidatePath(`/${input.eventCode}/logistics/arrivals`)
 
   return { ok: true, group: data }
 }

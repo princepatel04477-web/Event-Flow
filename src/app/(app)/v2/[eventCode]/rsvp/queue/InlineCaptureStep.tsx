@@ -62,6 +62,15 @@ export function InlineCaptureStep({
   const [modeChipId, setModeChipId] = useState<TravelModeChipId>('train')
   const [flightTrainNo, setFlightTrainNo] = useState<string>('')
 
+  const [isSplitArrival, setIsSplitArrival] = useState<boolean>(false)
+  const [splitPax1, setSplitPax1] = useState<number>(4)
+  const [splitMode1, setSplitMode1] = useState<TravelModeChipId>('train')
+  const [splitRef1, setSplitRef1] = useState<string>('')
+
+  const [splitPax2, setSplitPax2] = useState<number>(2)
+  const [splitMode2, setSplitMode2] = useState<TravelModeChipId>('road')
+  const [splitRef2, setSplitRef2] = useState<string>('')
+
   const [needsPickup, setNeedsPickup] = useState<boolean>(family?.needs_pickup ?? false)
 
   const defaultDepDate = defaultDepartureDate(startsOn, endsOn)
@@ -90,13 +99,26 @@ export function InlineCaptureStep({
       childrenCount: children,
       arrivalDate: actualArrivalDate,
       arrivalTime: actualArrivalTime,
-      travelMode: actualTravelMode,
-      flightTrainNo: flightTrainNo.trim() ? flightTrainNo.trim() : undefined,
+      travelMode: isSplitArrival ? travelModeChipToValue(splitMode1) : actualTravelMode,
+      flightTrainNo: isSplitArrival
+        ? splitRef1.trim() || undefined
+        : flightTrainNo.trim() ? flightTrainNo.trim() : undefined,
+      arrivalPaxOnLeg: isSplitArrival ? splitPax1 : totalGuests,
       needsPickup,
       departureDate: departureDate || undefined,
       departureTime: departureTime || undefined,
       departureMode: departureMode ? travelModeChipToValue(departureMode) : undefined,
       notes: notes.trim() ? notes.trim() : undefined,
+      splitArrival: isSplitArrival
+        ? {
+            mode: travelModeChipToValue(splitMode2),
+            date: actualArrivalDate,
+            time: actualArrivalTime,
+            location: '',
+            flightTrainNo: splitRef2.trim(),
+            paxOnLeg: splitPax2,
+          }
+        : null,
     })
 
     onSave(payload)
@@ -117,6 +139,13 @@ export function InlineCaptureStep({
     status,
     adults,
     children,
+    isSplitArrival,
+    splitMode1,
+    splitPax1,
+    splitRef1,
+    splitMode2,
+    splitPax2,
+    splitRef2,
     onSave,
   ])
 
@@ -279,6 +308,156 @@ export function InlineCaptureStep({
           />
         ) : null}
       </div>
+
+      {totalGuests > 1 ? (
+        <div className="flex flex-col gap-2.5 rounded-xl border border-rule bg-surface p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-ink">Split travel mode</span>
+              <p className="text-xs text-muted">
+                {isSplitArrival
+                  ? 'Guests arriving via different modes (e.g. train + road)'
+                  : 'Arriving separately? (e.g. 4 train, 2 road)'}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isSplitArrival}
+              onClick={() => {
+                setIsSplitArrival((v) => {
+                  const next = !v
+                  if (next && splitPax1 + splitPax2 !== totalGuests) {
+                    const p1 = Math.max(1, Math.min(totalGuests - 1, totalGuests - 2 || 1))
+                    setSplitPax1(p1)
+                    setSplitPax2(totalGuests - p1)
+                  }
+                  return next
+                })
+              }}
+              className={cn(
+                'tap relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 border-transparent transition-colors',
+                isSplitArrival ? 'bg-brand' : 'bg-rule-strong',
+              )}
+            >
+              <span
+                className={cn(
+                  'inline-block h-6 w-6 rounded-full bg-surface shadow transition-transform',
+                  isSplitArrival ? 'translate-x-5' : 'translate-x-0',
+                )}
+              />
+            </button>
+          </div>
+
+          {isSplitArrival ? (
+            <div className="flex flex-col gap-3 border-t border-rule pt-3">
+              {/* Part 1 */}
+              <div className="flex flex-col gap-2 rounded-lg bg-surface-2 p-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                    Part 1 Arrival
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted">Pax:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalGuests - 1}
+                      value={splitPax1}
+                      onChange={(e) => {
+                        const val = Math.max(1, Math.min(totalGuests - 1, Number(e.target.value) || 1))
+                        setSplitPax1(val)
+                        setSplitPax2(Math.max(1, totalGuests - val))
+                      }}
+                      className="tap h-8 w-14 rounded-lg border border-rule-strong bg-surface text-center text-sm font-semibold text-ink"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {TRAVEL_MODE_CHIPS.map((chip) => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      onClick={() => setSplitMode1(chip.id)}
+                      className={cn(
+                        'tap flex h-9 items-center justify-center rounded-lg border text-xs font-semibold',
+                        splitMode1 === chip.id
+                          ? 'border-brand bg-brand-tint text-brand'
+                          : 'border-rule-strong bg-surface text-ink',
+                      )}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+                {splitMode1 === 'train' || splitMode1 === 'flight' ? (
+                  <Input
+                    label={splitMode1 === 'train' ? 'Train no. / name' : 'Flight no.'}
+                    placeholder={splitMode1 === 'train' ? '12951' : '6E 5074'}
+                    value={splitRef1}
+                    onChange={(e) => setSplitRef1(e.target.value)}
+                    className="code-figure text-xs"
+                  />
+                ) : null}
+              </div>
+
+              {/* Part 2 */}
+              <div className="flex flex-col gap-2 rounded-lg bg-surface-2 p-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                    Part 2 Arrival
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted">Pax:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalGuests - 1}
+                      value={splitPax2}
+                      onChange={(e) => {
+                        const val = Math.max(1, Math.min(totalGuests - 1, Number(e.target.value) || 1))
+                        setSplitPax2(val)
+                        setSplitPax1(Math.max(1, totalGuests - val))
+                      }}
+                      className="tap h-8 w-14 rounded-lg border border-rule-strong bg-surface text-center text-sm font-semibold text-ink"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {TRAVEL_MODE_CHIPS.map((chip) => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      onClick={() => setSplitMode2(chip.id)}
+                      className={cn(
+                        'tap flex h-9 items-center justify-center rounded-lg border text-xs font-semibold',
+                        splitMode2 === chip.id
+                          ? 'border-brand bg-brand-tint text-brand'
+                          : 'border-rule-strong bg-surface text-ink',
+                      )}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+                {splitMode2 === 'train' || splitMode2 === 'flight' ? (
+                  <Input
+                    label={splitMode2 === 'train' ? 'Train no. / name' : 'Flight no.'}
+                    placeholder={splitMode2 === 'train' ? '12951' : '6E 5074'}
+                    value={splitRef2}
+                    onChange={(e) => setSplitRef2(e.target.value)}
+                    className="code-figure text-xs"
+                  />
+                ) : null}
+              </div>
+
+              <p className="text-center text-xs font-medium text-muted">
+                Summary: {splitPax1} arriving by {splitMode1 === 'road' ? 'Road' : splitMode1} + {splitPax2} arriving by {splitMode2 === 'road' ? 'Road' : splitMode2} = {totalGuests} guests total
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="flex items-center justify-between gap-3 rounded-xl border border-rule bg-surface px-3 py-2.5">
         <span className="text-sm font-medium text-ink">Needs pickup</span>

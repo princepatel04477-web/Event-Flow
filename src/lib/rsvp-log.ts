@@ -56,6 +56,7 @@ export interface LegFormValues {
   time: string
   location: string
   flightTrainNo: string
+  paxOnLeg?: number | string | null
 }
 
 export const EMPTY_LEG: LegFormValues = {
@@ -64,6 +65,7 @@ export const EMPTY_LEG: LegFormValues = {
   time: '',
   location: '',
   flightTrainNo: '',
+  paxOnLeg: null,
 }
 
 /** Everything the outcome form holds. All strings (native inputs), as the review form does. */
@@ -77,6 +79,7 @@ export interface RsvpLogFormValues {
   notes: string
   arrival: LegFormValues
   departure: LegFormValues
+  splitArrival?: LegFormValues | null
 }
 
 export function emptyFormValues(): RsvpLogFormValues {
@@ -90,6 +93,7 @@ export function emptyFormValues(): RsvpLogFormValues {
     notes: '',
     arrival: { ...EMPTY_LEG },
     departure: { ...EMPTY_LEG },
+    splitArrival: null,
   }
 }
 
@@ -188,6 +192,7 @@ const legSchema = z
     time: z.string(),
     location: z.string(),
     flightTrainNo: z.string(),
+    paxOnLeg: z.union([z.number(), z.string(), z.null()]).optional(),
   })
   .superRefine((leg, ctx) => {
     if (leg.mode && !leg.date) {
@@ -211,6 +216,7 @@ export const rsvpLogSchema = z
     notes: z.string(),
     arrival: legSchema,
     departure: legSchema,
+    splitArrival: legSchema.optional().nullable(),
   })
   .superRefine((values, ctx) => {
     // Confirming statuses MUST carry at least one person.
@@ -454,6 +460,7 @@ export interface BuildRsvpLogPayloadParams {
   arrivalTime: string
   travelMode: TravelMode | ''
   flightTrainNo?: string
+  arrivalPaxOnLeg?: number
   needsPickup: boolean
   departureDate?: string
   departureTime?: string
@@ -461,6 +468,7 @@ export interface BuildRsvpLogPayloadParams {
   departureFlightTrainNo?: string
   callbackDatetime?: string
   notes?: string
+  splitArrival?: LegFormValues | null
 }
 
 export function buildRsvpLogPayload(params: BuildRsvpLogPayloadParams): RsvpLogFormValues {
@@ -478,6 +486,7 @@ export function buildRsvpLogPayload(params: BuildRsvpLogPayloadParams): RsvpLogF
       time: params.arrivalTime || '',
       location: '',
       flightTrainNo: params.flightTrainNo ?? '',
+      paxOnLeg: params.arrivalPaxOnLeg ?? null,
     },
     departure: {
       mode: params.departureMode || '',
@@ -485,7 +494,9 @@ export function buildRsvpLogPayload(params: BuildRsvpLogPayloadParams): RsvpLogF
       time: params.departureTime || '',
       location: '',
       flightTrainNo: params.departureFlightTrainNo ?? '',
+      paxOnLeg: null,
     },
+    splitArrival: params.splitArrival ?? null,
   }
 }
 

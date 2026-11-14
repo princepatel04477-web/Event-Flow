@@ -239,6 +239,7 @@ export default async function FamilyPage({ params }: PageProps) {
                       {l.direction === 'arrival' ? 'Arrives' : 'Leaves'}
                       {l.travel_date ? ` ${formatDate(l.travel_date)}` : ''}
                       {l.travel_time ? ` · ${l.travel_time.slice(0, 5)}` : ''}
+                      {l.pax_on_leg ? ` · ${l.pax_on_leg} ${l.pax_on_leg === 1 ? 'guest' : 'guests'}` : ''}
                     </p>
                     <p className="truncate text-sm text-muted">
                       {[l.mode ? MODE[l.mode] ?? l.mode : null, l.reference, l.point].filter(Boolean).join(' · ') ||
